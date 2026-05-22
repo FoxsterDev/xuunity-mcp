@@ -8,6 +8,7 @@
 - Replaced the zsh-only Unix launcher with a bash-compatible launcher for Linux/macOS.
 - Expanded `FEATURES.md` with competitive differentiators and the full MCP/host helper surface.
 - Clarified feature maturity levels, implementation evidence, and compatibility validation status in `FEATURES.md`.
+- Clarified `COMPARISON.md` source confidence, maturity terminology, and validation caveats.
 - Updated installer wording and Claude Code user-scope config generation for the production stdio path.
 
 ## 0.3.10
