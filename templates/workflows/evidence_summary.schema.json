@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/FoxsterDev/xuunity-light-unity-mcp/templates/workflows/evidence_summary.schema.json",
+  "title": "XUUnity Light Unity MCP Evidence Summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "workflowId",
+    "projectRoot",
+    "verdict",
+    "checks",
+    "validationGaps"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xuunity.light-mcp.evidence.v1"
+    },
+    "workflowId": {
+      "type": "string"
+    },
+    "projectRoot": {
+      "type": "string"
+    },
+    "unityVersion": {
+      "type": "string"
+    },
+    "packageVersion": {
+      "type": "string"
+    },
+    "packageSourceMode": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "git",
+        "tag",
+        "commit",
+        "file",
+        "devmode",
+        "prodmode"
+      ]
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "partial",
+        "blocked"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "skipped",
+              "blocked"
+            ]
+          },
+          "tool": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "artifactPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "validationGaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "hostEditorRestored": {
+      "type": "boolean"
+    },
+    "residualRisk": {
+      "type": "string"
+    }
+  }
+}

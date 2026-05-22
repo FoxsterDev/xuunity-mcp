@@ -1,0 +1,125 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "xuunity.light-mcp.workflow.v1",
+  "workflowId": "post_change_validation",
+  "title": "Post-Code-Change Validation Gate",
+  "description": "Validate code changes through readiness, package refresh, compile, and focused EditMode tests.",
+  "useWhen": [
+    "C# scripts changed.",
+    "Unity package dependencies changed.",
+    "An agent needs evidence before claiming a task is complete."
+  ],
+  "inputs": [
+    {
+      "name": "PROJECT_ROOT",
+      "required": true,
+      "description": "Absolute path to the Unity project root.",
+      "example": "/absolute/path/to/UnityProject"
+    },
+    {
+      "name": "COMPILE_TARGET",
+      "required": false,
+      "description": "Unity BuildTarget enum name for the first compile gate.",
+      "example": "Android"
+    }
+  ],
+  "steps": [
+    {
+      "id": "status_summary",
+      "kind": "mcp_tool",
+      "description": "Confirm the bridge is reachable before mutating request state.",
+      "toolName": "unity_status_summary",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "timeoutMs": 5000
+      },
+      "stopOn": [
+        "bridge unreachable",
+        "wrong project root"
+      ],
+      "evidence": [
+        "health status",
+        "bridge reachability"
+      ]
+    },
+    {
+      "id": "project_refresh",
+      "kind": "mcp_tool",
+      "description": "Refresh assets, resolve packages, and rerun health probe.",
+      "toolName": "unity_project_refresh",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "forceAssetRefresh": true,
+        "resolvePackages": true,
+        "rerunHealthProbe": true,
+        "timeoutMs": 60000
+      },
+      "stopOn": [
+        "package restore failure",
+        "health probe failure"
+      ],
+      "evidence": [
+        "refresh status",
+        "package resolve status",
+        "health probe status"
+      ]
+    },
+    {
+      "id": "compile",
+      "kind": "mcp_tool",
+      "description": "Compile player scripts for the selected target without switching active build target.",
+      "toolName": "unity_compile_player_scripts",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "target": "${COMPILE_TARGET}",
+        "optionFlags": [
+          "DevelopmentBuild"
+        ],
+        "name": "post-change-compile",
+        "timeoutMs": 180000
+      },
+      "stopOn": [
+        "compile error"
+      ],
+      "evidence": [
+        "target",
+        "option flags",
+        "first compiler error or pass status",
+        "request id"
+      ]
+    },
+    {
+      "id": "editmode_tests",
+      "kind": "mcp_tool",
+      "description": "Run focused or full EditMode tests after compile passes.",
+      "toolName": "unity_tests_run_editmode",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "timeoutMs": 180000
+      },
+      "when": "compile passed",
+      "stopOn": [
+        "test failure"
+      ],
+      "evidence": [
+        "total tests",
+        "passed tests",
+        "failed tests",
+        "failing test names"
+      ]
+    }
+  ],
+  "evidenceRequired": [
+    "readiness result",
+    "project refresh result",
+    "compile result",
+    "EditMode test result or explicit skip reason",
+    "artifact paths",
+    "validation gaps"
+  ],
+  "closeoutSchema": "templates/workflows/evidence_summary.schema.json",
+  "notes": [
+    "Run PlayMode tests only when relevant to the changed surface.",
+    "Do not claim Unity validation from shell-only C# checks."
+  ]
+}

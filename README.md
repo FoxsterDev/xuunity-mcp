@@ -81,6 +81,7 @@ See [SECURITY.md](SECURITY.md) for the threat model.
 - [Features](FEATURES.md)
 - [AI integration](AI_INTEGRATION.md)
 - [Agent workflows](AGENT_WORKFLOWS.md)
+- [Machine-readable workflow templates](templates/workflows/)
 - [Security model](SECURITY.md)
 - [Comparison](COMPARISON.md)
 - [Discovery guide](DISCOVERY.md)

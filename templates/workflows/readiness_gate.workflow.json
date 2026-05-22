@@ -1,0 +1,124 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "xuunity.light-mcp.workflow.v1",
+  "workflowId": "readiness_gate",
+  "title": "First Project Readiness Gate",
+  "description": "Verify a Unity project is connected, healthy, capability-visible, and safe for agent validation.",
+  "useWhen": [
+    "A project is newly connected to XUUnity Light Unity MCP.",
+    "The agent does not trust the current Unity Editor state.",
+    "A validation workflow needs a fresh readiness preflight."
+  ],
+  "inputs": [
+    {
+      "name": "PROJECT_ROOT",
+      "required": true,
+      "description": "Absolute path to the Unity project root.",
+      "example": "/absolute/path/to/UnityProject"
+    }
+  ],
+  "steps": [
+    {
+      "id": "status_summary",
+      "kind": "mcp_tool",
+      "description": "Read compact editor and bridge status.",
+      "toolName": "unity_status_summary",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "timeoutMs": 5000
+      },
+      "stopOn": [
+        "wrong project root",
+        "bridge disabled",
+        "editor startup blocker"
+      ],
+      "evidence": [
+        "health status",
+        "editor running state",
+        "bridge reachability"
+      ]
+    },
+    {
+      "id": "capabilities",
+      "kind": "mcp_tool",
+      "description": "Read available Unity-side operation capabilities.",
+      "toolName": "unity_capabilities",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "timeoutMs": 5000
+      },
+      "stopOn": [
+        "required capability unsupported"
+      ],
+      "evidence": [
+        "adapter ids",
+        "unsupported operations"
+      ]
+    },
+    {
+      "id": "health_probe",
+      "kind": "mcp_tool",
+      "description": "Run a fresh Unity-side health probe.",
+      "toolName": "unity_health_probe",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "timeoutMs": 15000
+      },
+      "stopOn": [
+        "health probe failure"
+      ],
+      "evidence": [
+        "health probe status",
+        "capability report path"
+      ]
+    },
+    {
+      "id": "console_tail",
+      "kind": "mcp_tool",
+      "description": "Inspect recent Unity console messages.",
+      "toolName": "unity_console_tail",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "limit": 50,
+        "includeTypes": [
+          "error",
+          "exception",
+          "warning"
+        ],
+        "timeoutMs": 5000
+      },
+      "evidence": [
+        "startup errors",
+        "startup warnings"
+      ]
+    },
+    {
+      "id": "scene_snapshot",
+      "kind": "mcp_tool",
+      "description": "Capture lightweight active scene evidence.",
+      "toolName": "unity_scene_snapshot",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "timeoutMs": 5000
+      },
+      "evidence": [
+        "active scene name",
+        "active scene path",
+        "root object summary"
+      ]
+    }
+  ],
+  "evidenceRequired": [
+    "project root",
+    "bridge readiness result",
+    "capability status",
+    "health probe status",
+    "console startup blockers or lack thereof",
+    "active scene evidence"
+  ],
+  "closeoutSchema": "templates/workflows/evidence_summary.schema.json",
+  "notes": [
+    "Do not mutate project settings in this workflow.",
+    "Report unsupported capabilities as validation gaps."
+  ]
+}

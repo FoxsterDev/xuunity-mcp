@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/FoxsterDev/xuunity-light-unity-mcp/templates/workflows/workflow.schema.json",
+  "title": "XUUnity Light Unity MCP Agent Workflow",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "workflowId",
+    "title",
+    "description",
+    "inputs",
+    "steps",
+    "evidenceRequired"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "xuunity.light-mcp.workflow.v1"
+    },
+    "workflowId": {
+      "type": "string",
+      "pattern": "^[a-z0-9_\\-]+$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "useWhen": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "required",
+          "description"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_\\-]+$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "mcp_tool",
+              "cli_command",
+              "human_gate"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "toolName": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": "object"
+          },
+          "command": {
+            "type": "string"
+          },
+          "when": {
+            "type": "string"
+          },
+          "stopOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "evidenceRequired": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "closeoutSchema": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

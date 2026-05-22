@@ -86,6 +86,92 @@ Use these MCP tools from compatible clients:
 Use the CLI examples below when you need a deterministic local fallback or when
 you are documenting exactly what an agent did.
 
+## Client Tool Call Examples
+
+These examples use exact MCP tool names and argument objects. Client UIs expose
+MCP tools differently, but the tool name and JSON arguments stay the same.
+
+Claude Code, Claude Desktop, Cursor, and Windsurf:
+
+```json
+{
+  "tool": "unity_status_summary",
+  "arguments": {
+    "projectRoot": "$PROJECT_ROOT",
+    "timeoutMs": 5000
+  }
+}
+```
+
+```json
+{
+  "tool": "unity_project_refresh",
+  "arguments": {
+    "projectRoot": "$PROJECT_ROOT",
+    "forceAssetRefresh": true,
+    "resolvePackages": true,
+    "rerunHealthProbe": true,
+    "timeoutMs": 60000
+  }
+}
+```
+
+```json
+{
+  "tool": "unity_compile_player_scripts",
+  "arguments": {
+    "projectRoot": "$PROJECT_ROOT",
+    "target": "Android",
+    "optionFlags": ["DevelopmentBuild"],
+    "name": "post-change-android-compile",
+    "timeoutMs": 180000
+  }
+}
+```
+
+```json
+{
+  "tool": "unity_tests_run_editmode",
+  "arguments": {
+    "projectRoot": "$PROJECT_ROOT",
+    "timeoutMs": 180000
+  }
+}
+```
+
+Codex-style or custom stdio MCP clients can call the same tools through the
+standard MCP JSON-RPC envelope:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "unity_status_summary",
+    "arguments": {
+      "projectRoot": "$PROJECT_ROOT",
+      "timeoutMs": 5000
+    }
+  }
+}
+```
+
+For visual checks:
+
+```json
+{
+  "tool": "unity_game_view_screenshot",
+  "arguments": {
+    "projectRoot": "$PROJECT_ROOT",
+    "fileName": "agent-visual-check.png",
+    "includeImage": false,
+    "maxResolution": 1280,
+    "timeoutMs": 10000
+  }
+}
+```
+
 ## Evidence Checklist
 
 Each completed workflow should report:
@@ -101,6 +187,45 @@ Each completed workflow should report:
 - request id when available
 - validation gaps and skipped checks
 - whether the host-opened editor was restored
+
+## Evidence JSON Schema
+
+When a workflow closes out, prefer a structured evidence object that validates
+against `templates/workflows/evidence_summary.schema.json`.
+
+Minimum evidence object:
+
+```json
+{
+  "schemaVersion": "xuunity.light-mcp.evidence.v1",
+  "workflowId": "post_change_validation",
+  "projectRoot": "$PROJECT_ROOT",
+  "unityVersion": "6000.0.58f2",
+  "packageVersion": "0.3.11",
+  "packageSourceMode": "git",
+  "verdict": "pass",
+  "checks": [
+    {
+      "name": "readiness",
+      "status": "pass",
+      "tool": "unity_status_summary"
+    },
+    {
+      "name": "compile",
+      "status": "pass",
+      "tool": "unity_compile_player_scripts",
+      "requestId": "REQUEST_ID"
+    }
+  ],
+  "artifacts": [],
+  "validationGaps": [],
+  "hostEditorRestored": true
+}
+```
+
+Use `verdict: "partial"` when the workflow found useful evidence but skipped a
+representative check. Use `verdict: "blocked"` when readiness, package restore,
+capability gates, or editor startup prevented validation.
 
 ## Workflow 1: First Project Readiness Gate
 
@@ -777,6 +902,24 @@ Evidence to report:
 - published source commit or tag for prodmode
 - project refresh and health-probe result after switching
 - validation gap if Unity could not re-resolve packages
+
+## Machine-readable Workflow Templates
+
+Reusable templates live under `templates/workflows/`:
+
+- `workflow.schema.json`
+  - schema for workflow definitions
+- `evidence_summary.schema.json`
+  - schema for closeout evidence
+- `readiness_gate.workflow.json`
+  - first-contact readiness, capabilities, health, console, and scene checks
+- `post_change_validation.workflow.json`
+  - readiness, package refresh, compile, and EditMode validation
+- `package_mode_switch.workflow.json`
+  - wrapper-only `devmode` and `prodmode` source switching
+
+These files are machine-readable planning artifacts for agents and wrappers.
+They are not Unity scenario JSON and are not executed directly by the MCP server.
 
 ## Anti-Patterns
 

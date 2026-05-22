@@ -1,0 +1,116 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "xuunity.light-mcp.workflow.v1",
+  "workflowId": "package_mode_switch",
+  "title": "MCP Package Source Mode Switching",
+  "description": "Switch a Unity project between local MCP package development mode and published Git-pinned production mode.",
+  "useWhen": [
+    "An agent edits XUUnity Light Unity MCP package source.",
+    "A project must validate unpublished local package changes.",
+    "A project must return to publishable Git-pinned package state."
+  ],
+  "inputs": [
+    {
+      "name": "PROJECT_ROOT",
+      "required": true,
+      "description": "Absolute path to the Unity project root.",
+      "example": "/absolute/path/to/UnityProject"
+    },
+    {
+      "name": "WRAPPER",
+      "required": true,
+      "description": "Path to xuunity_light_unity_mcp.sh.",
+      "example": "./xuunity_light_unity_mcp.sh"
+    },
+    {
+      "name": "MODE",
+      "required": true,
+      "description": "Package source mode to select.",
+      "example": "devmode"
+    }
+  ],
+  "steps": [
+    {
+      "id": "select_mode",
+      "kind": "human_gate",
+      "description": "Confirm whether the task needs local package iteration or publishable project state.",
+      "stopOn": [
+        "mode is ambiguous"
+      ],
+      "evidence": [
+        "selected mode",
+        "reason for mode"
+      ]
+    },
+    {
+      "id": "devmode",
+      "kind": "cli_command",
+      "description": "Point com.xuunity.light-mcp at local templates/unity-package.",
+      "command": "${WRAPPER} devmode --project-root ${PROJECT_ROOT}",
+      "when": "MODE is devmode",
+      "stopOn": [
+        "missing project root",
+        "local package source missing"
+      ],
+      "evidence": [
+        "new dependency value",
+        "package source path",
+        "package-lock removal status"
+      ]
+    },
+    {
+      "id": "prodmode",
+      "kind": "cli_command",
+      "description": "Pin com.xuunity.light-mcp to the current published source HEAD.",
+      "command": "${WRAPPER} prodmode --project-root ${PROJECT_ROOT}",
+      "when": "MODE is prodmode",
+      "stopOn": [
+        "source HEAD not advertised by remote",
+        "missing git metadata"
+      ],
+      "evidence": [
+        "new dependency value",
+        "source remote",
+        "source commit",
+        "package-lock removal status"
+      ]
+    },
+    {
+      "id": "project_refresh",
+      "kind": "mcp_tool",
+      "description": "Force Unity to re-resolve packages after the mode switch.",
+      "toolName": "unity_project_refresh",
+      "arguments": {
+        "projectRoot": "${PROJECT_ROOT}",
+        "forceAssetRefresh": true,
+        "resolvePackages": true,
+        "rerunHealthProbe": true,
+        "timeoutMs": 60000
+      },
+      "stopOn": [
+        "package restore failure",
+        "health probe failure"
+      ],
+      "evidence": [
+        "refresh status",
+        "package resolve status",
+        "health probe status"
+      ]
+    }
+  ],
+  "evidenceRequired": [
+    "selected mode",
+    "previous dependency value",
+    "new dependency value",
+    "package-lock removal status",
+    "project refresh result",
+    "health probe result",
+    "validation gap if Unity could not re-resolve packages"
+  ],
+  "closeoutSchema": "templates/workflows/evidence_summary.schema.json",
+  "notes": [
+    "devmode is not validation evidence.",
+    "prodmode is not validation evidence.",
+    "Run compile or smoke validation after package refresh when closing out package changes."
+  ]
+}

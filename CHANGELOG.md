@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added wrapper help and agent workflow guidance for MCP `devmode` and `prodmode` package-source switching.
+- Added client-specific MCP payload examples, structured evidence schema, and machine-readable workflow templates for agent validation workflows.
 
 ## 0.3.11
 
