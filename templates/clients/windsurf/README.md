@@ -23,11 +23,18 @@ bash init_xuunity_light_unity_mcp.sh \
 
 ## User Config
 
-Install the production config:
+Install the production config on Linux/macOS:
 
 ```bash
 mkdir -p ~/.codeium/windsurf
 cp templates/clients/windsurf/mcp_config.json ~/.codeium/windsurf/mcp_config.json
+```
+
+Native Windows:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.codeium\windsurf" | Out-Null
+Copy-Item templates\clients\windsurf\mcp_config.windows.json "$env:USERPROFILE\.codeium\windsurf\mcp_config.json"
 ```
 
 If you already have other MCP servers, merge the

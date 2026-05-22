@@ -6,6 +6,7 @@ Windsurf Cascade reads user MCP servers from:
 
 ```text
 ~/.codeium/windsurf/mcp_config.json
+%USERPROFILE%\.codeium\windsurf\mcp_config.json
 ```
 
 ## Install The Server
@@ -24,7 +25,7 @@ bash init_xuunity_light_unity_mcp.sh \
 
 ## User Config
 
-Install the production config:
+Install the production config on Linux/macOS:
 
 ```bash
 mkdir -p ~/.codeium/windsurf
@@ -41,6 +42,30 @@ Production config:
       "args": [
         "-lc",
         "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""
+      ]
+    }
+  }
+}
+```
+
+For native Windows Windsurf, use:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.codeium\windsurf" | Out-Null
+Copy-Item templates\clients\windsurf\mcp_config.windows.json "$env:USERPROFILE\.codeium\windsurf\mcp_config.json"
+```
+
+Windows config:
+
+```json
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "if defined CODEX_TOOLS_HOME (call \"%CODEX_TOOLS_HOME%\\xuunity-light-unity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.codex-tools\\xuunity-light-unity-mcp\\run.cmd\")"
       ]
     }
   }

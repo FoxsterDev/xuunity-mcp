@@ -55,10 +55,16 @@ Three scope options. Pick by intent.
 
 #### Project scope (team-wide, under git)
 
-Recommended for monorepos. Copy this snippet to the repo root:
+Recommended for monorepos. Copy this snippet to the repo root on Linux/macOS:
 
 ```bash
 cp templates/clients/claude-code/.mcp.json .mcp.json
+```
+
+Native Windows:
+
+```powershell
+Copy-Item templates\clients\claude-code\.mcp.windows.json .mcp.json
 ```
 
 Then commit `.mcp.json`. Every team member running `claude` from the repo root

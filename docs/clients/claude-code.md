@@ -21,6 +21,8 @@ bash init_xuunity_light_unity_mcp.sh \
 
 ## Project Scope
 
+Use the Linux/macOS template when Claude Code runs in a Unix-like shell:
+
 Copy the production project config into the repo root:
 
 ```bash
@@ -45,6 +47,31 @@ Config:
 }
 ```
 
+For native Windows Claude Code, use the Windows template:
+
+```powershell
+Copy-Item templates\clients\claude-code\.mcp.windows.json .mcp.json
+```
+
+Windows config:
+
+```json
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "type": "stdio",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "if defined CLAUDE_TOOLS_HOME (call \"%CLAUDE_TOOLS_HOME%\\xuunity-light-unity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.claude-tools\\xuunity-light-unity-mcp\\run.cmd\")"
+      ],
+      "timeout": 600000
+    }
+  }
+}
+```
+
 Claude Code asks each user to approve project-scoped MCP servers on first use.
 
 ## User Scope
@@ -62,6 +89,12 @@ bash init_xuunity_light_unity_mcp.sh \
 ```bash
 claude mcp add --scope local --transport stdio xuunity_light_unity \
   -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh"'
+```
+
+Native Windows equivalent:
+
+```powershell
+claude mcp add --scope local --transport stdio xuunity_light_unity -- cmd.exe /d /c "if defined CLAUDE_TOOLS_HOME (call ""%CLAUDE_TOOLS_HOME%\xuunity-light-unity-mcp\run.cmd"") else (call ""%USERPROFILE%\.claude-tools\xuunity-light-unity-mcp\run.cmd"")"
 ```
 
 ## Verify

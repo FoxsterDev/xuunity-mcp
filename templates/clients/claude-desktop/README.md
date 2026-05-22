@@ -42,6 +42,24 @@ If you already have other MCP servers, merge the
 
 Restart Claude Desktop after changing the config.
 
+## Windows Config
+
+Claude Desktop reads this file on Windows:
+
+```text
+%APPDATA%\Claude\claude_desktop_config.json
+```
+
+Install the production config:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:APPDATA\Claude" | Out-Null
+Copy-Item templates\clients\claude-desktop\claude_desktop_config.windows.json `
+  "$env:APPDATA\Claude\claude_desktop_config.json"
+```
+
+Restart Claude Desktop after changing the config.
+
 ## Verify
 
 Open Claude Desktop settings, check the Developer or Connectors view, and

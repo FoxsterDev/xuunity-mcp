@@ -31,7 +31,7 @@ bash init_xuunity_light_unity_mcp.sh \
 
 ## Manual Config
 
-Add this to `~/.codex/config.toml`:
+Add this to `~/.codex/config.toml` on Linux/macOS:
 
 ```toml
 [mcp_servers.xuunity_light_unity]
@@ -42,6 +42,18 @@ required = false
 
 This avoids relying on client-side `~` expansion. The shell resolves `$HOME`
 and optional `CODEX_TOOLS_HOME`.
+
+For native Windows, add this to `%USERPROFILE%\.codex\config.toml`:
+
+```toml
+[mcp_servers.xuunity_light_unity]
+command = "cmd.exe"
+args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-light-unity-mcp\run.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-light-unity-mcp\run.cmd")']
+required = false
+```
+
+The Windows config uses `run.cmd`, which resolves `server.py` beside itself and
+prefers `PYTHON`, then `py -3`, then `python`, then `python3`.
 
 ## Verify
 

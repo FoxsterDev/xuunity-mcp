@@ -52,6 +52,40 @@ cp templates/clients/claude-desktop/claude_desktop_config.json \
   "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
 ```
 
+## Windows Config
+
+Claude Desktop reads:
+
+```text
+%APPDATA%\Claude\claude_desktop_config.json
+```
+
+Production config:
+
+```json
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "type": "stdio",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "if defined CLAUDE_TOOLS_HOME (call \"%CLAUDE_TOOLS_HOME%\\xuunity-light-unity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.claude-tools\\xuunity-light-unity-mcp\\run.cmd\")"
+      ]
+    }
+  }
+}
+```
+
+Install it:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:APPDATA\Claude" | Out-Null
+Copy-Item templates\clients\claude-desktop\claude_desktop_config.windows.json `
+  "$env:APPDATA\Claude\claude_desktop_config.json"
+```
+
 If the file already contains other MCP servers, merge only the
 `mcpServers.xuunity_light_unity` block.
 

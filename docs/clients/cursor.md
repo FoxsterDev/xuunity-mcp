@@ -23,7 +23,7 @@ bash init_xuunity_light_unity_mcp.sh \
 
 ## Project Config
 
-Create `.cursor/mcp.json`:
+Create `.cursor/mcp.json` on Linux/macOS:
 
 ```bash
 mkdir -p .cursor
@@ -47,6 +47,31 @@ Production config:
 }
 ```
 
+For native Windows Cursor, use:
+
+```powershell
+New-Item -ItemType Directory -Force .cursor | Out-Null
+Copy-Item templates\clients\cursor\mcp.windows.json .cursor\mcp.json
+```
+
+Windows config:
+
+```json
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "type": "stdio",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "if defined CODEX_TOOLS_HOME (call \"%CODEX_TOOLS_HOME%\\xuunity-light-unity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.codex-tools\\xuunity-light-unity-mcp\\run.cmd\")"
+      ]
+    }
+  }
+}
+```
+
 ## User Config
 
 For one user across projects:
@@ -54,6 +79,13 @@ For one user across projects:
 ```bash
 mkdir -p ~/.cursor
 cp templates/clients/cursor/mcp.json ~/.cursor/mcp.json
+```
+
+Native Windows user config:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.cursor" | Out-Null
+Copy-Item templates\clients\cursor\mcp.windows.json "$env:USERPROFILE\.cursor\mcp.json"
 ```
 
 If the target config already has other MCP servers, merge only the

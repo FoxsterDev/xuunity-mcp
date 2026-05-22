@@ -33,11 +33,15 @@ For active local development, reference the package folder directly:
 
 ## Initialize Host MCP Server
 
-From the repository root:
+From the repository root on Linux/macOS:
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh
 ```
+
+The installer writes `run.sh`, `run.cmd`, and `run.ps1` into each selected
+host tools directory. Native Windows clients should use the Windows templates
+that call `run.cmd`.
 
 To enable a Unity project:
 
@@ -64,6 +68,15 @@ args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-uni
 required = false
 ```
 
+Windows template:
+
+```toml
+[mcp_servers.xuunity_light_unity]
+command = "cmd.exe"
+args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-light-unity-mcp\run.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-light-unity-mcp\run.cmd")']
+required = false
+```
+
 ## Connect Claude Code
 
 The installer can register the MCP server in the Claude Code user config:
@@ -78,11 +91,24 @@ Project-scoped Claude Code config:
 cp templates/clients/claude-code/.mcp.json .mcp.json
 ```
 
+Native Windows project-scoped Claude Code config:
+
+```powershell
+Copy-Item templates\clients\claude-code\.mcp.windows.json .mcp.json
+```
+
 ## Connect Cursor
 
 ```bash
 mkdir -p .cursor
 cp templates/clients/cursor/mcp.json .cursor/mcp.json
+```
+
+Native Windows:
+
+```powershell
+New-Item -ItemType Directory -Force .cursor | Out-Null
+Copy-Item templates\clients\cursor\mcp.windows.json .cursor\mcp.json
 ```
 
 For user-global Cursor config, copy the same file to `~/.cursor/mcp.json`.
@@ -94,6 +120,13 @@ mkdir -p ~/.codeium/windsurf
 cp templates/clients/windsurf/mcp_config.json ~/.codeium/windsurf/mcp_config.json
 ```
 
+Native Windows:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.codeium\windsurf" | Out-Null
+Copy-Item templates\clients\windsurf\mcp_config.windows.json "$env:USERPROFILE\.codeium\windsurf\mcp_config.json"
+```
+
 ## Connect Claude Desktop
 
 On macOS:
@@ -102,6 +135,14 @@ On macOS:
 mkdir -p "$HOME/Library/Application Support/Claude"
 cp templates/clients/claude-desktop/claude_desktop_config.json \
   "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+```
+
+On Windows:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:APPDATA\Claude" | Out-Null
+Copy-Item templates\clients\claude-desktop\claude_desktop_config.windows.json `
+  "$env:APPDATA\Claude\claude_desktop_config.json"
 ```
 
 If a target config already has other MCP servers, merge only the
@@ -123,6 +164,6 @@ Do not treat the install as ready until status, capabilities, and health probe a
 ## Troubleshooting
 
 - If the bridge is disabled, run the init script with `--enable-project`.
-- If the AI client cannot find the server, verify the configured `run.sh` path.
+- If the AI client cannot find the server, verify the configured `run.sh` or `run.cmd` path.
 - If Unity imported the package but MCP calls fail, check `Library/XUUnityLightMcp/` for bridge state and request artifacts.
 - If a Unity project is already open, prefer reusing the healthy editor session instead of starting a competing one.

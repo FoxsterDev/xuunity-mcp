@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "type": "stdio",
+      "command": "cmd.exe",
+      "args": [
+        "/d",
+        "/c",
+        "if defined CLAUDE_TOOLS_HOME (call \"%CLAUDE_TOOLS_HOME%\\xuunity-light-unity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.claude-tools\\xuunity-light-unity-mcp\\run.cmd\")"
+      ],
+      "timeout": 600000
+    }
+  }
+}

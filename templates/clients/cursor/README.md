@@ -30,6 +30,13 @@ mkdir -p .cursor
 cp templates/clients/cursor/mcp.json .cursor/mcp.json
 ```
 
+Native Windows:
+
+```powershell
+New-Item -ItemType Directory -Force .cursor | Out-Null
+Copy-Item templates\clients\cursor\mcp.windows.json .cursor\mcp.json
+```
+
 Cursor and `cursor-agent` discover `.cursor/mcp.json` from the project tree.
 
 ## User Scope
@@ -39,6 +46,13 @@ For one user across all projects:
 ```bash
 mkdir -p ~/.cursor
 cp templates/clients/cursor/mcp.json ~/.cursor/mcp.json
+```
+
+Native Windows:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.cursor" | Out-Null
+Copy-Item templates\clients\cursor\mcp.windows.json "$env:USERPROFILE\.cursor\mcp.json"
 ```
 
 ## Verify

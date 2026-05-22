@@ -1,0 +1,33 @@
+$ErrorActionPreference = "Stop"
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$serverFile = $env:XUUNITY_LIGHT_UNITY_MCP_SERVER
+if ([string]::IsNullOrWhiteSpace($serverFile)) {
+    $serverFile = Join-Path $scriptDir "server.py"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($env:PYTHON)) {
+    & $env:PYTHON $serverFile @args
+    exit $LASTEXITCODE
+}
+
+$py = Get-Command py -ErrorAction SilentlyContinue
+if ($py) {
+    & $py.Source -3 $serverFile @args
+    exit $LASTEXITCODE
+}
+
+$python = Get-Command python -ErrorAction SilentlyContinue
+if ($python) {
+    & $python.Source $serverFile @args
+    exit $LASTEXITCODE
+}
+
+$python3 = Get-Command python3 -ErrorAction SilentlyContinue
+if ($python3) {
+    & $python3.Source $serverFile @args
+    exit $LASTEXITCODE
+}
+
+Write-Error "Python 3 was not found. Install Python 3 or set PYTHON to its executable path."
+exit 1

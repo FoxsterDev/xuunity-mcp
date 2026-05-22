@@ -4,6 +4,8 @@
 
 - Replaced placeholder client docs with production-ready MCP configs for Claude Code, Claude Desktop, Cursor, Windsurf, Codex-style agents, and generic stdio MCP clients.
 - Added reusable client config templates under `templates/clients/`.
+- Added native Windows client config templates and `run.cmd`/`run.ps1` launchers.
+- Replaced the zsh-only Unix launcher with a bash-compatible launcher for Linux/macOS.
 - Updated installer wording and Claude Code user-scope config generation for the production stdio path.
 
 ## 0.3.10

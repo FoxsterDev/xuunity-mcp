@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 set -euo pipefail
 
 dry_run=0
@@ -151,7 +151,7 @@ warn_ripgrep_fallback_once() {
   if [[ "${xuunity_light_unity_mcp_rg_fallback_warned:-0}" -eq 1 ]]; then
     return 0
   fi
-  print -u2 'optional command not found: rg; using grep fallback. Install ripgrep for faster local checks: brew install ripgrep'
+  printf '%s\n' 'optional command not found: rg; using grep fallback. Install ripgrep for faster local checks: brew install ripgrep' >&2
   xuunity_light_unity_mcp_rg_fallback_warned=1
 }
 
@@ -169,7 +169,8 @@ file_contains_regex() {
 append_codex_block_if_missing() {
   local block
   block=$'[mcp_servers.xuunity_light_unity]\n'
-  block+="command = \"$codex_run_path\""$'\n'
+  block+=$'command = "bash"\n'
+  block+="args = [\"-lc\", \"exec \\\"$codex_run_path\\\"\"]"$'\n'
   block+=$'required = false\n'
 
   if [[ -f "$config_path" ]] && file_contains_regex '^\[mcp_servers\.xuunity_light_unity\]' "$config_path"; then
@@ -178,7 +179,7 @@ append_codex_block_if_missing() {
   fi
 
   if [[ $dry_run -eq 1 ]]; then
-    printf '[dry-run] append experimental MCP block to %s\n' "$config_path"
+    printf '[dry-run] append MCP block to %s\n' "$config_path"
     printf '%s' "$block"
     return
   fi
@@ -351,6 +352,8 @@ install_server_into() {
     copy_if_needed "$helper_module" "$target_dir/$(basename "$helper_module")" 644
   done
   copy_if_needed "$templates_dir/run.sh" "$target_dir/run.sh" 755
+  copy_if_needed "$templates_dir/run.cmd" "$target_dir/run.cmd" 644
+  copy_if_needed "$templates_dir/run.ps1" "$target_dir/run.ps1" 644
 }
 
 run mkdir -p "$codex_home"
@@ -447,13 +450,14 @@ EOF
 
 case "$target" in
   codex)
-    printf -- '- %s/server.py\n- %s/run.sh\n' "$codex_install_dir" "$codex_install_dir"
+    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n' "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir"
     ;;
   claude)
-    printf -- '- %s/server.py\n- %s/run.sh\n' "$claude_install_dir" "$claude_install_dir"
+    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n' "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir"
     ;;
   both)
-    printf -- '- %s/server.py\n- %s/run.sh\n- %s/server.py\n- %s/run.sh\n' \
-      "$codex_install_dir" "$codex_install_dir" "$claude_install_dir" "$claude_install_dir"
+    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n' \
+      "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" \
+      "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir"
     ;;
 esac
