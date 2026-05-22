@@ -55,11 +55,11 @@ For complete setup, see [INSTALL.md](INSTALL.md).
 
 ## Supported Clients
 
-- Cursor
-- Claude Code
-- Claude Desktop
-- Windsurf
-- Codex-style agents
+- [Cursor](docs/clients/cursor.md)
+- [Claude Code](docs/clients/claude-code.md)
+- [Claude Desktop](docs/clients/claude-desktop.md)
+- [Windsurf](docs/clients/windsurf.md)
+- [Codex-style agents](docs/clients/codex.md)
 - custom MCP-compatible agents
 
 ## Safety Model
@@ -112,4 +112,3 @@ templates/unity-package
 ## License
 
 MIT. See [LICENSE](LICENSE) and [LICENSE.md](LICENSE.md).
-

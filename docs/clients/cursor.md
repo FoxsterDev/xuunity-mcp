@@ -2,29 +2,69 @@
 
 Use XUUnity Light Unity MCP with Cursor when you want a local AI agent to validate Unity projects through MCP.
 
-## Steps
+Cursor uses `.cursor/mcp.json` for project-scoped MCP servers and
+`~/.cursor/mcp.json` for user-global MCP servers.
 
-1. Install the host-side MCP server:
+## Install The Server
 
-   ```bash
-   bash init_xuunity_light_unity_mcp.sh
-   ```
+Install the host-side server files:
 
-2. Add the Unity package to `Packages/manifest.json`.
+```bash
+bash init_xuunity_light_unity_mcp.sh --target codex
+```
 
-3. Enable the bridge for the Unity project:
+Enable the bridge for the Unity project:
 
-   ```bash
-   bash init_xuunity_light_unity_mcp.sh \
-     --project-root /path/to/UnityProject \
-     --enable-project
-   ```
+```bash
+bash init_xuunity_light_unity_mcp.sh \
+  --project-root /path/to/UnityProject \
+  --enable-project
+```
 
-4. Configure Cursor to run:
+## Project Config
 
-   ```text
-   ~/.codex-tools/xuunity-light-unity-mcp/run.sh
-   ```
+Create `.cursor/mcp.json`:
 
-5. Verify with `unity.status`, `unity.capabilities.get`, and `unity.health.probe`.
+```bash
+mkdir -p .cursor
+cp templates/clients/cursor/mcp.json .cursor/mcp.json
+```
 
+Production config:
+
+```json
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""
+      ]
+    }
+  }
+}
+```
+
+## User Config
+
+For one user across projects:
+
+```bash
+mkdir -p ~/.cursor
+cp templates/clients/cursor/mcp.json ~/.cursor/mcp.json
+```
+
+If the target config already has other MCP servers, merge only the
+`mcpServers.xuunity_light_unity` block.
+
+## Verify
+
+```bash
+cursor-agent mcp list
+cursor-agent mcp list-tools xuunity_light_unity
+```
+
+Inside Cursor, confirm the server is connected in MCP settings. Then run
+`unity.status`, `unity.capabilities.get`, and `unity.health.probe`.

@@ -1,12 +1,17 @@
 # Claude Code Setup
 
-Use the installer to register XUUnity Light Unity MCP with Claude Code:
+Claude Code can use XUUnity Light Unity MCP through project scope, user scope,
+or a local ad-hoc server entry. Prefer project scope for team repos.
+
+## Install The Server
+
+Install the Claude-side server files:
 
 ```bash
-bash init_xuunity_light_unity_mcp.sh --install-claude-config
+bash init_xuunity_light_unity_mcp.sh --target claude
 ```
 
-Then enable the bridge for a Unity project:
+Enable the bridge for the Unity project:
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh \
@@ -14,11 +19,62 @@ bash init_xuunity_light_unity_mcp.sh \
   --enable-project
 ```
 
-Verify the setup with these MCP calls:
+## Project Scope
+
+Copy the production project config into the repo root:
+
+```bash
+cp templates/clients/claude-code/.mcp.json .mcp.json
+```
+
+Config:
+
+```json
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh\""
+      ],
+      "timeout": 600000
+    }
+  }
+}
+```
+
+Claude Code asks each user to approve project-scoped MCP servers on first use.
+
+## User Scope
+
+For one user across all repos:
+
+```bash
+bash init_xuunity_light_unity_mcp.sh \
+  --target claude \
+  --install-claude-config
+```
+
+## Local CLI Scope
+
+```bash
+claude mcp add --scope local --transport stdio xuunity_light_unity \
+  -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh"'
+```
+
+## Verify
+
+```bash
+claude mcp list
+```
+
+Inside Claude Code, run `/mcp` and confirm that `xuunity_light_unity` is
+connected. Then verify Unity with:
 
 1. `unity.status`
 2. `unity.capabilities.get`
 3. `unity.health.probe`
 
 Do not run compile, tests, Play Mode, or screenshots until the health probe succeeds.
-

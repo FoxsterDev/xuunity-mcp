@@ -67,7 +67,7 @@ Options:
                               codex  -> \$CODEX_TOOLS_HOME/xuunity-light-unity-mcp  (default \$HOME/.codex-tools)
                               claude -> \$CLAUDE_TOOLS_HOME/xuunity-light-unity-mcp (default \$HOME/.claude-tools)
                               both   -> install into both. Default: both.
-  --install-codex-config      Also append the early-stage Codex MCP config block.
+  --install-codex-config      Also append the Codex MCP config block.
   --install-claude-config     Also register the MCP server in ~/.claude.json (Claude Code user scope).
   --enable-project          Write local bridge config under Library/ so the editor-only bridge is active on next editor load.
   --disable-project         Remove local bridge config and local bridge state under Library/.
@@ -228,7 +228,7 @@ portable_run_command = f'exec "{run_path}"'
 desired = {
     "type": "stdio",
     "command": "bash",
-    "args": ["-c", portable_run_command],
+    "args": ["-lc", portable_run_command],
 }
 
 if existing == desired:
@@ -415,7 +415,7 @@ fi
 if [[ $install_codex_config -eq 1 ]]; then
   append_codex_block_if_missing
 else
-  printf 'skipped Codex config install by default; use --install-codex-config once you want to test the early-stage stdio MCP layer in a real client.\n'
+  printf 'skipped Codex config install by default; use --install-codex-config to register the stdio MCP server in a real client.\n'
 fi
 
 if [[ $install_claude_config -eq 1 ]]; then

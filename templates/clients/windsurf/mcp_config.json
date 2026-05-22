@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "xuunity_light_unity": {
+      "command": "bash",
+      "args": [
+        "-lc",
+        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""
+      ]
+    }
+  }
+}

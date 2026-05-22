@@ -5,9 +5,8 @@
       "command": "bash",
       "args": [
         "-lc",
-        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh\""
-      ],
-      "timeout": 600000
+        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""
+      ]
     }
   }
 }

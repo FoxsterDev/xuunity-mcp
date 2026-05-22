@@ -59,7 +59,8 @@ Template:
 
 ```toml
 [mcp_servers.xuunity_light_unity]
-command = "~/.codex-tools/xuunity-light-unity-mcp/run.sh"
+command = "bash"
+args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""]
 required = false
 ```
 
@@ -70,6 +71,41 @@ The installer can register the MCP server in the Claude Code user config:
 ```bash
 bash init_xuunity_light_unity_mcp.sh --install-claude-config
 ```
+
+Project-scoped Claude Code config:
+
+```bash
+cp templates/clients/claude-code/.mcp.json .mcp.json
+```
+
+## Connect Cursor
+
+```bash
+mkdir -p .cursor
+cp templates/clients/cursor/mcp.json .cursor/mcp.json
+```
+
+For user-global Cursor config, copy the same file to `~/.cursor/mcp.json`.
+
+## Connect Windsurf
+
+```bash
+mkdir -p ~/.codeium/windsurf
+cp templates/clients/windsurf/mcp_config.json ~/.codeium/windsurf/mcp_config.json
+```
+
+## Connect Claude Desktop
+
+On macOS:
+
+```bash
+mkdir -p "$HOME/Library/Application Support/Claude"
+cp templates/clients/claude-desktop/claude_desktop_config.json \
+  "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+```
+
+If a target config already has other MCP servers, merge only the
+`mcpServers.xuunity_light_unity` block.
 
 ## Verify Installation
 
@@ -90,4 +126,3 @@ Do not treat the install as ready until status, capabilities, and health probe a
 - If the AI client cannot find the server, verify the configured `run.sh` path.
 - If Unity imported the package but MCP calls fail, check `Library/XUUnityLightMcp/` for bridge state and request artifacts.
 - If a Unity project is already open, prefer reusing the healthy editor session instead of starting a competing one.
-
