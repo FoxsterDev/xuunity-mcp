@@ -19,6 +19,7 @@ editor-only Unity package.
 </p>
 
 [Quick Start](#quick-start) |
+[AI Setup Prompt](#ai-agent-setup-prompt) |
 [Features](FEATURES.md) |
 [Client Docs](#supported-clients) |
 [Security](SECURITY.md) |
@@ -50,6 +51,53 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 - Unity 2021.3 LTS+; Unity 6000 is the main validated production path
 - Python 3.10+
 - one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md)
+
+### AI Agent Setup Prompt
+
+Copy this prompt into your coding agent from the Unity project you want to
+connect. Replace the placeholders before running it.
+
+```text
+Configure XUUnity Light Unity MCP for this Unity project.
+
+Inputs:
+- Unity project root: <absolute path to the Unity project>
+- MCP client: <Claude Code | Claude Desktop | Cursor | Windsurf | Codex | custom stdio MCP client>
+- Package mode: Git UPM release v0.3.11, unless this is local MCP development.
+
+Principles:
+- Read the current README.md, INSTALL.md, and the matching docs/clients/*
+  guide before editing files.
+- Preserve existing user config. Merge the xuunity_light_unity MCP server block;
+  do not overwrite unrelated MCP servers, editor settings, or package entries.
+- Keep the Unity package editor-only. Do not add runtime/player dependencies.
+- Use the native template for the host OS: run.sh for macOS/Linux clients,
+  run.cmd or run.ps1 for native Windows clients.
+- If the MCP repo is missing locally, clone
+  https://github.com/FoxsterDev/xuunity-light-unity-mcp.git outside the Unity
+  Assets folder and treat that clone as <MCP_REPO_ROOT>.
+- Ask before destructive git operations, deleting user files, force-pushing,
+  killing unrelated Unity Editor sessions, or changing production package pins.
+
+Tasks:
+1. Confirm Python 3.10+, Unity project structure, and selected MCP client.
+2. Add the Unity package dependency:
+   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/templates/unity-package#v0.3.11
+3. From <MCP_REPO_ROOT>, run the host installer and enable the project bridge
+   through macOS/Linux shell, Git Bash, or WSL:
+   bash init_xuunity_light_unity_mcp.sh
+   bash init_xuunity_light_unity_mcp.sh --project-root "<UNITY_PROJECT_ROOT>" --enable-project
+4. Wire the selected MCP client using the files under templates/clients/.
+   Merge config if the target file already exists.
+5. Open or restart the Unity project if needed, then verify readiness with:
+   bash xuunity_light_unity_mcp.sh ensure-ready --project-root "<UNITY_PROJECT_ROOT>" --open-editor
+   bash xuunity_light_unity_mcp.sh request-status-summary --project-root "<UNITY_PROJECT_ROOT>"
+6. If your agent runtime can reload MCP tools, verify the MCP tools
+   unity_status_summary, unity_capabilities, and unity_health_probe. If it
+   cannot reload tools in-process, provide the exact restart steps for the user.
+7. Finish with a concise report listing files changed, commands run, verification
+   results, and any manual restart still required.
+```
 
 ### 1. Install The Unity Package
 
