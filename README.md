@@ -1,5 +1,9 @@
 <div align="center">
 
+<img src="docs/assets/xuunity-light-unity-mcp-preview.png" alt="XUUnity Light Unity MCP preview banner" width="100%">
+
+<br>
+
 # XUUnity Light Unity MCP
 
 **Open-source lightweight Unity MCP server for safe Unity Editor automation.**
