@@ -1,0 +1,33 @@
+{
+  "name": "xuunity-light-unity-mcp",
+  "displayName": "XUUnity Light Unity MCP",
+  "description": "Open-source lightweight MCP server for Unity Editor automation.",
+  "keywords": [
+    "unity",
+    "unity3d",
+    "unity-editor",
+    "mcp",
+    "model-context-protocol",
+    "unity-mcp",
+    "mcp-server",
+    "ai-agents",
+    "cursor",
+    "claude-code",
+    "claude-desktop",
+    "windsurf",
+    "codex",
+    "gamedev",
+    "unity-automation"
+  ],
+  "categories": [
+    "development-tools",
+    "game-development",
+    "automation"
+  ],
+  "transport": [
+    "stdio"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/FoxsterDev/xuunity-light-unity-mcp"
+}
+

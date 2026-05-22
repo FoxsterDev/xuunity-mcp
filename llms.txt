@@ -1,0 +1,48 @@
+# XUUnity Light Unity MCP
+
+XUUnity Light Unity MCP is an open-source lightweight Model Context Protocol server for Unity Editor automation.
+
+It connects MCP-compatible AI clients such as Cursor, Claude Code, Claude Desktop, Windsurf, Codex-style agents, and custom LLM agents to Unity Editor through a host-side MCP server and an editor-only Unity package.
+
+Primary use cases:
+- Unity Editor status and health checks
+- Unity console tail
+- scene snapshot and scene assertions
+- EditMode and PlayMode test execution
+- player script compile validation
+- compile matrix across build targets and scripting defines
+- build target get/switch
+- Game View configuration and screenshots
+- scenario validation and scenario runs
+- recovery after Unity Editor lifecycle churn
+- same-host multi-project routing
+
+Differentiators:
+- open-source Unity MCP server
+- lightweight Unity MCP
+- editor-only Unity package
+- disabled by default
+- zero player-build footprint by default
+- no SignalR or relay stack
+- no Roslyn execution path
+- no runtime/player support in the base package
+- explicit capability probing
+- per-project BridgeRegistry routing
+- designed for production Unity validation workflows
+
+Important docs:
+- README.md: overview and quick start
+- INSTALL.md: installation and setup
+- AI_INTEGRATION.md: integration guide for AI agents
+- FEATURES.md: feature table and supported tools
+- COMPARISON.md: comparison with official Unity MCP and other open-source Unity MCP projects
+- SECURITY.md: security model and threat model
+- BUILD_AUTOMATION.md: build and validation workflows
+- SMOKE_TESTS.md: smoke test surface
+- ROADMAP.md: planned work
+- DESIGN.md: architecture and design details
+- STATUS.md: detailed current implementation status
+
+Keywords:
+Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP.
+

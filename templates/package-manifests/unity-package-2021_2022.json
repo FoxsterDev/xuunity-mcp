@@ -1,0 +1,35 @@
+{
+  "name": "com.xuunity.light-mcp",
+  "displayName": "XUUnity Light Unity MCP",
+  "version": "0.3.10",
+  "unity": "2021.3",
+  "description": "Open-source lightweight Unity MCP server package for safe Unity Editor automation.",
+  "license": "MIT",
+  "documentationUrl": "https://github.com/FoxsterDev/xuunity-light-unity-mcp",
+  "changelogUrl": "https://github.com/FoxsterDev/xuunity-light-unity-mcp/blob/master/CHANGELOG.md",
+  "keywords": [
+    "unity",
+    "unity-editor",
+    "unity-mcp",
+    "mcp",
+    "mcp-server",
+    "automation",
+    "ai-agents",
+    "cursor",
+    "claude-code",
+    "xuunity",
+    "ai"
+  ],
+  "dependencies": {
+    "com.unity.test-framework": "1.1.33"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git",
+    "directory": "templates/unity-package"
+  },
+  "author": {
+    "name": "Siarhei Khalandachou",
+    "url": "https://www.linkedin.com/in/khalandachou/"
+  }
+}
