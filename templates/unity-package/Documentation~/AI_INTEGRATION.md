@@ -59,6 +59,6 @@ An AI agent should not:
 ## Upstream Docs
 
 - public guide: `README.md`
-- AI integration guide: `AI_INTEGRATION.md`
-- roadmap: `ROADMAP.md`
+- AI integration guide: `../../../docs/agents/AI_INTEGRATION.md`
+- roadmap: `../../../docs/architecture/ROADMAP.md`
 - license: `LICENSE`

@@ -20,11 +20,11 @@ editor-only Unity package.
 
 [Quick Start](#quick-start) |
 [AI Setup Prompt](#ai-agent-setup-prompt) |
-[Features](FEATURES.md) |
+[Features](docs/reference/FEATURES.md) |
 [Client Docs](#supported-clients) |
 [Security](SECURITY.md) |
-[Comparison](COMPARISON.md) |
-[Agent Workflows](AGENT_WORKFLOWS.md)
+[Comparison](docs/reference/COMPARISON.md) |
+[Agent Workflows](docs/agents/AGENT_WORKFLOWS.md)
 
 </div>
 
@@ -206,7 +206,7 @@ Host helper commands include `ensure-ready`, `restore-editor-state`,
 `recover-editor-session`, `batch-compile`, `batch-editmode-tests`,
 `batch-build-config-compile-matrix`, `artifact-probe`, `devmode`, and `prodmode`.
 
-See [FEATURES.md](FEATURES.md) for maturity levels and implementation evidence.
+See [FEATURES.md](docs/reference/FEATURES.md) for maturity levels and implementation evidence.
 
 </details>
 
@@ -236,10 +236,10 @@ stack.
 
 ## Documentation
 
-[Install](INSTALL.md) | [Features](FEATURES.md) | [AI integration](AI_INTEGRATION.md) |
-[Agent workflows](AGENT_WORKFLOWS.md) | [Workflow templates](templates/workflows/) |
-[Security](SECURITY.md) | [Comparison](COMPARISON.md) | [Discovery](DISCOVERY.md) |
-[Glossary](GLOSSARY.md) | [Status](STATUS.md) | [Build automation](BUILD_AUTOMATION.md) |
-[Smoke tests](SMOKE_TESTS.md) | [Roadmap](ROADMAP.md)
+[Install](INSTALL.md) | [Features](docs/reference/FEATURES.md) | [AI integration](docs/agents/AI_INTEGRATION.md) |
+[Agent workflows](docs/agents/AGENT_WORKFLOWS.md) | [Workflow templates](templates/workflows/) |
+[Security](SECURITY.md) | [Comparison](docs/reference/COMPARISON.md) | [Discovery](docs/reference/DISCOVERY.md) |
+[Glossary](docs/reference/GLOSSARY.md) | [Status](docs/reference/STATUS.md) | [Build automation](docs/operations/BUILD_AUTOMATION.md) |
+[Smoke tests](docs/operations/SMOKE_TESTS.md) | [Roadmap](docs/architecture/ROADMAP.md)
 
-License: MIT. See [LICENSE](LICENSE) and [LICENSE.md](LICENSE.md). Need help? Open an [issue](https://github.com/FoxsterDev/xuunity-light-unity-mcp/issues).
+License: MIT. See [LICENSE](LICENSE). Need help? Open an [issue](https://github.com/FoxsterDev/xuunity-light-unity-mcp/issues).

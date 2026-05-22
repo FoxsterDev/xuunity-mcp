@@ -110,7 +110,7 @@ A failed connect typically means the Claude-side server was never installed
 ## Available MCP Tools
 
 When connected, Claude Code sees the standard XUUnity stdio tools — see
-`FEATURES.md` for the canonical inventory.
+`../../../docs/reference/FEATURES.md` for the canonical inventory.
 
 Useful first-pass tools for any Unity work:
 
@@ -122,12 +122,12 @@ Useful first-pass tools for any Unity work:
 - `unity.compile.player_scripts`
 - `unity.tests.run_editmode`
 
-Follow the recommended first-validation pass in `AI_INTEGRATION.md`.
+Follow the recommended first-validation pass in `../../../docs/agents/AI_INTEGRATION.md`.
 
 ## Agent Behavior Rules
 
 When Claude Code runs Unity work in this repo through MCP, it should follow
-the same rules listed in `AI_INTEGRATION.md` — "Agent Behavior Rules" and
+the same rules listed in `../../../docs/agents/AI_INTEGRATION.md` — "Agent Behavior Rules" and
 "Startup Policy". They are agent-agnostic; this template only wires the
 transport.
 

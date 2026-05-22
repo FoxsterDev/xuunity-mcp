@@ -33,16 +33,16 @@ Differentiators:
 Important docs:
 - README.md: overview and quick start
 - INSTALL.md: installation and setup
-- AI_INTEGRATION.md: integration guide for AI agents
-- AGENT_WORKFLOWS.md: production-grade example workflows for AI agents
-- FEATURES.md: feature table and supported tools
-- COMPARISON.md: comparison with official Unity MCP and other open-source Unity MCP projects
+- docs/agents/AI_INTEGRATION.md: integration guide for AI agents
+- docs/agents/AGENT_WORKFLOWS.md: production-grade example workflows for AI agents
+- docs/reference/FEATURES.md: feature table and supported tools
+- docs/reference/COMPARISON.md: comparison with official Unity MCP and other open-source Unity MCP projects
 - SECURITY.md: security model and threat model
-- BUILD_AUTOMATION.md: build and validation workflows
-- SMOKE_TESTS.md: smoke test surface
-- ROADMAP.md: planned work
-- DESIGN.md: architecture and design details
-- STATUS.md: detailed current implementation status
+- docs/operations/BUILD_AUTOMATION.md: build and validation workflows
+- docs/operations/SMOKE_TESTS.md: smoke test surface
+- docs/architecture/ROADMAP.md: planned work
+- docs/architecture/DESIGN.md: architecture and design details
+- docs/reference/STATUS.md: detailed current implementation status
 
 Keywords:
 Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity agent workflow examples, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP.

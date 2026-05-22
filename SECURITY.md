@@ -35,7 +35,18 @@ It is not intended to:
 - Review scenario files before running them against sensitive projects.
 - Do not store credentials in bridge configs or scenario files.
 
+## License And Operational Responsibility
+
+This project uses the MIT License. See [LICENSE](LICENSE) for the canonical
+license text.
+
+Practical operating note:
+
+- this software is free to use
+- the author provides it without operational guarantees
+- you are responsible for how you apply it to repos, projects, builds, devices,
+  and automation flows
+
 ## Reporting Security Issues
 
 Open a private issue or contact the maintainer directly before publishing details for a vulnerability that could expose local projects, credentials, or build artifacts.
-

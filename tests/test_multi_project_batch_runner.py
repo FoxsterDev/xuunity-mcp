@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 
 OPS_ROOT = Path(__file__).resolve().parents[1]
-RUNNER = OPS_ROOT / "run_multi_project_batch_compile_matrix.sh"
+RUNNER = OPS_ROOT / "scripts" / "testing" / "run_multi_project_batch_compile_matrix.sh"
 
 
 class MultiProjectBatchRunnerTests(unittest.TestCase):

@@ -56,8 +56,8 @@ It must be installed separately on the machine that runs the AI client.
 This package is MIT-licensed and provided as-is, without warranty or liability.
 
 See:
-- `LICENSE.md`
+- `../../../LICENSE`
 
 ## Next Read
 
-- `AI_INTEGRATION.md`
+- `../../../docs/agents/AI_INTEGRATION.md`

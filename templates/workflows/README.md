@@ -19,4 +19,4 @@ Files:
 - `package_mode_switch.workflow.json`
   - Wrapper-only `devmode` and `prodmode` package-source switching.
 
-Use `AGENT_WORKFLOWS.md` for the human-readable playbooks and policy rules.
+Use `../../docs/agents/AGENT_WORKFLOWS.md` for the human-readable playbooks and policy rules.

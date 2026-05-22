@@ -460,7 +460,7 @@ switch_project_to_prodmode() {
 }
 
 dispatch_arrange_unity_windows() {
-  local arrange_script_path="$SOURCE_ROOT/arrange_unity_windows.py"
+  local arrange_script_path="$SOURCE_ROOT/scripts/tools/arrange_unity_windows.py"
   if [[ ! -f "$arrange_script_path" ]]; then
     echo "arrange_unity_windows.py not found: $arrange_script_path" >&2
     exit 1
