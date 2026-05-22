@@ -35,6 +35,7 @@ Use a broader Unity MCP implementation when you need:
 - `CoplayDev/unity-mcp`
 - `IvanMurzak/Unity-MCP`
 - `CoderGamester/mcp-unity`
+- `AndreySkyFoxSidorov/UnifiedUnityMCP`
 - `ozankasikci/unity-editor-mcp`
 
 ## Sources Reviewed
@@ -47,6 +48,7 @@ Reviewed on `2026-05-22`:
 - CoplayDev Unity MCP: <https://github.com/CoplayDev/unity-mcp>
 - IvanMurzak Unity MCP: <https://github.com/IvanMurzak/Unity-MCP>
 - CoderGamester MCP Unity: <https://github.com/CoderGamester/mcp-unity>
+- UnifiedUnityMCP: <https://github.com/AndreySkyFoxSidorov/UnifiedUnityMCP>
 - ozankasikci Unity Editor MCP: <https://github.com/ozankasikci/unity-editor-mcp>
 
 Source notes:
@@ -55,6 +57,7 @@ Source notes:
 - CoplayDev's public README positions the project as a bridge for Claude, Claude Code, Cursor, VS Code, and similar clients, with tools for assets, scenes, scripts, editor functions, profiling, physics, UI, VFX, tests, and more.
 - IvanMurzak's public repo positions the project as AI Skills, MCP tools, and CLI for a full Unity develop/test loop, with broad custom method/tool extensibility.
 - CoderGamester's public repo positions the project as an MCP plugin to connect Unity Editor with Cursor, Claude Code, Codex, Windsurf, and other IDEs.
+- UnifiedUnityMCP's public README positions the project as Antigravity-oriented global Unity Editor automation infrastructure with direct, strictly typed control and 52+ tools across objects, assets, scenes, editor state, builds, tests, packages, console, profiler, UI, physics, navmesh, terrain, rendering, animation, and workflow history.
 - ozankasikci's public repo positions the project as an MCP server and client for LLM interaction with Unity projects, including UI automation, console integration, and editor operations.
 
 ## Evidence Model
@@ -109,29 +112,29 @@ Primary design priorities:
 
 ## Feature Comparison
 
-| Capability / property | XUUnity Light | Official Unity MCP | CoplayDev | IvanMurzak | CoderGamester | ozankasikci |
-| --- | --- | --- | --- | --- | --- | --- |
-| Primary positioning | `Core` validation-first local Unity Editor automation | `Official / vendor-managed` Unity AI bridge | `Broad` editor automation | `Broad` AI develop/test loop | `Broad` IDE-to-Unity plugin | `Focused` server/client |
-| Evidence level used here | `Repo-verified` | `Primary-source` | `Primary-source` | `Primary-source` | `Primary-source` | `Primary-source` |
-| Editor-only base package | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
-| No normal player-build footprint by default | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
-| Easy disable/uninstall path | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
-| Disabled-by-default bridge activation | `Core` | `Conservative inference`: package/cloud/terms gated | `Conservative inference`: server start/config step | `Conservative inference`: setup/CLI gated | `Conservative inference`: package/client config gated | `Conservative inference`: server/client setup gated |
-| Capability probe / operation gating | `Core` | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes |
-| Unity status / readiness | `Core` | `Primary-source` Unity AI bridge | `Broad` | `Broad` | `Broad` | `Focused` |
-| Console tail / console inspection | `Core` | `Public-source unknown` | `Primary-source` tool list includes console reads | `Broad` | `Public-source unknown` in reviewed public source | `Primary-source` console integration |
-| Scene snapshot / scene interaction | `Core` | `Primary-source` scene/project-aware assistant claims | `Primary-source` scene control | `Broad` | `Broad` | `Focused` |
-| EditMode test execution | `Core` | `Public-source unknown` | `Primary-source` tool list includes test runs | `Primary-source` develop/test loop | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source |
-| Compile validation without active platform switch | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
-| Compile matrix across targets and defines | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
-| Play Mode state / enter / exit | `Supported` | `Public-source unknown` | `Broad` | `Broad` | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source |
-| Game View screenshot | `Reflection-gated` | `Public-source unknown` | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source |
-| Game View resolution control | `Reflection-gated` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
-| Broad mutation surface | `Not a base goal` | `Broad` editor actions | `Broad` | `Broad` | `Broad` | `Focused` |
-| Dynamic code execution in base path | `Not a base goal` | `Public-source unknown` | `Public-source unknown` | `Primary-source` custom C# method/tool path | `Public-source unknown` | `Public-source unknown` |
-| Custom tool / adapter extensibility | `Supported` narrow extension path | `Primary-source` Unity AI / preferred app path | `Primary-source` custom tools | `Primary-source` custom method/tool path | `Primary-source` client/plugin integration | `Public-source unknown` |
-| Multi-client support path | `Template provided` | `Primary-source` IDE/preferred application wording | `Primary-source` Claude/Cursor/VS Code style clients | `Primary-source` Claude Code/Gemini/Copilot/Cursor etc. | `Primary-source` Cursor/Claude Code/Codex/Windsurf etc. | `Primary-source` MCP server/client |
-| Local same-host install simplicity | `Core` | `Official / vendor-managed`, subscription/cloud gated | `Broad`, project setup required | `Broad`, CLI/setup required | `Broad`, package/client setup required | `Focused`, Node/server setup required |
+| Capability / property | XUUnity Light | Official Unity MCP | CoplayDev | IvanMurzak | CoderGamester | UnifiedUnityMCP | ozankasikci |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Primary positioning | `Core` validation-first local Unity Editor automation | `Official / vendor-managed` Unity AI bridge | `Broad` editor automation | `Broad` AI develop/test loop | `Broad` IDE-to-Unity plugin | `Broad` Antigravity/SSE Unity automation infrastructure | `Focused` server/client |
+| Evidence level used here | `Repo-verified` | `Primary-source` | `Primary-source` | `Primary-source` | `Primary-source` | `Primary-source` | `Primary-source` |
+| Editor-only base package | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
+| No normal player-build footprint by default | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
+| Easy disable/uninstall path | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
+| Disabled-by-default bridge activation | `Core` | `Conservative inference`: package/cloud/terms gated | `Conservative inference`: server start/config step | `Conservative inference`: setup/CLI gated | `Conservative inference`: package/client config gated | `Conservative inference`: SSE client config gated | `Conservative inference`: server/client setup gated |
+| Capability probe / operation gating | `Core` | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes | `Public-source unknown` for per-feature probes |
+| Unity status / readiness | `Core` | `Primary-source` Unity AI bridge | `Broad` | `Broad` | `Broad` | `Primary-source` editor state tools | `Focused` |
+| Console tail / console inspection | `Core` | `Public-source unknown` | `Primary-source` tool list includes console reads | `Broad` | `Public-source unknown` in reviewed public source | `Primary-source` console/debug/profiler tools | `Primary-source` console integration |
+| Scene snapshot / scene interaction | `Core` | `Primary-source` scene/project-aware assistant claims | `Primary-source` scene control | `Broad` | `Broad` | `Primary-source` scene/object/component tools | `Focused` |
+| EditMode test execution | `Core` | `Public-source unknown` | `Primary-source` tool list includes test runs | `Primary-source` develop/test loop | `Public-source unknown` in reviewed public source | `Primary-source` test-run tooling | `Public-source unknown` in reviewed public source |
+| Compile validation without active platform switch | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
+| Compile matrix across targets and defines | `Core` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
+| Play Mode state / enter / exit | `Supported` | `Public-source unknown` | `Broad` | `Broad` | `Public-source unknown` in reviewed public source | `Primary-source` editor-state tooling | `Public-source unknown` in reviewed public source |
+| Game View screenshot | `Reflection-gated` | `Public-source unknown` | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source | `Public-source unknown` in reviewed public source |
+| Game View resolution control | `Reflection-gated` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` | `Public-source unknown` |
+| Broad mutation surface | `Not a base goal` | `Broad` editor actions | `Broad` | `Broad` | `Broad` | `Broad` | `Focused` |
+| Dynamic code execution in base path | `Not a base goal` | `Public-source unknown` | `Public-source unknown` | `Primary-source` custom C# method/tool path | `Public-source unknown` | `Public-source unknown`; script management is claimed | `Public-source unknown` |
+| Custom tool / adapter extensibility | `Supported` narrow extension path | `Primary-source` Unity AI / preferred app path | `Primary-source` custom tools | `Primary-source` custom method/tool path | `Primary-source` client/plugin integration | `Primary-source` skills/tool modules | `Public-source unknown` |
+| Multi-client support path | `Template provided` | `Primary-source` IDE/preferred application wording | `Primary-source` Claude/Cursor/VS Code style clients | `Primary-source` Claude Code/Gemini/Copilot/Cursor etc. | `Primary-source` Cursor/Claude Code/Codex/Windsurf etc. | `Focused` Antigravity config shown | `Primary-source` MCP server/client |
+| Local same-host install simplicity | `Core` | `Official / vendor-managed`, subscription/cloud gated | `Broad`, project setup required | `Broad`, CLI/setup required | `Broad`, package/client setup required | `Focused`, Unity project plus SSE config | `Focused`, Node/server setup required |
 
 ## What The Lightweight MCP Already Covers
 
@@ -411,6 +414,22 @@ Cons:
 - public docs reviewed here do not clearly document XUUnity-style final accounting after editor lifecycle churn
 - public docs reviewed here do not clearly document active-target-free compile matrix validation
 - less specifically positioned around minimal production validation
+
+### AndreySkyFoxSidorov/UnifiedUnityMCP
+
+Pros:
+
+- broader and more current Unity automation surface than `ozankasikci/unity-editor-mcp` based on the reviewed README
+- public docs claim 52+ tools across GameObjects, components, assets, scenes, editor state, builds, tests, packages, console, profiler, UI, physics, navmesh, terrain, materials, shaders, lights, animator, timeline, scripts, ScriptableObjects, UnityEvents, validation, optimization, and workflow history
+- explicitly positions the bridge as direct, secure, and strictly typed Unity object control
+- pairs the MCP tool surface with Unity/C# skill guidance, which makes it a stronger AI-agent workflow reference than a bare server/client demo
+
+Cons:
+
+- younger public maturity signal than the larger community MCPs: reviewed repo showed a small commit count and no published releases
+- Antigravity/SSE-oriented public setup is less obviously multi-client than CoplayDev, IvanMurzak, CoderGamester, or XUUnity's shipped templates
+- public docs reviewed here do not clearly document XUUnity-style no-player-footprint, capability-gated reflection adapters, request final accounting, or active-target-free compile matrix validation
+- broad reflection and mutation surface is useful for agentic building, but less conservative as a default production validation backend
 
 ### ozankasikci/unity-editor-mcp
 
