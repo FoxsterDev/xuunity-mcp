@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.11
 
 - Replaced placeholder client docs with production-ready MCP configs for Claude Code, Claude Desktop, Cursor, Windsurf, Codex-style agents, and generic stdio MCP clients.
 - Added reusable client config templates under `templates/clients/`.

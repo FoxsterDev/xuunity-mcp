@@ -1,7 +1,7 @@
 {
   "name": "com.xuunity.light-mcp",
   "displayName": "XUUnity Light Unity MCP",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "unity": "6000.0",
   "description": "Open-source lightweight Unity MCP server package for safe Unity Editor automation.",
   "license": "MIT",
