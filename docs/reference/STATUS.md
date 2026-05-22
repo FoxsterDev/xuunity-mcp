@@ -107,7 +107,7 @@ Latest package-path validation for `v0.3.12`:
 | Host Python tests | `scripts/testing/run_host_python_tests.sh` | `97/97` passed |
 | Package self-tests | Representative Unity 6000 consumer project through production Git UPM `v0.3.12` | EditMode `6/6`, PlayMode `5/5` |
 | Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
-| Git tag visibility | GitHub remote refs | `v0.3.12` resolves to `2011152155aa9c8d05c11e0c17561cb445d2f960` |
+| Git tag visibility | GitHub remote refs | `v0.3.12` resolves to `2fa71514fb9ab8040c2fbb9f5585f7ef49c35740` |
 
 Cross-platform status:
 
