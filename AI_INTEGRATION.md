@@ -12,6 +12,8 @@ This guide is agent-agnostic.
 It is written to work for Codex, Claude Code, Cursor, Gemini-style agents, and
 future MCP-capable assistants.
 
+For concrete task playbooks after setup, see `AGENT_WORKFLOWS.md`.
+
 Author:
 - Siarhei Khalandachou
 - LinkedIn: `https://www.linkedin.com/in/khalandachou/`
@@ -272,6 +274,7 @@ recommended default for team-shared MCP wiring.
 ## Canonical References
 
 - `README.md`
+- `AGENT_WORKFLOWS.md`
 - `DESIGN.md`
 - `ROADMAP.md`
 - `COMPARISON.md`

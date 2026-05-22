@@ -80,6 +80,7 @@ See [SECURITY.md](SECURITY.md) for the threat model.
 - [Install](INSTALL.md)
 - [Features](FEATURES.md)
 - [AI integration](AI_INTEGRATION.md)
+- [Agent workflows](AGENT_WORKFLOWS.md)
 - [Security model](SECURITY.md)
 - [Comparison](COMPARISON.md)
 - [Discovery guide](DISCOVERY.md)

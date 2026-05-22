@@ -10,6 +10,7 @@
 - Clarified feature maturity levels, implementation evidence, and compatibility validation status in `FEATURES.md`.
 - Clarified `COMPARISON.md` source confidence, maturity terminology, and validation caveats.
 - Added `AndreySkyFoxSidorov/UnifiedUnityMCP` to `COMPARISON.md` as a broad but young Unity automation reference.
+- Added `AGENT_WORKFLOWS.md` to close Priority 15 with production-grade example agent workflows for Unity validation, triage, scenario replay, SDK checks, batch lanes, recovery, and release closeout.
 - Updated installer wording and Claude Code user-scope config generation for the production stdio path.
 
 ## 0.3.10

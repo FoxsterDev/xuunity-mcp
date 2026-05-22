@@ -34,6 +34,7 @@ Important docs:
 - README.md: overview and quick start
 - INSTALL.md: installation and setup
 - AI_INTEGRATION.md: integration guide for AI agents
+- AGENT_WORKFLOWS.md: production-grade example workflows for AI agents
 - FEATURES.md: feature table and supported tools
 - COMPARISON.md: comparison with official Unity MCP and other open-source Unity MCP projects
 - SECURITY.md: security model and threat model
@@ -44,5 +45,4 @@ Important docs:
 - STATUS.md: detailed current implementation status
 
 Keywords:
-Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP.
-
+Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity agent workflow examples, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP.
