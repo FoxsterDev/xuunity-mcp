@@ -1,33 +1,67 @@
+<div align="center">
+
 # XUUnity Light Unity MCP
 
-XUUnity Light Unity MCP is an open-source, lightweight Model Context Protocol server for Unity Editor automation.
+**Open-source lightweight Unity MCP server for safe Unity Editor automation.**
 
-It lets MCP-compatible AI clients such as Cursor, Claude Code, Claude Desktop, Codex-style agents, and custom LLM agents inspect and control Unity projects through a small editor-only Unity package and a local host-side MCP server.
+Connect Cursor, Claude Code, Claude Desktop, Windsurf, Codex-style agents, and
+custom MCP clients to Unity through a local stdio MCP server and a small
+editor-only Unity package.
 
-The project is designed for production Unity workflows where safety matters: compile checks, EditMode and PlayMode tests, scene inspection, console logs, build target validation, Game View screenshots, and recovery after Unity Editor lifecycle churn.
+<p>
+  <a href="https://github.com/FoxsterDev/xuunity-light-unity-mcp"><img alt="GitHub stars" src="https://img.shields.io/github/stars/FoxsterDev/xuunity-light-unity-mcp?style=flat&logo=github"></a>
+  <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-red.svg"></a>
+  <img alt="Unity 2021.3+" src="https://img.shields.io/badge/Unity-2021.3%2B-black.svg?logo=unity&logoColor=white">
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white">
+  <img alt="MCP enabled" src="https://img.shields.io/badge/MCP-enabled-green.svg">
+  <img alt="Git UPM ready" src="https://img.shields.io/badge/Git%20UPM-ready-brightgreen.svg">
+  <img alt="OpenUPM planned" src="https://img.shields.io/badge/OpenUPM-planned-lightgrey.svg">
+</p>
 
-Unlike broader Unity MCP implementations, XUUnity Light Unity MCP is editor-only by default, disabled until explicitly enabled per project, removable, and does not add runtime/player build footprint by default.
+[Quick Start](#quick-start) |
+[Features](FEATURES.md) |
+[Client Docs](#supported-clients) |
+[Security](SECURITY.md) |
+[Comparison](COMPARISON.md) |
+[Agent Workflows](AGENT_WORKFLOWS.md)
+
+</div>
+
+---
 
 ## Why Use It
 
-Use it when you want a small, local-first Unity MCP surface for validation-heavy workflows rather than broad unrestricted editor mutation.
+Use XUUnity Light Unity MCP when you want a local-first Unity MCP for
+validation-heavy AI workflows, not broad unrestricted editor mutation.
 
-Good fits:
+- compile checks without switching the active Unity build target
+- EditMode and PlayMode tests with normalized result accounting
+- scene snapshots, scene assertions, console tail, and Game View screenshots
+- bounded scenario validation and request-journal recovery after editor reloads
+- same-host multi-project routing for workstations with multiple Unity projects
+- editor-only package, disabled by default, with no player-build footprint by default
 
-- Unity Editor status and health checks
-- Unity console tail
-- scene snapshot and scene assertions
-- EditMode and PlayMode test execution
-- player script compile validation
-- compile matrix across build targets and scripting defines
-- build target get/switch
-- Game View configuration and screenshots
-- bounded scenario validation and scenario runs
-- same-host multi-project routing
+---
 
 ## Quick Start
 
-Add the Unity package to `Packages/manifest.json`:
+### Prerequisites
+
+- Unity 2021.3 LTS+; Unity 6000 is the main validated production path
+- Python 3.10+
+- one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md)
+
+### 1. Install The Unity Package
+
+In Unity: `Window > Package Manager > + > Add package from git URL...`
+
+> Tip
+>
+> ```text
+> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/templates/unity-package#v0.3.11
+> ```
+
+Or add it directly to `Packages/manifest.json`:
 
 ```json
 {
@@ -37,13 +71,17 @@ Add the Unity package to `Packages/manifest.json`:
 }
 ```
 
-Install the host-side MCP helper:
+Local package source for MCP development:
+`file:/absolute/path/to/xuunity-light-unity-mcp/templates/unity-package`.
+OpenUPM is planned; use Git UPM until the package is published there.
+
+### 2. Install The Host MCP Helper
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh
 ```
 
-Enable the bridge for a Unity project:
+Enable the bridge for one Unity project:
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh \
@@ -51,66 +89,109 @@ bash init_xuunity_light_unity_mcp.sh \
   --enable-project
 ```
 
-For complete setup, see [INSTALL.md](INSTALL.md).
+The installer writes Unix and Windows launchers: `run.sh`, `run.cmd`, and
+`run.ps1`.
+
+### 3. Connect Your Client
+
+Use a ready-made client template:
+
+```bash
+# Claude Code project scope
+cp templates/clients/claude-code/.mcp.json .mcp.json
+
+# Cursor project scope
+mkdir -p .cursor
+cp templates/clients/cursor/mcp.json .cursor/mcp.json
+```
+
+Native Windows templates are included next to the Unix templates as
+`.windows.json` files.
+
+### 4. Verify Connection
+
+```bash
+bash xuunity_light_unity_mcp.sh ensure-ready \
+  --project-root /path/to/UnityProject \
+  --open-editor
+
+bash xuunity_light_unity_mcp.sh request-status-summary \
+  --project-root /path/to/UnityProject
+```
+
+Then try:
+
+```text
+Use XUUnity Light Unity MCP to check this Unity project health, compile Android
+player scripts, and report the first actionable failure with artifact paths.
+```
+
+---
 
 ## Supported Clients
 
-- [Cursor](docs/clients/cursor.md)
 - [Claude Code](docs/clients/claude-code.md)
 - [Claude Desktop](docs/clients/claude-desktop.md)
+- [Cursor](docs/clients/cursor.md)
 - [Windsurf](docs/clients/windsurf.md)
 - [Codex-style agents](docs/clients/codex.md)
-- custom MCP-compatible agents
+- custom stdio MCP clients
 
-## Safety Model
+Manual macOS/Linux and Windows configs live in `templates/clients/`.
 
-- editor-only Unity package
-- disabled by default
-- explicit per-project enablement
-- no player build footprint by default
-- no runtime/player automation in the base package
-- no dynamic Roslyn execution path
-- no SignalR or external relay stack
-- capability-gated operations
+<details>
+<summary><strong>Features And Tools</strong></summary>
 
-See [SECURITY.md](SECURITY.md) for the threat model.
+Popular MCP tools:
+
+`unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
+`unity_console_tail` | `unity_scene_snapshot` | `unity_scene_assert` |
+`unity_compile_player_scripts` | `unity_compile_matrix` |
+`unity_compile_build_config_matrix` | `unity_tests_run_editmode` |
+`unity_tests_run_playmode` | `unity_playmode_state` | `unity_playmode_set` |
+`unity_game_view_configure` | `unity_game_view_screenshot` |
+`unity_scenario_validate` | `unity_scenario_run_and_wait` |
+`unity_request_final_status` | `unity_project_refresh` |
+`unity_edm4u_resolve` | `unity_sdk_dependency_verify`
+
+Host helper commands include `ensure-ready`, `restore-editor-state`,
+`recover-editor-session`, `batch-compile`, `batch-editmode-tests`,
+`batch-build-config-compile-matrix`, `artifact-probe`, `devmode`, and `prodmode`.
+
+See [FEATURES.md](FEATURES.md) for maturity levels and implementation evidence.
+
+</details>
+
+<details>
+<summary><strong>Package Mode, Troubleshooting, And Security</strong></summary>
+
+`devmode` is for local MCP package edits:
+`bash xuunity_light_unity_mcp.sh devmode --project-root /path/to/UnityProject`.
+
+`prodmode` is for published Git-pinned package state:
+`bash xuunity_light_unity_mcp.sh prodmode --project-root /path/to/UnityProject`.
+
+Troubleshooting:
+
+- Server not found: run `bash init_xuunity_light_unity_mcp.sh` again.
+- Bridge disabled: run the installer with `--project-root` and `--enable-project`.
+- Unity not ready: run `ensure-ready --open-editor` before validation tools.
+- Package changes not visible: run `unity_project_refresh` or reopen Unity.
+- Long operation timed out: recover with `request-final-status`.
+
+Safety defaults: local same-host MCP server, editor-only package, disabled by
+default, explicit per-project enablement, no runtime/player automation in the
+base package, no dynamic Roslyn execution path, and no SignalR or external relay
+stack.
+
+</details>
 
 ## Documentation
 
-- [Install](INSTALL.md)
-- [Features](FEATURES.md)
-- [AI integration](AI_INTEGRATION.md)
-- [Agent workflows](AGENT_WORKFLOWS.md)
-- [Machine-readable workflow templates](templates/workflows/)
-- [Security model](SECURITY.md)
-- [Comparison](COMPARISON.md)
-- [Discovery guide](DISCOVERY.md)
-- [Glossary](GLOSSARY.md)
-- [Current implementation status](STATUS.md)
-- [Build automation](BUILD_AUTOMATION.md)
-- [Smoke tests](SMOKE_TESTS.md)
-- [Roadmap](ROADMAP.md)
+[Install](INSTALL.md) | [Features](FEATURES.md) | [AI integration](AI_INTEGRATION.md) |
+[Agent workflows](AGENT_WORKFLOWS.md) | [Workflow templates](templates/workflows/) |
+[Security](SECURITY.md) | [Comparison](COMPARISON.md) | [Discovery](DISCOVERY.md) |
+[Glossary](GLOSSARY.md) | [Status](STATUS.md) | [Build automation](BUILD_AUTOMATION.md) |
+[Smoke tests](SMOKE_TESTS.md) | [Roadmap](ROADMAP.md)
 
-## Package
-
-Unity package id:
-
-```text
-com.xuunity.light-mcp
-```
-
-Current package version:
-
-```text
-0.3.11
-```
-
-Package folder:
-
-```text
-templates/unity-package
-```
-
-## License
-
-MIT. See [LICENSE](LICENSE) and [LICENSE.md](LICENSE.md).
+License: MIT. See [LICENSE](LICENSE) and [LICENSE.md](LICENSE.md). Need help? Open an [issue](https://github.com/FoxsterDev/xuunity-light-unity-mcp/issues).
