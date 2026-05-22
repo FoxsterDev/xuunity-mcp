@@ -469,6 +469,85 @@ dispatch_arrange_unity_windows() {
   exec python3 "$arrange_script_path" "$@"
 }
 
+print_wrapper_help() {
+  cat <<EOF
+Usage: $(basename "$0") [--compact-summary] <command> [args]
+
+Wrapper commands:
+  help | --help
+      Show this wrapper command list.
+  server-help
+      Show the installed server CLI help.
+  devmode --project-root PATH
+      Point com.xuunity.light-mcp at the local templates/unity-package source
+      and remove its package-lock entry so Unity can re-resolve it.
+  prodmode --project-root PATH
+      Pin com.xuunity.light-mcp to the current published source HEAD and remove
+      its package-lock entry. Refuses unpublished source commits.
+  arrange-unity-windows [args]
+      Arrange Unity and agent windows on macOS.
+
+Server commands:
+  Any other command refreshes the installed helper from this source checkout and
+  delegates to server.py. Common commands include:
+    ensure-ready
+    request-status-summary
+    request-capabilities
+    request-health-probe
+    request-project-refresh
+    request-compile
+    request-editmode-tests
+    request-playmode-tests
+    request-final-status
+    restore-editor-state
+    batch-compile
+    batch-editmode-tests
+
+Mode notes:
+  devmode is for local MCP package iteration only.
+  prodmode is for published source state only; push the source branch or tag
+  before switching a project back to prodmode.
+  After devmode or prodmode, let Unity re-resolve packages by reopen, focus, or
+  explicit project refresh.
+EOF
+}
+
+print_mode_help() {
+  local mode="$1"
+  case "$mode" in
+    devmode)
+      cat <<EOF
+Usage: $(basename "$0") devmode --project-root PATH
+
+Switch a Unity project to local XUUnity Light Unity MCP package development.
+
+Effects:
+  - sets com.xuunity.light-mcp to file:<relative path to templates/unity-package>
+  - removes the com.xuunity.light-mcp package-lock entry
+
+After switching, let Unity re-resolve packages by reopen, focus, or explicit
+project refresh before running validation.
+EOF
+      ;;
+    prodmode)
+      cat <<EOF
+Usage: $(basename "$0") prodmode --project-root PATH
+
+Switch a Unity project to a published Git-pinned XUUnity Light Unity MCP package.
+
+Effects:
+  - verifies the current source HEAD is advertised by the remote
+  - sets com.xuunity.light-mcp to the remote Git package URL pinned to that HEAD
+  - removes the com.xuunity.light-mcp package-lock entry
+
+Push the source branch or release tag before prodmode. After switching, let Unity
+re-resolve packages by reopen, focus, or explicit project refresh before running
+validation.
+EOF
+      ;;
+  esac
+}
+
 filtered_args=()
 for arg in "$@"; do
   if [[ "$arg" == "--compact-summary" ]]; then
@@ -479,9 +558,21 @@ for arg in "$@"; do
 done
 set -- "${filtered_args[@]}"
 
+case "${1:-}" in
+  -h|--help|help)
+    print_wrapper_help
+    exit 0
+    ;;
+esac
+
 sync_installed_helper_if_needed
 
 case "${1:-}" in
+  server-help)
+    shift
+    run_server_with_optional_compact_summary --help "$@"
+    exit 0
+    ;;
   arrange-unity-windows)
     shift
     dispatch_arrange_unity_windows "$@"
@@ -489,11 +580,19 @@ case "${1:-}" in
     ;;
   devmode)
     shift
+    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
+      print_mode_help devmode
+      exit 0
+    fi
     switch_project_to_devmode "$@"
     exit 0
     ;;
   prodmode)
     shift
+    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
+      print_mode_help prodmode
+      exit 0
+    fi
     switch_project_to_prodmode "$@"
     exit 0
     ;;

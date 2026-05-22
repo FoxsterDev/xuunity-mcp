@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added wrapper help and agent workflow guidance for MCP `devmode` and `prodmode` package-source switching.
+
 ## 0.3.11
 
 - Replaced placeholder client docs with production-ready MCP configs for Claude Code, Claude Desktop, Cursor, Windsurf, Codex-style agents, and generic stdio MCP clients.

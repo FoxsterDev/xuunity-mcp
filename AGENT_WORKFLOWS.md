@@ -93,6 +93,7 @@ Each completed workflow should report:
 - project root
 - Unity version when available
 - package version when available
+- package source mode when MCP package wiring changed
 - bridge readiness result
 - capability/adapter status for used operations
 - compile/test/scenario/build target outcome
@@ -707,6 +708,76 @@ Unity validation:
 - residual risk:
 ```
 
+## Workflow 13: MCP Package Source Mode Switching
+
+Use when the agent is changing this MCP package or validating unpublished MCP
+package changes inside a real Unity project.
+
+Agent prompt:
+
+```text
+Switch the Unity project into the correct XUUnity Light Unity MCP package source
+mode. Use devmode only for local package iteration. Use prodmode only after the
+source commit or tag is published. Do not hand-edit the manifest to bypass the
+wrapper checks.
+```
+
+Development route:
+
+```bash
+"$WRAPPER" devmode \
+  --project-root "$PROJECT_ROOT"
+
+"$WRAPPER" request-project-refresh \
+  --project-root "$PROJECT_ROOT" \
+  --force-asset-refresh \
+  --resolve-packages \
+  --rerun-health-probe \
+  --timeout-ms 60000
+```
+
+Use `devmode` only while actively editing the MCP source package. It writes a
+local `file:` dependency to `templates/unity-package` and removes the package
+lock entry so Unity can re-resolve the package.
+
+Production route:
+
+```bash
+# First publish the MCP source branch or release tag that contains the package
+# changes. prodmode refuses to pin an unpublished source HEAD.
+git push origin HEAD
+
+"$WRAPPER" prodmode \
+  --project-root "$PROJECT_ROOT"
+
+"$WRAPPER" request-project-refresh \
+  --project-root "$PROJECT_ROOT" \
+  --force-asset-refresh \
+  --resolve-packages \
+  --rerun-health-probe \
+  --timeout-ms 60000
+```
+
+Use `prodmode` for publishable project state. It pins the Unity dependency to
+the current published source commit and removes the package lock entry so Unity
+can re-resolve it.
+
+Stop criteria:
+
+- `prodmode` says the source HEAD is not advertised by the remote
+- Unity package re-resolution fails
+- the project remains in devmode when the task is a release or publish closeout
+- package refresh succeeds but health probe or compile validation fails
+
+Evidence to report:
+
+- mode selected: `devmode` or `prodmode`
+- previous and new `com.xuunity.light-mcp` dependency value
+- whether the package-lock entry was removed
+- published source commit or tag for prodmode
+- project refresh and health-probe result after switching
+- validation gap if Unity could not re-resolve packages
+
 ## Anti-Patterns
 
 Avoid these agent behaviors:
@@ -716,6 +787,8 @@ Avoid these agent behaviors:
 - using broad editor mutation when a read/validate operation is enough
 - rerunning timed-out operations before checking `request-final-status`
 - treating Game View reflection support as universal
+- leaving a release-bound project in `devmode`
+- hand-editing `Packages/manifest.json` to fake `prodmode` around an unpublished source commit
 - hiding skipped Windows/Linux/client smoke validation
 - storing credentials in scenario files, expectation files, logs, or generated reports
 - using project-private details in public docs or examples
