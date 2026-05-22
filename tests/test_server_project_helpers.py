@@ -1254,7 +1254,7 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertCountEqual(["a", "b"], entry_order)
 
     def test_find_running_unity_editors_for_project_ignores_unity_hub_launcher(self) -> None:
-        project_root = Path("/Users/test/ProjectA")
+        project_root = Path("/tmp/xuunity/ProjectA")
         commands = [
             (
                 101,
@@ -1279,12 +1279,12 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertEqual("6000.0.58f2", matches[0]["unity_version"])
 
     def test_find_running_unity_editors_for_project_requires_exact_project_path_argument(self) -> None:
-        project_root = Path("/Users/test/ProjectA")
+        project_root = Path("/tmp/xuunity/ProjectA")
         commands = [
             (
                 202,
                 "/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity "
-                '-projectPath "/Users/test/ProjectA-Shadow" -logFile /tmp/editor.log',
+                '-projectPath "/tmp/xuunity/ProjectA-Shadow" -logFile /tmp/editor.log',
             ),
         ]
 
@@ -1299,12 +1299,12 @@ class ServerProjectHelperTests(unittest.TestCase):
     def test_extract_unity_project_path_from_command_supports_quoted_paths(self) -> None:
         command = (
             '/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity '
-            '-projectPath "/Users/test/My Project" -logFile /tmp/editor.log'
+            '-projectPath "/tmp/xuunity/My Project" -logFile /tmp/editor.log'
         )
 
         result = server_editor_host.extract_unity_project_path_from_command(command)
 
-        self.assertEqual("/Users/test/My Project", result)
+        self.assertEqual("/tmp/xuunity/My Project", result)
 
 
 if __name__ == "__main__":

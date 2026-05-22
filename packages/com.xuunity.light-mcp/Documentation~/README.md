@@ -1,5 +1,8 @@
 # XUUnity Light MCP Unity Package
 
+Date: `2026-05-22`
+Status: `current for package v0.3.12`
+
 This Unity package provides the editor-side bridge for the lightweight
 XUUnity Light Unity MCP service.
 

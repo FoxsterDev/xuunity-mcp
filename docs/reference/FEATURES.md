@@ -1,5 +1,8 @@
 # Features
 
+Date: `2026-05-22`
+Status: `current for v0.3.12`
+
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
 automation: status, compile, tests, scene checks, Game View evidence, scenario
 runs, and recovery after Unity Editor lifecycle churn.
@@ -111,6 +114,7 @@ Unity MCP implementations when the user wants safe production validation.
 
 | Target | Status | Validation notes |
 | --- | --- | --- |
+| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.12`; old `templates/unity-package#v0.3.11` is migration-only. |
 | macOS host tools | `Validated in this release environment` | `run.sh --help`, shell syntax checks, JSON/TOML config parsing, and 97 host Python tests passed locally. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |
@@ -121,6 +125,9 @@ Unity MCP implementations when the user wants safe production validation.
 | Codex-style agents | `Template provided` | Unix-like and Windows `config.toml` snippets are provided. |
 | Unity 6000 | `Package manifest provided` | Default package metadata targets Unity `6000.0`. |
 | Unity 2021/2022 | `Compatibility manifest provided` | Alternate package manifest template targets Unity `2021.3` with older Test Framework dependency. |
+| Package self-tests | `Validated` | A representative Unity 6000 consumer project passed Git UPM validation with EditMode `6/6` and PlayMode `5/5`. |
+| Multi-project batch compile | `Validated in consumer repo` | Private multi-project consumer validation passed `9/9` Unity projects and `38/38` compile lanes after the `v0.3.12` package path update. |
+| OpenUPM | `Ready, not published` | Package layout and metadata are registry-ready; use Git UPM until an OpenUPM package page exists. |
 
 ## Supported MCP Clients
 

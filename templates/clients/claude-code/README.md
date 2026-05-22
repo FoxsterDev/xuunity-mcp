@@ -137,8 +137,8 @@ transport.
   the target Unity project (the server does not assume one).
 - The repo router (`Agents.md`) requires validation to go through MCP for
   Unity-aware lanes; do not fall back to direct `unity -batchmode` /
-  `-runTests` from a shell tool just because Unity is installed locally. See
-  `AIModules/XUUnityInternal/knowledge/apperfunhub_validation_boundaries.md`.
+  `-runTests` from a shell tool just because Unity is installed locally. If your
+  host repo defines local validation-boundary guidance, follow that guidance.
 - Project-scope `.mcp.json` requires user approval on first launch. That is
   Claude Code's built-in safeguard; it cannot be auto-approved by the snippet.
 - The Claude-side install (`~/.claude-tools/`) is fully independent from any

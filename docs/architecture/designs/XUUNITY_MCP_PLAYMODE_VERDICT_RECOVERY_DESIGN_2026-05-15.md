@@ -41,17 +41,17 @@ Validation completed:
   - includes regression coverage for `recover-editor-session --open-editor`
     using the helper that returns both JSON payload and process status
   - includes regression coverage for same-project host launch-in-progress reuse
-- package self-tests through ApperfunHub MCP devmode:
+- package self-tests through private consumer project MCP devmode:
   - EditMode `6/6` passing
   - PlayMode `5/5` passing
   - observed transport: `tcp_loopback`
-- ApperfunHub project validation after P1:
+- private consumer project validation after P1:
   - EditMode `518/518` passing
   - PlayMode `250/250` passing on retry after a transient Unity Package
     Manager auth/log issue
 - isolated setup smoke for a temporary Unity project root:
   - generated `bridge_config.json` contains `"transport": "tcp_loopback"`
-- PlayMode verdict recovery proof suite through ApperfunHub MCP devmode:
+- PlayMode verdict recovery proof suite through private consumer project MCP devmode:
   - compact passing PlayMode verdict with counts
   - scenario polling timeout reconciled from terminal persisted result
   - started PlayMode runtime timeout classified as
@@ -591,10 +591,10 @@ Current proof-plan status as of `2026-05-15`:
 | Proof area | Status | Notes |
 | --- | --- | --- |
 | Host unit and fixture tests | Complete for current implementation | `../../../scripts/testing/run_host_python_tests.sh` passes `90/90`; coverage includes persisted PlayMode result recovery, missing-payload unproven verdict, started runtime timeout, pre-start timeout separation, cleanup guidance, P1 scenario reconciliation, P2 `file_ipc` readiness wording, default `tcp_loopback` transport resolution, `recover-editor-session --open-editor` helper regression, and same-project host launch-in-progress reuse |
-| Unity/package self-tests | Complete for current package self-test scope | `run_package_self_tests.sh --mode all` passes against ApperfunHub in devmode: EditMode `6/6`, PlayMode `5/5`, using `tcp_loopback` |
-| Consumer project regression | Complete for broad project regression, with one transient retry | ApperfunHub EditMode `518/518` passed; ApperfunHub PlayMode `250/250` passed on retry after a transient Unity Package Manager auth/log issue |
+| Unity/package self-tests | Complete for current package self-test scope | `run_package_self_tests.sh --mode all` passes against a private consumer project in devmode: EditMode `6/6`, PlayMode `5/5`, using `tcp_loopback` |
+| Consumer project regression | Complete for broad project regression, with one transient retry | Private consumer project EditMode `518/518` passed; private consumer project PlayMode `250/250` passed on retry after a transient Unity Package Manager auth/log issue |
 | New-project setup default | Verified | Isolated setup smoke generated `Library/XUUnityLightMcp/config/bridge_config.json` with `"transport": "tcp_loopback"` |
-| PlayMode verdict recovery proof suite | Complete | `run_playmode_verdict_recovery_proof_suite.sh` passed against ApperfunHub in devmode; it deploys a temporary generated PlayMode proof assembly under `Assets/`, cleans it up, and verifies pass, persisted scenario reconciliation, runtime timeout, cleanup guidance, final healthy/edit state, and no generated proof assets left in project status |
+| PlayMode verdict recovery proof suite | Complete | `run_playmode_verdict_recovery_proof_suite.sh` passed against a private consumer project in devmode; it deploys a temporary generated PlayMode proof assembly under `Assets/`, cleans it up, and verifies pass, persisted scenario reconciliation, runtime timeout, cleanup guidance, final healthy/edit state, and no generated proof assets left in project status |
 | Live started-runtime-timeout proof | Complete | Proof suite observed `runtime_timeout_after_test_start` with started/progress evidence |
 | Live cleanup-guidance proof | Complete | Proof suite observed concrete PlayMode exit cleanup command and verified final `playmode_state=edit` |
 | Live scenario polling false-negative proof | Complete | Proof suite forced poll-timeout recovery and reconciled the terminal persisted scenario result |

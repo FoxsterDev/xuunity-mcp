@@ -109,27 +109,27 @@ So on this host, the package is now live-proven across:
 
 Original pre-fix matrix run summary:
 
-- `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T160449Z/summary.tsv`
+- `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T160449Z/summary.tsv`
 
 Original pre-fix matrix result root:
 
-- `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T160449Z/results/`
+- `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T160449Z/results/`
 
 Focused `2022.3.67f2` rerun showing the old package-resolution failure:
 
-- summary: `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T160926Z/summary.tsv`
-- project root: `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T160926Z/projects/SampleProject_2022_3_67f2`
-- editor log: `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T160926Z/projects/SampleProject_2022_3_67f2/Library/XUUnityLightMcp/logs/unity_editor.log`
+- summary: `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T160926Z/summary.tsv`
+- project root: `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T160926Z/projects/SampleProject_2022_3_67f2`
+- editor log: `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T160926Z/projects/SampleProject_2022_3_67f2/Library/XUUnityLightMcp/logs/unity_editor.log`
 
 Focused rerun after version-aware package generation proved `2022.3.67f2` end to end:
 
-- summary: `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T162425Z/summary.tsv`
-- result root: `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T162425Z/results/2022.3.67f2`
+- summary: `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T162425Z/summary.tsv`
+- result root: `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T162425Z/results/2022.3.67f2`
 
 Current post-fix full matrix:
 
-- summary: `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T162524Z/summary.tsv`
-- result root: `/private/var/folders/z5/_nnwz2wx7rbc9m83l3qsjhf40000gn/T/xuunity-light-unity-mcp-version-matrix/20260507T162524Z/results/`
+- summary: `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T162524Z/summary.tsv`
+- result root: `<temp-root>/xuunity-light-unity-mcp-version-matrix/20260507T162524Z/results/`
 
 ## Recommendation For README
 

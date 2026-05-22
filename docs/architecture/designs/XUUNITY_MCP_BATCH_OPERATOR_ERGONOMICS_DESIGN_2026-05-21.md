@@ -76,12 +76,12 @@ Validation:
 - Host Python compile check passed for changed server modules.
 - Host unittest discovery passed: `96` tests.
 - `../../../scripts/testing/run_host_python_tests.sh` passed: `96` tests.
-- Unity package self-tests passed against `ApperfunHub` in MCP `devmode`:
+- Unity package self-tests passed against a private consumer project in MCP `devmode`:
   EditMode `6/6`, PlayMode `5/5`.
-- `ApperfunHub` MCP post-change validation passed end-to-end after updating its
+- Private consumer project MCP post-change validation passed end-to-end after updating its
   stale PlayMode regression selector to the current
-  `Apperfun.Core.Tests.PlayMode` assembly and full test name.
-- `ApperfunHub` batch compile passed for `Android`: `70` assemblies compiled,
+  private consumer PlayMode test assembly and full test name.
+- Private consumer project batch compile passed for `Android`: `70` assemblies compiled,
   `0` errors, and no unexpected new dirty paths.
 
 Not covered:

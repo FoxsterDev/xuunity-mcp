@@ -1,5 +1,8 @@
 # AI Integration Instructions
 
+Date: `2026-05-22`
+Status: `current for package v0.3.12`
+
 Use this document when an AI agent is integrating this Unity package into a new
 project.
 
@@ -25,6 +28,12 @@ The full system requires:
    - capability report
    - health probe
 6. only then run compile, tests, play mode, or screenshot commands
+
+Current Git UPM package URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
+```
 
 ## Safety Rules
 

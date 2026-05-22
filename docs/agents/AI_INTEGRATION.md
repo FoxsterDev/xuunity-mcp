@@ -1,6 +1,6 @@
 # AI Integration Guide
 
-Date: `2026-05-07`
+Date: `2026-05-22`
 Status: `active public guidance`
 
 ## Purpose
@@ -73,18 +73,7 @@ bash init_xuunity_light_unity_mcp.sh \
 
 ## Package Install Route
 
-For active local development, point directly at the package folder:
-
-```json
-{
-  "dependencies": {
-    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp"
-  }
-}
-```
-
-For projects that want to consume the Unity package directly from GitHub,
-use the package subpath route instead:
+For production consumers, use the current Git UPM release path:
 
 ```json
 {
@@ -94,10 +83,26 @@ use the package subpath route instead:
 }
 ```
 
-Use this route when:
+For active local development of this MCP package, point directly at the package
+folder:
+
+```json
+{
+  "dependencies": {
+    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp"
+  }
+}
+```
+
+Use the Git UPM route when:
 
 - the consumer repo should not vendor the package files locally
 - the team wants a single upstream source of truth
+- the project should be publishable or CI-friendly
+
+OpenUPM is not the documented install route yet. The package layout is
+OpenUPM-ready, but Git UPM remains the current production path until the package
+is published there.
 
 Use the direct local `file:` route when:
 

@@ -1,5 +1,8 @@
 # Install XUUnity Light Unity MCP
 
+Date: `2026-05-22`
+Status: `current for v0.3.12`
+
 XUUnity Light Unity MCP has two pieces:
 
 1. a host-side MCP server
@@ -8,6 +11,9 @@ XUUnity Light Unity MCP has two pieces:
 Install both before expecting an AI client to control Unity.
 
 ## Option 1: Git UPM Package
+
+This is the current production install route until OpenUPM publication is
+complete.
 
 Add this dependency to `Packages/manifest.json`:
 
@@ -178,6 +184,17 @@ After package import and bridge enablement:
 6. call `unity.health.probe`
 
 Do not treat the install as ready until status, capabilities, and health probe all succeed.
+
+For package-level verification after upgrading to `v0.3.12`, run:
+
+```bash
+templates/smoke/run_package_self_tests.sh \
+  --project-root /path/to/UnityProject \
+  --mode all
+```
+
+The current self-test baseline is EditMode `6/6` and PlayMode `5/5` on a
+healthy Unity 6000 project.
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Continuation
 
-Date: `2026-05-07`
+Date: `2026-05-22`
 Status: `active continuation note`
 
 ## Current Baseline
@@ -314,7 +314,7 @@ For shared protocol integration work:
 - second-wave scenario steps can run and report structured results
 - startup helpers can fail fast on interactive compile blockers and package-resolution failures
 - host-opened editor sessions can be restored to the original closed state after validation
-- baseline smoke orchestration can be reused from public `AIRoot` templates while keeping consumer-specific fixtures host-local
+- baseline smoke orchestration can be reused from this public repo's templates while keeping consumer-specific fixtures host-local
 - lifecycle-reset ambiguity can now be resolved from the request journal without manual raw journal digging
 - the reusable post-change validation route now runs compile before heavier scenario work
 - the public operator contract now prefers summary-first recovery over repeated

@@ -15,7 +15,7 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
     def test_jsonl_progress_plus_final_json_stdout_counts_as_success(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            project_root = temp_root / "Sudoku"
+            project_root = temp_root / "ConsumerProject"
             (project_root / "Packages").mkdir(parents=True)
             (project_root / "ProjectSettings").mkdir()
             (project_root / "Packages" / "manifest.json").write_text(
@@ -96,7 +96,7 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr + completed.stdout)
-            status = json.loads((results_dir / "Sudoku_status.json").read_text(encoding="utf-8"))
+            status = json.loads((results_dir / "ConsumerProject_status.json").read_text(encoding="utf-8"))
             self.assertTrue(status["json_parse_ok"])
             self.assertTrue(status["succeeded"])
             self.assertEqual("passed", status["matrix_status"])

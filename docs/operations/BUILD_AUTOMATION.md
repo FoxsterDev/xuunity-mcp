@@ -1,7 +1,10 @@
 # Build Automation Surface
 
-This document defines the public-safe build automation surface for
-`AIRoot/Operations/XUUnityLightUnityMcp`.
+Date: `2026-05-22`
+Status: `current for v0.3.12`
+
+This document defines the public-safe build automation surface for the
+standalone `xuunity-light-unity-mcp` repository.
 
 The goal is to keep the public contract generic enough for:
 - plain Unity projects that only need normal batch builds
@@ -15,11 +18,15 @@ Current public operations:
 - `unity.build_target.switch`
 - `unity.compile.player_scripts`
 - `unity.compile.matrix`
+- `unity_compile_build_config_matrix`
 - `unity.edm4u.resolve`
 - `unity.sdk.dependency.verify`
 - `unity_status_summary`
 - `unity_request_final_status`
 - `unity_scenario_result_summary`
+- `unity_scenario_results_list`
+- `unity_scenario_result_latest`
+- `unity_scenario_run_and_wait`
 - `unity_maintenance_prune`
 
 Current public scenario hook lane:
@@ -153,7 +160,7 @@ The public layer should own orchestration, not project-specific settings mutatio
 Current minimal host-side command:
 
 ```bash
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   batch-compile \
   --project-root /path/to/UnityProject \
   --target Android
@@ -162,11 +169,11 @@ python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
 Define-matrix validation and deterministic EditMode tests use the same closed-project batch lane:
 
 ```bash
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   batch-build-config-compile-matrix \
   --project-root /path/to/UnityProject
 
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   batch-editmode-tests \
   --project-root /path/to/UnityProject \
   --assembly-name MyProject.Tests
@@ -175,7 +182,7 @@ python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
 Plain artifact builds still use:
 
 ```bash
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   batch-build-player \
   --project-root /path/to/UnityProject \
   --build-target Android \
@@ -200,7 +207,7 @@ Default progress behavior:
 Batch helpers also report tracked workspace side effects:
 
 ```bash
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   batch-build-player \
   --project-root /path/to/UnityProject \
   --build-target Android \
@@ -220,7 +227,7 @@ command.
 Artifact probes can be attached to `batch-build-player`:
 
 ```bash
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   batch-build-player \
   --project-root /path/to/UnityProject \
   --build-target Android \
@@ -232,7 +239,7 @@ The same generic probe runner can inspect an existing artifact without
 rebuilding:
 
 ```bash
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   artifact-probe \
   --artifact-path Builds/Android/MyGame.apk \
   --artifact-probe-file /path/to/probes.json
@@ -413,7 +420,7 @@ are large.
 Current cleanup command:
 
 ```bash
-python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
+python3 templates/server.py \
   maintenance-prune \
   --project-root /path/to/UnityProject \
   --dry-run
@@ -421,7 +428,7 @@ python3 AIRoot/Operations/XUUnityLightUnityMcp/templates/server.py \
 
 ## What Stays Project-Local
 
-Do not promote these into public `AIRoot`:
+Do not promote these into the public reusable repo:
 - project-specific asset paths
 - project-specific profile names
 - project-specific restore file lists

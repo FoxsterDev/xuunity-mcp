@@ -1,5 +1,8 @@
 # Package Path Migration
 
+Date: `2026-05-22`
+Status: `current for v0.3.12`
+
 XUUnity Light Unity MCP moved the Unity package to a registry-native path for
 OpenUPM and Unity Package Manager indexing.
 

@@ -1,5 +1,8 @@
 # XUUnity Light Unity MCP Devmode Validation
 
+Date: `2026-05-22`
+Status: `current for v0.3.12`
+
 Use this document when changing the XUUnity Light Unity MCP host, server,
 wrapper scripts, Unity package, package metadata, smoke runners, or package
 source switching behavior.
@@ -8,18 +11,19 @@ source switching behavior.
 
 - Treat `devmode` as the local-package validation mode for MCP development.
 - Validate MCP package changes through a consumer Unity project that resolves
-  `com.xuunity.light-mcp` from the local `AIRoot` working tree.
+  `com.xuunity.light-mcp` from the local `packages/com.xuunity.light-mcp`
+  working tree.
 - Project-specific smoke suites, compile matrices, scenario runs, and product
   PlayMode suites are useful additional evidence, but they do not replace the
   package-owned MCP regression lane.
 
 ## Required Closeout For Executable-Code Changes
 
-After executable-code changes under `AIRoot/Operations/XUUnityLightUnityMcp/`
-or its Unity package, run the package-owned self-test lane before closeout:
+After executable-code changes in this repo or its Unity package, run the
+package-owned self-test lane before closeout:
 
 ```bash
-AIRoot/Operations/XUUnityLightUnityMcp/templates/smoke/run_package_self_tests.sh \
+templates/smoke/run_package_self_tests.sh \
   --project-root <UnityProjectRoot> \
   --mode all
 ```

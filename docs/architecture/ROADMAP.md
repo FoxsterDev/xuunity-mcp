@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Roadmap
 
-Date: `2026-05-10`
+Date: `2026-05-22`
 Status: `active public roadmap`
 
 ## North Star
@@ -66,6 +66,8 @@ survival and more about:
 
 Already implemented:
 
+- standalone public repository and `v0.3.12` Git UPM package path under
+  `packages/com.xuunity.light-mcp`
 - bridge enable/disable lifecycle
 - status and capability probing
 - compact status summaries with bridge stabilization fields
@@ -109,6 +111,8 @@ Already implemented:
   `designs/XUUNITY_MCP_BATCH_OPERATOR_ERGONOMICS_DESIGN_2026-05-21.md`:
   progress heartbeats, artifact probes, workspace side-effect summaries,
   project-defined hook summaries, and reclassification operator verdicts
+- public agent documentation, client templates, workflow templates, comparison,
+  security, discovery, and install docs are in place
 
 This is enough for:
 
@@ -117,6 +121,7 @@ This is enough for:
 - controlled screenshot capture
 - early automation experiments
 - repeatable same-host multi-project routing and recovery
+- production Git UPM consumption through `v0.3.12`
 
 This is not yet enough for:
 
@@ -130,11 +135,11 @@ This is not yet enough for:
 
 Near-term target:
 
-- raise the current service from `78/100` to `85+/100`
+- move from a strong same-host validation lane to broader ecosystem readiness
 - do this first in the intended same-host editor validation scope
 - avoid widening scope until the current lane is measurably hardened
 
-Meaning of `85+` here:
+Meaning of "operationally strong" here:
 
 - repeatable healthy startup and validation across supported clients
 - clear recovery after bridge churn and lifecycle resets
@@ -147,6 +152,8 @@ It is the threshold for calling the current lane operationally strong.
 
 Near-term emphasis after the architecture milestone:
 
+- submit the package to OpenUPM now that the registry-native package path is in
+  place
 - keep hardening the current lane with richer evidence outputs
 - broaden proof across more supported clients and more real consumer projects
 - improve read surfaces so diagnosis needs less shell fallback
@@ -155,30 +162,30 @@ Near-term emphasis after the architecture milestone:
 
 Current recommendation:
 
-- close the remaining Phase 1 reliability hardening before broadening proof
+- close package-discovery publication work and then broaden host/client proof
 
 Most valuable next milestone:
 
-- lifecycle and stale-request reliability closeout for the current same-host
-  editor lane
+- OpenUPM submission plus Linux/Windows live host smoke validation
 
 Why this is next:
 
-- artifact manifests, structured timings, and persisted scenario result
-  browsing are now materially in place
-- the biggest remaining trust gap is now lifecycle churn proof and the limits of
-  host-side-only cancellation semantics
-- broader cross-client proof will be more meaningful after that reliability
-  floor is tighter
+- `v0.3.12` moved the package to the registry-native path
+- macOS validation is strong enough for current same-host use
+- Linux and Windows claims should remain conservative until executed on those hosts
+- OpenUPM and external catalog pages are the next discoverability gap
 
 Focus:
 
+- OpenUPM submission and release metadata
+- Linux and native Windows smoke proof
+- broader supported-client proof
 - broader lifecycle fault-injection proof
 - request cancellation semantics
 - keep the new host prerequisite report stable while closing the remaining
   lifecycle gaps
 
-## Phased Plan To Reach 85+
+## Phased Plan To Broaden Proof
 
 ### Phase 1: Core Reliability Hardening
 
@@ -285,7 +292,7 @@ Focus:
 Exit criteria:
 - common validation and regression tasks stay inside the MCP lane instead of falling back to shell scraping
 - result interpretation is cheaper for both humans and agents
-- the current lane is defensibly `85+`
+- the current lane is defensibly operationally strong
 
 Expected score impact:
 - `+1 to +2`
@@ -321,7 +328,7 @@ Current progress:
   request artifacts
 - remaining work in this wave is broader fault-injection proof and
   cancellation-hygiene polish
-- this wave maps directly to Phase 1 and the beginning of Phase 2 in the `85+` plan
+- this wave maps directly to Phase 1 and the beginning of Phase 2 in the proof-broadening plan
 
 ### Wave 2: Better Read Surface
 
@@ -365,7 +372,7 @@ Current state:
 - current step surface is intentionally small
 - persisted result browsing and artifact surfacing are now in place
 - next gap is richer assertions and sharper failure interpretation rather than first-time scenario bring-up
-- this wave contributes to Phase 2 and Phase 4 of the `85+` plan
+- this wave contributes to Phase 2 and Phase 4 of the proof-broadening plan
 
 Done when:
 - a scripted play-mode regression scenario can be authored once and replayed by any supported agent
@@ -495,7 +502,7 @@ Do next:
 1. close the remaining Phase 1 reliability hardening
 2. broaden supported-client and multi-consumer proof in Phase 3
 3. keep tightening Phase 2 evidence surfacing where operator friction remains
-4. close Phase 4 only after the evidence says the lane is already near `85`
+4. close Phase 4 only after the evidence says the lane is already operationally strong
 
 Do not do next:
 

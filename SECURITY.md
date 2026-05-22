@@ -1,5 +1,8 @@
 # Security Model
 
+Date: `2026-05-22`
+Status: `current for v0.3.12`
+
 XUUnity Light Unity MCP is designed as a local same-host Unity Editor automation service.
 
 Default safety choices:
@@ -14,6 +17,8 @@ Default safety choices:
 - no project settings mutation during normal install path
 - capability-gated operations
 - request artifacts stored under the Unity project `Library` folder
+- production package consumed through a pinned Git UPM release path unless the
+  project intentionally switches into local `devmode`
 
 ## Threat Model
 
@@ -34,6 +39,8 @@ It is not intended to:
 - Treat AI clients as trusted local operators.
 - Review scenario files before running them against sensitive projects.
 - Do not store credentials in bridge configs or scenario files.
+- Use `prodmode` or an explicit Git UPM tag for publishable project state.
+- Use `devmode` only for local MCP package iteration.
 
 ## License And Operational Responsibility
 

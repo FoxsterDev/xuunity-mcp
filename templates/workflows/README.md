@@ -1,5 +1,8 @@
 # XUUnity Light Unity MCP Workflow Templates
 
+Date: `2026-05-22`
+Status: `current for v0.3.12`
+
 This folder contains machine-readable agent workflow templates.
 
 These files are planning and reporting artifacts for AI agents and local
@@ -20,3 +23,9 @@ Files:
   - Wrapper-only `devmode` and `prodmode` package-source switching.
 
 Use `../../docs/agents/AGENT_WORKFLOWS.md` for the human-readable playbooks and policy rules.
+
+Current production package source for workflow evidence:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
+```
