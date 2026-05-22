@@ -116,8 +116,8 @@ verdict itself is correct.
 
 Relevant public code areas:
 
-- `templates/unity-package/Editor/Helpers/XUUnityLightMcpTestRunState.cs`
-- `templates/unity-package/Editor/Operations/XUUnityLightMcpPlayModeTestsOperation.cs`
+- `packages/com.xuunity.light-mcp/Editor/Helpers/XUUnityLightMcpTestRunState.cs`
+- `packages/com.xuunity.light-mcp/Editor/Operations/XUUnityLightMcpPlayModeTestsOperation.cs`
 - `templates/server_specs.py`
 - `templates/server_bridge_payloads.py`
 - `templates/server_bridge_runtime.py`
@@ -335,8 +335,8 @@ settle is the better place to define post-run editor state.
 
 Files:
 
-- `templates/unity-package/Editor/Core/XUUnityLightMcpModels.cs`
-- `templates/unity-package/Editor/Helpers/XUUnityLightMcpTestRunState.cs`
+- `packages/com.xuunity.light-mcp/Editor/Core/XUUnityLightMcpModels.cs`
+- `packages/com.xuunity.light-mcp/Editor/Helpers/XUUnityLightMcpTestRunState.cs`
 
 Changes:
 

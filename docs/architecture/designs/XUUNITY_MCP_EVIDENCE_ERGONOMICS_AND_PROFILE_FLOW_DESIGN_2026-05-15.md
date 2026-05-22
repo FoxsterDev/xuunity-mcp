@@ -37,8 +37,8 @@ Updated: `2026-05-15`
 
 | Item | Status | Evidence |
 | --- | --- | --- |
-| `unity.scene.assert` operation | Implemented | `templates/unity-package/Editor/Operations/XUUnityLightMcpSceneAssertOperation.cs` |
-| `assert_scene` scenario step | Implemented | `templates/unity-package/Editor/Helpers/XUUnityLightMcpScenarioRunner.cs` |
+| `unity.scene.assert` operation | Implemented | `packages/com.xuunity.light-mcp/Editor/Operations/XUUnityLightMcpSceneAssertOperation.cs` |
+| `assert_scene` scenario step | Implemented | `packages/com.xuunity.light-mcp/Editor/Helpers/XUUnityLightMcpScenarioRunner.cs` |
 | MCP tool schema for scene assertion | Implemented | `templates/server_specs.py` exposes `unity_scene_assert` |
 | CLI scene assertion helper | Implemented | `templates/server.py` exposes `request-scene-assert` |
 | Capability/status accounting for scene assertion | Implemented | `XUUnityLightMcpCapabilityRegistry.cs` and `XUUnityLightMcpHealthProbe.cs` include `unity.scene.assert` |

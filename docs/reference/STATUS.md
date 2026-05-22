@@ -211,7 +211,7 @@ Public package self-tests:
   ```json
   {
     "dependencies": {
-      "com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/templates/unity-package"
+      "com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp"
     },
     "testables": [
       "com.xuunity.light-mcp"
@@ -334,7 +334,7 @@ On macOS, the process that launches the wrapper must have Accessibility access:
 - `templates/smoke/`
 - `templates/clients/`
 - `templates/package-manifests/`
-- `templates/unity-package/`
+- `packages/com.xuunity.light-mcp/`
 - `../architecture/designs/`
 - `../archive/retros/`
 - `../archive/reports/`
@@ -534,7 +534,7 @@ Default direct local dependency shape:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/templates/unity-package"
+    "com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp"
   }
 }
 ```
@@ -544,7 +544,7 @@ Git-pinned shape:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/ai-research-hub.git?path=/Operations/XUUnityLightUnityMcp/templates/unity-package#<commit>"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/ai-research-hub.git?path=/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp#<commit>"
   }
 }
 ```
@@ -572,7 +572,7 @@ AIRoot/Operations/XUUnityLightUnityMcp/xuunity_light_unity_mcp.sh \
 Behavior:
 
 - `devmode` rewrites `Packages/manifest.json` directly to the local `AIRoot` `file:` source:
-  - `file:../../AIRoot/Operations/XUUnityLightUnityMcp/templates/unity-package`
+  - `file:../../AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp`
 - `devmode` must not create a project-local mirror such as:
   - `<Project>/XUUnityLightMcpPackageSource/com.xuunity.light-mcp`
 - `prodmode` rewrites `Packages/manifest.json` to a git-pinned dependency using:
@@ -675,7 +675,7 @@ Public convenience wrapper:
 
 Optional Unity project scaffold:
 - manifest entry:
-  - `"com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/templates/unity-package"`
+  - `"com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp"`
 - local activation file only when explicitly enabled:
   - `<Project>/Library/XUUnityLightMcp/config/bridge_config.json`
 - package-declared dependency for the `unity_tests_run_editmode` operation:
@@ -930,12 +930,12 @@ Keep Unity-version claims just as narrow as transport claims:
 
 Current package declaration:
 
-- `templates/unity-package/package.json`
+- `packages/com.xuunity.light-mcp/package.json`
   - `"unity": "6000.0"`
 
 Current compatibility strategy for legacy editors:
 
-- keep the checked-in base package under `templates/unity-package/` as the `6000+` line
+- keep the checked-in base package under `packages/com.xuunity.light-mcp/` as the `6000+` line
 - generate a version-aware package source per project when wiring older editors
 - select the package manifest from:
   - `templates/package-manifests/unity-package-2021_2022.json`

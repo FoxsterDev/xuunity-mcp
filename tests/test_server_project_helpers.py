@@ -138,8 +138,8 @@ class ServerProjectHelperTests(unittest.TestCase):
                 / "AIRoot"
                 / "Operations"
                 / "XUUnityLightUnityMcp"
-                / "templates"
-                / "unity-package"
+                / "packages"
+                / "com.xuunity.light-mcp"
             )
             package_dir.mkdir(parents=True, exist_ok=True)
             (package_dir / "package.json").write_text('{"name":"com.xuunity.light-mcp"}\n', encoding="utf-8")
@@ -151,7 +151,7 @@ class ServerProjectHelperTests(unittest.TestCase):
                 json.dumps(
                     {
                         "dependencies": {
-                            "com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/templates/unity-package"
+                            "com.xuunity.light-mcp": "file:../../AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp"
                         }
                     },
                     indent=2,

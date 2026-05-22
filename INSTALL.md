@@ -14,7 +14,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/templates/unity-package#v0.3.11"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
   }
 }
 ```
@@ -26,10 +26,28 @@ For active local development, reference the package folder directly:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-light-unity-mcp/templates/unity-package"
+    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp"
   }
 }
 ```
+
+## Migrating From The Old Package Path
+
+`v0.3.11` and earlier used this package subpath:
+
+```text
+templates/unity-package
+```
+
+`v0.3.12+` uses the registry-native package path:
+
+```text
+packages/com.xuunity.light-mcp
+```
+
+Existing projects pinned to `v0.3.11` can keep working until they intentionally
+upgrade. New installs should use the `packages/com.xuunity.light-mcp` Git UPM
+path.
 
 ## Initialize Host MCP Server
 

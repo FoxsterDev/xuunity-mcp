@@ -9,8 +9,8 @@ from server_core import ToolInvocationError, read_json
 
 LIGHTWEIGHT_PACKAGE_NAME = "com.xuunity.light-mcp"
 LIGHTWEIGHT_PACKAGE_TEMPLATE_MARKERS = (
-    Path("templates/unity-package/package.json"),
-    Path("AIRoot/Operations/XUUnityLightUnityMcp/templates/unity-package/package.json"),
+    Path("packages/com.xuunity.light-mcp/package.json"),
+    Path("AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp/package.json"),
 )
 
 
@@ -123,7 +123,7 @@ def inspect_package_dependency_alignment(project_root: Path) -> dict[str, Any]:
             result["alignment"] = "file_mismatch"
             result["warning"] = (
                 "The project uses a file dependency, but it does not point at the repo-local "
-                "AIRoot XUUnityLightUnityMcp template package."
+                "AIRoot XUUnityLightUnityMcp package source."
             )
         return result
 

@@ -50,7 +50,7 @@ RUN_TEMPLATE_RELATIVE_PATH="templates/run.sh"
 SERVER_MODULES_TEMPLATE_RELATIVE_GLOB="templates/server_*.py"
 RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH="templates/xuunity_light_unity_mcp_runtime_defaults.json"
 PACKAGE_NAME="com.xuunity.light-mcp"
-PACKAGE_TEMPLATE_RELATIVE_PATH="templates/unity-package"
+PACKAGE_TEMPLATE_RELATIVE_PATH="packages/com.xuunity.light-mcp"
 COMPACT_SUMMARY="false"
 
 resolve_repo_root() {
@@ -479,7 +479,7 @@ Wrapper commands:
   server-help
       Show the installed server CLI help.
   devmode --project-root PATH
-      Point com.xuunity.light-mcp at the local templates/unity-package source
+      Point com.xuunity.light-mcp at the local packages/com.xuunity.light-mcp source
       and remove its package-lock entry so Unity can re-resolve it.
   prodmode --project-root PATH
       Pin com.xuunity.light-mcp to the current published source HEAD and remove
@@ -522,7 +522,7 @@ Usage: $(basename "$0") devmode --project-root PATH
 Switch a Unity project to local XUUnity Light Unity MCP package development.
 
 Effects:
-  - sets com.xuunity.light-mcp to file:<relative path to templates/unity-package>
+  - sets com.xuunity.light-mcp to file:<relative path to packages/com.xuunity.light-mcp>
   - removes the com.xuunity.light-mcp package-lock entry
 
 After switching, let Unity re-resolve packages by reopen, focus, or explicit

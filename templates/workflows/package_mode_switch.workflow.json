@@ -45,7 +45,7 @@
     {
       "id": "devmode",
       "kind": "cli_command",
-      "description": "Point com.xuunity.light-mcp at local templates/unity-package.",
+      "description": "Point com.xuunity.light-mcp at local packages/com.xuunity.light-mcp.",
       "command": "${WRAPPER} devmode --project-root ${PROJECT_ROOT}",
       "when": "MODE is devmode",
       "stopOn": [

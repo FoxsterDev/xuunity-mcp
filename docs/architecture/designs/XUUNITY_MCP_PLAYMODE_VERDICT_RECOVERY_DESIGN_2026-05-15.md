@@ -511,14 +511,14 @@ Host code:
 
 Unity package:
 
-- `templates/unity-package/Editor/Helpers/XUUnityLightMcpTestRunState.cs`
+- `packages/com.xuunity.light-mcp/Editor/Helpers/XUUnityLightMcpTestRunState.cs`
   - persist per-request result artifact and progress
   - preserve expired terminal artifacts through first recovery
-- `templates/unity-package/Editor/Operations/XUUnityLightMcpPlayModeTestsOperation.cs`
+- `packages/com.xuunity.light-mcp/Editor/Operations/XUUnityLightMcpPlayModeTestsOperation.cs`
   - ensure PlayMode callbacks update durable progress and final state
-- `templates/unity-package/Editor/Core/XUUnityLightMcpModels.cs`
+- `packages/com.xuunity.light-mcp/Editor/Core/XUUnityLightMcpModels.cs`
   - add result artifact/progress fields
-- `templates/unity-package/Editor/Bridge/XUUnityLightMcpBridgeStateWriter.cs`
+- `packages/com.xuunity.light-mcp/Editor/Bridge/XUUnityLightMcpBridgeStateWriter.cs`
   - surface active PlayMode progress in bridge state when present
 
 ## Acceptance Checks

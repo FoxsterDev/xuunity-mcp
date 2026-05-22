@@ -86,6 +86,7 @@ done
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 templates_dir="$script_dir/templates"
+package_source_dir="$script_dir/packages/com.xuunity.light-mcp"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 codex_tools_home="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}"
 claude_tools_home="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}"
@@ -382,7 +383,7 @@ if [[ -n "$project_root" ]]; then
   package_source_path=""
 
   if [[ $uninstall_project -eq 0 && $disable_project -eq 0 ]]; then
-    package_source_path="$(python3 - "$project_root/Packages" "$templates_dir/unity-package" <<'PY'
+    package_source_path="$(python3 - "$project_root/Packages" "$package_source_dir" <<'PY'
 import os
 import sys
 print("file:" + os.path.relpath(os.path.realpath(sys.argv[2]), os.path.realpath(sys.argv[1])))

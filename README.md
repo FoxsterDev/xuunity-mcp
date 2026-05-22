@@ -67,7 +67,7 @@ Configure XUUnity Light Unity MCP for this Unity project.
 Inputs:
 - Unity project root: <absolute path to the Unity project>
 - MCP client: <Claude Code | Claude Desktop | Cursor | Windsurf | Codex | custom stdio MCP client>
-- Package mode: Git UPM release v0.3.11, unless this is local MCP development.
+- Package mode: Git UPM release v0.3.12, unless this is local MCP development.
 
 Principles:
 - Read the current README.md, INSTALL.md, and the matching docs/clients/*
@@ -86,7 +86,7 @@ Principles:
 Tasks:
 1. Confirm Python 3.10+, Unity project structure, and selected MCP client.
 2. Add the Unity package dependency:
-   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/templates/unity-package#v0.3.11
+   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
 3. From <MCP_REPO_ROOT>, run the host installer and enable the project bridge
    through macOS/Linux shell, Git Bash, or WSL:
    bash init_xuunity_light_unity_mcp.sh
@@ -110,7 +110,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/templates/unity-package#v0.3.11
+> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -118,14 +118,18 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/templates/unity-package#v0.3.11"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
   }
 }
 ```
 
 Local package source for MCP development:
-`file:/absolute/path/to/xuunity-light-unity-mcp/templates/unity-package`.
+`file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp`.
 OpenUPM is planned; use Git UPM until the package is published there.
+
+Migration note: `v0.3.11` used `templates/unity-package`. `v0.3.12+` uses
+`packages/com.xuunity.light-mcp` so the package path is registry-native for
+OpenUPM and Unity Package Manager indexing.
 
 ### 2. Install The Host MCP Helper
 

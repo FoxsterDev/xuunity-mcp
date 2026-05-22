@@ -2,10 +2,23 @@
 
 ## Unreleased
 
-- Added wrapper help and agent workflow guidance for MCP `devmode` and `prodmode` package-source switching.
-- Added client-specific MCP payload examples, structured evidence schema, and machine-readable workflow templates for agent validation workflows.
+- No unreleased changes yet.
+
+## 0.3.12
+
+- Moved the Unity package from `templates/unity-package` to the registry-native
+  `packages/com.xuunity.light-mcp` path for OpenUPM and Unity Package Manager
+  indexing.
+- Updated Git UPM install examples, local file package examples, wrapper
+  `devmode` / `prodmode`, installer wiring, package discovery, and tests to use
+  the new package path.
+- Added migration notes for users pinned to the old `v0.3.11`
+  `templates/unity-package` path.
 
 ## 0.3.11
+
+- Added wrapper help and agent workflow guidance for MCP `devmode` and `prodmode` package-source switching.
+- Added client-specific MCP payload examples, structured evidence schema, and machine-readable workflow templates for agent validation workflows.
 
 - Replaced placeholder client docs with production-ready MCP configs for Claude Code, Claude Desktop, Cursor, Windsurf, Codex-style agents, and generic stdio MCP clients.
 - Added reusable client config templates under `templates/clients/`.

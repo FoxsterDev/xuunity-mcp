@@ -862,7 +862,7 @@ Development route:
 ```
 
 Use `devmode` only while actively editing the MCP source package. It writes a
-local `file:` dependency to `templates/unity-package` and removes the package
+local `file:` dependency to `packages/com.xuunity.light-mcp` and removes the package
 lock entry so Unity can re-resolve the package.
 
 Production route:

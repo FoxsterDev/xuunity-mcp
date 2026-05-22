@@ -78,7 +78,7 @@ For active local development, point directly at the package folder:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-light-unity-mcp/templates/unity-package"
+    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp"
   }
 }
 ```
@@ -89,7 +89,7 @@ use the package subpath route instead:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/templates/unity-package#v0.3.11"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
   }
 }
 ```

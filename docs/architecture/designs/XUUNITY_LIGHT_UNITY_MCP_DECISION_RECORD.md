@@ -144,7 +144,7 @@ The Unity package must be editor-only.
 Base rules:
 
 - package id: `com.xuunity.light-mcp`
-- public source: `AIRoot/Operations/XUUnityLightUnityMcp/templates/unity-package`
+- public source: `AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp`
 - no runtime asmdef in the base package
 - no generated source under `Assets/`
 - no player-build footprint by default
