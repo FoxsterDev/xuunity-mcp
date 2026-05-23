@@ -36,6 +36,13 @@ def host_platform_kind() -> str:
     return current_host_platform_adapter().platform_kind
 
 
+def _truncate_host_process_text(value: Any, limit: int = 600) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)] + "..."
+
+
 def parse_unity_version_from_text(value: str) -> str:
     text = (value or "").strip()
     if not text:
@@ -236,6 +243,37 @@ def discover_unity_installations() -> list[tuple[str, Path]]:
 
 def list_process_commands() -> list[tuple[int, str]]:
     return current_host_platform_adapter().list_process_commands()
+
+
+def list_process_commands_report() -> dict[str, Any]:
+    report = current_host_platform_adapter().list_process_commands_report()
+    commands = report.get("commands") if isinstance(report, dict) else []
+    normalized_commands: list[tuple[int, str]] = []
+    for entry in commands or []:
+        try:
+            pid = int(entry[0])
+            command = str(entry[1])
+        except (IndexError, TypeError, ValueError):
+            continue
+        if pid > 0 and command:
+            normalized_commands.append((pid, command))
+    return {
+        "available": bool(report.get("available")) if isinstance(report, dict) else False,
+        "commands": normalized_commands,
+        "error_code": str(report.get("error_code") or "") if isinstance(report, dict) else "process_listing_failed",
+        "stderr": _truncate_host_process_text(report.get("stderr") if isinstance(report, dict) else ""),
+        "platform_kind": str(report.get("platform_kind") or host_platform_kind()) if isinstance(report, dict) else host_platform_kind(),
+    }
+
+
+def process_visibility_summary() -> dict[str, Any]:
+    report = list_process_commands_report()
+    return {
+        "process_visibility_available": bool(report.get("available")),
+        "process_visibility_error_code": str(report.get("error_code") or ""),
+        "process_visibility_stderr": _truncate_host_process_text(report.get("stderr") or ""),
+        "process_visibility_platform_kind": str(report.get("platform_kind") or host_platform_kind()),
+    }
 
 
 def try_read_host_editor_session_state(project_root: Path) -> dict[str, Any] | None:
@@ -917,12 +955,24 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
                 stderr = (exc.stderr or "").strip()
                 stdout = (exc.stdout or "").strip()
                 detail = stderr or stdout or str(exc)
+                unity_executable_path = unity_app / "Contents" / "MacOS" / "Unity"
+                launch_services_error_match = re.search(r"(?:Code=|error\s+)(-?\d+)", detail)
                 raise ToolInvocationError(
                     "unity_editor_launch_failed",
                     (
                         f"Failed to launch Unity editor at {unity_app}. "
                         f"Command: {' '.join(launch_command)}. Detail: {detail}"
                     ),
+                    {
+                        "unity_app_bundle_present": unity_app.is_dir(),
+                        "unity_executable_present": unity_executable_path.is_file(),
+                        "unity_executable_path": str(unity_executable_path),
+                        "launch_services_error_code": (
+                            launch_services_error_match.group(1)
+                            if launch_services_error_match
+                            else ""
+                        ),
+                    },
                 ) from exc
 
             launched_editor = wait_for_matching_editor_process(project_root, unity_app, 15.0)
@@ -1087,6 +1137,9 @@ def wait_for_project_editor_exit(
     deadline = time.time() + (max(1000, timeout_ms) / 1000.0)
     live_project_pids: list[int] = []
     while time.time() < deadline:
+        visibility = process_visibility_summary()
+        if not bool(visibility.get("process_visibility_available")):
+            return False, list_live_project_editor_pids(project_root)
         live_project_pids = list_live_project_editor_pids(project_root)
         tracked_alive = tracked_pid > 0 and pid_is_alive(tracked_pid)
         current_alive = current_pid > 0 and pid_is_alive(current_pid)
@@ -1102,6 +1155,84 @@ def wait_for_project_editor_exit(
     return False, list_live_project_editor_pids(project_root)
 
 
+def verify_project_editor_closed(project_root: Path, timeout_ms: int) -> dict[str, Any]:
+    bounded_timeout_ms = max(0, int(timeout_ms or 0))
+    deadline = time.time() + (bounded_timeout_ms / 1000.0)
+    live_project_pids: list[int] = []
+    visibility = process_visibility_summary()
+
+    while True:
+        live_project_pids = list_live_project_editor_pids(project_root)
+        visibility = process_visibility_summary()
+        process_visibility_available = bool(visibility.get("process_visibility_available"))
+        if not process_visibility_available:
+            break
+        if not live_project_pids:
+            break
+        if time.time() >= deadline:
+            break
+        time.sleep(0.2)
+
+    process_visibility_available = bool(visibility.get("process_visibility_available"))
+    process_visibility_error_code = str(visibility.get("process_visibility_error_code") or "")
+    same_project_editor_closed = process_visibility_available and not live_project_pids
+    if not process_visibility_available:
+        closeout_classification = "process_visibility_restricted"
+        next_distinct_action = "restore_host_process_visibility"
+        recommended_next_action = "restore_host_process_visibility"
+    elif same_project_editor_closed:
+        closeout_classification = "same_project_editor_closed"
+        next_distinct_action = "rerun_closed_editor_batch_lane"
+        recommended_next_action = "none"
+    else:
+        closeout_classification = "editor_still_running"
+        next_distinct_action = "manual_editor_close_or_request_quit_wait"
+        recommended_next_action = "manual_editor_close"
+
+    result = {
+        "action": "verify_editor_closed",
+        "project_root": str(project_root),
+        "timeout_ms": bounded_timeout_ms,
+        "same_project_editor_closed": same_project_editor_closed,
+        "process_exit_verified": same_project_editor_closed,
+        "live_project_editor_pids": live_project_pids,
+        "closeout_classification": closeout_classification,
+        "recommended_next_action": recommended_next_action,
+        "next_distinct_action": next_distinct_action,
+        "recommended_recovery_command": (
+            f"xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} "
+            "--timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000"
+            if live_project_pids and process_visibility_available
+            else ""
+        ),
+    }
+    result.update(visibility)
+    if not process_visibility_available and not process_visibility_error_code:
+        result["process_visibility_error_code"] = "process_visibility_restricted"
+    return result
+
+
+def _attach_editor_closed_verification(
+    payload: dict[str, Any],
+    project_root: Path,
+    timeout_ms: int = 0,
+) -> dict[str, Any]:
+    verification = verify_project_editor_closed(project_root, timeout_ms)
+    for key in (
+        "same_project_editor_closed",
+        "process_exit_verified",
+        "live_project_editor_pids",
+        "process_visibility_available",
+        "process_visibility_error_code",
+        "process_visibility_stderr",
+        "process_visibility_platform_kind",
+        "next_distinct_action",
+    ):
+        payload[key] = verification.get(key)
+    payload["editor_closed_verification"] = verification
+    return payload
+
+
 def restore_host_opened_editor_state(
     project_root: Path,
     timeout_ms: int,
@@ -1109,7 +1240,7 @@ def restore_host_opened_editor_state(
 ) -> dict[str, Any]:
     session = try_read_host_editor_session_state(project_root)
     if not session or not bool(session.get("opened_by_host")):
-        return {
+        return _attach_editor_closed_verification({
             "project_root": str(project_root),
             "host_opened_session_found": False,
             "restored": False,
@@ -1117,7 +1248,7 @@ def restore_host_opened_editor_state(
             "closeout_classification": "not_opened_by_host",
             "recommended_next_action": "none",
             "reason": "not_opened_by_host",
-        }
+        }, project_root, 0)
 
     tracked_pid = int(session.get("editor_pid") or 0)
     live_state = try_read_live_editor_state(project_root)
@@ -1174,13 +1305,17 @@ def restore_host_opened_editor_state(
             restoration["stale_active_test_run_cleared"] = clear_stale_active_test_run_state(project_root)
             restoration["restored"] = True
             restoration["closeout_verified"] = True
+            restoration["process_exit_verified"] = True
+            restoration["same_project_editor_closed"] = True
             restoration["closeout_classification"] = "closed_via_unity_editor_quit"
             restoration["recommended_next_action"] = "none"
+            restoration["next_distinct_action"] = "rerun_closed_editor_batch_lane"
             restoration["reason"] = "host_opened_editor_closed"
             restoration["close_path"] = "unity.editor.quit"
             restoration["closed_editor_pid"] = current_pid
             restoration["live_project_editor_pids"] = live_project_pids
             clear_stale_project_lock(project_root)
+            _attach_editor_closed_verification(restoration, project_root, 0)
             return restoration
 
     if managed_pid > 0 and terminate_editor_pid(managed_pid, sigterm_timeout_ms):
@@ -1191,8 +1326,11 @@ def restore_host_opened_editor_state(
             restoration["stale_active_test_run_cleared"] = clear_stale_active_test_run_state(project_root)
             restoration["restored"] = True
             restoration["closeout_verified"] = True
+            restoration["process_exit_verified"] = True
+            restoration["same_project_editor_closed"] = True
             restoration["reason"] = "host_opened_editor_closed"
             restoration["recommended_next_action"] = "none"
+            restoration["next_distinct_action"] = "rerun_closed_editor_batch_lane"
             if bool(restoration.get("quit_request_attempted")) and bool(restoration.get("quit_request_accepted")):
                 restoration["closeout_classification"] = "quit_ack_without_exit_sigterm_recovered"
                 restoration["close_path"] = "unity.editor.quit+host_sigterm"
@@ -1205,6 +1343,7 @@ def restore_host_opened_editor_state(
             restoration["closed_editor_pid"] = managed_pid
             restoration["live_project_editor_pids"] = live_project_pids
             clear_stale_project_lock(project_root)
+            _attach_editor_closed_verification(restoration, project_root, 0)
             return restoration
 
     if managed_pid > 0 and not pid_is_alive(managed_pid):
@@ -1216,10 +1355,14 @@ def restore_host_opened_editor_state(
             restoration["stale_active_test_run_cleared"] = clear_stale_active_test_run_state(project_root)
             restoration["restored"] = False
             restoration["closeout_verified"] = True
+            restoration["process_exit_verified"] = True
+            restoration["same_project_editor_closed"] = True
             restoration["closeout_classification"] = "tracked_editor_already_closed"
             restoration["recommended_next_action"] = "none"
+            restoration["next_distinct_action"] = "rerun_closed_editor_batch_lane"
             restoration["reason"] = "tracked_editor_already_closed"
             restoration["terminated_hub_launcher_pids"] = terminated_hub_pids
+            _attach_editor_closed_verification(restoration, project_root, 0)
             return restoration
 
         if bool(restoration.get("quit_request_attempted")) and bool(restoration.get("quit_request_accepted")):
@@ -1234,6 +1377,10 @@ def restore_host_opened_editor_state(
             restoration["closeout_classification"] = "project_editor_still_running_untracked"
             restoration["reason"] = "project_editor_still_running_untracked"
         restoration["live_project_editor_pids"] = live_project_pids
+        restoration["same_project_editor_closed"] = False
+        restoration["process_exit_verified"] = False
+        restoration["next_distinct_action"] = "manual_editor_close_or_request_quit_wait"
+        restoration.update(process_visibility_summary())
         return restoration
 
     if bool(restoration.get("quit_request_attempted")) and bool(restoration.get("quit_request_accepted")):
@@ -1256,6 +1403,10 @@ def restore_host_opened_editor_state(
         restoration["closeout_classification"] = "tracked_editor_still_running"
         restoration["reason"] = "tracked_editor_still_running"
     restoration["live_project_editor_pids"] = list_live_project_editor_pids(project_root)
+    restoration["same_project_editor_closed"] = False
+    restoration["process_exit_verified"] = False
+    restoration["next_distinct_action"] = "manual_editor_close_or_request_quit_wait"
+    restoration.update(process_visibility_summary())
     return restoration
 
 

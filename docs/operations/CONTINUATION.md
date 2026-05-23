@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Continuation
 
-Date: `2026-05-22`
+Date: `2026-05-23`
 Status: `active continuation note`
 
 ## Current Baseline
@@ -29,6 +29,7 @@ It now has:
 - tracked workspace side-effect accounting around batch helpers
 - project-defined hook summary promotion in compact scenario summaries
 - operator verdicts for confirmed lifecycle reclassification recovery
+- design-plan history for retro-derived implementation plans
 
 The public `xuunity` protocol layer also now understands validation-lane
 selection.
@@ -112,7 +113,10 @@ Transport defaults:
 - `file_ipc` remains an explicit fallback/compatibility transport
 
 Latest applied retro:
-- `../archive/retros/2026-05-15_playmode_verdict_recovery_and_single_project_launch_retro.md`
+- `../archive/retros/2026-05-23_devmode_batch_lifecycle_retro.md`
+
+Latest applied design plan:
+- `../architecture/designs/XUUNITY_MCP_DEVMODE_BATCH_LIFECYCLE_HARDENING_DESIGN_2026-05-23.md`
 
 Day-to-day readiness:
 - suitable for same-host status, refresh, compile, EditMode, PlayMode, package
@@ -254,23 +258,31 @@ PlayMode churn note:
 
 Mini-playbook for closeout mismatch:
 
-1. run `restore-editor-state --project-root <project>`
-2. if it returns `closeout_classification=quit_ack_without_exit`, treat that as
-   "quit was acknowledged but process exit was not proven"
-3. run the surfaced `recommended_recovery_command` when present
-4. verify remaining project editor PIDs before assuming the editor is gone
-5. only after verified exit treat the validation session as fully closed
+1. run
+   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`
+2. if it returns `editor_quit_ack_without_exit`, treat that as "quit was
+   acknowledged but process exit was not proven"
+3. run `verify-editor-closed --project-root <project> --timeout-ms 30000`
+4. if live project editor PIDs remain, close or terminate the editor explicitly,
+   then run `verify-editor-closed` again
+5. only after `same_project_editor_closed=true` and
+   `process_exit_verified=true` treat the validation session as fully closed
 
 Compile-first closeout recipe for changed C# scripts:
 
 1. inspect editor state with `request-status-summary --project-root <project>`
 2. if the same project editor blocks the batch lane, run the surfaced recovery
-   command, usually `request-editor-quit --project-root <project>`
-3. verify process exit with `restore-editor-state --project-root <project>` or
-   `recover-editor-session --project-root <project>`
+   command, usually
+   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`
+3. verify process exit with `verify-editor-closed --project-root <project>`
 4. run the fast batch compile gate
 5. only after compile passes, run batch EditMode tests, PlayMode, scenario, or
    GUI smoke validation
+
+Host process visibility is a lifecycle-truth prerequisite. If a sandboxed or
+restricted client reports `process_visibility_restricted`, do not infer that the
+editor is closed. Move the command to a host context that can list local
+processes, then rerun the closeout or batch preflight.
 
 Only after that:
 - compile
@@ -278,6 +290,29 @@ Only after that:
 - play mode
 - Game View operations
 - scenario runs
+
+## Design Plan And Retro Closeout
+
+When a chat provides a concrete MCP design or implementation plan:
+
+1. save a public-safe plan under `../architecture/designs/` when it is a feature,
+   tool-surface, lifecycle, operator, or runtime design
+2. save retro-derived action plans or lesson records under `../archive/retros/`
+   when the source is an incident or weak operator session
+3. update `../architecture/designs/DESIGN_PLAN_HISTORY.md` with status,
+   implementation evidence, and remaining gaps
+4. after implementation, self-review the code/docs diff before final closeout
+5. record post-retro notes: what went well, where risks remain, what validation
+   proved, and what follow-up should remain visible
+
+Self-review should check:
+
+- public interface compatibility
+- lifecycle and closeout truth fields
+- process or project-selection ambiguity
+- docs/operator guidance for the changed behavior
+- tests for parser, failure, and recovery paths
+- accidental project-private evidence in public docs
 
 ## What A New Chat Should Read First
 

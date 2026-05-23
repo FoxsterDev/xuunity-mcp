@@ -14,6 +14,7 @@ if str(TEMPLATES_DIR) not in sys.path:
 
 import server
 import server_editor_host
+from server_host_platform import HostPlatformAdapter
 from server_project_context import ensure_project_root as ensure_project_root_base
 from server_registry import BridgeRegistry
 from server_core import ToolInvocationError
@@ -35,6 +36,18 @@ def make_unity_project(root: Path) -> Path:
 
 
 class ServerProjectHelperTests(unittest.TestCase):
+    def test_host_platform_process_report_exposes_listing_failure(self) -> None:
+        completed = mock.Mock(returncode=1, stdout="", stderr="operation not permitted")
+        adapter = HostPlatformAdapter(platform_kind="macos")
+
+        with mock.patch("server_host_platform.subprocess.run", return_value=completed):
+            report = adapter.list_process_commands_report()
+
+        self.assertFalse(report["available"])
+        self.assertEqual("process_listing_failed", report["error_code"])
+        self.assertEqual("operation not permitted", report["stderr"])
+        self.assertEqual([], report["commands"])
+
     def test_ensure_project_root_accepts_valid_unity_project(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             project_root = make_unity_project(Path(tmp_dir) / "MyProject")

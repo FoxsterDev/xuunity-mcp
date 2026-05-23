@@ -22,11 +22,17 @@ class HostPlatformAdapter:
             return False
         return True
 
-    def list_process_commands(self) -> list[tuple[int, str]]:
+    def list_process_commands_report(self) -> dict[str, object]:
         if os.name == "nt":
             shell_path = shutil.which("powershell") or shutil.which("powershell.exe") or shutil.which("pwsh")
             if not shell_path:
-                return []
+                return {
+                    "available": False,
+                    "commands": [],
+                    "error_code": "process_listing_tool_missing",
+                    "stderr": "PowerShell was not found on PATH.",
+                    "platform_kind": self.platform_kind,
+                }
 
             script = (
                 "Get-CimInstance Win32_Process | "
@@ -41,17 +47,45 @@ class HostPlatformAdapter:
                     capture_output=True,
                     text=True,
                 )
-            except OSError:
-                return []
+            except OSError as exc:
+                return {
+                    "available": False,
+                    "commands": [],
+                    "error_code": "process_listing_failed",
+                    "stderr": str(exc),
+                    "platform_kind": self.platform_kind,
+                }
+
+            stderr = (completed.stderr or "").strip()
+            if completed.returncode != 0:
+                return {
+                    "available": False,
+                    "commands": [],
+                    "error_code": "process_listing_failed",
+                    "stderr": stderr,
+                    "platform_kind": self.platform_kind,
+                }
 
             raw = completed.stdout.strip()
             if not raw:
-                return []
+                return {
+                    "available": False,
+                    "commands": [],
+                    "error_code": "process_listing_empty",
+                    "stderr": stderr,
+                    "platform_kind": self.platform_kind,
+                }
 
             try:
                 payload = json.loads(raw)
-            except json.JSONDecodeError:
-                return []
+            except json.JSONDecodeError as exc:
+                return {
+                    "available": False,
+                    "commands": [],
+                    "error_code": "process_listing_parse_failed",
+                    "stderr": f"{exc}: {stderr}".strip(),
+                    "platform_kind": self.platform_kind,
+                }
 
             if isinstance(payload, dict):
                 payload = [payload]
@@ -67,7 +101,13 @@ class HostPlatformAdapter:
                 command = str(entry.get("CommandLine") or "").strip()
                 if pid > 0 and command:
                     commands.append((pid, command))
-            return commands
+            return {
+                "available": True,
+                "commands": commands,
+                "error_code": "",
+                "stderr": stderr,
+                "platform_kind": self.platform_kind,
+            }
 
         try:
             completed = subprocess.run(
@@ -76,8 +116,33 @@ class HostPlatformAdapter:
                 capture_output=True,
                 text=True,
             )
-        except OSError:
-            return []
+        except OSError as exc:
+            return {
+                "available": False,
+                "commands": [],
+                "error_code": "process_listing_failed",
+                "stderr": str(exc),
+                "platform_kind": self.platform_kind,
+            }
+
+        stderr = (completed.stderr or "").strip()
+        if completed.returncode != 0:
+            return {
+                "available": False,
+                "commands": [],
+                "error_code": "process_listing_failed",
+                "stderr": stderr,
+                "platform_kind": self.platform_kind,
+            }
+
+        if not (completed.stdout or "").strip():
+            return {
+                "available": False,
+                "commands": [],
+                "error_code": "process_listing_empty",
+                "stderr": stderr,
+                "platform_kind": self.platform_kind,
+            }
 
         commands: list[tuple[int, str]] = []
         for line in completed.stdout.splitlines():
@@ -95,7 +160,18 @@ class HostPlatformAdapter:
             command = command.strip()
             if pid > 0 and command:
                 commands.append((pid, command))
-        return commands
+        return {
+            "available": True,
+            "commands": commands,
+            "error_code": "",
+            "stderr": stderr,
+            "platform_kind": self.platform_kind,
+        }
+
+    def list_process_commands(self) -> list[tuple[int, str]]:
+        report = self.list_process_commands_report()
+        commands = report.get("commands") if isinstance(report, dict) else []
+        return list(commands or [])
 
 
 def host_platform_kind() -> str:

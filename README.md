@@ -241,7 +241,8 @@ Popular MCP tools:
 `unity_request_final_status` | `unity_project_refresh` |
 `unity_edm4u_resolve` | `unity_sdk_dependency_verify`
 
-Host helper commands include `ensure-ready`, `restore-editor-state`,
+Host helper commands include `ensure-ready`, `verify-editor-closed`,
+`request-editor-quit --wait-for-exit`, `restore-editor-state`,
 `recover-editor-session`, `batch-compile`, `batch-editmode-tests`,
 `batch-build-config-compile-matrix`, `artifact-probe`, `devmode`, and `prodmode`.
 
@@ -265,6 +266,14 @@ Troubleshooting:
 - Unity not ready: run `ensure-ready --open-editor` before validation tools.
 - Package changes not visible: run `unity_project_refresh` or reopen Unity.
 - Long operation timed out: recover with `request-final-status`.
+- Closed-project batch refused because the editor is open: run
+  `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`,
+  then `verify-editor-closed --project-root <project> --timeout-ms 30000`.
+  If live PIDs remain, close or terminate the editor explicitly, verify again,
+  then rerun the batch helper.
+- `process_visibility_restricted`: run from a host context that can list local
+  processes. Closed-editor batch lanes need process visibility to prove
+  `same_project_editor_closed=true`.
 
 Safety defaults: local same-host MCP server, editor-only package, disabled by
 default, explicit per-project enablement, no runtime/player automation in the

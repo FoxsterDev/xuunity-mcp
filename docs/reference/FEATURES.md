@@ -94,6 +94,8 @@ Unity MCP implementations when the user wants safe production validation.
 | Registry | `registry-prune-contexts` | `Host helper` | Prunes stale same-host project context entries. |
 | Readiness | `open-editor` | `Host helper` | Opens a Unity project through the host helper. |
 | Readiness | `ensure-ready` | `Host helper` | Opens or recovers Unity until the bridge is ready. |
+| Recovery | `verify-editor-closed` | `Host helper` | Verifies `same_project_editor_closed=true` before closed-project batch lanes. |
+| Recovery | `request-editor-quit --wait-for-exit` | `Host helper` | Separates quit acknowledgement from process-exit proof. |
 | Recovery | `restore-editor-state` | `Host helper` | Restores host-opened editor session state. |
 | Recovery | `recover-editor-session` | `Host helper` | Recovers common stale editor/session cases. |
 | Request state | `request-status-summary` | `Host helper` | Compact status summary for polling. |

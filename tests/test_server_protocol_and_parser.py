@@ -37,6 +37,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "request-scenario-results-list",
                 "request-scenario-result-latest",
                 "request-project-refresh",
+                "verify-editor-closed",
                 "request-edm4u-resolve",
                 "request-sdk-dependency-verify",
                 "project-discovery-report",
@@ -326,7 +327,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertEqual("compile_probe_blocked_by_live_editor", payload["recovery_classification"])
         self.assertEqual("close_same_project_editor_or_use_interactive_lane", payload["recovery_recommended_next_action"])
         self.assertEqual(
-            "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000",
+            "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
             payload["recommended_recovery_command"],
         )
         self.assertNotIn("reopen_block_reason", payload)
@@ -415,7 +416,13 @@ class ServerProtocolAndParserTests(unittest.TestCase):
     def test_batch_editor_conflict_includes_concrete_recovery_command(self) -> None:
         project_root = Path("/tmp/FakeProject")
 
-        with mock.patch.object(server, "list_live_project_editor_pids", return_value=[1234]):
+        with (
+            mock.patch.object(server, "process_visibility_summary", return_value={
+                "process_visibility_available": True,
+                "process_visibility_error_code": "",
+            }),
+            mock.patch.object(server, "list_live_project_editor_pids", return_value=[1234]),
+        ):
             with self.assertRaises(server.ToolInvocationError) as ctx:
                 server.ensure_batch_project_closed(project_root, "batch compile")
 
@@ -427,9 +434,12 @@ class ServerProtocolAndParserTests(unittest.TestCase):
             exc.details["recommended_next_action"],
         )
         self.assertEqual(
-            "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000",
+            "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
             exc.details["recommended_recovery_command"],
         )
+        self.assertFalse(exc.details["same_project_editor_closed"])
+        self.assertFalse(exc.details["process_exit_verified"])
+        self.assertEqual("editor_still_running", exc.details["closeout_classification"])
         self.assertTrue(exc.details["closeout_verification_required"])
 
         summary = server.build_batch_prepare_failure_summary(
@@ -445,7 +455,10 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertEqual(exc.details["recommended_next_action"], summary["recommended_next_action"])
         self.assertEqual(exc.details["recommended_recovery_command"], summary["recommended_recovery_command"])
         self.assertTrue(summary["closeout_verification_required"])
-        self.assertIn("verify editor process exit", summary["next_step"])
+        self.assertFalse(summary["same_project_editor_closed"])
+        self.assertFalse(summary["process_exit_verified"])
+        self.assertEqual("editor_still_running", summary["closeout_classification"])
+        self.assertIn("process_exit_verified=true", summary["next_step"])
 
     def test_batch_commands_accept_timeout_ms(self) -> None:
         parser = server.build_parser()
@@ -472,6 +485,175 @@ class ServerProtocolAndParserTests(unittest.TestCase):
             ]
         )
         self.assertEqual(900000, editmode_args.timeout_ms)
+
+        quit_args = parser.parse_args(
+            [
+                "request-editor-quit",
+                "--project-root",
+                "/tmp/FakeProject",
+                "--wait-for-exit",
+                "--exit-timeout-ms",
+                "45000",
+            ]
+        )
+        self.assertTrue(quit_args.wait_for_exit)
+        self.assertEqual(45000, quit_args.exit_timeout_ms)
+
+        restore_args = parser.parse_args(
+            [
+                "restore-editor-state",
+                "--project-root",
+                "/tmp/FakeProject",
+                "--require-closed",
+            ]
+        )
+        self.assertTrue(restore_args.require_closed)
+
+        verify_args = parser.parse_args(
+            [
+                "verify-editor-closed",
+                "--project-root",
+                "/tmp/FakeProject",
+                "--timeout-ms",
+                "12000",
+            ]
+        )
+        self.assertEqual(12000, verify_args.timeout_ms)
+
+    def test_verify_editor_closed_success_emits_closed_payload(self) -> None:
+        args = argparse.Namespace(project_root="/tmp/FakeProject", timeout_ms=30000)
+        emitted_payloads: list[dict[str, object]] = []
+        closed_payload = {
+            "same_project_editor_closed": True,
+            "live_project_editor_pids": [],
+            "process_visibility_available": True,
+            "process_visibility_error_code": "",
+            "process_exit_verified": True,
+        }
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "verify_project_editor_closed", return_value=closed_payload),
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_verify_editor_closed(args)
+
+        self.assertEqual([closed_payload], emitted_payloads)
+
+    def test_verify_editor_closed_fails_when_process_is_live(self) -> None:
+        args = argparse.Namespace(project_root="/tmp/FakeProject", timeout_ms=30000)
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(
+                server,
+                "verify_project_editor_closed",
+                return_value={
+                    "same_project_editor_closed": False,
+                    "live_project_editor_pids": [1234],
+                    "process_visibility_available": True,
+                    "process_visibility_error_code": "",
+                    "process_exit_verified": False,
+                    "closeout_classification": "editor_still_running",
+                },
+            ),
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_verify_editor_closed(args)
+
+        self.assertEqual("editor_still_running", ctx.exception.code)
+        self.assertEqual([1234], ctx.exception.details["live_project_editor_pids"])
+
+    def test_request_editor_quit_wait_succeeds_when_process_exits(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            timeout_ms=15000,
+            wait_for_exit=True,
+            exit_timeout_ms=30000,
+        )
+        emitted_payloads: list[dict[str, object]] = []
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value={"status": "ok", "request_id": "quit-1"}),
+            mock.patch.object(
+                server,
+                "verify_project_editor_closed",
+                return_value={
+                    "same_project_editor_closed": True,
+                    "live_project_editor_pids": [],
+                    "process_visibility_available": True,
+                    "process_visibility_error_code": "",
+                    "process_exit_verified": True,
+                    "closeout_classification": "same_project_editor_closed",
+                },
+            ),
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_request_editor_quit(args)
+
+        self.assertEqual(1, len(emitted_payloads))
+        payload = emitted_payloads[0]
+        self.assertTrue(payload["quit_request_accepted"])
+        self.assertTrue(payload["same_project_editor_closed"])
+        self.assertTrue(payload["process_exit_verified"])
+        self.assertEqual("quit_ack_and_process_exit_verified", payload["closeout_classification"])
+
+    def test_request_editor_quit_wait_fails_when_ack_does_not_exit(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            timeout_ms=15000,
+            wait_for_exit=True,
+            exit_timeout_ms=30000,
+        )
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value={"status": "ok", "request_id": "quit-1"}),
+            mock.patch.object(
+                server,
+                "verify_project_editor_closed",
+                return_value={
+                    "same_project_editor_closed": False,
+                    "live_project_editor_pids": [1234],
+                    "process_visibility_available": True,
+                    "process_visibility_error_code": "",
+                    "process_exit_verified": False,
+                    "closeout_classification": "editor_still_running",
+                },
+            ),
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_request_editor_quit(args)
+
+        self.assertEqual("editor_quit_ack_without_exit", ctx.exception.code)
+        self.assertTrue(ctx.exception.details["quit_request_accepted"])
+        self.assertEqual([1234], ctx.exception.details["live_project_editor_pids"])
+        self.assertEqual("editor_quit_ack_without_exit", ctx.exception.details["closeout_classification"])
+
+    def test_restore_editor_state_require_closed_fails_when_project_still_live(self) -> None:
+        args = argparse.Namespace(project_root="/tmp/FakeProject", timeout_ms=15000, require_closed=True)
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(
+                server,
+                "restore_host_opened_editor_state",
+                return_value={
+                    "host_opened_session_found": False,
+                    "closeout_verified": True,
+                    "same_project_editor_closed": False,
+                    "live_project_editor_pids": [1234],
+                    "process_visibility_available": True,
+                    "process_exit_verified": False,
+                },
+            ),
+            mock.patch.object(server, "refresh_project_context"),
+            mock.patch.object(server, "build_project_discovery_report", return_value={}),
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_restore_editor_state(args)
+
+        self.assertEqual("restore_editor_state_incomplete", ctx.exception.code)
+        self.assertEqual([1234], ctx.exception.details["live_project_editor_pids"])
 
     def test_test_framework_regression_defaults_are_public_safe(self) -> None:
         parser = server.build_parser()
@@ -515,6 +697,10 @@ class ServerProtocolAndParserTests(unittest.TestCase):
             "error": {"code": "restore_editor_state_incomplete", "message": "closeout incomplete"},
             "closeout_classification": "quit_ack_without_exit",
             "closeout_verified": False,
+            "process_visibility_error_code": "none",
+            "same_project_editor_closed": False,
+            "process_exit_verified": False,
+            "next_distinct_action": "manual_editor_close",
             "recommended_next_action": "manual_editor_close",
             "recommended_recovery_command": "xuunity_light_unity_mcp.sh recover-editor-session --project-root /tmp/FakeProject",
         }
@@ -526,6 +712,9 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         output = stderr.getvalue()
         self.assertIn("closeout_classification=quit_ack_without_exit", output)
         self.assertIn("closeout_verified=false", output)
+        self.assertIn("same_project_editor_closed=false", output)
+        self.assertIn("process_exit_verified=false", output)
+        self.assertIn("next_distinct_action=manual_editor_close", output)
         self.assertIn("recovery_command xuunity_light_unity_mcp.sh recover-editor-session", output)
 
     def test_request_playmode_tests_exits_playmode_and_retries_once(self) -> None:

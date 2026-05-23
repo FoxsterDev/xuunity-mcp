@@ -15,6 +15,34 @@ def _copy_dict(payload: dict[str, Any] | None) -> dict[str, Any]:
     return dict(payload) if isinstance(payload, dict) else {}
 
 
+def _normalize_process_visibility_report(payload: dict[str, Any] | None) -> dict[str, Any]:
+    report = dict(payload or {})
+    if "process_visibility_available" in report:
+        available = bool(report.get("process_visibility_available"))
+        error_code = str(report.get("process_visibility_error_code") or "")
+        stderr = str(report.get("process_visibility_stderr") or "")
+        platform_kind = str(report.get("process_visibility_platform_kind") or "")
+    elif "available" in report:
+        available = bool(report.get("available"))
+        error_code = str(report.get("error_code") or "")
+        stderr = str(report.get("stderr") or "")
+        platform_kind = str(report.get("platform_kind") or "")
+    else:
+        available = True
+        error_code = ""
+        stderr = ""
+        platform_kind = ""
+    if not available and not error_code:
+        error_code = "process_visibility_restricted"
+    return {
+        "process_visibility_available": available,
+        "process_visibility_error_code": error_code,
+        "process_visibility_stderr": stderr,
+        "process_visibility_platform_kind": platform_kind,
+        "process_visibility_restricted": not available,
+    }
+
+
 def _transport_metadata(bridge_state: dict[str, Any]) -> dict[str, Any]:
     metadata: dict[str, Any] = {}
     for key in TRANSPORT_METADATA_KEYS:
@@ -88,6 +116,9 @@ def _state_groups(
             "detected_editor_count": int(discovery.get("detected_editor_count") or 0),
             "detected_editor_pids": list(discovery.get("detected_editor_pids") or []),
             "opened_by_host": bool(host_editor_session_state.get("opened_by_host")),
+            "process_visibility_available": bool(discovery.get("process_visibility_available", True)),
+            "process_visibility_error_code": str(discovery.get("process_visibility_error_code") or ""),
+            "process_visibility_restricted": bool(discovery.get("process_visibility_restricted")),
         },
         "transport": dict(transport_state or {}),
         "health": {
@@ -146,6 +177,15 @@ def _build_host_prerequisites(
         or discovery.get("bridge_pid_alive")
         or discovery.get("host_session_pid_alive")
     )
+    process_visibility_available = bool(discovery.get("process_visibility_available", True))
+    live_editor_status = "ready" if live_editor_present else "unknown" if not process_visibility_available else "missing"
+    live_editor_code = (
+        "none"
+        if live_editor_present
+        else "process_visibility_restricted"
+        if not process_visibility_available
+        else "editor_not_running"
+    )
     transport_ready = bool(transport_state.get("transport_ready_for_requests")) and bool(discovery.get("bridge_state_live"))
     stale_requests = dict(stale_request_artifacts or {})
     stale_request_count = int(stale_requests.get("candidate_count") or 0)
@@ -191,14 +231,18 @@ def _build_host_prerequisites(
         },
         "live_editor": {
             "ready": live_editor_present,
-            "status": "ready" if live_editor_present else "missing",
-            "code": "none" if live_editor_present else "editor_not_running",
+            "status": live_editor_status,
+            "code": live_editor_code,
             "summary": (
                 "A matching Unity editor process is live for this project."
                 if live_editor_present
+                else "Host process listing is unavailable; live editor state cannot be proven."
+                if not process_visibility_available
                 else "No matching Unity editor process is currently live for this project."
             ),
             "detected_editor_count": int(discovery.get("detected_editor_count") or 0),
+            "process_visibility_available": process_visibility_available,
+            "process_visibility_error_code": str(discovery.get("process_visibility_error_code") or ""),
         },
         "transport_ready": {
             "ready": transport_ready,
@@ -236,7 +280,7 @@ def _build_host_prerequisites(
     blocking_codes = [
         str(check.get("code") or "")
         for check in checks.values()
-        if str(check.get("status") or "") == "missing" and str(check.get("code") or "") not in {"", "none"}
+        if str(check.get("status") or "") in {"missing", "unknown"} and str(check.get("code") or "") not in {"", "none"}
     ]
     warning_codes = [
         str(check.get("code") or "")
@@ -263,6 +307,7 @@ def _reconciliation_summary(
     host_session_pid_alive: bool,
     bridge_currently_enabled: bool,
     detected_editor_pids: list[int],
+    process_visibility_restricted: bool,
 ) -> dict[str, str]:
     bridge_pid = int(bridge_state.get("editor_pid") or 0)
     host_session_pid = int(host_editor_session_state.get("editor_pid") or 0)
@@ -313,6 +358,14 @@ def _reconciliation_summary(
             "recommended_next_action": "enable_bridge_and_retry",
         }
 
+    if process_visibility_restricted:
+        return {
+            "case": "process_visibility_restricted",
+            "status": "unknown",
+            "reason": "host_process_listing_unavailable",
+            "recommended_next_action": "restore_host_process_visibility",
+        }
+
     if bridge_pid > 0 and not bridge_pid_alive and host_session_pid > 0 and not host_session_pid_alive:
         return {
             "case": "stale_bridge_and_host_session",
@@ -356,10 +409,18 @@ def discover_project_context_state(
     build_project_health: Callable[..., dict[str, Any]] | None = None,
     inspect_package_dependency_alignment: Callable[[Path], dict[str, Any]] | None = None,
     inspect_stale_request_artifacts: Callable[[Path], dict[str, Any]] | None = None,
+    process_visibility_report: dict[str, Any] | Callable[[], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     bridge_state = _copy_dict(try_read_bridge_state(project_root))
     host_editor_session_state = _copy_dict(try_read_host_editor_session_state(project_root))
     detected_editors = [dict(editor) for editor in (find_running_unity_editors_for_project(project_root) or []) if isinstance(editor, dict)]
+    raw_process_visibility = (
+        process_visibility_report()
+        if callable(process_visibility_report)
+        else process_visibility_report
+    )
+    process_visibility = _normalize_process_visibility_report(raw_process_visibility)
+    process_visibility_restricted = bool(process_visibility.get("process_visibility_restricted"))
 
     detected_editor_pids = sorted(
         {
@@ -394,6 +455,7 @@ def discover_project_context_state(
         host_session_pid_alive=host_session_pid_alive,
         bridge_currently_enabled=bridge_currently_enabled,
         detected_editor_pids=detected_editor_pids,
+        process_visibility_restricted=process_visibility_restricted,
     )
 
     routed_editor_pid = 0
@@ -420,6 +482,10 @@ def discover_project_context_state(
         authoritative_state_source = "bridge_config"
         discovery_classification = "bridge_disabled"
         discovery_reason = "bridge_disabled_in_project_config"
+    elif process_visibility_restricted:
+        authoritative_state_source = "host_process_visibility"
+        discovery_classification = "process_visibility_restricted"
+        discovery_reason = "host_process_listing_unavailable"
     elif bridge_state or host_editor_session_state:
         authoritative_state_source = "state_files"
         discovery_classification = "stale_state"
@@ -460,6 +526,7 @@ def discover_project_context_state(
         "detected_editor_count": len(detected_editor_pids),
         "detected_editor_pids": detected_editor_pids,
         "detected_editors": detected_editors,
+        **process_visibility,
     }
 
     if build_project_health is not None:

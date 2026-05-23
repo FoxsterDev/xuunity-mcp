@@ -261,6 +261,12 @@ Notes:
 - this lane is intentionally plain
 - it expects the same Unity project editor to be closed before execution
 - another Unity editor process for a different project does not block this lane
+- if the same project editor is open, use
+  `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`
+  and then `verify-editor-closed --project-root <project> --timeout-ms 30000`
+  before retrying
+- host process visibility must be available; `process_visibility_restricted`
+  means the lane cannot prove the editor is closed
 - it uses the current project settings and enabled scenes unless scenes are passed explicitly
 - it is suitable for simple projects and CI lanes, not for custom per-project restore workflows
 - it is valid for compile, compile-matrix, and deterministic EditMode test work

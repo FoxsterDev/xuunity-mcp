@@ -83,6 +83,7 @@ from server_editor_host import (
     find_running_unity_editors_for_project,
     list_live_project_editor_pids,
     open_unity_editor,
+    process_visibility_summary,
     read_recent_editor_log,
     resolve_batch_build_output_path,
     resolve_editor_log_path,
@@ -90,6 +91,7 @@ from server_editor_host import (
     terminate_editor_pid,
     try_read_host_editor_session_state,
     update_host_editor_session_pid,
+    verify_project_editor_closed,
     wait_for_ready,
 )
 from server_health import (
@@ -242,6 +244,7 @@ def _refresh_project_context_state(project_root: Path) -> dict[str, Any]:
         build_project_health=_build_project_health_details,
         inspect_package_dependency_alignment=inspect_package_dependency_alignment,
         inspect_stale_request_artifacts=inspect_stale_request_artifacts,
+        process_visibility_report=process_visibility_summary,
     )
     bridge_state = dict(discovery.get("last_bridge_state") or {})
     host_editor_session_state = dict(discovery.get("last_host_editor_session_state") or {})
@@ -396,6 +399,7 @@ def build_status_summary_from_context(
 DISCOVERY_STATUS_FALLBACK_ERROR_CODES = frozenset(
     {
         "editor_not_running",
+        "process_visibility_restricted",
         "transport_not_ready",
         "bridge_disabled",
     }
@@ -418,13 +422,14 @@ DISCOVERY_NEXT_ACTION_COMMANDS = {
     "open_editor_or_ensure_ready": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
     "ensure_ready_or_recover_bridge": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
     "recover_editor_session": "xuunity_light_unity_mcp.sh recover-editor-session --project-root {project_root} --timeout-ms 180000",
-    "close_same_project_editor_or_use_interactive_lane": "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000",
+    "close_same_project_editor_or_use_interactive_lane": "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
     "start_or_recover_editor": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
     "clear_stale_host_session_and_retry": "xuunity_light_unity_mcp.sh restore-editor-state --project-root {project_root} --timeout-ms 15000",
     "refresh_host_session_if_needed": "xuunity_light_unity_mcp.sh request-status-summary --project-root {project_root} --timeout-ms 5000",
     "inspect_editor_log": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
     "inspect_editor_log_and_observe": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
     "inspect_editor_log_and_consider_graceful_restart": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
+    "restore_host_process_visibility": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
 }
 
 
@@ -454,9 +459,17 @@ def enrich_tool_invocation_error_with_discovery(project_root: Path, exc: ToolInv
 
 def build_batch_editor_conflict_details(project_root: Path, live_editor_pids: list[int]) -> dict[str, Any]:
     next_action = "close_same_project_editor_or_use_interactive_lane"
+    visibility = process_visibility_summary()
     return {
         "live_editor_pids": live_editor_pids,
+        "live_project_editor_pids": live_editor_pids,
+        "same_project_editor_closed": False,
+        "process_exit_verified": False,
+        "process_visibility_available": bool(visibility.get("process_visibility_available")),
+        "process_visibility_error_code": str(visibility.get("process_visibility_error_code") or ""),
+        "closeout_classification": "editor_still_running",
         "recommended_next_action": next_action,
+        "next_distinct_action": "request_quit_wait_for_exit_then_verify_closed",
         "recommended_recovery_command": recommended_recovery_command_for_project(project_root, next_action),
         "closeout_verification_required": True,
         "closeout_verification_note": "Verify editor process exit before rerunning the closed-project batch lane.",
@@ -729,7 +742,7 @@ def classify_compile_probe_failure(compile_probe: dict[str, Any]) -> tuple[str, 
         return (
             "compile_probe_blocked_by_live_editor",
             "close_same_project_editor_or_use_interactive_lane",
-            "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000",
+            "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
         )
 
     return (
@@ -964,6 +977,10 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
     operation_outcome = str(payload.get("operation_outcome") or "")
     closeout_classification = str(payload.get("closeout_classification") or "")
     closeout_verified = payload.get("closeout_verified")
+    process_visibility_error_code = str(payload.get("process_visibility_error_code") or "")
+    same_project_editor_closed = payload.get("same_project_editor_closed")
+    process_exit_verified = payload.get("process_exit_verified")
+    next_distinct_action = str(payload.get("next_distinct_action") or "")
 
     parts = ["[xuunity-light-unity-mcp] request_failure"]
     if code:
@@ -982,8 +999,16 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
         parts.append(f"closeout_classification={closeout_classification}")
     if closeout_verified is not None:
         parts.append(f"closeout_verified={str(bool(closeout_verified)).lower()}")
+    if process_visibility_error_code:
+        parts.append(f"process_visibility_error_code={process_visibility_error_code}")
+    if same_project_editor_closed is not None:
+        parts.append(f"same_project_editor_closed={str(bool(same_project_editor_closed)).lower()}")
+    if process_exit_verified is not None:
+        parts.append(f"process_exit_verified={str(bool(process_exit_verified)).lower()}")
     if recommended_next_action:
         parts.append(f"recommended_next_action={recommended_next_action}")
+    if next_distinct_action:
+        parts.append(f"next_distinct_action={next_distinct_action}")
 
     try:
         sys.stderr.write(" ".join(parts) + "\n")
@@ -1016,8 +1041,14 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "transport_outcome",
         "operation_outcome",
         "recommended_next_action",
+        "next_distinct_action",
         "closeout_classification",
         "closeout_verified",
+        "process_visibility_available",
+        "process_visibility_error_code",
+        "same_project_editor_closed",
+        "process_exit_verified",
+        "quit_request_accepted",
         "transport",
         "initial_bridge_generation",
         "initial_bridge_session_id",
@@ -1787,8 +1818,79 @@ def cmd_request_scene_assert(args):
 
 
 def cmd_request_editor_quit(args):
-    response = request_editor_quit(args.project_root, args.timeout_ms)
-    print_json(response)
+    project_root = ensure_project_root(args.project_root)
+    response = request_editor_quit(str(project_root), args.timeout_ms)
+    response["quit_request_accepted"] = response.get("status") == "ok"
+    response["process_exit_verified"] = False
+    if not bool(getattr(args, "wait_for_exit", False)):
+        print_json(response)
+        return
+
+    verification = verify_project_editor_closed(project_root, args.exit_timeout_ms)
+    payload = {
+        "action": "request_editor_quit",
+        "project_root": str(project_root),
+        "quit_request": response,
+        "quit_request_accepted": response.get("status") == "ok",
+        "quit_request_id": str(response.get("request_id") or ""),
+        "quit_request_status": str(response.get("status") or ""),
+    }
+    payload.update(verification)
+    if bool(payload.get("same_project_editor_closed")):
+        payload["closeout_classification"] = "quit_ack_and_process_exit_verified"
+        payload["recommended_next_action"] = "none"
+        payload["next_distinct_action"] = "rerun_closed_editor_batch_lane"
+        print_json(payload)
+        return
+
+    if not bool(payload.get("process_visibility_available")):
+        payload["closeout_classification"] = "process_visibility_restricted"
+        payload["recommended_next_action"] = "restore_host_process_visibility"
+        payload["next_distinct_action"] = "restore_host_process_visibility"
+        raise ToolInvocationError(
+            "process_visibility_restricted",
+            (
+                "Unity quit request was acknowledged, but host process visibility is unavailable, "
+                "so process exit cannot be verified."
+            ),
+            payload,
+        )
+
+    payload["closeout_classification"] = "editor_quit_ack_without_exit"
+    payload["recommended_next_action"] = "manual_editor_close"
+    payload["next_distinct_action"] = "manual_editor_close_or_terminate_then_verify_closed"
+    raise ToolInvocationError(
+        "editor_quit_ack_without_exit",
+        (
+            "Unity quit request was acknowledged, but the same-project editor process is still live. "
+            f"Live editor pid(s): {', '.join(str(pid) for pid in payload.get('live_project_editor_pids') or [])}."
+        ),
+        payload,
+    )
+
+
+def cmd_verify_editor_closed(args):
+    project_root = ensure_project_root(args.project_root)
+    payload = verify_project_editor_closed(project_root, args.timeout_ms)
+    if bool(payload.get("same_project_editor_closed")):
+        print_json(payload)
+        return
+
+    if not bool(payload.get("process_visibility_available")):
+        raise ToolInvocationError(
+            "process_visibility_restricted",
+            "Host process visibility is unavailable, so same-project editor closure cannot be verified.",
+            payload,
+        )
+
+    raise ToolInvocationError(
+        "editor_still_running",
+        (
+            "The same-project Unity editor is still running. "
+            f"Live editor pid(s): {', '.join(str(pid) for pid in payload.get('live_project_editor_pids') or [])}."
+        ),
+        payload,
+    )
 
 
 def cmd_request_project_refresh(args):
@@ -2014,6 +2116,28 @@ def progress_stdout_enabled(args: Any) -> bool:
 
 
 def ensure_batch_project_closed(project_root: Path, action_label: str):
+    visibility = process_visibility_summary()
+    if not bool(visibility.get("process_visibility_available")):
+        details = {
+            "live_editor_pids": [],
+            "live_project_editor_pids": [],
+            "same_project_editor_closed": False,
+            "process_exit_verified": False,
+            "closeout_classification": "process_visibility_restricted",
+            "recommended_next_action": "restore_host_process_visibility",
+            "next_distinct_action": "restore_host_process_visibility",
+            "closeout_verification_required": True,
+            "closeout_verification_note": "Closed-editor batch lanes require host process visibility before launch.",
+        }
+        details.update(visibility)
+        raise ToolInvocationError(
+            "process_visibility_restricted",
+            (
+                f"Refusing to start {action_label} because host process visibility is unavailable. "
+                "The closed-project batch lane cannot prove that this Unity project editor is closed."
+            ),
+            details,
+        )
     live_editor_pids = list_live_project_editor_pids(project_root)
     if live_editor_pids:
         raise ToolInvocationError(
@@ -3191,6 +3315,21 @@ def cmd_restore_editor_state(args):
         if recommended_recovery_command:
             message += f" next_step: {recommended_recovery_command}"
         raise ToolInvocationError("restore_editor_state_incomplete", message, payload)
+    if bool(getattr(args, "require_closed", False)) and not bool(payload.get("same_project_editor_closed")):
+        if not bool(payload.get("process_visibility_available")):
+            raise ToolInvocationError(
+                "process_visibility_restricted",
+                "Host process visibility is unavailable, so restore-editor-state --require-closed cannot verify closure.",
+                payload,
+            )
+        raise ToolInvocationError(
+            "restore_editor_state_incomplete",
+            (
+                "restore-editor-state --require-closed did not reach verified same-project editor closure. "
+                f"Live editor pid(s): {', '.join(str(pid) for pid in payload.get('live_project_editor_pids') or [])}."
+            ),
+            payload,
+        )
     print_json(payload)
 
 
@@ -4024,7 +4163,17 @@ def build_parser():
     editor_quit_cmd = sub.add_parser("request-editor-quit", help="Send a direct unity.editor.quit request through the active bridge transport.")
     editor_quit_cmd.add_argument("--project-root", required=True)
     editor_quit_cmd.add_argument("--timeout-ms", type=int, default=15000)
+    editor_quit_cmd.add_argument("--wait-for-exit", action="store_true")
+    editor_quit_cmd.add_argument("--exit-timeout-ms", type=int, default=30000)
     editor_quit_cmd.set_defaults(func=cmd_request_editor_quit)
+
+    verify_editor_closed_cmd = sub.add_parser(
+        "verify-editor-closed",
+        help="Verify that no same-project Unity editor process is live.",
+    )
+    verify_editor_closed_cmd.add_argument("--project-root", required=True)
+    verify_editor_closed_cmd.add_argument("--timeout-ms", type=int, default=30000)
+    verify_editor_closed_cmd.set_defaults(func=cmd_verify_editor_closed)
 
     project_refresh_cmd = sub.add_parser("request-project-refresh", help="Send a direct unity.project.refresh request through the active bridge transport.")
     project_refresh_cmd.add_argument("--project-root", required=True)
@@ -4170,6 +4319,7 @@ def build_parser():
     )
     restore_editor_cmd.add_argument("--project-root", required=True)
     restore_editor_cmd.add_argument("--timeout-ms", type=int, default=15000)
+    restore_editor_cmd.add_argument("--require-closed", action="store_true")
     restore_editor_cmd.set_defaults(func=cmd_restore_editor_state)
 
     recover_editor_cmd = sub.add_parser(

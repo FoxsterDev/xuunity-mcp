@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Designs
 
-Date: `2026-05-12`
+Date: `2026-05-23`
 Status: `active public design index`
 
 This folder holds public-safe design notes for the lightweight `xuunity` Unity
@@ -11,13 +11,20 @@ Use this folder for MCP-specific design material such as:
 - operator-facing MCP contract design
 - MCP validation-suite design
 - public-safe split notes for designs that moved into a narrower module
+- concrete implementation plans distilled from retros or chat plans
 
 Keep cross-cutting public designs in `AIRoot/Design/`.
 Keep project-specific implementation notes and evidence outside public `AIRoot`.
 
+For every substantial MCP implementation plan, add or update a public-safe design
+record here and update `DESIGN_PLAN_HISTORY.md` with status, validation
+evidence, self-review notes, and post-retro risks/follow-ups.
+
 ## Current Designs
 
+- `DESIGN_PLAN_HISTORY.md`
 - `XUUNITY_LIGHT_UNITY_MCP_DECISION_RECORD.md`
+- `XUUNITY_MCP_DEVMODE_BATCH_LIFECYCLE_HARDENING_DESIGN_2026-05-23.md`
 - `XUUNITY_MCP_UI_PRIMITIVES_DESIGN_2026-05-12.md`
 - `XUUNITY_MCP_UI_PRIMITIVES_AND_REFERENCE_WATCH_DESIGN_2026-05-12.md`
 - `XUUNITY_MCP_REFERENCE_WATCH_DESIGN_2026-05-12.md`

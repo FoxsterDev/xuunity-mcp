@@ -3,6 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+source_root_has_mcp_package() {
+  local candidate="$1"
+  [[ -f "$candidate/templates/server.py" && -f "$candidate/packages/com.xuunity.light-mcp/package.json" ]]
+}
+
 resolve_source_root() {
   if [[ -n "${XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT:-}" ]]; then
     cd "$XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT" && pwd
@@ -10,12 +15,12 @@ resolve_source_root() {
   fi
 
   if [[ -n "${XUUNITY_LIGHT_UNITY_MCP_AIRROOT:-}" ]]; then
-    if [[ -d "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT/templates" ]]; then
-      cd "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT" && pwd
+    if source_root_has_mcp_package "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT/Operations/XUUnityLightUnityMcp"; then
+      cd "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT/Operations/XUUnityLightUnityMcp" && pwd
       return 0
     fi
-    if [[ -d "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT/Operations/XUUnityLightUnityMcp/templates" ]]; then
-      cd "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT/Operations/XUUnityLightUnityMcp" && pwd
+    if source_root_has_mcp_package "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT"; then
+      cd "$XUUNITY_LIGHT_UNITY_MCP_AIRROOT" && pwd
       return 0
     fi
   fi
@@ -89,6 +94,20 @@ require_command() {
   fi
 }
 
+require_package_source_root() {
+  local expected_package_source="$SOURCE_ROOT/$PACKAGE_TEMPLATE_RELATIVE_PATH"
+  if [[ -f "$SOURCE_ROOT/$SERVER_TEMPLATE_RELATIVE_PATH" && -f "$expected_package_source/package.json" ]]; then
+    return 0
+  fi
+
+  echo "xuunity-light-unity-mcp source root preflight failed" >&2
+  echo "source_root=$SOURCE_ROOT" >&2
+  echo "expected_package_source=$expected_package_source" >&2
+  echo "airroot=${XUUNITY_LIGHT_UNITY_MCP_AIRROOT:-}" >&2
+  echo "recommended_next_action=fix_source_root_or_set_XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT" >&2
+  exit 1
+}
+
 warn_ripgrep_fallback_once() {
   if [[ "${XUUNITY_LIGHT_UNITY_MCP_RG_FALLBACK_WARNED:-false}" == "true" ]]; then
     return 0
@@ -128,11 +147,25 @@ error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
 error_code = str(error.get("code") or "")
 if exit_code != 0 or error_code:
     parts = ["outcome=error", f"exit_code={exit_code}", f"code={error_code}"]
+    details = error.get("details") if isinstance(error.get("details"), dict) else {}
     if payload.get("request_id"):
         parts.append(f"request_id={payload.get('request_id')}")
     next_action = payload.get("recommended_next_action") or error.get("recommended_next_action")
     if next_action:
         parts.append(f"next={next_action}")
+    for key in (
+        "process_visibility_error_code",
+        "same_project_editor_closed",
+        "process_exit_verified",
+        "closeout_classification",
+    ):
+        value = payload.get(key)
+        if value is None:
+            value = details.get(key)
+        if value is not None and value != "":
+            if isinstance(value, bool):
+                value = str(value).lower()
+            parts.append(f"{key}={value}")
     line(*parts)
     raise SystemExit(0)
 
@@ -364,10 +397,7 @@ switch_project_to_devmode() {
   local lock_path="$project_root/Packages/packages-lock.json"
   local package_source_path="$SOURCE_ROOT/$PACKAGE_TEMPLATE_RELATIVE_PATH"
 
-  if [[ ! -f "$package_source_path/package.json" ]]; then
-    echo "local MCP package source not found: $package_source_path/package.json" >&2
-    exit 1
-  fi
+  require_package_source_root
 
   local dependency_value
   dependency_value="$(python3 - "$project_root/Packages" "$package_source_path" <<'PY'
@@ -397,6 +427,8 @@ switch_project_to_prodmode() {
   local unity_version
   unity_version="$(read_project_unity_version "$project_root")"
   local unity_major="${unity_version%%.*}"
+
+  require_package_source_root
 
   if [[ ! -e "$SOURCE_ROOT/.git" ]]; then
     echo "source git metadata not found: $SOURCE_ROOT/.git" >&2

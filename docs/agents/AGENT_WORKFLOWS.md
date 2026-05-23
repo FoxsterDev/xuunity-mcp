@@ -1,6 +1,6 @@
 # Agent Workflows
 
-Date: `2026-05-22`
+Date: `2026-05-23`
 Status: `active public guidance`
 
 ## Purpose
@@ -34,6 +34,8 @@ Every agent workflow should follow this contract:
 8. Resolve interrupted requests through `request-final-status`.
 9. Restore host-opened editor state at closeout.
 10. Report unsupported capabilities as explicit validation gaps.
+11. For substantial MCP implementation plans, update the design-plan history and
+    perform a code/docs self-review before final closeout.
 
 Stop immediately when:
 
@@ -187,6 +189,9 @@ Each completed workflow should report:
 - request id when available
 - validation gaps and skipped checks
 - whether the host-opened editor was restored
+- design-plan or retro artifact updated when the work came from a plan
+- self-review notes for code/docs changes
+- post-retro risks and follow-up when reusable lessons were found
 
 ## Evidence JSON Schema
 
@@ -650,6 +655,26 @@ Use the non-interactive batch lane because the project should stay closed.
 Fail if another live Unity Editor owns this project. Capture result files and
 logs.
 ```
+
+If the batch preflight reports a same-project editor conflict, close and verify
+before retrying:
+
+```bash
+"$WRAPPER" request-editor-quit \
+  --project-root "$PROJECT_ROOT" \
+  --timeout-ms 30000 \
+  --wait-for-exit \
+  --exit-timeout-ms 30000
+
+"$WRAPPER" verify-editor-closed \
+  --project-root "$PROJECT_ROOT" \
+  --timeout-ms 30000
+```
+
+Only rerun the batch helper after `same_project_editor_closed=true` and
+`process_exit_verified=true`. If `process_visibility_restricted` appears, move
+the command to a host context that can list local processes; do not treat an
+empty PID list as proof while visibility is restricted.
 
 Compile route:
 

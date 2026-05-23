@@ -361,12 +361,20 @@ def build_batch_prepare_failure_summary(
         "recommended_recovery_command",
         "closeout_verification_required",
         "closeout_verification_note",
+        "live_editor_pids",
+        "live_project_editor_pids",
+        "same_project_editor_closed",
+        "process_exit_verified",
+        "process_visibility_available",
+        "process_visibility_error_code",
+        "closeout_classification",
+        "next_distinct_action",
     ):
         if key in details:
             summary[key] = details[key]
     if summary.get("recommended_recovery_command"):
         summary["next_step"] = (
-            "Run recommended_recovery_command, verify editor process exit, then rerun the batch command."
+            "Run recommended_recovery_command, require process_exit_verified=true, then rerun the batch command."
         )
     return summary
 

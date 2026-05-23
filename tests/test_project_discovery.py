@@ -103,6 +103,37 @@ class ProjectDiscoveryTests(unittest.TestCase):
         self.assertIn("editor_not_running", result["host_prerequisites"]["blocking_codes"])
         self.assertIn("transport_not_ready", result["host_prerequisites"]["blocking_codes"])
 
+    def test_discovery_reports_process_visibility_restricted_instead_of_editor_not_running(self) -> None:
+        project_root = Path("/tmp/ProjectA")
+        result = discover_project_context_state(
+            project_root,
+            try_read_bridge_state=lambda _: None,
+            try_read_host_editor_session_state=lambda _: None,
+            find_running_unity_editors_for_project=lambda _: [],
+            pid_is_alive=lambda pid: False,
+            bridge_enabled=lambda _: True,
+            process_visibility_report={
+                "process_visibility_available": False,
+                "process_visibility_error_code": "process_listing_failed",
+                "process_visibility_stderr": "operation not permitted",
+                "process_visibility_platform_kind": "macos",
+            },
+        )
+
+        self.assertEqual("process_visibility_restricted", result["discovery_classification"])
+        self.assertEqual("process_visibility_restricted", result["reconciliation_case"])
+        self.assertEqual("unknown", result["reconciliation_status"])
+        self.assertFalse(result["process_visibility_available"])
+        live_editor = result["host_prerequisites"]["checks"]["live_editor"]
+        self.assertEqual("unknown", live_editor["status"])
+        self.assertEqual("process_visibility_restricted", live_editor["code"])
+        self.assertIn("process_visibility_restricted", result["host_prerequisites"]["blocking_codes"])
+        self.assertNotIn("editor_not_running", result["host_prerequisites"]["blocking_codes"])
+        self.assertEqual(
+            "process_listing_failed",
+            result["state_groups"]["process_identity"]["process_visibility_error_code"],
+        )
+
     def test_discovery_bridge_disabled_overrides_stale_state_when_editor_is_not_live(self) -> None:
         project_root = Path("/tmp/ProjectA")
         result = discover_project_context_state(
