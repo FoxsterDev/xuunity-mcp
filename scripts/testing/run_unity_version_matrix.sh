@@ -400,6 +400,9 @@ install_mcp_package() {
   bash "$INIT_SCRIPT" \
     --project-root "$project_root" \
     --enable-project
+  bash "$WRAPPER_SCRIPT" \
+    devmode \
+    --project-root "$project_root"
 }
 
 run_version_matrix_entry() {

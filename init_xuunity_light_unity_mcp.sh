@@ -62,7 +62,7 @@ Usage:
   bash init_xuunity_light_unity_mcp.sh [options]
 
 Options:
-    --project-root <path>     Optional Unity project root for wiring the editor-only package as a direct local file dependency.
+    --project-root <path>     Optional Unity project root for enabling or disabling the editor-only bridge under Library/.
   --target codex|claude|both  Choose which install location(s) receive the server files.
                               codex  -> \$CODEX_TOOLS_HOME/xuunity-light-unity-mcp  (default \$HOME/.codex-tools)
                               claude -> \$CLAUDE_TOOLS_HOME/xuunity-light-unity-mcp (default \$HOME/.claude-tools)
@@ -71,7 +71,7 @@ Options:
   --install-claude-config     Also register the MCP server in ~/.claude.json (Claude Code user scope).
   --enable-project          Write local bridge config under Library/ so the editor-only bridge is active on next editor load.
   --disable-project         Remove local bridge config and local bridge state under Library/.
-  --uninstall-project       Remove the project package, manifest dependency, and local bridge state from the Unity project.
+  --uninstall-project       Remove the manifest dependency and local bridge state from the Unity project.
   --dry-run                 Print intended actions without writing files.
   --force                   Overwrite installed scaffold files.
 EOF
@@ -86,7 +86,6 @@ done
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 templates_dir="$script_dir/templates"
-package_source_dir="$script_dir/packages/com.xuunity.light-mcp"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 codex_tools_home="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}"
 claude_tools_home="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}"
@@ -96,29 +95,6 @@ config_path="$codex_home/config.toml"
 claude_config_path="${CLAUDE_CONFIG_PATH:-$HOME/.claude.json}"
 codex_run_path="$codex_install_dir/run.sh"
 claude_run_path="$claude_install_dir/run.sh"
-
-materialized_package_source_path() {
-  local project_root="$1"
-  printf '%s\n' "$project_root/XUUnityLightMcpPackageSource/com.xuunity.light-mcp"
-}
-
-remove_materialized_package_source() {
-  local project_root="$1"
-  local source_root
-  source_root="$(materialized_package_source_path "$project_root")"
-
-  if [[ ! -e "$source_root" ]]; then
-    return
-  fi
-
-  if [[ $dry_run -eq 1 ]]; then
-    printf '[dry-run] remove %s\n' "$source_root"
-    return
-  fi
-
-  rm -rf "$source_root"
-  printf 'removed %s\n' "$source_root"
-}
 
 run() {
   if [[ $dry_run -eq 1 ]]; then
@@ -378,40 +354,16 @@ if [[ -n "$project_root" ]]; then
     exit 1
   fi
 
-  project_package_dir="$project_root/Packages/com.xuunity.light-mcp"
   manifest_path="$project_root/Packages/manifest.json"
-  package_source_path=""
-
-  if [[ $uninstall_project -eq 0 && $disable_project -eq 0 ]]; then
-    package_source_path="$(python3 - "$project_root/Packages" "$package_source_dir" <<'PY'
-import os
-import sys
-print("file:" + os.path.relpath(os.path.realpath(sys.argv[2]), os.path.realpath(sys.argv[1])))
-PY
-)"
-  fi
 
   if [[ $uninstall_project -eq 1 ]]; then
-    if [[ $dry_run -eq 1 ]]; then
-      printf '[dry-run] remove %s\n' "$project_package_dir"
-    else
-      rm -rf "$project_package_dir"
-      printf 'removed %s\n' "$project_package_dir"
-    fi
     unpatch_manifest_if_needed "$manifest_path"
-    remove_materialized_package_source "$project_root"
     remove_bridge_state "$project_root"
   elif [[ $disable_project -eq 1 ]]; then
     remove_bridge_state "$project_root"
   else
-    patch_manifest_if_needed "$manifest_path" "$package_source_path"
-
     if [[ $enable_project -eq 1 ]]; then
       write_bridge_config "$project_root"
-    fi
-
-    if [[ $disable_project -eq 1 ]]; then
-      remove_bridge_state "$project_root"
     fi
   fi
 fi

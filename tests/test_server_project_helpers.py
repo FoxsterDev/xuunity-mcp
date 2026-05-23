@@ -167,6 +167,42 @@ class ServerProjectHelperTests(unittest.TestCase):
             self.assertTrue(result["repo_local_package_source_present"])
             self.assertEqual(str(package_dir.resolve()), result["resolved_dependency_path"])
 
+    def test_inspect_package_dependency_alignment_for_git_dependency_is_default_ready_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            package_dir = (
+                repo_root
+                / "AIRoot"
+                / "Operations"
+                / "XUUnityLightUnityMcp"
+                / "packages"
+                / "com.xuunity.light-mcp"
+            )
+            package_dir.mkdir(parents=True, exist_ok=True)
+            (package_dir / "package.json").write_text('{"name":"com.xuunity.light-mcp"}\n', encoding="utf-8")
+
+            project_root = make_unity_project(repo_root / "MyProject")
+            manifest_path = project_root / "Packages" / "manifest.json"
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "dependencies": {
+                            "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
+                        }
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = server.inspect_package_dependency_alignment(project_root)
+
+            self.assertEqual("git_or_remote", result["dependency_mode"])
+            self.assertEqual("git_pinned", result["alignment"])
+            self.assertEqual("", result["warning"])
+
     def test_inspect_package_dependency_alignment_for_missing_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             project_root = make_unity_project(Path(tmp_dir) / "MyProject")

@@ -15,13 +15,16 @@ Windsurf Cascade reads user MCP servers from:
 bash init_xuunity_light_unity_mcp.sh --target codex
 ```
 
-Enable the bridge for the Unity project:
+Enable the bridge for the Unity project without changing package mode:
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh \
   --project-root /path/to/UnityProject \
   --enable-project
 ```
+
+Keep the Unity package on the default Git UPM dependency unless you explicitly
+switch the project into local package `devmode`.
 
 ## User Config
 

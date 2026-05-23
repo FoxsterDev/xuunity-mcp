@@ -71,6 +71,8 @@ bash init_xuunity_light_unity_mcp.sh \
   --enable-project
 ```
 
+This enables the bridge only. It does not rewrite `Packages/manifest.json`.
+
 ## Package Install Route
 
 For production consumers, use the current Git UPM release path:
@@ -78,13 +80,13 @@ For production consumers, use the current Git UPM release path:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
   }
 }
 ```
 
 For active local development of this MCP package, point directly at the package
-folder:
+folder only when you explicitly switch the consumer project into `devmode`:
 
 ```json
 {

@@ -4,6 +4,37 @@
 
 - No unreleased changes yet.
 
+## 0.3.13
+
+Release tag: `v0.3.13`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
+```
+
+### Changed
+
+- Restored Git UPM as the default production package source for project setup.
+  `init_xuunity_light_unity_mcp.sh --enable-project` now enables the bridge
+  without rewriting `Packages/manifest.json`.
+- Kept local `file:` package wiring behind explicit wrapper mode switches only:
+  `devmode` for local MCP package iteration and `prodmode` for returning to the
+  published Git-backed source.
+- Updated project-package alignment checks so a Git-pinned dependency is treated
+  as the default healthy production state instead of warning about local-source
+  expectations.
+- Added a reusable clean-project Android APK smoke runner that creates a Unity
+  project, installs the package from Git UPM, proves MCP readiness, restores
+  the editor session, and runs a regular Unity batch APK build.
+- Added Android Build Support preflight reporting for the clean-project smoke
+  runner, including a structured fail-fast summary and an explicit
+  `--allow-no-android` MCP-only readiness mode.
+- Updated installer docs, client docs, AI integration docs, smoke contracts,
+  and package examples to document the Git-default / devmode-only package
+  source model consistently.
+
 ## 0.3.12
 
 Release tag: `v0.3.12`

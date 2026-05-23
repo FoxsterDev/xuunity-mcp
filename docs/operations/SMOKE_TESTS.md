@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-05-22`
-Status: `current for v0.3.12`
+Status: `current for v0.3.13`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -23,7 +23,7 @@ Provide a small generic baseline that proves:
 Current release evidence:
 
 - host Python tests: `97/97`
-- package self-tests through production Git UPM `v0.3.12`: EditMode `6/6`, PlayMode `5/5`
+- package self-tests through production Git UPM `v0.3.13`: EditMode `6/6`, PlayMode `5/5`
 - multi-project batch compile matrix in a consumer repo: `9/9` projects, `38/38` lanes, `0` failures
 
 ## Generic Smoke Layers
@@ -258,7 +258,38 @@ Pass criteria:
 - a missing required entry fails
 - `zip_entry_glob_exists` reports a match without dumping archive contents
 - `--artifact-probe-warn-only` keeps the wrapper path non-fatal while the
-  summary still reports `artifact_probe_succeeded=false`
+  probe verdict is still surfaced clearly
+
+### 15. Android APK Smoke
+
+Use a clean Unity project and prove the default Git UPM package route can:
+
+- import the package
+- enable the bridge without rewriting package mode
+- pass `ensure-ready`
+- report healthy `unity.status`
+- close the host-opened editor session cleanly
+- produce an Android APK from a regular Unity batch build command
+
+Pass criteria:
+
+- `--enable-project` leaves `Packages/manifest.json` on the Git dependency
+- `request-status-summary` reports `dependency_mode=git_or_remote`
+- `request-status-summary` reports `alignment=git_pinned`
+- the smoke emits a summary artifact with APK path, SHA-256, and build log path
+- when Android Build Support is missing and the caller does not pass
+  `--allow-no-android`, the runner fails in `preflight` and still writes a
+  summary artifact with the recommended fix
+- when Android Build Support is missing and the caller passes
+  `--allow-no-android`, the runner still proves MCP readiness and marks the APK
+  lane as `skipped_missing_android_build_support`
+
+Reusable runner:
+
+```bash
+templates/smoke/run_clean_project_android_apk_smoke.sh
+templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
+```
 
 ### 15. Batch Side-Effect Smoke
 

@@ -1,7 +1,7 @@
 # Install XUUnity Light Unity MCP
 
 Date: `2026-05-22`
-Status: `current for v0.3.12`
+Status: `current for v0.3.13`
 
 XUUnity Light Unity MCP has two pieces:
 
@@ -20,7 +20,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
   }
 }
 ```
@@ -67,12 +67,29 @@ The installer writes `run.sh`, `run.cmd`, and `run.ps1` into each selected
 host tools directory. Native Windows clients should use the Windows templates
 that call `run.cmd`.
 
-To enable a Unity project:
+To enable a Unity project bridge without changing package mode:
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh \
   --project-root /path/to/UnityProject \
   --enable-project
+```
+
+This writes bridge config under `Library/XUUnityLightMcp/` only. It does not
+rewrite `Packages/manifest.json`. Keep Git UPM as the default project state and
+use wrapper `devmode` only when you intentionally want the local `file:`
+package source.
+
+Explicit local mode switch:
+
+```bash
+bash xuunity_light_unity_mcp.sh devmode --project-root /path/to/UnityProject
+```
+
+Switch back to the published Git-backed dependency:
+
+```bash
+bash xuunity_light_unity_mcp.sh prodmode --project-root /path/to/UnityProject
 ```
 
 ## Connect Codex-Style Agents
@@ -185,7 +202,7 @@ After package import and bridge enablement:
 
 Do not treat the install as ready until status, capabilities, and health probe all succeed.
 
-For package-level verification after upgrading to `v0.3.12`, run:
+For package-level verification after upgrading to `v0.3.13`, run:
 
 ```bash
 templates/smoke/run_package_self_tests.sh \
@@ -195,6 +212,20 @@ templates/smoke/run_package_self_tests.sh \
 
 The current self-test baseline is EditMode `6/6` and PlayMode `5/5` on a
 healthy Unity 6000 project.
+
+For a clean-project Android APK proof that keeps Git UPM as the default package
+mode and only uses local `file:` mode through explicit `devmode`, run:
+
+```bash
+templates/smoke/run_clean_project_android_apk_smoke.sh
+```
+
+When the selected Unity editor does not include Android Build Support and you
+only want MCP readiness proof, allow the runner to skip the APK lane:
+
+```bash
+templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
+```
 
 ## Troubleshooting
 

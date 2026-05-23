@@ -1,7 +1,7 @@
 # Security Model
 
 Date: `2026-05-22`
-Status: `current for v0.3.12`
+Status: `current for v0.3.13`
 
 XUUnity Light Unity MCP is designed as a local same-host Unity Editor automation service.
 

@@ -1,7 +1,7 @@
 # XUUnity Light MCP Unity Package
 
 Date: `2026-05-22`
-Status: `current for package v0.3.12`
+Status: `current for package v0.3.13`
 
 This Unity package provides the editor-side bridge for the lightweight
 XUUnity Light Unity MCP service.
@@ -24,7 +24,7 @@ Add this to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
   }
 }
 ```

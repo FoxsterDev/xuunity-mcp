@@ -11,13 +11,16 @@ Install the Claude-side server files:
 bash init_xuunity_light_unity_mcp.sh --target claude
 ```
 
-Enable the bridge for the Unity project:
+Enable the bridge for the Unity project without changing package mode:
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh \
   --project-root /path/to/UnityProject \
   --enable-project
 ```
+
+Keep the Unity package on the default Git UPM dependency unless you explicitly
+switch the project into local package `devmode`.
 
 ## Project Scope
 

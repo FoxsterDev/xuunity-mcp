@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Devmode Validation
 
 Date: `2026-05-22`
-Status: `current for v0.3.12`
+Status: `current for v0.3.13`
 
 Use this document when changing the XUUnity Light Unity MCP host, server,
 wrapper scripts, Unity package, package metadata, smoke runners, or package

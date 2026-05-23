@@ -4,7 +4,7 @@ Date: `2026-05-22`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
-for MCP-capable AI agents. The current public release line is `v0.3.12`.
+for MCP-capable AI agents. The current public release line is `v0.3.13`.
 
 ## Current Package
 
@@ -17,7 +17,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
 ```
 
 Current package path:
@@ -99,15 +99,15 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest package-path validation for `v0.3.12`:
+Latest package-path validation for `v0.3.13`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.12`, `unity=6000.0` |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.13`, `unity=6000.0` |
 | Host Python tests | `scripts/testing/run_host_python_tests.sh` | `97/97` passed |
-| Package self-tests | Representative Unity 6000 consumer project through production Git UPM `v0.3.12` | EditMode `6/6`, PlayMode `5/5` |
+| Package self-tests | Representative Unity 6000 consumer project through production Git UPM `v0.3.13` | EditMode `6/6`, PlayMode `5/5` |
 | Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
-| Git tag visibility | GitHub remote refs | `v0.3.12` resolves to `2fa71514fb9ab8040c2fbb9f5585f7ef49c35740` |
+| Git tag visibility | Git refs | Release tag `v0.3.13` is the current Git UPM source pin for consumers. |
 
 Cross-platform status:
 
@@ -126,7 +126,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
   }
 }
 ```

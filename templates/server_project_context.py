@@ -132,12 +132,8 @@ def inspect_package_dependency_alignment(project_root: Path) -> dict[str, Any]:
     else:
         result["dependency_mode"] = "other"
 
-    if package_source is not None:
-        result["alignment"] = "repo_local_source_not_loaded"
-        result["warning"] = (
-            "A repo-local AIRoot XUUnityLightUnityMcp package source exists, but the project manifest "
-            "does not currently load it through a file dependency."
-        )
+    if result["dependency_mode"] == "git_or_remote":
+        result["alignment"] = "git_pinned"
     else:
         result["alignment"] = "external_only"
 

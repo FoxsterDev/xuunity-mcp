@@ -67,7 +67,7 @@ Configure XUUnity Light Unity MCP for this Unity project.
 Inputs:
 - Unity project root: <absolute path to the Unity project>
 - MCP client: <Claude Code | Claude Desktop | Cursor | Windsurf | Codex | custom stdio MCP client>
-- Package mode: Git UPM release v0.3.12, unless this is local MCP development.
+- Package mode: Git UPM release v0.3.13, unless this is local MCP development.
 
 Principles:
 - Read the current README.md, INSTALL.md, and the matching docs/clients/*
@@ -86,11 +86,13 @@ Principles:
 Tasks:
 1. Confirm Python 3.10+, Unity project structure, and selected MCP client.
 2. Add the Unity package dependency:
-   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
+   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
 3. From <MCP_REPO_ROOT>, run the host installer and enable the project bridge
    through macOS/Linux shell, Git Bash, or WSL:
    bash init_xuunity_light_unity_mcp.sh
    bash init_xuunity_light_unity_mcp.sh --project-root "<UNITY_PROJECT_ROOT>" --enable-project
+   This enables the bridge only. It does not switch the Unity package away from
+   the Git UPM dependency.
 4. Wire the selected MCP client using the files under templates/clients/.
    Merge config if the target file already exists.
 5. Open or restart the Unity project if needed, then verify readiness with:
@@ -110,7 +112,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
+> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -118,13 +120,15 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
   }
 }
 ```
 
 Local package source for MCP development:
 `file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp`.
+Keep Git UPM as the default project state. Switch to the local `file:` source
+only through explicit `devmode`.
 OpenUPM is planned; use Git UPM until the package is published there.
 
 Migration note: `v0.3.11` used `templates/unity-package`. `v0.3.12+` uses
@@ -137,7 +141,7 @@ OpenUPM and Unity Package Manager indexing.
 bash init_xuunity_light_unity_mcp.sh
 ```
 
-Enable the bridge for one Unity project:
+Enable the bridge for one Unity project without changing package mode:
 
 ```bash
 bash init_xuunity_light_unity_mcp.sh \
@@ -147,6 +151,18 @@ bash init_xuunity_light_unity_mcp.sh \
 
 The installer writes Unix and Windows launchers: `run.sh`, `run.cmd`, and
 `run.ps1`.
+
+For local MCP package iteration, switch package mode explicitly:
+
+```bash
+bash xuunity_light_unity_mcp.sh devmode --project-root /path/to/UnityProject
+```
+
+To switch back to the published Git-backed source:
+
+```bash
+bash xuunity_light_unity_mcp.sh prodmode --project-root /path/to/UnityProject
+```
 
 ### 3. Connect Your Client
 
@@ -180,6 +196,21 @@ Then try:
 ```text
 Use XUUnity Light Unity MCP to check this Unity project health, compile Android
 player scripts, and report the first actionable failure with artifact paths.
+```
+
+For a clean-project end-to-end Android smoke, including Git-default package
+install, bridge readiness, and a regular Unity batch APK build:
+
+```bash
+templates/smoke/run_clean_project_android_apk_smoke.sh
+```
+
+If the selected Unity editor does not have Android Build Support installed but
+you still want MCP-only readiness evidence, allow the runner to skip the APK
+lane explicitly:
+
+```bash
+templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 ```
 
 ---
