@@ -3,10 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
-using UnityEditor.SceneManagement;
-using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Helpers;
 
@@ -66,8 +63,6 @@ namespace XUUnity.LightMcp.Editor.Batch
             public XUUnityLightMcpTestsPayload tests;
         }
 
-        static BatchValidationArgs _activeArgs;
-        static BatchValidationResult _activeResult;
         static DateTime _startedAtUtc;
 
         public static void ExecuteFromCommandLine()
@@ -80,7 +75,6 @@ namespace XUUnity.LightMcp.Editor.Batch
                 started_at_utc = _startedAtUtc.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             };
 
-            var awaitAsyncCompletion = false;
             var exitCode = 1;
 
             try
@@ -102,10 +96,9 @@ namespace XUUnity.LightMcp.Editor.Batch
                         break;
 
                     case "editmode-tests":
-                        _activeArgs = args;
-                        _activeResult = result;
-                        StartEditModeTests(args, result);
-                        awaitAsyncCompletion = true;
+                        throw new InvalidOperationException(
+                            "EditMode batch tests require the optional XUUnity Test Framework capability. " +
+                            "Install com.unity.test-framework and run the optional batch test entrypoint.");
                         break;
 
                     default:
@@ -121,10 +114,7 @@ namespace XUUnity.LightMcp.Editor.Batch
             }
             finally
             {
-                if (!awaitAsyncCompletion)
-                {
-                    FinalizeAndExit(args, result, exitCode);
-                }
+                FinalizeAndExit(args, result, exitCode);
             }
         }
 
@@ -256,46 +246,6 @@ namespace XUUnity.LightMcp.Editor.Batch
             return result.succeeded;
         }
 
-        static void StartEditModeTests(BatchValidationArgs args, BatchValidationResult result)
-        {
-            if (EditorApplication.isCompiling)
-            {
-                throw new InvalidOperationException("Unity is currently compiling scripts.");
-            }
-
-            if (EditorUtility.scriptCompilationFailed)
-            {
-                throw new InvalidOperationException("Unity has compilation errors. Resolve them before running EditMode tests.");
-            }
-
-            var dirtyScenes = GetDirtyOpenScenes();
-            if (dirtyScenes.Count > 0)
-            {
-                var sceneList = string.Join(", ", dirtyScenes.Select(FormatSceneForMessage));
-                throw new InvalidOperationException($"Cannot run EditMode tests while open scenes have unsaved changes: {sceneList}");
-            }
-
-            if (!TryBuildFilter(args, out var filter, out var errorMessage))
-            {
-                throw new InvalidOperationException(errorMessage);
-            }
-
-            var api = ScriptableObject.CreateInstance<TestRunnerApi>();
-            var callbacks = new BatchEditModeCallbacks(OnEditModeTestsCompleted);
-            callbacks.Begin(result.project_root);
-            api.RegisterCallbacks(callbacks);
-            api.Execute(new ExecutionSettings(filter));
-        }
-
-        static void OnEditModeTestsCompleted(XUUnityLightMcpTestsPayload payload)
-        {
-            _activeResult.tests = payload;
-            _activeResult.succeeded = payload.status == "passed";
-            _activeResult.outcome = _activeResult.succeeded ? "batch_validation_completed" : "batch_validation_failed";
-            _activeResult.top_actionable_error = FirstTestFailure(payload);
-            FinalizeAndExit(_activeArgs, _activeResult, _activeResult.succeeded ? 0 : 1);
-        }
-
         static BatchValidationArgs ParseArgs(string[] rawArgs)
         {
             var args = new BatchValidationArgs();
@@ -399,22 +349,6 @@ namespace XUUnity.LightMcp.Editor.Batch
             File.WriteAllText(fullPath, JsonUtility.ToJson(result, true));
         }
 
-        static bool TryBuildFilter(BatchValidationArgs args, out Filter filter, out string errorMessage)
-        {
-            filter = new Filter
-            {
-                testMode = TestMode.EditMode
-            };
-            errorMessage = "";
-
-            filter.testNames = NormalizeFilterValues(args.testNames);
-            filter.groupNames = NormalizeFilterValues(args.groupNames);
-            filter.categoryNames = NormalizeFilterValues(args.categoryNames);
-            filter.assemblyNames = NormalizeFilterValues(args.assemblyNames);
-            XUUnityLightMcpEditModeFilterResolver.ResolveTestNames(filter);
-            return true;
-        }
-
         static string[] NormalizeFilterValues(string[] values)
         {
             if (values == null || values.Length == 0)
@@ -429,28 +363,6 @@ namespace XUUnity.LightMcp.Editor.Batch
                 .ToArray();
 
             return normalized.Length == 0 ? null : normalized;
-        }
-
-        static List<Scene> GetDirtyOpenScenes()
-        {
-            var result = new List<Scene>(EditorSceneManager.sceneCount);
-            for (var i = 0; i < EditorSceneManager.sceneCount; i++)
-            {
-                var scene = EditorSceneManager.GetSceneAt(i);
-                if (scene.isDirty)
-                {
-                    result.Add(scene);
-                }
-            }
-
-            return result;
-        }
-
-        static string FormatSceneForMessage(Scene scene)
-        {
-            var name = string.IsNullOrEmpty(scene.name) ? "(untitled)" : scene.name;
-            var path = string.IsNullOrEmpty(scene.path) ? "(unsaved)" : scene.path;
-            return $"'{name}' ({path})";
         }
 
         static string FirstCompileError(XUUnityLightMcpCompileConfigPayload payload)
@@ -471,124 +383,5 @@ namespace XUUnity.LightMcp.Editor.Batch
                 : $"Compile validation finished with status '{payload.status}'.";
         }
 
-        static string FirstTestFailure(XUUnityLightMcpTestsPayload payload)
-        {
-            if (payload == null)
-            {
-                return "";
-            }
-
-            var firstFailure = payload.failures == null ? null : payload.failures.FirstOrDefault();
-            if (firstFailure != null && !string.IsNullOrWhiteSpace(firstFailure.message))
-            {
-                return firstFailure.message;
-            }
-
-            return payload.status == "passed"
-                ? ""
-                : $"EditMode tests finished with status '{payload.status}'.";
-        }
-
-        sealed class BatchEditModeCallbacks : ICallbacks
-        {
-            readonly Action<XUUnityLightMcpTestsPayload> _onCompleted;
-            readonly List<XUUnityLightMcpTestFailure> _failures = new();
-
-            string _projectRoot = "";
-            DateTime _startedAtUtc;
-            int _total;
-            int _passed;
-            int _failed;
-            int _skipped;
-
-            public BatchEditModeCallbacks(Action<XUUnityLightMcpTestsPayload> onCompleted)
-            {
-                _onCompleted = onCompleted ?? throw new ArgumentNullException(nameof(onCompleted));
-            }
-
-            public void Begin(string projectRoot)
-            {
-                _projectRoot = projectRoot ?? "";
-                _startedAtUtc = DateTime.UtcNow;
-                _total = 0;
-                _passed = 0;
-                _failed = 0;
-                _skipped = 0;
-                _failures.Clear();
-            }
-
-            public void RunStarted(ITestAdaptor testsToRun)
-            {
-                _total = CountLeafTests(testsToRun);
-            }
-
-            public void RunFinished(ITestResultAdaptor result)
-            {
-                var payload = new XUUnityLightMcpTestsPayload
-                {
-                    project_root = _projectRoot,
-                    total = _total,
-                    passed = _passed,
-                    failed = _failed,
-                    skipped = _skipped,
-                    duration_seconds = Math.Round((DateTime.UtcNow - _startedAtUtc).TotalSeconds, 6),
-                    failures = new List<XUUnityLightMcpTestFailure>(_failures),
-                    validation_evidence = "unity_batchmode"
-                };
-
-                payload.status = payload.total == 0
-                    ? "no_tests"
-                    : payload.failed > 0
-                        ? "failed"
-                        : "passed";
-
-                _onCompleted(payload);
-            }
-
-            public void TestStarted(ITestAdaptor test)
-            {
-            }
-
-            public void TestFinished(ITestResultAdaptor result)
-            {
-                if (result?.Test == null || result.Test.IsSuite)
-                {
-                    return;
-                }
-
-                switch (result.TestStatus)
-                {
-                    case TestStatus.Passed:
-                        _passed++;
-                        break;
-                    case TestStatus.Failed:
-                        _failed++;
-                        _failures.Add(new XUUnityLightMcpTestFailure
-                        {
-                            name = result.Test.FullName ?? result.Test.Name ?? "",
-                            message = result.Message ?? ""
-                        });
-                        break;
-                    case TestStatus.Skipped:
-                        _skipped++;
-                        break;
-                }
-            }
-
-            static int CountLeafTests(ITestAdaptor test)
-            {
-                if (test == null)
-                {
-                    return 0;
-                }
-
-                if (test.HasChildren && test.Children != null)
-                {
-                    return test.Children.Sum(CountLeafTests);
-                }
-
-                return test.IsSuite ? 0 : 1;
-            }
-        }
     }
 }

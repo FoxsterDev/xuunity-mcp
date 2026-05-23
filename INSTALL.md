@@ -1,7 +1,7 @@
 # Install XUUnity Light Unity MCP
 
-Date: `2026-05-22`
-Status: `current for v0.3.13`
+Date: `2026-05-23`
+Status: `current for v0.3.14`
 
 XUUnity Light Unity MCP has two pieces:
 
@@ -20,7 +20,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14"
   }
 }
 ```
@@ -79,6 +79,62 @@ This writes bridge config under `Library/XUUnityLightMcp/` only. It does not
 rewrite `Packages/manifest.json`. Keep Git UPM as the default project state and
 use wrapper `devmode` only when you intentionally want the local `file:`
 package source.
+
+## Guided Workspace Setup
+
+For a single Unity project, a flat multi-project hub, mixed Unity versions, or
+nested repositories, prefer the guided plan/apply flow:
+
+```bash
+bash xuunity_light_unity_mcp.sh setup-plan \
+  --workspace-root /path/to/workspace \
+  --recursive > xuunity-setup-plan.json
+
+bash xuunity_light_unity_mcp.sh setup-apply \
+  --plan-file xuunity-setup-plan.json \
+  --yes
+
+bash xuunity_light_unity_mcp.sh validate-setup \
+  --project-root /path/to/UnityProject
+```
+
+`setup-plan` computes actions per project. It does not apply one dependency
+version globally across mixed Unity versions.
+
+The MCP core package works without `com.unity.test-framework`. EditMode and
+PlayMode test operations are optional capabilities enabled by Unity asmdef
+Version Defines when `com.unity.test-framework >= 1.1.33` is present.
+
+Recommended Test Framework versions:
+
+| Unity version | Recommended dependency |
+| --- | --- |
+| Unity 2021/2022 | `com.unity.test-framework@1.1.33` |
+| Unity 6000+ | `com.unity.test-framework@1.5.1` |
+
+To enable test operations after explicit approval:
+
+```bash
+bash xuunity_light_unity_mcp.sh install-test-framework \
+  --project-root /path/to/UnityProject \
+  --yes
+
+bash xuunity_light_unity_mcp.sh validate-setup \
+  --project-root /path/to/UnityProject \
+  --include-tests
+```
+
+When the Unity bridge is already healthy, clients may use
+`unity_package_install_test_framework` with `approve: true` to install the same
+optional dependency through Unity Package Manager.
+
+If the project already declares `com.unity.test-framework`, the setup wizard
+does not treat every existing version the same way. A version at or above
+`1.1.33` enables the test capability. Unity 6000 projects on `1.1.33` stay
+supported but report `upgrade_recommended=true` toward `1.5.1`. A version below
+`1.1.33` reports `disabled_dependency_too_old` and plans an explicit approved
+upgrade, preserving unrelated manifest entries and requiring a Unity package
+resolve/compile check afterward.
 
 Explicit local mode switch:
 
@@ -202,7 +258,7 @@ After package import and bridge enablement:
 
 Do not treat the install as ready until status, capabilities, and health probe all succeed.
 
-For package-level verification after upgrading to `v0.3.13`, run:
+For package-level verification after upgrading to `v0.3.14`, run:
 
 ```bash
 templates/smoke/run_package_self_tests.sh \
@@ -233,3 +289,7 @@ templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 - If the AI client cannot find the server, verify the configured `run.sh` or `run.cmd` path.
 - If Unity imported the package but MCP calls fail, check `Library/XUUnityLightMcp/` for bridge state and request artifacts.
 - If a Unity project is already open, prefer reusing the healthy editor session instead of starting a competing one.
+- If `batch-editmode-tests` reports `test_capability_unavailable`, inspect the
+  reported capability status. Missing Test Framework means install it with
+  `install-test-framework --yes`; an old declared Test Framework means approve
+  the dependency upgrade, let Unity resolve packages, then rerun validation.

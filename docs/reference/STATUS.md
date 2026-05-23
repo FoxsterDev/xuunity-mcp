@@ -1,10 +1,10 @@
 # Status
 
-Date: `2026-05-22`
+Date: `2026-05-23`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
-for MCP-capable AI agents. The current public release line is `v0.3.13`.
+for MCP-capable AI agents. The current source line is `v0.3.14`.
 
 ## Current Package
 
@@ -17,7 +17,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
 ```
 
 Current package path:
@@ -30,6 +30,8 @@ Migration note:
 
 - `v0.3.11` and earlier used `templates/unity-package`.
 - `v0.3.12+` uses `packages/com.xuunity.light-mcp`.
+- `v0.3.14+` keeps the default package metadata on Unity `2021.3` and makes
+  Test Framework-backed operations optional.
 - The old path is kept only as a migration pointer for users pinned to
   `v0.3.11`.
 
@@ -50,6 +52,7 @@ Implemented Unity-side operations:
 - `unity.build_target.switch`
 - `unity.editor.quit`
 - `unity.project.refresh`
+- `unity.package.install_test_framework`
 - `unity.edm4u.resolve`
 - `unity.sdk.dependency.verify`
 - `unity.console.tail`
@@ -70,6 +73,10 @@ Implemented Unity-side operations:
 Implemented host-side MCP tools and helpers:
 
 - `unity_status_summary`
+- `xuunity_setup_plan`
+- `xuunity_setup_apply`
+- `xuunity_setup_validate`
+- `unity_package_install_test_framework`
 - `unity_request_final_status`
 - `unity_scenario_result_summary`
 - `unity_scenario_results_list`
@@ -80,6 +87,10 @@ Implemented host-side MCP tools and helpers:
 - `project-discovery-report`
 - `registry-context-report`
 - `registry-prune-contexts`
+- `setup-plan`
+- `setup-apply`
+- `validate-setup`
+- `install-test-framework`
 - `open-editor`
 - `ensure-ready`
 - `recover-editor-session`
@@ -99,15 +110,15 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest package-path validation for `v0.3.13`:
+Latest source validation for `v0.3.14`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.13`, `unity=6000.0` |
-| Host Python tests | `scripts/testing/run_host_python_tests.sh` | `97/97` passed |
-| Package self-tests | Representative Unity 6000 consumer project through production Git UPM `v0.3.13` | EditMode `6/6`, PlayMode `5/5` |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.14`, `unity=2021.3`, no hard Test Framework dependency |
+| Host Python tests | `scripts/testing/run_host_python_tests.sh` | `115/115` passed |
+| Package self-tests | Representative Unity 6000 consumer project through production Git UPM `v0.3.13` | EditMode `6/6`, PlayMode `5/5` before the optional-capability split; rerun live Unity matrix before tagging `v0.3.14` |
 | Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
-| Git tag visibility | Git refs | Release tag `v0.3.13` is the current Git UPM source pin for consumers. |
+| Git tag visibility | Git refs | Release tag `v0.3.14` must be pushed before consumers pin it from Git UPM. |
 
 Cross-platform status:
 
@@ -116,8 +127,8 @@ Cross-platform status:
 | macOS host tools | `validated on this host` | Shell wrapper, host tests, Unity package self-tests, and multi-project matrix passed. |
 | Linux host tools | `portable by design` | Bash-compatible launchers/templates exist; run a Linux Unity smoke before claiming live proof. |
 | Native Windows clients | `templates provided` | `run.cmd`, `run.ps1`, and Windows client configs exist; native Windows MCP connection still needs host execution proof. |
-| Unity 6000+ | `primary package line` | Checked-in package metadata targets Unity `6000.0`. |
-| Unity 2021/2022 | `compatibility manifest route` | Use generated package metadata from `templates/package-manifests/` for older editor lines. |
+| Unity 2021.3+ | `default package line` | Checked-in package metadata targets Unity `2021.3`; setup wizard chooses optional Test Framework recommendations per project. |
+| Optional Test Framework | `capability-gated` | Core readiness stays healthy when missing; tests report `disabled_missing_dependency`, `disabled_dependency_too_old`, or supported with `upgrade_recommended` when an existing dependency should be reviewed. |
 
 ## Package Source Modes
 
@@ -126,7 +137,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14"
   }
 }
 ```

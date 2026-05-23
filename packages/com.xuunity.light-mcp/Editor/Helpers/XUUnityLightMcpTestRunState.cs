@@ -1,14 +1,13 @@
 using System;
 using System.IO;
 using System.Linq;
-using UnityEditor.TestTools.TestRunner.Api;
 using XUUnity.LightMcp.Editor.Core;
-using XUUnity.LightMcp.Editor.Operations;
 
 namespace XUUnity.LightMcp.Editor.Helpers
 {
     internal static class XUUnityLightMcpTestRunState
     {
+        const string PlayModeTestsOperationName = "unity.tests.run_playmode";
         static readonly object Gate = new();
 
         public static XUUnityLightMcpPersistedTestRunState Begin(string requestId, string operation, string testMode, string filterSummary, int requestTimeoutMs)
@@ -130,7 +129,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
         }
 
-        public static void RecordTestFinished(TestStatus testStatus, string testName, string message)
+        public static void RecordTestFinished(string testStatus, string testName, string message)
         {
             lock (Gate)
             {
@@ -142,12 +141,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 state.run_phase = "running";
                 state.last_finished_test = testName ?? "";
                 state.last_progress_at_utc = UtcNow();
-                switch (testStatus)
+                switch ((testStatus ?? "").Trim().ToLowerInvariant())
                 {
-                    case TestStatus.Passed:
+                    case "passed":
                         state.passed++;
                         break;
-                    case TestStatus.Failed:
+                    case "failed":
                         state.failed++;
                         state.failures.Add(new XUUnityLightMcpTestFailure
                         {
@@ -155,7 +154,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                             message = message ?? ""
                         });
                         break;
-                    case TestStatus.Skipped:
+                    case "skipped":
                         state.skipped++;
                         break;
                 }
@@ -393,13 +392,13 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     }
 
                     if (string.Equals(payload.event_type, "request_abandoned", StringComparison.Ordinal)
-                        && !string.Equals(state.operation, XUUnityLightMcpPlayModeTestRunner.OperationName, StringComparison.Ordinal))
+                        && !string.Equals(state.operation, PlayModeTestsOperationName, StringComparison.Ordinal))
                     {
                         return true;
                     }
 
                     if (string.Equals(payload.event_type, "request_abandoned", StringComparison.Ordinal)
-                        && string.Equals(state.operation, XUUnityLightMcpPlayModeTestRunner.OperationName, StringComparison.Ordinal))
+                        && string.Equals(state.operation, PlayModeTestsOperationName, StringComparison.Ordinal))
                     {
                         return IsRecoveryDeadlineExpiredLocked(state);
                     }
@@ -518,109 +517,6 @@ namespace XUUnity.LightMcp.Editor.Helpers
         }
     }
 
-    internal sealed class XUUnityLightMcpPersistedTestCallbacks : ICallbacks
-    {
-        readonly string _operationName;
-        readonly string _testMode;
-        readonly Action<XUUnityLightMcpResponse> _onCompleted;
-
-        bool _active;
-        string _startedAtUtc = "";
-
-        public bool IsActive => _active;
-        public string StartedAtUtc => _startedAtUtc ?? "";
-
-        public XUUnityLightMcpPersistedTestCallbacks(string operationName, string testMode, Action<XUUnityLightMcpResponse> onCompleted)
-        {
-            _operationName = operationName ?? throw new ArgumentNullException(nameof(operationName));
-            _testMode = testMode ?? throw new ArgumentNullException(nameof(testMode));
-            _onCompleted = onCompleted ?? throw new ArgumentNullException(nameof(onCompleted));
-        }
-
-        public void Begin(string requestId, string filterSummary, int requestTimeoutMs)
-        {
-            var state = XUUnityLightMcpTestRunState.Begin(requestId, _operationName, _testMode, filterSummary, requestTimeoutMs);
-            Restore(state);
-        }
-
-        public void Restore(XUUnityLightMcpPersistedTestRunState state)
-        {
-            _active = state != null
-                      && string.Equals(state.operation, _operationName, StringComparison.Ordinal)
-                      && string.Equals(state.response_handoff_state, "pending", StringComparison.Ordinal)
-                      && string.IsNullOrWhiteSpace(state.completed_at_utc);
-            _startedAtUtc = _active ? state.started_at_utc ?? "" : "";
-        }
-
-        public void Clear()
-        {
-            _active = false;
-            _startedAtUtc = "";
-        }
-
-        public void RunStarted(ITestAdaptor testsToRun)
-        {
-            if (!_active)
-            {
-                return;
-            }
-
-            XUUnityLightMcpTestRunState.RecordRunStarted(CountLeafTests(testsToRun));
-        }
-
-        public void RunFinished(ITestResultAdaptor result)
-        {
-            if (!_active)
-            {
-                return;
-            }
-
-            var response = XUUnityLightMcpTestRunState.CompleteAndBuildResponse(
-                "unity_test_runner_callbacks",
-                XUUnityLightMcpPlayModeStateOperation.ResolvePlayModeState(),
-                XUUnityLightMcpTestRunSummary.FromResult(result));
-            _onCompleted(response);
-        }
-
-        public void TestStarted(ITestAdaptor test)
-        {
-            if (!_active || test == null || test.IsSuite)
-            {
-                return;
-            }
-
-            XUUnityLightMcpTestRunState.RecordTestStarted(test.FullName ?? test.Name ?? "");
-        }
-
-        public void TestFinished(ITestResultAdaptor result)
-        {
-            if (!_active || result?.Test == null || result.Test.IsSuite)
-            {
-                return;
-            }
-
-            XUUnityLightMcpTestRunState.RecordTestFinished(
-                result.TestStatus,
-                result.Test.FullName ?? result.Test.Name ?? "",
-                result.Message ?? "");
-        }
-
-        static int CountLeafTests(ITestAdaptor test)
-        {
-            if (test == null)
-            {
-                return 0;
-            }
-
-            if (test.HasChildren && test.Children != null)
-            {
-                return test.Children.Sum(CountLeafTests);
-            }
-
-            return test.IsSuite ? 0 : 1;
-        }
-    }
-
     internal sealed class XUUnityLightMcpTestRunSummary
     {
         public int total;
@@ -628,54 +524,5 @@ namespace XUUnity.LightMcp.Editor.Helpers
         public int failed;
         public int skipped;
         public System.Collections.Generic.List<XUUnityLightMcpTestFailure> failures = new();
-
-        public static XUUnityLightMcpTestRunSummary FromResult(ITestResultAdaptor result)
-        {
-            var summary = new XUUnityLightMcpTestRunSummary();
-            AddResult(summary, result);
-            return summary;
-        }
-
-        static void AddResult(XUUnityLightMcpTestRunSummary summary, ITestResultAdaptor result)
-        {
-            if (summary == null || result == null)
-            {
-                return;
-            }
-
-            if (result.HasChildren && result.Children != null)
-            {
-                foreach (var child in result.Children)
-                {
-                    AddResult(summary, child);
-                }
-
-                return;
-            }
-
-            if (result.Test != null && result.Test.IsSuite)
-            {
-                return;
-            }
-
-            summary.total++;
-            switch (result.TestStatus)
-            {
-                case TestStatus.Passed:
-                    summary.passed++;
-                    break;
-                case TestStatus.Failed:
-                    summary.failed++;
-                    summary.failures.Add(new XUUnityLightMcpTestFailure
-                    {
-                        name = result.Test?.FullName ?? result.Test?.Name ?? "",
-                        message = result.Message ?? ""
-                    });
-                    break;
-                case TestStatus.Skipped:
-                    summary.skipped++;
-                    break;
-            }
-        }
     }
 }

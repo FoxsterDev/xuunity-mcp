@@ -4,7 +4,6 @@ using System.IO;
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.Build.Player;
-using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 using XUUnity.LightMcp.Editor.Core;
 
@@ -77,7 +76,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath,
                 unity_version = Application.unityVersion,
                 checked_at_utc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                status = disabledOperations.Count == 0 ? "healthy" : "degraded",
+                status = ResolveReportStatus(capabilities),
                 supported_operations = supportedOperations,
                 disabled_operations = disabledOperations,
                 capabilities = capabilities
@@ -118,6 +117,10 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 reason = string.IsNullOrWhiteSpace(capability.reason)
                     ? $"Capability '{capabilityId}' is not supported in Unity {Application.unityVersion}."
                     : capability.reason;
+                if (!string.IsNullOrWhiteSpace(capability.recommended_action))
+                {
+                    reason = $"{reason} Recommended action: {capability.recommended_action}";
+                }
                 return false;
             }
 
@@ -158,11 +161,13 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 capability_id = XUUnityLightMcpCapabilityRegistry.CoreCapability,
                 adapter_id = "unity_editor_builtin_v1",
                 supported = true,
+                status = "supported",
                 reason = "",
                 operations = new List<string>
                 {
                     "unity.status",
                     "unity.editor.quit",
+                    "unity.package.install_test_framework",
                     "unity.project.refresh",
                     "unity.edm4u.resolve",
                     "unity.sdk.dependency.verify",
@@ -178,32 +183,18 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static XUUnityLightMcpCapabilityRecord BuildEditModeTestsCapability()
         {
-            var supported = typeof(TestRunnerApi) != null;
-            return new XUUnityLightMcpCapabilityRecord
-            {
-                capability_id = XUUnityLightMcpCapabilityRegistry.EditModeTestsCapability,
-                adapter_id = "unity_test_framework_v1",
-                supported = supported,
-                reason = supported
-                    ? ""
-                    : "Unity Test Framework API is unavailable; EditMode test operations are disabled.",
-                operations = new List<string> { "unity.tests.run_editmode" }
-            };
+            return BuildTestFrameworkCapability(
+                XUUnityLightMcpCapabilityRegistry.EditModeTestsCapability,
+                "unity.tests.run_editmode",
+                "EditMode");
         }
 
         static XUUnityLightMcpCapabilityRecord BuildPlayModeTestsCapability()
         {
-            var supported = typeof(TestRunnerApi) != null;
-            return new XUUnityLightMcpCapabilityRecord
-            {
-                capability_id = XUUnityLightMcpCapabilityRegistry.PlayModeTestsCapability,
-                adapter_id = "unity_test_framework_v1",
-                supported = supported,
-                reason = supported
-                    ? ""
-                    : "Unity Test Framework API is unavailable; PlayMode test operations are disabled.",
-                operations = new List<string> { "unity.tests.run_playmode" }
-            };
+            return BuildTestFrameworkCapability(
+                XUUnityLightMcpCapabilityRegistry.PlayModeTestsCapability,
+                "unity.tests.run_playmode",
+                "PlayMode");
         }
 
         static XUUnityLightMcpCapabilityRecord BuildBuildTargetCapability()
@@ -213,6 +204,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 capability_id = XUUnityLightMcpCapabilityRegistry.BuildTargetCapability,
                 adapter_id = "editor_build_target_builtin_v1",
                 supported = true,
+                status = "supported",
                 reason = "",
                 operations = new List<string>
                 {
@@ -237,6 +229,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 capability_id = XUUnityLightMcpCapabilityRegistry.CompileCapability,
                 adapter_id = "compile_player_scripts_v1",
                 supported = supported,
+                status = supported ? "supported" : "unsupported",
                 reason = supported
                     ? ""
                     : "Unity PlayerBuildInterface.CompilePlayerScripts API is unavailable; compile validation operations are disabled.",
@@ -255,6 +248,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 capability_id = XUUnityLightMcpCapabilityRegistry.PlayModeCapability,
                 adapter_id = "editor_playmode_builtin_v1",
                 supported = true,
+                status = "supported",
                 reason = "",
                 operations = new List<string>
                 {
@@ -272,6 +266,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 capability_id = XUUnityLightMcpCapabilityRegistry.GameViewCapability,
                 adapter_id = probe.adapter_id,
                 supported = probe.supported,
+                status = probe.supported ? "supported" : "unsupported",
                 reason = probe.reason,
                 operations = new List<string>
                 {
@@ -279,6 +274,74 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     "unity.game_view.screenshot"
                 }
             };
+        }
+
+        static XUUnityLightMcpCapabilityRecord BuildTestFrameworkCapability(string capabilityId, string operationName, string modeLabel)
+        {
+            var registered = XUUnityLightMcpCapabilityRegistry.BuildRegisteredCapabilityOrNull(capabilityId);
+            if (registered != null)
+            {
+                return registered;
+            }
+
+            var packageName = XUUnityLightMcpCompatibilityPolicy.TestFrameworkPackageName;
+            var installedVersion = XUUnityLightMcpCompatibilityPolicy.InstalledPackageVersion(packageName);
+            var recommendedVersion = XUUnityLightMcpCompatibilityPolicy.RecommendedTestFrameworkVersionForCurrentUnity();
+            var minimumVersion = XUUnityLightMcpCompatibilityPolicy.TestFrameworkMinimumVersion;
+            var status = "disabled_missing_dependency";
+            var reason = $"Unity Test Framework is not installed; {modeLabel} test operations are disabled.";
+            var action = $"Install {packageName} {recommendedVersion} for Unity {Application.unityVersion}.";
+
+            if (!string.IsNullOrWhiteSpace(installedVersion))
+            {
+                if (!XUUnityLightMcpCompatibilityPolicy.IsVersionAtLeast(installedVersion, minimumVersion))
+                {
+                    status = "disabled_dependency_too_old";
+                    reason = $"{packageName} {installedVersion} is older than the minimum supported version {minimumVersion}; {modeLabel} test operations are disabled.";
+                    action = $"Upgrade {packageName} from {installedVersion} to {recommendedVersion} for Unity {Application.unityVersion} after approval.";
+                }
+                else
+                {
+                    status = "degraded";
+                    reason = $"{packageName} {installedVersion} is installed, but the optional MCP Test Framework assembly did not register. Wait for package resolve/domain reload or inspect Unity compile errors.";
+                    action = "Run project refresh and inspect Unity compile errors if the test capability remains unavailable.";
+                }
+            }
+
+            return new XUUnityLightMcpCapabilityRecord
+            {
+                capability_id = capabilityId,
+                adapter_id = "unity_test_framework_v1",
+                supported = false,
+                status = status,
+                reason = reason,
+                dependency = packageName,
+                installed_dependency_version = installedVersion,
+                minimum_dependency_version = minimumVersion,
+                recommended_dependency_version = recommendedVersion,
+                recommendation_basis = "unity_version_policy",
+                recommended_action = action,
+                operations = new List<string> { operationName }
+            };
+        }
+
+        static string ResolveReportStatus(List<XUUnityLightMcpCapabilityRecord> capabilities)
+        {
+            foreach (var capability in capabilities)
+            {
+                if (capability == null || capability.supported)
+                {
+                    continue;
+                }
+
+                if (string.Equals(capability.status, "degraded", StringComparison.Ordinal)
+                    || string.Equals(capability.status, "error", StringComparison.Ordinal))
+                {
+                    return "degraded";
+                }
+            }
+
+            return "healthy";
         }
     }
 }

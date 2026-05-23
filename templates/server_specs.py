@@ -49,6 +49,16 @@ OPERATION_LIFECYCLE_POLICIES: dict[str, dict[str, Any]] = {
         "retry_on_transport_connect_failed": True,
         "post_reset_recovery_cap_ms": 180000,
     },
+    "unity.package.install_test_framework": {
+        "activate_unity": True,
+        "wait_for_idle_before": True,
+        "wait_for_idle_after": True,
+        "idle_stable_cycles_after": 2,
+        "retry_on_lifecycle_reset": True,
+        "retry_on_transport_response_missing": True,
+        "retry_on_transport_connect_failed": True,
+        "post_reset_recovery_cap_ms": 300000,
+    },
     "unity.edm4u.resolve": {
         "activate_unity": True,
         "wait_for_idle_before": True,
@@ -232,6 +242,59 @@ SCENARIO_DEFINITION_SCHEMA: dict[str, Any] = {
 }
 
 TOOLS: dict[str, dict[str, Any]] = {
+    "xuunity_setup_plan": {
+        "description": "Discover Unity projects under a workspace and produce an explicit per-project XUUnity Light MCP setup plan.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "workspaceRoot": {
+                    "type": "string",
+                    "description": "Workspace or repository root to scan for Unity projects."
+                },
+                "projectRoots": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Explicit Unity project roots to include."
+                },
+                "recursive": {"type": "boolean", "default": False},
+                "includeTestFramework": {
+                    "type": "string",
+                    "enum": ["auto", "yes", "no"],
+                    "default": "auto",
+                    "description": "Whether optional Unity Test Framework install or cautious upgrade actions should be planned."
+                },
+                "packageSource": {
+                    "type": "string",
+                    "enum": ["git", "file"],
+                    "default": "git"
+                },
+                "packageVersion": {"type": "string"},
+                "localPackageSource": {"type": "string"}
+            }
+        }
+    },
+    "xuunity_setup_apply": {
+        "description": "Apply an approved XUUnity Light MCP setup plan. This mutates project manifests only when approve is true.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "plan": {"type": "object"},
+                "approve": {"type": "boolean", "default": False}
+            },
+            "required": ["plan", "approve"]
+        }
+    },
+    "xuunity_setup_validate": {
+        "description": "Validate one Unity project's XUUnity Light MCP setup, optionally requiring the Test Framework capability.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "includeTests": {"type": "boolean", "default": False}
+            },
+            "required": ["projectRoot"]
+        }
+    },
     "unity_status": {
         "bridgeOperation": "unity.status",
         "description": "Return normalized Unity editor and bridge readiness state for one project.",
@@ -341,6 +404,27 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "timeoutMs": {"type": "integer", "default": 180000, "minimum": 1000}
             },
             "required": ["projectRoot"]
+        }
+    },
+    "unity_package_install_test_framework": {
+        "bridgeOperation": "unity.package.install_test_framework",
+        "description": "Install or cautiously upgrade the optional Unity Test Framework package through Unity Package Manager after explicit approval.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "approve": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true before mutating Package Manager state."
+                },
+                "version": {
+                    "type": "string",
+                    "description": "Optional explicit com.unity.test-framework version. Defaults to the Unity-version policy."
+                },
+                "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
+            },
+            "required": ["projectRoot", "approve"]
         }
     },
     "unity_edm4u_resolve": {

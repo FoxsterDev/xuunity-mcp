@@ -1,7 +1,7 @@
 # Glossary
 
-Date: `2026-05-22`
-Status: `current for v0.3.13`
+Date: `2026-05-23`
+Status: `current for v0.3.14`
 
 ## XUUnity
 
@@ -22,7 +22,7 @@ The Unity package is `com.xuunity.light-mcp`. It contains the editor-side bridge
 Current production Git UPM path:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
 ```
 
 ## Git UPM
@@ -47,6 +47,18 @@ package development.
 `prodmode` points a consumer Unity project at a published Git package source.
 It refuses unpublished source commits so release-bound projects do not depend
 on local-only package changes.
+
+## Optional Capability
+
+An MCP feature that may be `supported`, `unsupported`,
+`disabled_missing_dependency`, `disabled_dependency_too_old`, `degraded`, or
+`error` without making the core MCP health fail.
+
+## Test Framework Capability
+
+The optional EditMode and PlayMode test surface backed by
+`com.unity.test-framework`. Unity enables it through asmdef Version Defines
+when `XUUNITY_LIGHT_MCP_TESTS_CAPABILITY` is available.
 
 ## BridgeRegistry
 

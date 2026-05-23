@@ -29,6 +29,10 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertTrue(
             {
                 "bridge-state",
+                "setup-plan",
+                "setup-apply",
+                "validate-setup",
+                "install-test-framework",
                 "request-status",
                 "request-status-summary",
                 "request-final-status",
@@ -37,6 +41,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "request-scenario-results-list",
                 "request-scenario-result-latest",
                 "request-project-refresh",
+                "request-install-test-framework",
                 "verify-editor-closed",
                 "request-edm4u-resolve",
                 "request-sdk-dependency-verify",
@@ -64,6 +69,10 @@ class ServerProtocolAndParserTests(unittest.TestCase):
             for tool in response["result"]["tools"]
         }
         self.assertIn("unity_status_summary", tool_names)
+        self.assertIn("xuunity_setup_plan", tool_names)
+        self.assertIn("xuunity_setup_apply", tool_names)
+        self.assertIn("xuunity_setup_validate", tool_names)
+        self.assertIn("unity_package_install_test_framework", tool_names)
         self.assertIn("unity_request_final_status", tool_names)
         self.assertIn("unity_compile_build_config_matrix", tool_names)
         self.assertIn("unity_edm4u_resolve", tool_names)
@@ -519,6 +528,39 @@ class ServerProtocolAndParserTests(unittest.TestCase):
             ]
         )
         self.assertEqual(12000, verify_args.timeout_ms)
+
+        setup_args = parser.parse_args(
+            [
+                "setup-plan",
+                "--workspace-root",
+                "/tmp/Workspace",
+                "--project-root",
+                "/tmp/FakeProject",
+                "--recursive",
+                "--include-test-framework",
+                "yes",
+            ]
+        )
+        self.assertEqual("/tmp/Workspace", setup_args.workspace_root)
+        self.assertEqual(["/tmp/FakeProject"], setup_args.project_root)
+        self.assertTrue(setup_args.recursive)
+        self.assertEqual("yes", setup_args.include_test_framework)
+
+        request_install_args = parser.parse_args(
+            [
+                "request-install-test-framework",
+                "--project-root",
+                "/tmp/FakeProject",
+                "--yes",
+                "--version",
+                "1.5.1",
+                "--timeout-ms",
+                "300000",
+            ]
+        )
+        self.assertTrue(request_install_args.yes)
+        self.assertEqual("1.5.1", request_install_args.version)
+        self.assertEqual(300000, request_install_args.timeout_ms)
 
     def test_verify_editor_closed_success_emits_closed_payload(self) -> None:
         args = argparse.Namespace(project_root="/tmp/FakeProject", timeout_ms=30000)

@@ -1088,6 +1088,11 @@ def build_batch_validation_command(
     extra_args: list[str] | None = None,
 ) -> list[str]:
     unity_binary = resolve_unity_executable(unity_app)
+    execute_method = (
+        "XUUnity.LightMcp.Editor.Batch.XUUnityLightMcpBatchTestFrameworkCli.ExecuteFromCommandLine"
+        if action == "editmode-tests"
+        else "XUUnity.LightMcp.Editor.Batch.XUUnityLightMcpBatchValidationCli.ExecuteFromCommandLine"
+    )
     command = [
         str(unity_binary),
         "-batchmode",
@@ -1096,7 +1101,7 @@ def build_batch_validation_command(
         "-logFile",
         str(log_path),
         "-executeMethod",
-        "XUUnity.LightMcp.Editor.Batch.XUUnityLightMcpBatchValidationCli.ExecuteFromCommandLine",
+        execute_method,
         "--",
         "--xuunity-batch-action",
         action,

@@ -381,10 +381,11 @@ make validation lanes deterministic and recoverable:
 - `unity.editor.quit` is an operational lifecycle command and should not be
   treated as routine feature-work behavior.
 
-The Unity package currently depends on Unity's Test Framework package because
-test execution is part of the validation core. This is acceptable under the
-dependency policy because it is a Unity-owned editor/testing dependency, not a
-heavy external runtime stack.
+The Unity package core does not depend on Unity's Test Framework package. Test
+execution is an optional capability: the Test Framework assembly compiles only
+when Unity asmdef Version Defines set `XUUNITY_LIGHT_MCP_TESTS_CAPABILITY`
+because `com.unity.test-framework >= 1.1.33` is present. Missing optional test
+support is reported as a capability status, not as whole-MCP health failure.
 
 The package still intentionally does not expose:
 
@@ -398,11 +399,13 @@ The package still intentionally does not expose:
     supported public API.
   - Not default because it is brittle across Unity versions and can bypass
     intended safety checks.
-- package add/remove
+- broad package add/remove
   - Useful for dependency onboarding, SDK migration experiments, and automated
     package upgrade probes.
   - Not default because it mutates project dependencies, triggers reload/import
-    churn, and can break unrelated validation lanes.
+    churn, and can break unrelated validation lanes. The narrow approved
+    `unity.package.install_test_framework` operation exists only to enable the
+    optional Test Framework capability after explicit approval.
 - broad asset delete/mutation
   - Useful for asset cleanup, migration, generated content repair, or bulk
     project refactors.

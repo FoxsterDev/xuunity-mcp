@@ -6,6 +6,8 @@ namespace XUUnity.LightMcp.Editor.Core
 {
     internal static class XUUnityLightMcpCapabilityRegistry
     {
+        public delegate XUUnityLightMcpCapabilityRecord CapabilityProvider();
+
         public const string CoreCapability = "core";
         public const string BuildTargetCapability = "build_target_control";
         public const string EditModeTestsCapability = "editmode_tests";
@@ -23,6 +25,7 @@ namespace XUUnity.LightMcp.Editor.Core
             "unity.project.refresh",
             "unity.edm4u.resolve",
             "unity.sdk.dependency.verify",
+            "unity.package.install_test_framework",
             "unity.editor.quit"
         };
 
@@ -33,6 +36,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.edm4u.resolve", CoreCapability },
             { "unity.sdk.dependency.verify", CoreCapability },
             { "unity.editor.quit", CoreCapability },
+            { "unity.package.install_test_framework", CoreCapability },
             { "unity.console.tail", CoreCapability },
             { "unity.scene.snapshot", CoreCapability },
             { "unity.scene.assert", CoreCapability },
@@ -51,6 +55,8 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.game_view.screenshot", GameViewCapability }
         };
 
+        static readonly Dictionary<string, CapabilityProvider> CapabilityProviders = new(StringComparer.Ordinal);
+
         public static bool IsUngated(string operationName)
         {
             return UngatedOperations.Contains(operationName ?? "");
@@ -64,6 +70,26 @@ namespace XUUnity.LightMcp.Editor.Core
         public static List<string> AllKnownOperations()
         {
             return OperationCapabilities.Keys.OrderBy(value => value, StringComparer.Ordinal).ToList();
+        }
+
+        public static void RegisterProvider(string capabilityId, CapabilityProvider provider)
+        {
+            if (string.IsNullOrWhiteSpace(capabilityId) || provider == null)
+            {
+                return;
+            }
+
+            CapabilityProviders[capabilityId] = provider;
+        }
+
+        public static XUUnityLightMcpCapabilityRecord BuildRegisteredCapabilityOrNull(string capabilityId)
+        {
+            if (!CapabilityProviders.TryGetValue(capabilityId ?? "", out var provider))
+            {
+                return null;
+            }
+
+            return provider();
         }
     }
 }

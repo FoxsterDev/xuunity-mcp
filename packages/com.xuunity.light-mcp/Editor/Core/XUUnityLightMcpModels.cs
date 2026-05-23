@@ -247,7 +247,15 @@ namespace XUUnity.LightMcp.Editor.Core
         public string capability_id = "";
         public string adapter_id = "";
         public bool supported;
+        public string status = "unknown";
         public string reason = "";
+        public string dependency = "";
+        public string installed_dependency_version = "";
+        public string minimum_dependency_version = "";
+        public string recommended_dependency_version = "";
+        public string recommendation_basis = "";
+        public string recommended_action = "";
+        public bool upgrade_recommended;
         public List<string> operations = new();
     }
 
@@ -360,6 +368,34 @@ namespace XUUnity.LightMcp.Editor.Core
         public string backend_id = "xuunity.light_unity_mcp";
         public string project_root = "";
         public string outcome = "quit_requested";
+        public string requested_at_utc = "";
+        public string validation_evidence = "unity_mcp";
+    }
+
+    [Serializable]
+    internal sealed class XUUnityLightMcpInstallTestFrameworkArgs
+    {
+        public bool approve;
+        public string version = "";
+    }
+
+    [Serializable]
+    internal sealed class XUUnityLightMcpInstallTestFrameworkPayload
+    {
+        public string backend_id = "xuunity.light_unity_mcp";
+        public string project_root = "";
+        public string unity_version = "";
+        public string dependency = "";
+        public string requested_version = "";
+        public string minimum_dependency_version = "";
+        public string recommended_dependency_version = "";
+        public string recommendation_basis = "unity_version_policy";
+        public string installed_dependency_version_before = "";
+        public string installed_dependency_version_after = "";
+        public bool upgrade_recommended_before;
+        public string outcome = "";
+        public string recommended_action = "";
+        public string next_action = "";
         public string requested_at_utc = "";
         public string validation_evidence = "unity_mcp";
     }

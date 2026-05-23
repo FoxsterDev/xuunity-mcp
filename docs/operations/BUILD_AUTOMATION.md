@@ -1,7 +1,7 @@
 # Build Automation Surface
 
-Date: `2026-05-22`
-Status: `current for v0.3.13`
+Date: `2026-05-23`
+Status: `current for v0.3.14`
 
 This document defines the public-safe build automation surface for the
 standalone `xuunity-light-unity-mcp` repository.

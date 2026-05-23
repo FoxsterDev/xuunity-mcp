@@ -533,7 +533,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
         {
             if (stepResult.status == "pending")
             {
-                var request = BuildNestedRequest(operationName, XUUnityLightMcpTestsUtility.BuildTestsArgsJson(step), GetTimeoutMs(step, 600.0d));
+                var request = BuildNestedRequest(operationName, XUUnityLightMcpTestArgsUtility.BuildTestsArgsJson(step), GetTimeoutMs(step, 600.0d));
                 var response = ExecuteNestedOperation(request.operation, request.args_json, request);
                 if (response != null)
                 {

@@ -35,3 +35,4 @@ operator or lifecycle behavior.
 - `2026-05-14_sdk_rollout_mcp_portfolio_retro.md`
 - `2026-05-21_project_hook_batch_build_operator_retro.md`
 - `2026-05-23_devmode_batch_lifecycle_retro.md`
+- `2026-05-23_optional_capability_setup_wizard_retro.md`

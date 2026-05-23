@@ -522,11 +522,16 @@ Wrapper commands:
 Server commands:
   Any other command refreshes the installed helper from this source checkout and
   delegates to server.py. Common commands include:
+    setup-plan
+    setup-apply
+    validate-setup
+    install-test-framework
     ensure-ready
     request-status-summary
     request-capabilities
     request-health-probe
     request-project-refresh
+    request-install-test-framework
     request-compile
     request-editmode-tests
     request-playmode-tests

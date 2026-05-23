@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-- No unreleased changes yet.
+- Prepared `v0.3.14` package metadata with Unity `2021.3` as the default
+  minimum and removed the hard `com.unity.test-framework` dependency.
+- Added optional Test Framework capability wiring through asmdef Version
+  Defines and `XUUNITY_LIGHT_MCP_TESTS_CAPABILITY`.
+- Added setup wizard commands and MCP tools for per-project setup planning,
+  approved setup application, setup validation, and approved Test Framework
+  installation.
+- Added capability statuses for optional test support, including missing and
+  too-old dependency states that do not make core MCP health fail.
 
 ## 0.3.13
 

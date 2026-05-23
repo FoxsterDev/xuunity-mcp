@@ -12,8 +12,15 @@
     "precompiledReferences": [],
     "autoReferenced": false,
     "defineConstraints": [
-        "UNITY_INCLUDE_TESTS"
+        "UNITY_INCLUDE_TESTS",
+        "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY"
     ],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.test-framework",
+            "expression": "1.1.33",
+            "define": "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY"
+        }
+    ],
     "noEngineReferences": false
 }

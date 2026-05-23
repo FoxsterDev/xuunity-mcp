@@ -155,6 +155,18 @@ from server_runtime_config import (
     resolve_operation_default_timeout_ms,
     resolve_operation_lifecycle_policy_overrides,
 )
+from server_setup_wizard import (
+    LIGHT_MCP_PACKAGE_NAME as SETUP_LIGHT_MCP_PACKAGE_NAME,
+    TEST_FRAMEWORK_CAPABILITY_DEFINE,
+    TEST_FRAMEWORK_PACKAGE_NAME,
+    apply_setup_plan,
+    build_setup_plan,
+    classify_test_framework_state,
+    install_test_framework,
+    normalize_project_root as normalize_setup_project_root,
+    parse_unity_version,
+    validate_setup,
+)
 from server_scenario_results import (
     latest_persisted_scenario_result_summary,
     list_persisted_scenario_result_summaries,
@@ -178,7 +190,7 @@ from server_workspace_effects import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-light-unity-mcp",
-    "version": "0.3.11",
+    "version": "0.3.14",
 }
 LIGHTWEIGHT_PACKAGE_NAME = "com.xuunity.light-mcp"
 
@@ -282,6 +294,7 @@ MUTATING_BRIDGE_OPERATIONS = frozenset(
         "unity.compile.matrix",
         "unity.tests.run_editmode",
         "unity.tests.run_playmode",
+        "unity.package.install_test_framework",
         "unity.playmode.set",
         "unity.build_target.switch",
         "unity.editor.quit",
@@ -958,6 +971,33 @@ def print_json(data: Any) -> None:
     sys.stdout.write("\n")
 
 
+def operation_source_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def default_local_package_source() -> Path:
+    return operation_source_root() / "packages" / SETUP_LIGHT_MCP_PACKAGE_NAME
+
+
+def default_light_mcp_package_version() -> str:
+    package_path = default_local_package_source() / "package.json"
+    try:
+        payload = read_json(package_path)
+    except Exception:
+        return "0.0.0"
+    if isinstance(payload, dict):
+        return str(payload.get("version") or "0.0.0")
+    return "0.0.0"
+
+
+def mcp_json_result(payload: dict[str, Any], *, is_error: bool = False) -> dict[str, Any]:
+    return {
+        "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=True)}],
+        "structuredContent": payload,
+        "isError": is_error,
+    }
+
+
 def emit_tool_error_summary(payload: dict[str, Any]) -> None:
     if not isinstance(payload, dict):
         return
@@ -1591,12 +1631,91 @@ def call_unity_maintenance_prune_tool(arguments: dict[str, Any]) -> dict[str, An
     )
 
 
+def _optional_string_arg(arguments: dict[str, Any], name: str) -> str:
+    value = arguments.get(name)
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise JsonRpcError(-32602, f"{name} must be a string when provided.")
+    return value
+
+
+def _optional_string_list_arg(arguments: dict[str, Any], name: str) -> list[str]:
+    value = arguments.get(name)
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise JsonRpcError(-32602, f"{name} must be an array of strings when provided.")
+    return list(value)
+
+
+def _optional_bool_arg(arguments: dict[str, Any], name: str, default: bool) -> bool:
+    value = arguments.get(name, default)
+    if not isinstance(value, bool):
+        raise JsonRpcError(-32602, f"{name} must be a boolean when provided.")
+    return value
+
+
+def call_xuunity_setup_plan_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    include_test_framework = _optional_string_arg(arguments, "includeTestFramework") or "auto"
+    if include_test_framework not in {"auto", "yes", "no"}:
+        raise JsonRpcError(-32602, "includeTestFramework must be one of: auto, yes, no.")
+
+    package_source = _optional_string_arg(arguments, "packageSource") or "git"
+    if package_source not in {"git", "file"}:
+        raise JsonRpcError(-32602, "packageSource must be one of: git, file.")
+
+    try:
+        payload = build_setup_plan(
+            workspace_root=_optional_string_arg(arguments, "workspaceRoot") or None,
+            project_roots=_optional_string_list_arg(arguments, "projectRoots"),
+            recursive=_optional_bool_arg(arguments, "recursive", False),
+            include_test_framework=include_test_framework,
+            package_source=package_source,
+            package_version=_optional_string_arg(arguments, "packageVersion") or default_light_mcp_package_version(),
+            local_package_source=_optional_string_arg(arguments, "localPackageSource") or str(default_local_package_source()),
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload)
+
+
+def call_xuunity_setup_apply_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    plan = arguments.get("plan")
+    if not isinstance(plan, dict):
+        raise JsonRpcError(-32602, "plan must be an object.")
+    approve = _optional_bool_arg(arguments, "approve", False)
+    try:
+        payload = apply_setup_plan(plan, approve=approve)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload)
+
+
+def call_xuunity_setup_validate_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+    try:
+        project_root = normalize_setup_project_root(project_root_value)
+        payload = validate_setup(
+            project_root,
+            include_tests=_optional_bool_arg(arguments, "includeTests", False),
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload, is_error=payload.get("validation_status") == "blocked")
+
+
 def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
     return call_tool_base(
         name,
         arguments,
         tools=TOOLS,
         special_tool_handlers={
+            "xuunity_setup_plan": call_xuunity_setup_plan_tool,
+            "xuunity_setup_apply": call_xuunity_setup_apply_tool,
+            "xuunity_setup_validate": call_xuunity_setup_validate_tool,
             "unity_status_summary": call_unity_status_summary_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
             "unity_scenario_result_summary": call_unity_scenario_result_summary_tool,
@@ -1643,6 +1762,56 @@ def serve_stdio() -> int:
         protocol_version=PROTOCOL_VERSION,
         handle_message=handle_json_rpc_message,
     )
+
+
+def cmd_setup_plan(args):
+    payload = build_setup_plan(
+        workspace_root=args.workspace_root,
+        project_roots=list(args.project_root or []),
+        recursive=bool(args.recursive),
+        include_test_framework=args.include_test_framework,
+        package_source=args.package_source,
+        package_version=args.package_version or default_light_mcp_package_version(),
+        local_package_source=args.local_package_source or str(default_local_package_source()),
+    )
+    print_json(payload)
+
+
+def cmd_setup_apply(args):
+    plan_path = Path(args.plan_file).expanduser()
+    if not plan_path.is_absolute():
+        plan_path = (Path.cwd() / plan_path).resolve()
+    plan = read_json(plan_path)
+    payload = apply_setup_plan(plan, approve=bool(args.yes))
+    print_json(payload)
+
+
+def cmd_validate_setup(args):
+    project_root = normalize_setup_project_root(args.project_root)
+    payload = validate_setup(project_root, include_tests=bool(args.include_tests))
+    print_json(payload)
+    if payload.get("validation_status") != "ready":
+        raise SystemExit(1)
+
+
+def cmd_install_test_framework(args):
+    project_root = normalize_setup_project_root(args.project_root)
+    payload = install_test_framework(project_root, approve=bool(args.yes), version=args.version or "")
+    print_json(payload)
+
+
+def cmd_request_install_test_framework(args):
+    project_root = ensure_project_root(args.project_root)
+    response = invoke_bridge(
+        str(project_root),
+        "unity.package.install_test_framework",
+        {
+            "approve": bool(args.yes),
+            "version": args.version or "",
+        },
+        resolve_operation_default_timeout_ms(project_root, "unity.package.install_test_framework", 300000) if args.timeout_ms is None else args.timeout_ms,
+    )
+    print_json(response)
 
 
 def cmd_bridge_state(args):
@@ -3747,8 +3916,55 @@ def cmd_batch_build_config_compile_matrix(args):
             pass
 
 
+def require_test_framework_capability_for_batch(project_root: Path) -> dict[str, Any]:
+    unity_version = parse_unity_version(project_root)
+    state = classify_test_framework_state(project_root, unity_version)
+    if bool(state.get("supported")):
+        return state
+
+    recommended_version = str(state.get("recommended_dependency_version") or "")
+    install_command = (
+        "xuunity_light_unity_mcp.sh install-test-framework "
+        f"--project-root {project_root} --yes"
+        + (f" --version {recommended_version}" if recommended_version else "")
+    )
+    status = str(state.get("status") or "error")
+    if status == "unsupported":
+        recommended_next_action = "use_supported_unity_version"
+        next_distinct_action = "open_project_with_unity_2021_3_or_newer"
+    elif status == "disabled_dependency_too_old":
+        recommended_next_action = "upgrade_optional_test_framework"
+        next_distinct_action = "upgrade_test_framework_then_rerun_batch"
+    else:
+        recommended_next_action = "install_optional_test_framework"
+        next_distinct_action = "install_test_framework_then_rerun_batch"
+
+    raise ToolInvocationError(
+        "test_capability_unavailable",
+        "Batch EditMode tests require the optional Test Framework capability.",
+        {
+            "capability": "tests",
+            "capability_status": status,
+            "capability_define": TEST_FRAMEWORK_CAPABILITY_DEFINE,
+            "dependency": TEST_FRAMEWORK_PACKAGE_NAME,
+            "installed_dependency_version": str(state.get("installed_dependency_version") or ""),
+            "minimum_dependency_version": str(state.get("minimum_dependency_version") or ""),
+            "recommended_dependency_version": recommended_version,
+            "recommendation_basis": str(state.get("recommendation_basis") or ""),
+            "recommended_action": str(state.get("recommended_action") or ""),
+            "dependency_action": str(state.get("dependency_action") or ""),
+            "upgrade_caution": str(state.get("upgrade_caution") or ""),
+            "recommended_next_action": recommended_next_action,
+            "next_distinct_action": next_distinct_action,
+            "install_command": install_command,
+            "unity_version": unity_version,
+        },
+    )
+
+
 def cmd_batch_editmode_tests(args):
     project_root = ensure_project_root(args.project_root)
+    require_test_framework_capability_for_batch(project_root)
     unity_app = detect_unity_app_path_for_project(project_root, args.unity_app)
     log_path = (
         Path(args.batch_log_path).expanduser().resolve()
@@ -4076,6 +4292,44 @@ def build_parser():
     )
     sub = parser.add_subparsers(dest="command")
 
+    setup_plan_cmd = sub.add_parser(
+        "setup-plan",
+        help="Discover Unity projects and print an explicit per-project XUUnity Light MCP setup plan.",
+    )
+    setup_plan_cmd.add_argument("--workspace-root")
+    setup_plan_cmd.add_argument("--project-root", action="append", default=[])
+    setup_plan_cmd.add_argument("--recursive", action="store_true")
+    setup_plan_cmd.add_argument("--include-test-framework", choices=["auto", "yes", "no"], default="auto")
+    setup_plan_cmd.add_argument("--package-source", choices=["git", "file"], default="git")
+    setup_plan_cmd.add_argument("--package-version", default="")
+    setup_plan_cmd.add_argument("--local-package-source", default="")
+    setup_plan_cmd.set_defaults(func=cmd_setup_plan)
+
+    setup_apply_cmd = sub.add_parser(
+        "setup-apply",
+        help="Apply an approved setup plan from setup-plan. Mutates manifests only with --yes.",
+    )
+    setup_apply_cmd.add_argument("--plan-file", required=True)
+    setup_apply_cmd.add_argument("--yes", action="store_true")
+    setup_apply_cmd.set_defaults(func=cmd_setup_apply)
+
+    validate_setup_cmd = sub.add_parser(
+        "validate-setup",
+        help="Validate one project's XUUnity Light MCP setup and optional Test Framework capability.",
+    )
+    validate_setup_cmd.add_argument("--project-root", required=True)
+    validate_setup_cmd.add_argument("--include-tests", action="store_true")
+    validate_setup_cmd.set_defaults(func=cmd_validate_setup)
+
+    install_test_framework_cmd = sub.add_parser(
+        "install-test-framework",
+        help="Install the optional com.unity.test-framework dependency in a project manifest after explicit approval.",
+    )
+    install_test_framework_cmd.add_argument("--project-root", required=True)
+    install_test_framework_cmd.add_argument("--yes", action="store_true")
+    install_test_framework_cmd.add_argument("--version", default="")
+    install_test_framework_cmd.set_defaults(func=cmd_install_test_framework)
+
     state_cmd = sub.add_parser("bridge-state", help="Read the Unity bridge heartbeat state file.")
     state_cmd.add_argument("--project-root", required=True)
     state_cmd.set_defaults(func=cmd_bridge_state)
@@ -4182,6 +4436,16 @@ def build_parser():
     project_refresh_cmd.add_argument("--rerun-health-probe", dest="rerun_health_probe", action=argparse.BooleanOptionalAction, default=True)
     project_refresh_cmd.add_argument("--timeout-ms", type=int, default=None)
     project_refresh_cmd.set_defaults(func=cmd_request_project_refresh)
+
+    install_tf_bridge_cmd = sub.add_parser(
+        "request-install-test-framework",
+        help="Install optional com.unity.test-framework through Unity Package Manager on a healthy bridge after explicit approval.",
+    )
+    install_tf_bridge_cmd.add_argument("--project-root", required=True)
+    install_tf_bridge_cmd.add_argument("--yes", action="store_true")
+    install_tf_bridge_cmd.add_argument("--version", default="")
+    install_tf_bridge_cmd.add_argument("--timeout-ms", type=int, default=None)
+    install_tf_bridge_cmd.set_defaults(func=cmd_request_install_test_framework)
 
     edm4u_resolve_cmd = sub.add_parser("request-edm4u-resolve", help="Run a whitelisted External Dependency Manager for Unity resolver operation through the active bridge transport.")
     edm4u_resolve_cmd.add_argument("--project-root", required=True)

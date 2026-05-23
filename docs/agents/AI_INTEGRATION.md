@@ -73,6 +73,43 @@ bash init_xuunity_light_unity_mcp.sh \
 
 This enables the bridge only. It does not rewrite `Packages/manifest.json`.
 
+## Preferred Guided Setup
+
+For new integrations, especially when the workspace may contain multiple Unity
+projects or mixed Unity versions, prefer the setup wizard over manual manifest
+edits:
+
+```bash
+bash xuunity_light_unity_mcp.sh setup-plan \
+  --workspace-root /path/to/workspace \
+  --recursive > xuunity-setup-plan.json
+
+bash xuunity_light_unity_mcp.sh setup-apply \
+  --plan-file xuunity-setup-plan.json \
+  --yes
+
+bash xuunity_light_unity_mcp.sh validate-setup \
+  --project-root /path/to/UnityProject
+```
+
+Do not globally apply one dependency version across a mixed-version hub. The
+plan computes per-project actions.
+
+Test operations are optional. If `validate-setup --include-tests` reports
+`disabled_missing_dependency`, ask for approval before running:
+
+```bash
+bash xuunity_light_unity_mcp.sh install-test-framework \
+  --project-root /path/to/UnityProject \
+  --yes
+```
+
+If the project already declares `com.unity.test-framework` but the version is
+below `1.1.33`, treat this as a cautious package upgrade, not a fresh install.
+Ask for approval, update only that dependency, let Unity resolve packages, then
+validate compile/test behavior. Unity 6000 projects with `1.1.33` are supported
+but may report an optional `upgrade_recommended=true` toward `1.5.1`.
+
 ## Package Install Route
 
 For production consumers, use the current Git UPM release path:
@@ -80,7 +117,7 @@ For production consumers, use the current Git UPM release path:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14"
   }
 }
 ```

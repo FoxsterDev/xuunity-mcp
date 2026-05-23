@@ -1,7 +1,7 @@
 # Features
 
-Date: `2026-05-22`
-Status: `current for v0.3.13`
+Date: `2026-05-23`
+Status: `current for v0.3.14`
 
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
 automation: status, compile, tests, scene checks, Game View evidence, scenario
@@ -89,6 +89,10 @@ Unity MCP implementations when the user wants safe production validation.
 
 | Area | Command | Level | Evidence / notes |
 | --- | --- | --- | --- |
+| Setup | `setup-plan` | `Host helper` | Discovers single projects, flat hubs, mixed Unity versions, and nested project roots before mutation. |
+| Setup | `setup-apply` | `Host helper` | Applies an approved setup plan only after explicit approval. |
+| Setup | `validate-setup` | `Host helper` | Reports core readiness and optional Test Framework capability state. |
+| Setup | `install-test-framework` | `Host helper` | Installs the optional Test Framework dependency after explicit approval. |
 | Discovery | `project-discovery-report` | `Host helper` | Explains bridge, editor, package, and stale-artifact state for one project. |
 | Registry | `registry-context-report` | `Host helper` | Reports same-host project context cache state. |
 | Registry | `registry-prune-contexts` | `Host helper` | Prunes stale same-host project context entries. |
@@ -116,7 +120,7 @@ Unity MCP implementations when the user wants safe production validation.
 
 | Target | Status | Validation notes |
 | --- | --- | --- |
-| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.13`; old `templates/unity-package#v0.3.11` is migration-only. |
+| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.14`; old `templates/unity-package#v0.3.11` is migration-only. |
 | macOS host tools | `Validated in this release environment` | `run.sh --help`, shell syntax checks, JSON/TOML config parsing, and 97 host Python tests passed locally. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |
@@ -125,9 +129,9 @@ Unity MCP implementations when the user wants safe production validation.
 | Cursor | `Template provided` | Project/user `.cursor/mcp.json` templates are provided for Unix-like and native Windows hosts. |
 | Windsurf | `Template provided` | `~/.codeium/windsurf/mcp_config.json` and Windows equivalent templates are provided. |
 | Codex-style agents | `Template provided` | Unix-like and Windows `config.toml` snippets are provided. |
-| Unity 6000 | `Package manifest provided` | Default package metadata targets Unity `6000.0`. |
-| Unity 2021/2022 | `Compatibility manifest provided` | Alternate package manifest template targets Unity `2021.3` with older Test Framework dependency. |
-| Package self-tests | `Validated` | A representative Unity 6000 consumer project passed Git UPM validation with EditMode `6/6` and PlayMode `5/5`. |
+| Unity 2021.3+ | `Package manifest provided` | Default package metadata targets Unity `2021.3`; Unity 6000 remains the main production validation line. |
+| Optional Test Framework capability | `Implemented` | Core MCP is healthy without `com.unity.test-framework`; test operations enable through asmdef Version Defines when `>=1.1.33` is installed. |
+| Package self-tests | `Validated before optional split` | A representative Unity 6000 consumer project passed Git UPM validation with EditMode `6/6` and PlayMode `5/5`; rerun live Unity matrix before tagging `v0.3.14`. |
 | Multi-project batch compile | `Validated in consumer repo` | Private multi-project consumer validation passed `9/9` Unity projects and `38/38` compile lanes after the `v0.3.12` package path update. |
 | OpenUPM | `Ready, not published` | Package layout and metadata are registry-ready; use Git UPM until an OpenUPM package page exists. |
 

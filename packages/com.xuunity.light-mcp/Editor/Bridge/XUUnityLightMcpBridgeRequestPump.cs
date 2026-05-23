@@ -80,6 +80,20 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 XUUnityLightMcpBridgeRuntimeState.MarkRequestStarted(requestId, operationName, remainingPendingRequests + 1);
                 XUUnityLightMcpRequestJournal.WriteRequestStarted(requestId, operationName, startedAtUtc, remainingPendingRequests + 1);
 
+                if (XUUnityLightMcpCapabilityRegistry.TryGetRequiredCapability(request.operation, out _)
+                    && !XUUnityLightMcpHealthProbe.IsOperationSupported(request.operation, out var unavailableReason))
+                {
+                    XUUnityLightMcpResponseWriter.Write(
+                        XUUnityLightMcpResponseWriter.Error(
+                            request.request_id,
+                            "operation_unavailable",
+                            unavailableReason
+                        )
+                    );
+                    operationStatus = "operation_unavailable";
+                    return;
+                }
+
                 if (!XUUnityLightMcpOperationRegistry.TryGet(request.operation, out var operation))
                 {
                     XUUnityLightMcpResponseWriter.Write(
@@ -93,19 +107,6 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 }
                 else
                 {
-                    if (!XUUnityLightMcpHealthProbe.IsOperationSupported(request.operation, out var unsupportedReason))
-                    {
-                        XUUnityLightMcpResponseWriter.Write(
-                            XUUnityLightMcpResponseWriter.Error(
-                                request.request_id,
-                                "operation_unavailable",
-                                unsupportedReason
-                            )
-                        );
-                        operationStatus = "operation_unavailable";
-                        return;
-                    }
-
                     var response = operation.Execute(request);
                     if (response != null)
                     {

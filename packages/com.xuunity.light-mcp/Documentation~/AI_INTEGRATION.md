@@ -1,7 +1,7 @@
 # AI Integration Instructions
 
-Date: `2026-05-22`
-Status: `current for package v0.3.13`
+Date: `2026-05-23`
+Status: `current for package v0.3.14`
 
 Use this document when an AI agent is integrating this Unity package into a new
 project.
@@ -32,7 +32,7 @@ The full system requires:
 Current Git UPM package URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
 ```
 
 ## Safety Rules
@@ -41,6 +41,8 @@ An AI agent should:
 
 - keep the bridge disabled unless Unity-aware validation is needed
 - trust capability gating for version-sensitive operations
+- treat EditMode and PlayMode tests as optional capabilities backed by
+  `com.unity.test-framework`, not as core readiness requirements
 - prefer validation before mutation
 - keep validation gaps explicit
 
@@ -48,6 +50,7 @@ An AI agent should not:
 
 - rewrite `ProjectSettings` just to make the package work
 - inject broad define symbols
+- add `com.unity.test-framework` without explicit user approval
 - assume Game View reflection is always valid
 - treat shell compile as equivalent to Unity validation
 

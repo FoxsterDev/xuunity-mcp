@@ -1,0 +1,28 @@
+{
+  "name": "com.xuunity.light-mcp.Editor.TestFramework",
+  "rootNamespace": "XUUnity.LightMcp.Editor",
+  "references": [
+    "com.xuunity.light-mcp.Editor",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.unity.test-framework",
+      "expression": "1.1.33",
+      "define": "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY"
+    }
+  ],
+  "noEngineReferences": false
+}

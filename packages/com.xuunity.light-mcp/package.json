@@ -1,8 +1,8 @@
 {
   "name": "com.xuunity.light-mcp",
   "displayName": "XUUnity Light Unity MCP",
-  "version": "0.3.13",
-  "unity": "6000.0",
+  "version": "0.3.14",
+  "unity": "2021.3",
   "description": "Open-source lightweight Unity MCP server package for safe Unity Editor automation.",
   "license": "MIT",
   "documentationUrl": "https://github.com/FoxsterDev/xuunity-light-unity-mcp",
@@ -20,9 +20,7 @@
     "xuunity",
     "ai"
   ],
-  "dependencies": {
-    "com.unity.test-framework": "1.5.1"
-  },
+  "dependencies": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git",

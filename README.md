@@ -56,6 +56,36 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 - Python 3.10+
 - one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md)
 
+### Guided Setup Wizard
+
+For single projects, flat hubs, mixed-version hubs, or nested repositories, ask
+the host helper to produce an explicit per-project plan before mutating files:
+
+```bash
+bash xuunity_light_unity_mcp.sh setup-plan \
+  --workspace-root /path/to/workspace \
+  --recursive > xuunity-setup-plan.json
+
+bash xuunity_light_unity_mcp.sh setup-apply \
+  --plan-file xuunity-setup-plan.json \
+  --yes
+
+bash xuunity_light_unity_mcp.sh validate-setup \
+  --project-root /path/to/UnityProject
+```
+
+The core MCP package works without `com.unity.test-framework`. Test operations
+are an optional capability. To enable them explicitly:
+
+```bash
+bash xuunity_light_unity_mcp.sh install-test-framework \
+  --project-root /path/to/UnityProject \
+  --yes
+```
+
+The helper recommends `com.unity.test-framework@1.1.33` for Unity 2021/2022 and
+`@1.5.1` for Unity 6000+, while the capability gate remains `>= 1.1.33`.
+
 ### AI Agent Setup Prompt
 
 Copy this prompt into your coding agent from the Unity project you want to
@@ -66,8 +96,10 @@ Configure XUUnity Light Unity MCP for this Unity project.
 
 Inputs:
 - Unity project root: <absolute path to the Unity project>
+- Workspace/repository root: <absolute path to workspace; may equal project root>
 - MCP client: <Claude Code | Claude Desktop | Cursor | Windsurf | Codex | custom stdio MCP client>
-- Package mode: Git UPM release v0.3.13, unless this is local MCP development.
+- Package mode: Git UPM release v0.3.14, unless this is local MCP development.
+- Test operations: optional. Install Test Framework only after explicit approval.
 
 Principles:
 - Read the current README.md, INSTALL.md, and the matching docs/clients/*
@@ -75,6 +107,8 @@ Principles:
 - Preserve existing user config. Merge the xuunity_light_unity MCP server block;
   do not overwrite unrelated MCP servers, editor settings, or package entries.
 - Keep the Unity package editor-only. Do not add runtime/player dependencies.
+- Do not add com.unity.test-framework as a hard dependency of the MCP package.
+  Test features are optional capabilities gated by Version Defines.
 - Use the native template for the host OS: run.sh for macOS/Linux clients,
   run.cmd or run.ps1 for native Windows clients.
 - If the MCP repo is missing locally, clone
@@ -84,24 +118,34 @@ Principles:
   killing unrelated Unity Editor sessions, or changing production package pins.
 
 Tasks:
-1. Confirm Python 3.10+, Unity project structure, and selected MCP client.
-2. Add the Unity package dependency:
-   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
-3. From <MCP_REPO_ROOT>, run the host installer and enable the project bridge
+1. Confirm Python 3.10+, Unity project structure, selected MCP client, and
+   whether the workspace contains one project, a flat hub, mixed Unity versions,
+   or nested repositories.
+2. From <MCP_REPO_ROOT>, run the host installer
    through macOS/Linux shell, Git Bash, or WSL:
    bash init_xuunity_light_unity_mcp.sh
-   bash init_xuunity_light_unity_mcp.sh --project-root "<UNITY_PROJECT_ROOT>" --enable-project
-   This enables the bridge only. It does not switch the Unity package away from
-   the Git UPM dependency.
-4. Wire the selected MCP client using the files under templates/clients/.
+3. Produce and review a setup plan:
+   bash xuunity_light_unity_mcp.sh setup-plan --workspace-root "<WORKSPACE_ROOT>" --project-root "<UNITY_PROJECT_ROOT>" --recursive > xuunity-setup-plan.json
+4. Apply the plan only after user approval:
+   bash xuunity_light_unity_mcp.sh setup-apply --plan-file xuunity-setup-plan.json --yes
+5. If test operations are required and the plan reports
+   disabled_missing_dependency, ask for approval, then run:
+   bash xuunity_light_unity_mcp.sh install-test-framework --project-root "<UNITY_PROJECT_ROOT>" --yes
+   If the project already has Test Framework but the version is too old, treat
+   the same command as an approved package upgrade and review Unity's package
+   resolve/compile result afterward.
+6. Wire the selected MCP client using the files under templates/clients/.
    Merge config if the target file already exists.
-5. Open or restart the Unity project if needed, then verify readiness with:
+7. Open or restart the Unity project if needed, then verify readiness with:
    bash xuunity_light_unity_mcp.sh ensure-ready --project-root "<UNITY_PROJECT_ROOT>" --open-editor
    bash xuunity_light_unity_mcp.sh request-status-summary --project-root "<UNITY_PROJECT_ROOT>"
-6. If your agent runtime can reload MCP tools, verify the MCP tools
-   unity_status_summary, unity_capabilities, and unity_health_probe. If it
-   cannot reload tools in-process, provide the exact restart steps for the user.
-7. Finish with a concise report listing files changed, commands run, verification
+   bash xuunity_light_unity_mcp.sh validate-setup --project-root "<UNITY_PROJECT_ROOT>"
+   Use --include-tests only when test operations are expected.
+8. If your agent runtime can reload MCP tools, verify the MCP tools
+   xuunity_setup_validate, unity_status_summary, unity_capabilities, and
+   unity_health_probe. If it cannot reload tools in-process, provide the exact
+   restart steps for the user.
+9. Finish with a concise report listing files changed, commands run, verification
    results, and any manual restart still required.
 ```
 
@@ -112,7 +156,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
+> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -120,7 +164,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14"
   }
 }
 ```
@@ -231,6 +275,7 @@ Manual macOS/Linux and Windows configs live in `templates/clients/`.
 
 Popular MCP tools:
 
+`xuunity_setup_plan` | `xuunity_setup_apply` | `xuunity_setup_validate` |
 `unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
 `unity_console_tail` | `unity_scene_snapshot` | `unity_scene_assert` |
 `unity_compile_player_scripts` | `unity_compile_matrix` |
@@ -239,9 +284,11 @@ Popular MCP tools:
 `unity_game_view_configure` | `unity_game_view_screenshot` |
 `unity_scenario_validate` | `unity_scenario_run_and_wait` |
 `unity_request_final_status` | `unity_project_refresh` |
-`unity_edm4u_resolve` | `unity_sdk_dependency_verify`
+`unity_package_install_test_framework` | `unity_edm4u_resolve` |
+`unity_sdk_dependency_verify`
 
-Host helper commands include `ensure-ready`, `verify-editor-closed`,
+Host helper commands include `setup-plan`, `setup-apply`, `validate-setup`,
+`install-test-framework`, `ensure-ready`, `verify-editor-closed`,
 `request-editor-quit --wait-for-exit`, `restore-editor-state`,
 `recover-editor-session`, `batch-compile`, `batch-editmode-tests`,
 `batch-build-config-compile-matrix`, `artifact-probe`, `devmode`, and `prodmode`.
@@ -265,6 +312,14 @@ Troubleshooting:
 - Bridge disabled: run the installer with `--project-root` and `--enable-project`.
 - Unity not ready: run `ensure-ready --open-editor` before validation tools.
 - Package changes not visible: run `unity_project_refresh` or reopen Unity.
+- Test operations unavailable: run `validate-setup --include-tests`; if the
+  Test Framework capability is missing, install it explicitly with
+  `install-test-framework --yes` or the MCP tool
+  `unity_package_install_test_framework` with `approve: true`.
+  If Test Framework is already declared but too old, the same command upgrades
+  only that dependency after approval. If Unity 6000 already has `1.1.33`,
+  tests may run, but setup reports an optional upgrade recommendation to
+  `1.5.1`.
 - Long operation timed out: recover with `request-final-status`.
 - Closed-project batch refused because the editor is open: run
   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`,

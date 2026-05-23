@@ -20,14 +20,13 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.build_target.get", new XUUnityLightMcpBuildTargetGetOperation() },
             { "unity.build_target.switch", new XUUnityLightMcpBuildTargetSwitchOperation() },
             { "unity.editor.quit", new XUUnityLightMcpEditorQuitOperation() },
+            { "unity.package.install_test_framework", new XUUnityLightMcpInstallTestFrameworkOperation() },
             { "unity.project.refresh", new XUUnityLightMcpProjectRefreshOperation() },
             { "unity.edm4u.resolve", new XUUnityLightMcpEdm4uResolveOperation() },
             { "unity.sdk.dependency.verify", new XUUnityLightMcpSdkDependencyVerifyOperation() },
             { "unity.console.tail", new XUUnityLightMcpConsoleTailOperation() },
             { "unity.scene.snapshot", new XUUnityLightMcpSceneSnapshotOperation() },
             { "unity.scene.assert", new XUUnityLightMcpSceneAssertOperation() },
-            { "unity.tests.run_editmode", new XUUnityLightMcpEditModeTestsOperation() },
-            { "unity.tests.run_playmode", new XUUnityLightMcpPlayModeTestsOperation() },
             { "unity.playmode.state", new XUUnityLightMcpPlayModeStateOperation() },
             { "unity.playmode.set", new XUUnityLightMcpPlayModeSetOperation() },
             { "unity.game_view.configure", new XUUnityLightMcpGameViewConfigureOperation() },
@@ -42,6 +41,16 @@ namespace XUUnity.LightMcp.Editor.Core
         public static bool TryGet(string operationName, out IXUUnityLightMcpOperation operation)
         {
             return Operations.TryGetValue(operationName, out operation);
+        }
+
+        public static void Register(IXUUnityLightMcpOperation operation)
+        {
+            if (operation == null || string.IsNullOrWhiteSpace(operation.OperationName))
+            {
+                return;
+            }
+
+            Operations[operation.OperationName] = operation;
         }
     }
 }
