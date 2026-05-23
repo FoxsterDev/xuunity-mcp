@@ -136,12 +136,13 @@ behavior.
 - Static tests verify the core asmdef and core editor sources do not reference
   TestRunner APIs.
 - Policy tests verify Unity 2021/2022/6000 Test Framework recommendations.
-
-Validation gap:
-
-- Live Unity 2021.3/2022.3/6000.x matrix should be rerun before publishing the
-  `v0.3.14` tag. Previous `v0.3.13` Unity 6000 self-test evidence predates the
-  optional assembly split.
+- Live clean-project matrix passed package EditMode `6/6` and PlayMode `5/5` on
+  `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`,
+  `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1`.
+- `2021.3.45f2` is classified as
+  `skipped/create_project_license_unavailable` on this host because Unity
+  cannot create a clean project before package import without a valid editor
+  license.
 
 ## Self-Review
 

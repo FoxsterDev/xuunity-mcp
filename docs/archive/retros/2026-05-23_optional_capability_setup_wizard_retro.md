@@ -56,8 +56,9 @@ Status: `post-implementation retro`
 - Live clean-project matrix passed package EditMode `6/6` and PlayMode `5/5` on
   `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`,
   `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1`.
-- `2021.3.45f2` failed before package import because Unity reported no valid
-  editor license while creating a clean project.
+- `2021.3.45f2` is classified as `skipped/create_project_license_unavailable`
+  before package import because Unity reports no valid editor license while
+  creating a clean project.
 
 ## Follow-Up
 

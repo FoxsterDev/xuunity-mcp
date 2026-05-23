@@ -22,9 +22,8 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests: `97/97`
-- package self-tests through production Git UPM `v0.3.13`: EditMode `6/6`, PlayMode `5/5` before the optional Test Framework split
-- optional-capability host/static tests for `v0.3.14`: `123/123` host tests passed locally
+- host Python tests for `v0.3.14`: `123/123`
+- package self-tests for `v0.3.14`: EditMode `6/6`, PlayMode `5/5` on runnable installed Unity `2021.3`, `2022.3`, and `6000.x` editors after offline optional Test Framework setup
 - multi-project batch compile matrix in a consumer repo: `9/9` projects, `38/38` lanes, `0` failures
 
 ## Generic Smoke Layers

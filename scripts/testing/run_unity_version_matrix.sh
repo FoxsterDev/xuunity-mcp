@@ -461,6 +461,9 @@ run_version_matrix_entry() {
     create_project_classification="$(classify_create_project_failure "$result_dir/create_project.log")"
     failed_step="${create_project_classification%%|*}"
     notes="${create_project_classification#*|}"
+    if [[ "$failed_step" == "create_project_license_unavailable" ]]; then
+      result="skipped"
+    fi
     write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
     record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
     return 0
