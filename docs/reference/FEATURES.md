@@ -121,7 +121,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Target | Status | Validation notes |
 | --- | --- | --- |
 | Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.14`; old `templates/unity-package#v0.3.11` is migration-only. |
-| macOS host tools | `Validated in this release environment` | `run.sh --help`, shell syntax checks, JSON/TOML config parsing, and 97 host Python tests passed locally. |
+| macOS host tools | `Validated in this release environment` | Shell syntax checks, JSON/TOML config parsing, and 123 host Python tests passed locally. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |
 | Claude Code | `Template provided` | Project `.mcp.json`, Windows `.mcp.windows.json`, and user-scope installer path are documented. |
@@ -129,9 +129,9 @@ Unity MCP implementations when the user wants safe production validation.
 | Cursor | `Template provided` | Project/user `.cursor/mcp.json` templates are provided for Unix-like and native Windows hosts. |
 | Windsurf | `Template provided` | `~/.codeium/windsurf/mcp_config.json` and Windows equivalent templates are provided. |
 | Codex-style agents | `Template provided` | Unix-like and Windows `config.toml` snippets are provided. |
-| Unity 2021.3+ | `Package manifest provided` | Default package metadata targets Unity `2021.3`; Unity 6000 remains the main production validation line. |
+| Unity 2021.3+ | `Validated` | Default package metadata targets Unity `2021.3`; clean Unity `2021.3.58f1` Git UPM release smoke passed after `v0.3.14` tag publication. |
 | Optional Test Framework capability | `Implemented` | Core MCP is healthy without `com.unity.test-framework`; test operations enable through asmdef Version Defines when `>=1.1.33` is installed. |
-| Package self-tests | `Validated before optional split` | A representative Unity 6000 consumer project passed Git UPM validation with EditMode `6/6` and PlayMode `5/5`; rerun live Unity matrix before tagging `v0.3.14`. |
+| Package self-tests | `Validated` | Clean installed-editor matrix passed package EditMode `6/6` and PlayMode `5/5`; the published `v0.3.14` Git UPM tag passed the same package self-tests on Unity `2021.3.58f1`. |
 | Multi-project batch compile | `Validated in consumer repo` | Private multi-project consumer validation passed `9/9` Unity projects and `38/38` compile lanes after the `v0.3.12` package path update. |
 | OpenUPM | `Ready, not published` | Package layout and metadata are registry-ready; use Git UPM until an OpenUPM package page exists. |
 

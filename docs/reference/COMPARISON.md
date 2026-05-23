@@ -203,9 +203,9 @@ Release validation status for the current XUUnity Light package:
 
 | Area | Status | Caveat |
 | --- | --- | --- |
-| Current package source | `Repo-verified; tag pending` | Source package is `v0.3.14` at `packages/com.xuunity.light-mcp`; publish the Git tag before consumers pin it. OpenUPM publication is still pending. |
-| macOS host tools | `Repo-verified` | `run.sh --help`, shell syntax checks, JSON/TOML config parsing, and 97 host Python tests passed in the local release environment. |
-| Package self-tests | `Repo-verified` | A representative Unity 6000 consumer project passed Git UPM validation with EditMode `6/6` and PlayMode `5/5`. |
+| Current package source | `Release tag verified` | Source package is `v0.3.14` at `packages/com.xuunity.light-mcp`; the Git tag is visible on `origin` and resolves to the release source commit. OpenUPM publication is still pending. |
+| macOS host tools | `Repo-verified` | Shell syntax checks, JSON/TOML config parsing, and 123 host Python tests passed in the local release environment. |
+| Package self-tests | `Release Git UPM verified` | Clean installed-editor matrix passed package EditMode `6/6` and PlayMode `5/5`; the published `v0.3.14` Git UPM tag passed the same package self-tests on Unity `2021.3.58f1`. |
 | Multi-project compile matrix | `Repo-verified` | Private multi-project consumer validation passed `9/9` projects and `38/38` compile lanes after the `v0.3.12` package path update. |
 | Linux host tools | `Template provided` / portable path | Unix launcher is bash-compatible and avoids zsh-only expansion, but should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs plus `run.cmd` and `run.ps1` are included and statically validated; native Windows MCP connection still needs host smoke validation. |
