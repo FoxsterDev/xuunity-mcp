@@ -972,7 +972,12 @@ def print_json(data: Any) -> None:
 
 
 def operation_source_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    server_path = Path(__file__).resolve()
+    for candidate in (server_path.parent, server_path.parents[1]):
+        package_metadata = candidate / "packages" / SETUP_LIGHT_MCP_PACKAGE_NAME / "package.json"
+        if package_metadata.is_file():
+            return candidate
+    return server_path.parents[1]
 
 
 def default_local_package_source() -> Path:

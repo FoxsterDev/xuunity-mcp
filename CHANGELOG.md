@@ -11,6 +11,10 @@
   installation.
 - Added capability statuses for optional test support, including missing and
   too-old dependency states that do not make core MCP health fail.
+- Fixed installed-helper setup planning so the default Git UPM dependency uses
+  the package metadata version instead of falling back to `v0.0.0`.
+- Added a README install simulation audit covering single-project, hub,
+  mixed-version, nested-repo, and optional Test Framework setup paths.
 
 ## 0.3.13
 

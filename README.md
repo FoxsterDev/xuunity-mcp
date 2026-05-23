@@ -52,7 +52,8 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 
 ### Prerequisites
 
-- Unity 2021.3 LTS+; Unity 6000 is the main validated production path
+- Unity 2021.3 LTS+; the current release has live validation on Unity 2021.3,
+  2022.3, and 6000.x. See [Status](docs/reference/STATUS.md).
 - Python 3.10+
 - one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md)
 
@@ -214,7 +215,9 @@ bash xuunity_light_unity_mcp.sh prodmode --project-root /path/to/UnityProject
 
 ### 3. Connect Your Client
 
-Use a ready-made client template:
+Use a ready-made client template. If the destination file already exists, merge
+the `xuunity_light_unity` server block instead of overwriting unrelated MCP
+servers.
 
 ```bash
 # Claude Code project scope

@@ -86,6 +86,7 @@ done
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 templates_dir="$script_dir/templates"
+package_metadata_source="$script_dir/packages/com.xuunity.light-mcp/package.json"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 codex_tools_home="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}"
 claude_tools_home="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}"
@@ -331,6 +332,8 @@ install_server_into() {
   copy_if_needed "$templates_dir/run.sh" "$target_dir/run.sh" 755
   copy_if_needed "$templates_dir/run.cmd" "$target_dir/run.cmd" 644
   copy_if_needed "$templates_dir/run.ps1" "$target_dir/run.ps1" 644
+  run mkdir -p "$target_dir/packages/com.xuunity.light-mcp"
+  copy_if_needed "$package_metadata_source" "$target_dir/packages/com.xuunity.light-mcp/package.json" 644
 }
 
 run mkdir -p "$codex_home"

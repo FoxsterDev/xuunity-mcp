@@ -56,6 +56,7 @@ SERVER_MODULES_TEMPLATE_RELATIVE_GLOB="templates/server_*.py"
 RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH="templates/xuunity_light_unity_mcp_runtime_defaults.json"
 PACKAGE_NAME="com.xuunity.light-mcp"
 PACKAGE_TEMPLATE_RELATIVE_PATH="packages/com.xuunity.light-mcp"
+PACKAGE_METADATA_RELATIVE_PATH="$PACKAGE_TEMPLATE_RELATIVE_PATH/package.json"
 COMPACT_SUMMARY="false"
 
 resolve_repo_root() {
@@ -241,6 +242,7 @@ sync_file_from_source() {
   local temp_path
   temp_path="$(mktemp)"
   cp "$SOURCE_ROOT/$relative_source_path" "$temp_path"
+  mkdir -p "$(dirname "$destination_path")"
 
   if [[ -f "$destination_path" ]] && cmp -s "$temp_path" "$destination_path"; then
     rm -f "$temp_path"
@@ -260,6 +262,7 @@ sync_installed_helper_if_needed() {
   sync_file_from_source "$SERVER_PATH" "$SERVER_TEMPLATE_RELATIVE_PATH"
   sync_file_from_source "$RUN_PATH" "$RUN_TEMPLATE_RELATIVE_PATH"
   sync_file_from_source "$INSTALL_DIR/$(basename "$RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH")" "$RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH"
+  sync_file_from_source "$INSTALL_DIR/$PACKAGE_METADATA_RELATIVE_PATH" "$PACKAGE_METADATA_RELATIVE_PATH"
 
   local module_source_path=""
   for module_source_path in "$SOURCE_ROOT"/$SERVER_MODULES_TEMPLATE_RELATIVE_GLOB; do

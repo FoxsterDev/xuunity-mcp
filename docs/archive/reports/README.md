@@ -34,6 +34,7 @@ Use these reports when:
 - `2026-05-08_playmode_recovery_timeout_and_fault_suite_hardening_plan.md`
 - `2026-05-09_multi_project_architecture_working_design.md`
 - `2026-05-11_batch_compile_gate_and_recovery_design_patch.md`
+- `2026-05-23_readme_install_simulation_audit.md`
 
 ## Canonical Supporting Docs
 
