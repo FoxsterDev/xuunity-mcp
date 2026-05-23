@@ -61,6 +61,12 @@ platform module, or optional project package:
    recommendation basis, and recommended action.
 8. Never mutate manifests unless the caller gives explicit approval.
 
+For Unity Editor API availability, use Unity's built-in version symbols when
+the compatibility boundary is known, for example `UNITY_2021_3_OR_NEWER`,
+`UNITY_2022_3_OR_NEWER`, or `UNITY_6000_0_OR_NEWER`. If the exact API boundary
+is not known or spans package-manager implementation differences, use a narrow
+reflection/fallback helper and cover it with a static compatibility test.
+
 Reference Test Framework gate:
 
 ```json
@@ -125,7 +131,7 @@ behavior.
 
 - `python3 -m unittest tests.test_setup_wizard -v` passed 9 tests.
 - `python3 -m unittest tests.test_server_protocol_and_parser -v` passed 21 tests.
-- `scripts/testing/run_host_python_tests.sh` passed 115 tests.
+- `scripts/testing/run_host_python_tests.sh` passed 123 tests.
 - Static tests verify package metadata has no hard Test Framework dependency.
 - Static tests verify the core asmdef and core editor sources do not reference
   TestRunner APIs.
@@ -161,8 +167,13 @@ Risks:
   Unity versions because it is the critical compile boundary.
 - Test assembly references and optional assembly registration need live Unity
   domain reload verification before tagging.
+- `install-test-framework` should be the default Test Framework install route:
+  mutate `Packages/manifest.json` offline before opening Unity, preserve newer
+  existing Test Framework versions, and then let Unity resolve packages during
+  normal startup.
 - `request-install-test-framework` mutates package state through Package
-  Manager; it is narrow and approved, but should remain auditable.
+  Manager; keep it audited, require explicit approval, and reserve it for
+  already healthy bridges.
 - Supported-but-not-recommended versions, such as Unity 6000 with Test
   Framework `1.1.33`, can still be surprising to operators. The status must
   stay non-blocking while the upgrade recommendation remains visible.

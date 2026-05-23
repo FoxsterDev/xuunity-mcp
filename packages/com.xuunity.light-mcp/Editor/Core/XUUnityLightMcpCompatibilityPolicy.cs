@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using UnityEditor.PackageManager;
 using UnityEngine;
@@ -7,6 +9,8 @@ namespace XUUnity.LightMcp.Editor.Core
 {
     internal static class XUUnityLightMcpCompatibilityPolicy
     {
+        static readonly BindingFlags StaticBindings = BindingFlags.Public | BindingFlags.Static;
+
         public const string TestFrameworkPackageName = "com.unity.test-framework";
         public const string TestFrameworkMinimumVersion = "1.1.33";
         public const string TestFrameworkCapabilityDefine = "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY";
@@ -26,13 +30,50 @@ namespace XUUnity.LightMcp.Editor.Core
         {
             try
             {
-                var packageInfo = PackageInfo.FindForPackageName(packageName);
+                var packageInfo = FindPackageInfo(packageName);
                 return packageInfo == null ? "" : packageInfo.version ?? "";
             }
             catch
             {
                 return "";
             }
+        }
+
+        static PackageInfo FindPackageInfo(string packageName)
+        {
+            if (string.IsNullOrWhiteSpace(packageName))
+            {
+                return null;
+            }
+
+            var packageInfoType = typeof(PackageInfo);
+            var findForPackageName = packageInfoType.GetMethod("FindForPackageName", StaticBindings);
+            if (findForPackageName != null)
+            {
+                return findForPackageName.Invoke(null, new object[] { packageName }) as PackageInfo;
+            }
+
+            var getAllRegisteredPackages = packageInfoType.GetMethod("GetAllRegisteredPackages", StaticBindings);
+            if (getAllRegisteredPackages == null)
+            {
+                return null;
+            }
+
+            var packages = getAllRegisteredPackages.Invoke(null, null) as IEnumerable;
+            if (packages == null)
+            {
+                return null;
+            }
+
+            foreach (var item in packages)
+            {
+                if (item is PackageInfo packageInfo && string.Equals(packageInfo.name, packageName, StringComparison.Ordinal))
+                {
+                    return packageInfo;
+                }
+            }
+
+            return null;
         }
 
         public static bool IsVersionAtLeast(string installedVersion, string minimumVersion)

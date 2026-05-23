@@ -274,6 +274,7 @@ def build_setup_plan(
                         "version": tf_state["recommended_dependency_version"],
                         "reason": "enable_optional_test_capability",
                         "requires_approval": True,
+                        "apply_phase": "before_opening_unity",
                     }
                 )
             elif tf_state["status"] == "disabled_dependency_too_old" or tf_state["upgrade_recommended"]:
@@ -286,6 +287,7 @@ def build_setup_plan(
                         "reason": tf_state["dependency_action"],
                         "requires_approval": True,
                         "caution": tf_state["upgrade_caution"],
+                        "apply_phase": "before_opening_unity",
                     }
                 )
         elif include_test_framework == "auto" and tf_state["status"] == "disabled_dependency_too_old":
@@ -298,6 +300,7 @@ def build_setup_plan(
                     "reason": "required_for_optional_test_capability",
                     "requires_approval": True,
                     "caution": tf_state["upgrade_caution"],
+                    "apply_phase": "before_opening_unity",
                 }
             )
         elif include_test_framework == "auto" and tf_state["upgrade_recommended"]:
@@ -478,7 +481,8 @@ def install_test_framework(project_root: Path, *, approve: bool, version: str = 
             "outcome": "already_suitable",
             "upgrade_recommended": bool(before.get("upgrade_recommended")),
             "packages_lock_entries_removed": [],
-            "next_action": "run validate-setup --include-tests when test operations are expected",
+            "mutation_mode": "offline_manifest",
+            "next_action": "open Unity or run ensure-ready --open-editor, then request capabilities when test operations are expected",
         }
     set_manifest_dependency(project_root, TEST_FRAMEWORK_PACKAGE_NAME, selected_version)
     removed = remove_lock_entries(project_root, [TEST_FRAMEWORK_PACKAGE_NAME])
@@ -497,7 +501,9 @@ def install_test_framework(project_root: Path, *, approve: bool, version: str = 
         "upgrade_recommended_before": bool(before.get("upgrade_recommended")),
         "upgrade_caution": str(before.get("upgrade_caution") or ""),
         "packages_lock_entries_removed": removed,
-        "next_action": "let Unity resolve packages, then run request-health-probe or validate-setup",
+        "mutation_mode": "offline_manifest",
+        "apply_phase": "before_opening_unity",
+        "next_action": "open Unity or run ensure-ready --open-editor so Unity resolves packages, then run request-health-probe or validate-setup",
     }
 
 

@@ -72,6 +72,16 @@ class SetupWizardTests(unittest.TestCase):
             optional["versionDefines"][0],
         )
 
+    def test_package_test_asmdefs_enable_unity_test_assemblies(self) -> None:
+        for relative_path in (
+            "Tests/EditMode/com.xuunity.light-mcp.Editor.Tests.asmdef",
+            "Tests/PlayMode/com.xuunity.light-mcp.PlayMode.Tests.asmdef",
+        ):
+            payload = json.loads((PACKAGE_ROOT / relative_path).read_text(encoding="utf-8"))
+            self.assertIn("TestAssemblies", payload.get("optionalUnityReferences", []))
+            self.assertNotIn("UnityEngine.TestRunner", payload.get("references", []))
+            self.assertNotIn("UnityEditor.TestRunner", payload.get("references", []))
+
     def test_core_editor_sources_do_not_reference_test_runner_api(self) -> None:
         forbidden = (
             "UnityEditor.TestTools.TestRunner",
@@ -84,6 +94,10 @@ class SetupWizardTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             for token in forbidden:
                 self.assertNotIn(token, text, str(path))
+
+    def test_compatibility_policy_does_not_directly_call_newer_package_info_api(self) -> None:
+        text = (PACKAGE_ROOT / "Editor" / "Core" / "XUUnityLightMcpCompatibilityPolicy.cs").read_text(encoding="utf-8")
+        self.assertNotIn(".FindForPackageName(", text)
 
     def test_policy_recommends_test_framework_version_by_unity_major(self) -> None:
         self.assertEqual("1.1.33", wizard.recommended_test_framework_version("2021.3.45f1"))
@@ -125,6 +139,7 @@ class SetupWizardTests(unittest.TestCase):
                 "version": "1.1.33",
                 "reason": "enable_optional_test_capability",
                 "requires_approval": True,
+                "apply_phase": "before_opening_unity",
             },
             actions_2022,
         )
@@ -133,6 +148,7 @@ class SetupWizardTests(unittest.TestCase):
         self.assertEqual("1.1.33", upgrade_actions_6000[0]["current_version"])
         self.assertEqual("1.5.1", upgrade_actions_6000[0]["version"])
         self.assertEqual("upgrade_recommended", upgrade_actions_6000[0]["reason"])
+        self.assertEqual("before_opening_unity", upgrade_actions_6000[0]["apply_phase"])
 
     def test_setup_apply_requires_approval_and_mutates_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -266,6 +282,22 @@ class SetupWizardTests(unittest.TestCase):
 
         self.assertEqual("already_suitable", result["outcome"])
         self.assertEqual("1.1.33", manifest["dependencies"]["com.unity.test-framework"])
+        self.assertEqual("offline_manifest", result["mutation_mode"])
+        self.assertIn("ensure-ready --open-editor", result["next_action"])
+
+    def test_install_test_framework_preserves_newer_existing_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = create_unity_project(
+                Path(tmp) / "Project",
+                unity_version="6000.0.45f1",
+                dependencies={"com.unity.test-framework": "1.6.0"},
+            )
+            result = wizard.install_test_framework(project_root, approve=True)
+            manifest = json.loads((project_root / "Packages" / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual("already_suitable", result["outcome"])
+        self.assertFalse(result["upgrade_recommended"])
+        self.assertEqual("1.6.0", manifest["dependencies"]["com.unity.test-framework"])
 
     def test_install_test_framework_upgrades_existing_old_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -280,6 +312,8 @@ class SetupWizardTests(unittest.TestCase):
         self.assertEqual("upgraded", result["outcome"])
         self.assertTrue(result["upgrade_recommended_before"])
         self.assertEqual("1.5.1", manifest["dependencies"]["com.unity.test-framework"])
+        self.assertEqual("offline_manifest", result["mutation_mode"])
+        self.assertEqual("before_opening_unity", result["apply_phase"])
 
     def test_validate_include_tests_blocks_missing_optional_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

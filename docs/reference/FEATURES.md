@@ -92,7 +92,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Setup | `setup-plan` | `Host helper` | Discovers single projects, flat hubs, mixed Unity versions, and nested project roots before mutation. |
 | Setup | `setup-apply` | `Host helper` | Applies an approved setup plan only after explicit approval. |
 | Setup | `validate-setup` | `Host helper` | Reports core readiness and optional Test Framework capability state. |
-| Setup | `install-test-framework` | `Host helper` | Installs the optional Test Framework dependency after explicit approval. |
+| Setup | `install-test-framework` | `Host helper` | Installs the optional Test Framework dependency in `Packages/manifest.json` after explicit approval; prefer before opening Unity so package resolution happens on startup. |
 | Discovery | `project-discovery-report` | `Host helper` | Explains bridge, editor, package, and stale-artifact state for one project. |
 | Registry | `registry-context-report` | `Host helper` | Reports same-host project context cache state. |
 | Registry | `registry-prune-contexts` | `Host helper` | Prunes stale same-host project context entries. |

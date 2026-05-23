@@ -24,7 +24,7 @@ Current release evidence:
 
 - host Python tests: `97/97`
 - package self-tests through production Git UPM `v0.3.13`: EditMode `6/6`, PlayMode `5/5` before the optional Test Framework split
-- optional-capability host/static tests for `v0.3.14`: `115/115` host tests passed locally
+- optional-capability host/static tests for `v0.3.14`: `123/123` host tests passed locally
 - multi-project batch compile matrix in a consumer repo: `9/9` projects, `38/38` lanes, `0` failures
 
 ## Generic Smoke Layers

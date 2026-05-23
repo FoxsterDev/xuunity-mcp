@@ -99,7 +99,6 @@ namespace XUUnity.LightMcp.Editor.Batch
                         throw new InvalidOperationException(
                             "EditMode batch tests require the optional XUUnity Test Framework capability. " +
                             "Install com.unity.test-framework and run the optional batch test entrypoint.");
-                        break;
 
                     default:
                         throw new InvalidOperationException($"Unknown batch validation action '{args.action}'.");

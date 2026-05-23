@@ -387,6 +387,13 @@ when Unity asmdef Version Defines set `XUUNITY_LIGHT_MCP_TESTS_CAPABILITY`
 because `com.unity.test-framework >= 1.1.33` is present. Missing optional test
 support is reported as a capability status, not as whole-MCP health failure.
 
+When code depends on Unity Editor APIs that vary by editor version, prefer
+Unity's built-in version symbols such as `UNITY_2021_3_OR_NEWER`,
+`UNITY_2022_3_OR_NEWER`, and `UNITY_6000_0_OR_NEWER` once the boundary is
+known. If the boundary is uncertain, use a narrow reflection/fallback wrapper
+so Unity 2021 remains compile-safe and add a static test to prevent direct
+references to unavailable APIs from creeping back in.
+
 The package still intentionally does not expose:
 
 - arbitrary C# execution

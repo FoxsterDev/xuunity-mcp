@@ -96,13 +96,18 @@ Do not globally apply one dependency version across a mixed-version hub. The
 plan computes per-project actions.
 
 Test operations are optional. If `validate-setup --include-tests` reports
-`disabled_missing_dependency`, ask for approval before running:
+`disabled_missing_dependency`, ask for approval before opening Unity, then run:
 
 ```bash
 bash xuunity_light_unity_mcp.sh install-test-framework \
   --project-root /path/to/UnityProject \
   --yes
 ```
+
+This host command edits `Packages/manifest.json` offline. Prefer it before the
+first Unity open/restart so Unity resolves the package graph during normal
+startup. Use the in-editor MCP install operation only when the bridge is already
+healthy and the operator intentionally wants a live Package Manager mutation.
 
 If the project already declares `com.unity.test-framework` but the version is
 below `1.1.33`, treat this as a cautious package upgrade, not a fresh install.

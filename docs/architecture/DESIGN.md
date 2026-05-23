@@ -293,6 +293,9 @@ Design rule:
 - every version-sensitive capability should expose an `adapter_id`
 - health probe decides whether that adapter is supported
 - unsupported adapters disable their operations cleanly
+- Unity Editor API differences should be guarded with Unity built-in version
+  symbols such as `UNITY_2022_3_OR_NEWER` when the boundary is known; otherwise
+  use narrow reflection/fallback helpers that compile on Unity 2021.3+
 
 Future path:
 - add Unity-version-specific adapters only where probe evidence shows real divergence

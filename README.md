@@ -83,6 +83,10 @@ bash xuunity_light_unity_mcp.sh install-test-framework \
   --yes
 ```
 
+Prefer this before opening or restarting Unity. The host helper mutates
+`Packages/manifest.json` offline, then Unity resolves the package graph during
+normal startup.
+
 The helper recommends `com.unity.test-framework@1.1.33` for Unity 2021/2022 and
 `@1.5.1` for Unity 6000+, while the capability gate remains `>= 1.1.33`.
 
@@ -129,7 +133,7 @@ Tasks:
 4. Apply the plan only after user approval:
    bash xuunity_light_unity_mcp.sh setup-apply --plan-file xuunity-setup-plan.json --yes
 5. If test operations are required and the plan reports
-   disabled_missing_dependency, ask for approval, then run:
+   disabled_missing_dependency, ask for approval before opening Unity, then run:
    bash xuunity_light_unity_mcp.sh install-test-framework --project-root "<UNITY_PROJECT_ROOT>" --yes
    If the project already has Test Framework but the version is too old, treat
    the same command as an approved package upgrade and review Unity's package
@@ -311,11 +315,15 @@ Troubleshooting:
 - Server not found: run `bash init_xuunity_light_unity_mcp.sh` again.
 - Bridge disabled: run the installer with `--project-root` and `--enable-project`.
 - Unity not ready: run `ensure-ready --open-editor` before validation tools.
-- Package changes not visible: run `unity_project_refresh` or reopen Unity.
+- Package changes not visible: prefer reopening Unity so it resolves the
+  manifest from a clean startup; use `unity_project_refresh` for an already
+  healthy bridge.
 - Test operations unavailable: run `validate-setup --include-tests`; if the
-  Test Framework capability is missing, install it explicitly with
-  `install-test-framework --yes` or the MCP tool
-  `unity_package_install_test_framework` with `approve: true`.
+  Test Framework capability is missing, install it explicitly with the host
+  `install-test-framework --yes` helper before opening Unity. Use the MCP tool
+  `unity_package_install_test_framework` with `approve: true` only when the
+  bridge is already healthy and an in-editor Package Manager mutation is
+  intentional.
   If Test Framework is already declared but too old, the same command upgrades
   only that dependency after approval. If Unity 6000 already has `1.1.33`,
   tests may run, but setup reports an optional upgrade recommendation to

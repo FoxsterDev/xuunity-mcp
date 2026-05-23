@@ -1,15 +1,15 @@
 {
     "name": "com.xuunity.light-mcp.PlayMode.Tests",
     "rootNamespace": "XUUnity.LightMcp.Tests.PlayMode",
-    "references": [
-        "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
     "autoReferenced": false,
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS",

@@ -123,9 +123,37 @@ if [[ "$PATCH_RESULT" == "patched" ]]; then
 fi
 "$WRAPPER" request-project-refresh --project-root "$PROJECT_ROOT" --timeout-ms 180000 >/dev/null
 
+run_mcp_json_step() {
+  local label="$1"
+  shift
+  local output_path="$TMP_DIR/${label}.json"
+  if ! "$@" >"$output_path"; then
+    cat "$output_path"
+    return 1
+  fi
+  cat "$output_path"
+  python3 - "$output_path" "$label" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+label = sys.argv[2]
+payload = json.loads(path.read_text(encoding="utf-8"))
+status = str(payload.get("status") or "")
+if status not in {"ok", "success"}:
+    error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
+    code = error.get("code") or "mcp_response_error"
+    message = error.get("message") or f"{label} returned status {status}"
+    print(f"{label} failed: {code}: {message}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+}
+
 run_editmode() {
   local category="$1"
-  "$WRAPPER" request-editmode-tests \
+  run_mcp_json_step "editmode_${category//[^A-Za-z0-9_]/_}" \
+    "$WRAPPER" request-editmode-tests \
     --project-root "$PROJECT_ROOT" \
     --assembly-name com.xuunity.light-mcp.Editor.Tests \
     --category-name "$category" \
@@ -134,7 +162,8 @@ run_editmode() {
 
 run_playmode() {
   local category="$1"
-  "$WRAPPER" request-playmode-tests \
+  run_mcp_json_step "playmode_${category//[^A-Za-z0-9_]/_}" \
+    "$WRAPPER" request-playmode-tests \
     --project-root "$PROJECT_ROOT" \
     --assembly-name com.xuunity.light-mcp.PlayMode.Tests \
     --category-name "$category" \

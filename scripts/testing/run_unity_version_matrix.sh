@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PUBLIC_OPS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WRAPPER="$PUBLIC_OPS_ROOT/xuunity_light_unity_mcp.sh"
 INIT_SCRIPT="$PUBLIC_OPS_ROOT/init_xuunity_light_unity_mcp.sh"
+PACKAGE_SELF_TESTS_SCRIPT="$PUBLIC_OPS_ROOT/templates/smoke/run_package_self_tests.sh"
 ACCEPTANCE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/interactive_acceptance_smoke.json"
 REFRESH_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/refresh_contract_smoke.json"
 COMPILE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/compile_contract_smoke.json"
@@ -21,6 +22,7 @@ VERSIONS=()
 KEEP_PROJECTS="false"
 RECREATE_PROJECTS="false"
 LIST_DETECTED="false"
+SKIP_PACKAGE_SELF_TESTS="false"
 
 usage() {
   cat <<EOF
@@ -31,6 +33,7 @@ Options:
   --artifact-root <path>   Override artifact root. Default: $ARTIFACT_ROOT
   --keep-projects          Keep generated clean projects after the run.
   --recreate-projects      Recreate each clean project even if it already exists for this run.
+  --skip-package-self-tests Skip optional Test Framework install plus package EditMode/PlayMode self-tests.
   --list-detected          Print detected Unity versions and editor executables, then exit.
   -h, --help               Show this help.
 
@@ -56,6 +59,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --recreate-projects)
       RECREATE_PROJECTS="true"
+      ;;
+    --skip-package-self-tests)
+      SKIP_PACKAGE_SELF_TESTS="true"
       ;;
     --list-detected)
       LIST_DETECTED="true"
@@ -363,6 +369,16 @@ copy_if_exists() {
   fi
 }
 
+classify_create_project_failure() {
+  local log_path="$1"
+  if [[ -f "$log_path" ]] && rg -q "No valid Unity Editor license found|No ULF license found|Access token is unavailable" "$log_path"; then
+    echo "create_project_license_unavailable|Unity failed to create a clean project because no valid editor license was available"
+    return 0
+  fi
+
+  echo "create_project|Unity failed to create a clean project"
+}
+
 run_step() {
   local step_name="$1"
   local stdout_path="$2"
@@ -400,9 +416,20 @@ install_mcp_package() {
   bash "$INIT_SCRIPT" \
     --project-root "$project_root" \
     --enable-project
-  bash "$WRAPPER_SCRIPT" \
+  bash "$WRAPPER" \
     devmode \
     --project-root "$project_root"
+}
+
+install_test_framework_dependency() {
+  local project_root="$1"
+  # Route through the public helper instead of editing manifest.json directly.
+  # This preserves newer existing Test Framework versions, treats old versions
+  # as approved upgrades, and installs only when the dependency is missing.
+  bash "$WRAPPER" \
+    install-test-framework \
+    --project-root "$project_root" \
+    --yes
 }
 
 run_version_matrix_entry() {
@@ -430,8 +457,10 @@ run_version_matrix_entry() {
 
   if ! create_project_if_needed "$unity_version" "$unity_path" "$project_root" "$result_dir"; then
     result="failed"
-    failed_step="create_project"
-    notes="Unity failed to create a clean project"
+    local create_project_classification
+    create_project_classification="$(classify_create_project_failure "$result_dir/create_project.log")"
+    failed_step="${create_project_classification%%|*}"
+    notes="${create_project_classification#*|}"
     write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
     record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
     return 0
@@ -441,6 +470,30 @@ run_version_matrix_entry() {
     result="failed"
     failed_step="init_mcp_package"
     notes="init_xuunity_light_unity_mcp.sh failed"
+    write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
+    record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
+    return 0
+  fi
+
+  if [[ "$SKIP_PACKAGE_SELF_TESTS" != "true" ]] && ! run_step \
+    "install-test-framework-before-open" \
+    "$result_dir/install_test_framework.stdout.json" \
+    "$result_dir/install_test_framework.stderr.txt" \
+    install_test_framework_dependency "$project_root"; then
+    result="failed"
+    failed_step="install_test_framework"
+    notes="Optional Test Framework manifest install failed"
+  elif [[ "$SKIP_PACKAGE_SELF_TESTS" != "true" ]] && ! run_step \
+    "validate-setup-include-tests-before-open" \
+    "$result_dir/validate_setup_include_tests.stdout.json" \
+    "$result_dir/validate_setup_include_tests.stderr.txt" \
+    "$WRAPPER" validate-setup --project-root "$project_root" --include-tests; then
+    result="failed"
+    failed_step="validate_setup_include_tests"
+    notes="validate-setup --include-tests failed before editor open"
+  fi
+
+  if [[ "$result" != "passed" ]]; then
     write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
     record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
     return 0
@@ -483,6 +536,14 @@ run_version_matrix_entry() {
     result="failed"
     failed_step="request_capabilities"
     notes="request-capabilities failed"
+  elif [[ "$SKIP_PACKAGE_SELF_TESTS" != "true" ]] && ! run_step \
+    "package-self-tests" \
+    "$result_dir/package_self_tests.stdout.json" \
+    "$result_dir/package_self_tests.stderr.txt" \
+    "$PACKAGE_SELF_TESTS_SCRIPT" --project-root "$project_root" --mode all --no-open-editor --timeout-ms 300000; then
+    result="failed"
+    failed_step="package_self_tests"
+    notes="Package EditMode/PlayMode self-tests failed"
   elif ! run_step \
     "interactive-acceptance" \
     "$result_dir/interactive_acceptance.stdout.json" \
@@ -522,7 +583,7 @@ run_version_matrix_entry() {
   write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
   record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
 
-  if [[ "$KEEP_PROJECTS" != "true" ]]; then
+  if [[ "$KEEP_PROJECTS" != "true" && "$result" == "passed" ]]; then
     rm -rf "$project_root"
   fi
 }

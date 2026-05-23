@@ -18,6 +18,9 @@ Status: `post-implementation retro`
 - The setup wizard now distinguishes missing Test Framework, already suitable
   Test Framework, too-old existing Test Framework, and supported-but-upgrade-
   recommended versions.
+- Live matrix smoke exposed a Unity 2021 compile-time API mismatch before
+  release: `PackageInfo.FindForPackageName` is unavailable there. The fix uses
+  a compatibility wrapper and a static guard against direct calls to newer APIs.
 - The self-review pass caught a bad intermediate choice: a new global
   `healthy_with_unsupported_capabilities` status would have broken existing
   readiness checks that expect core health to be `healthy`.
@@ -30,11 +33,15 @@ Status: `post-implementation retro`
 - Moving files without preserving `.meta` GUIDs would have created noisy Unity
   asset churn. The implementation preserved the old test-operation `.meta`
   files and added `.meta` files for new assets.
-- Package Manager mutation is useful for approved Test Framework install, but
-  must remain narrow and explicit.
+- Offline manifest mutation before opening Unity is the preferred Test
+  Framework install path. In-editor Package Manager mutation remains useful,
+  but should be treated as a narrow fallback for already healthy bridges.
 - Existing Test Framework versions may be part of a project's own test setup.
   Treating old versions as a cautious upgrade path is safer than presenting
   every dependency change as a fresh install.
+- Editing a shell runner while it is executing can corrupt the running shell's
+  parse stream. Future live-matrix script changes should be made before a run or
+  validated in a separate copy.
 
 ## Validation
 
@@ -45,12 +52,17 @@ Status: `post-implementation retro`
 - Host tests cover already suitable dependency, too-old dependency upgrade, and
   Unity 6000 supported-with-upgrade-recommendation behavior.
 - Full host validation passed: `scripts/testing/run_host_python_tests.sh`
-  reported `115/115`.
+  reported `123/123`.
+- Live clean-project matrix passed package EditMode `6/6` and PlayMode `5/5` on
+  `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`,
+  `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1`.
+- `2021.3.45f2` failed before package import because Unity reported no valid
+  editor license while creating a clean project.
 
 ## Follow-Up
 
-- Run the live Unity matrix for 2021.3, 2022.3, and 6000.x with and without
-  Test Framework.
+- Re-run the full installed-editor matrix after the `2021.3.45f2` license is
+  repaired if that editor must be release evidence.
 - Verify `batch-editmode-tests` before install reports actionable guidance and
   after install runs the optional batch entrypoint.
 - Do a separate Rider and VS Code MCP setup guide after validating their current

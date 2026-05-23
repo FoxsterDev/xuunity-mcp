@@ -151,7 +151,47 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return report != null &&
                    report.probe_version == ProbeVersion &&
                    string.Equals(report.unity_version, Application.unityVersion, StringComparison.Ordinal) &&
-                   string.Equals(report.project_root, XUUnityLightMcpFileIpcPaths.ProjectRootPath, StringComparison.Ordinal);
+                   string.Equals(report.project_root, XUUnityLightMcpFileIpcPaths.ProjectRootPath, StringComparison.Ordinal) &&
+                   TestFrameworkDependencyStateMatches(report);
+        }
+
+        static bool TestFrameworkDependencyStateMatches(XUUnityLightMcpCapabilitiesReport report)
+        {
+            var currentVersion = XUUnityLightMcpCompatibilityPolicy.InstalledPackageVersion(
+                XUUnityLightMcpCompatibilityPolicy.TestFrameworkPackageName);
+            var sawTestCapability = false;
+            if (report.capabilities == null)
+            {
+                return false;
+            }
+
+            foreach (var capability in report.capabilities)
+            {
+                if (capability == null)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(capability.capability_id, XUUnityLightMcpCapabilityRegistry.EditModeTestsCapability, StringComparison.Ordinal)
+                    && !string.Equals(capability.capability_id, XUUnityLightMcpCapabilityRegistry.PlayModeTestsCapability, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                sawTestCapability = true;
+                if (string.Equals(capability.status, "degraded", StringComparison.Ordinal)
+                    || string.Equals(capability.status, "error", StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                if (!string.Equals(capability.installed_dependency_version ?? "", currentVersion ?? "", StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return sawTestCapability;
         }
 
         static XUUnityLightMcpCapabilityRecord BuildCoreCapability()
