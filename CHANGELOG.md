@@ -19,6 +19,8 @@
   GitHub issue about MCP setup or automation failures.
 - Added an install-specific retro prompt for collecting structured MCP setup
   evidence before opening a GitHub issue.
+- Changed `prodmode` to pin the published package release tag, such as
+  `#v0.3.14`, instead of a raw source commit SHA.
 
 ## 0.3.13
 

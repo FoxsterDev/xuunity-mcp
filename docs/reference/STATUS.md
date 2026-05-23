@@ -119,7 +119,7 @@ Latest source validation for `v0.3.14`:
 | Package self-tests | Clean devmode projects on installed Unity editors | EditMode `6/6`, PlayMode `5/5` on `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`, `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1` after offline optional Test Framework setup. `2021.3.45f2` is classified as `skipped/create_project_license_unavailable` on this host because Unity reports no valid editor license before package import. |
 | Git UPM release smoke | Clean Unity `2021.3.58f1` project pinned to `#v0.3.14` | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package EditMode `6/6` and PlayMode `5/5` passed, and closeout verified `process_exit_verified=true`. |
 | Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
-| Git tag visibility | Git refs | Release tag `v0.3.14` is visible on `origin` and resolves to source commit `5be0431`. |
+| Git tag visibility | Git refs | Release tag `v0.3.14` is visible on `origin` and resolves to the release source commit. |
 
 Cross-platform status:
 
@@ -163,8 +163,9 @@ bash xuunity_light_unity_mcp.sh prodmode --project-root /path/to/UnityProject
 Rules:
 
 - `devmode` points a Unity project at the local package working tree.
-- `prodmode` pins the Unity project to the current published source commit.
-- `prodmode` refuses to pin an unpublished source `HEAD`.
+- `prodmode` pins the Unity project to the published release tag that matches
+  the package version, for example `#v0.3.14`.
+- `prodmode` refuses to pin when that release tag is not visible on `origin`.
 - both modes remove the package lock entry so Unity re-resolves honestly.
 
 ## Install And Smoke Commands

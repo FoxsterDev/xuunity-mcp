@@ -109,14 +109,6 @@ require_package_source_root() {
   exit 1
 }
 
-warn_ripgrep_fallback_once() {
-  if [[ "${XUUNITY_LIGHT_UNITY_MCP_RG_FALLBACK_WARNED:-false}" == "true" ]]; then
-    return 0
-  fi
-  echo "optional command not found: rg; using grep fallback. Install ripgrep for faster local checks: brew install ripgrep" >&2
-  XUUNITY_LIGHT_UNITY_MCP_RG_FALLBACK_WARNED="true"
-}
-
 emit_compact_summary_from_json_file() {
   local json_file="$1"
   local exit_code="$2"
@@ -317,20 +309,46 @@ normalize_git_url_for_unity_upm() {
   printf '%s\n' "$git_url"
 }
 
-remote_advertises_commit() {
+remote_release_tag_commit() {
   local repo_root="$1"
   local remote_name="$2"
-  local git_commit="$3"
-  if command -v rg >/dev/null 2>&1; then
-    git -C "$repo_root" ls-remote --heads --tags "$remote_name" \
-      | awk '{print $1}' \
-      | rg -qx "$git_commit"
-  else
-    warn_ripgrep_fallback_once
-    git -C "$repo_root" ls-remote --heads --tags "$remote_name" \
-      | awk '{print $1}' \
-      | grep -Fxq "$git_commit"
+  local release_tag="$3"
+  local tag_ref="refs/tags/$release_tag"
+  local peeled_ref="${tag_ref}^{}"
+  local hash=""
+  local ref=""
+  local direct_hash=""
+
+  while IFS=$'\t' read -r hash ref; do
+    if [[ "$ref" == "$peeled_ref" ]]; then
+      printf '%s\n' "$hash"
+      return 0
+    fi
+    if [[ "$ref" == "$tag_ref" ]]; then
+      direct_hash="$hash"
+    fi
+  done < <(git -C "$repo_root" ls-remote --tags "$remote_name" "$tag_ref" "$peeled_ref")
+
+  if [[ -n "$direct_hash" ]]; then
+    printf '%s\n' "$direct_hash"
+    return 0
   fi
+
+  return 1
+}
+
+read_package_version() {
+  python3 - "$SOURCE_ROOT/$PACKAGE_METADATA_RELATIVE_PATH" <<'PY'
+import json
+import pathlib
+import sys
+
+package_json = pathlib.Path(sys.argv[1])
+version = json.loads(package_json.read_text(encoding="utf-8")).get("version", "")
+if not version:
+    raise SystemExit("Could not read package version from package.json")
+print(version)
+PY
 }
 
 read_project_unity_version() {
@@ -457,19 +475,19 @@ switch_project_to_prodmode() {
   git_commit="$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
   local source_branch
   source_branch="$(git -C "$SOURCE_ROOT" branch --show-current)"
+  local package_version
+  package_version="$(read_package_version)"
+  local release_tag="v$package_version"
+  local release_commit
 
-  if ! remote_advertises_commit "$SOURCE_ROOT" "$remote_name" "$git_commit"; then
-    echo "prodmode requires the current source HEAD to be published on the remote before pinning it." >&2
-    echo "source commit is not currently advertised by remote '$remote_name' as a branch or tag tip: $git_commit" >&2
-    if [[ -n "$source_branch" ]]; then
-      echo "Push it first, for example: git -C \"$SOURCE_ROOT\" push $remote_name $source_branch" >&2
-    else
-      echo "Push the source commit to '$remote_name' first, or use devmode for local-only iteration." >&2
-    fi
+  if ! release_commit="$(remote_release_tag_commit "$SOURCE_ROOT" "$remote_name" "$release_tag")"; then
+    echo "prodmode requires the package release tag to be published on the remote before pinning it." >&2
+    echo "release tag is not currently advertised by remote '$remote_name': $release_tag" >&2
+    echo "Push it first, for example: git -C \"$SOURCE_ROOT\" push $remote_name $release_tag" >&2
     exit 1
   fi
 
-  local dependency_value="${git_url}?path=/${PACKAGE_TEMPLATE_RELATIVE_PATH}#${git_commit}"
+  local dependency_value="${git_url}?path=/${PACKAGE_TEMPLATE_RELATIVE_PATH}#${release_tag}"
 
   update_manifest_dependency "$manifest_path" "$dependency_value"
   remove_lock_dependency "$lock_path"
@@ -485,12 +503,21 @@ switch_project_to_prodmode() {
   echo "source_remote=$remote_name"
   echo "source_branch=$source_branch"
   echo "source_commit=$git_commit"
+  echo "source_release_tag=$release_tag"
+  echo "source_release_commit=$release_commit"
+  if [[ "$git_commit" == "$release_commit" ]]; then
+    echo "source_head_matches_release=true"
+  else
+    echo "source_head_matches_release=false"
+  fi
   echo "source_worktree_dirty=$worktree_dirty"
   echo "packages_lock_entry_removed=true"
   if [[ "$worktree_dirty" == "true" ]]; then
-    echo "warning=prodmode pins the last committed source state only"
+    echo "warning=prodmode pins the published release tag; local working tree has unpublished changes"
+  elif [[ "$git_commit" != "$release_commit" ]]; then
+    echo "warning=prodmode pins the published release tag; local HEAD differs from the release commit"
   else
-    echo "warning=prodmode pins the current source HEAD commit; Unity must re-resolve to apply it"
+    echo "warning=prodmode pins the published release tag; Unity must re-resolve to apply it"
   fi
 }
 
@@ -517,8 +544,9 @@ Wrapper commands:
       Point com.xuunity.light-mcp at the local packages/com.xuunity.light-mcp source
       and remove its package-lock entry so Unity can re-resolve it.
   prodmode --project-root PATH
-      Pin com.xuunity.light-mcp to the current published source HEAD and remove
-      its package-lock entry. Refuses unpublished source commits.
+      Pin com.xuunity.light-mcp to the published release tag matching the
+      package version and remove its package-lock entry. Refuses missing
+      release tags.
   arrange-unity-windows [args]
       Arrange Unity and agent windows on macOS.
 
@@ -545,7 +573,7 @@ Server commands:
 
 Mode notes:
   devmode is for local MCP package iteration only.
-  prodmode is for published source state only; push the source branch or tag
+  prodmode is for published release state only; push the package release tag
   before switching a project back to prodmode.
   After devmode or prodmode, let Unity re-resolve packages by reopen, focus, or
   explicit project refresh.
@@ -573,14 +601,14 @@ EOF
       cat <<EOF
 Usage: $(basename "$0") prodmode --project-root PATH
 
-Switch a Unity project to a published Git-pinned XUUnity Light Unity MCP package.
+Switch a Unity project to a published Git release-tagged XUUnity Light Unity MCP package.
 
 Effects:
-  - verifies the current source HEAD is advertised by the remote
-  - sets com.xuunity.light-mcp to the remote Git package URL pinned to that HEAD
+  - verifies the package release tag is advertised by the remote
+  - sets com.xuunity.light-mcp to the remote Git package URL pinned to that tag
   - removes the com.xuunity.light-mcp package-lock entry
 
-Push the source branch or release tag before prodmode. After switching, let Unity
+Push the package release tag before prodmode. After switching, let Unity
 re-resolve packages by reopen, focus, or explicit project refresh before running
 validation.
 EOF

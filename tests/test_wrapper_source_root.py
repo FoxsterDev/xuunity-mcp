@@ -21,6 +21,15 @@ class WrapperSourceRootTests(unittest.TestCase):
         )
         return root
 
+    def run_git(self, cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
     def test_devmode_prefers_operations_package_source_under_airroot(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         wrapper = repo_root / "xuunity_light_unity_mcp.sh"
@@ -117,6 +126,77 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertTrue(installed_package_json.is_file())
             installed_version = json.loads(installed_package_json.read_text(encoding="utf-8"))["version"]
             self.assertEqual(package_version, installed_version)
+
+    def test_prodmode_pins_package_version_release_tag_not_raw_commit(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        wrapper = repo_root / "xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            source_root = temp_root / "Source"
+            package_root = source_root / "packages" / "com.xuunity.light-mcp"
+            templates_root = source_root / "templates"
+            package_version = "0.3.14"
+            release_tag = f"v{package_version}"
+
+            templates_root.mkdir(parents=True)
+            package_root.mkdir(parents=True)
+            (templates_root / "server.py").write_text("# fake server\n", encoding="utf-8")
+            (templates_root / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (templates_root / "xuunity_light_unity_mcp_runtime_defaults.json").write_text("{}\n", encoding="utf-8")
+            (package_root / "package.json").write_text(
+                json.dumps(
+                    {
+                        "name": "com.xuunity.light-mcp",
+                        "version": package_version,
+                        "unity": "2021.3",
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            remote_root = temp_root / "remote.git"
+            self.run_git(temp_root, "init", "--bare", str(remote_root))
+            self.run_git(source_root, "init")
+            self.run_git(source_root, "config", "user.email", "test@example.invalid")
+            self.run_git(source_root, "config", "user.name", "Wrapper Test")
+            self.run_git(source_root, "add", ".")
+            self.run_git(source_root, "commit", "-m", "Release source")
+            self.run_git(source_root, "tag", "-a", release_tag, "-m", "Release")
+            self.run_git(source_root, "remote", "add", "origin", str(remote_root))
+            self.run_git(source_root, "push", "origin", "HEAD:refs/heads/master", f"refs/tags/{release_tag}")
+
+            project_root = self.create_fake_project(temp_root / "FakeProject", "6000.0.58f2")
+            (project_root / "Packages" / "packages-lock.json").write_text(
+                json.dumps({"dependencies": {"com.xuunity.light-mcp": {"version": "old"}}}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            env = dict(os.environ)
+            env["XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT"] = str(source_root)
+            env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
+            env["CLAUDE_TOOLS_HOME"] = str(temp_root / "claude-tools")
+
+            completed = subprocess.run(
+                [str(wrapper), "prodmode", "--project-root", str(project_root)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            manifest = json.loads((project_root / "Packages" / "manifest.json").read_text(encoding="utf-8"))
+            dependency = manifest["dependencies"]["com.xuunity.light-mcp"]
+            self.assertTrue(dependency.endswith(f"#{release_tag}"))
+            self.assertNotRegex(dependency, r"#[0-9a-f]{40}$")
+            self.assertIn(f"source_release_tag={release_tag}", completed.stdout)
+            self.assertIn("source_head_matches_release=true", completed.stdout)
+
+            lock = json.loads((project_root / "Packages" / "packages-lock.json").read_text(encoding="utf-8"))
+            self.assertNotIn("com.xuunity.light-mcp", lock["dependencies"])
 
 
 if __name__ == "__main__":

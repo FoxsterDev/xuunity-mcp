@@ -45,8 +45,8 @@ package development.
 ## prodmode
 
 `prodmode` points a consumer Unity project at a published Git package source.
-It refuses unpublished source commits so release-bound projects do not depend
-on local-only package changes.
+It pins the package to the published release tag that matches the package
+version so release-bound projects do not depend on local-only package changes.
 
 ## Optional Capability
 

@@ -868,7 +868,7 @@ Agent prompt:
 ```text
 Switch the Unity project into the correct XUUnity Light Unity MCP package source
 mode. Use devmode only for local package iteration. Use prodmode only after the
-source commit or tag is published. Do not hand-edit the manifest to bypass the
+package release tag is published. Do not hand-edit the manifest to bypass the
 wrapper checks.
 ```
 
@@ -893,9 +893,8 @@ lock entry so Unity can re-resolve the package.
 Production route:
 
 ```bash
-# First publish the MCP source branch or release tag that contains the package
-# changes. prodmode refuses to pin an unpublished source HEAD.
-git push origin HEAD
+# First publish the package release tag that matches package.json, for example:
+git push origin v0.3.14
 
 "$WRAPPER" prodmode \
   --project-root "$PROJECT_ROOT"
@@ -909,12 +908,12 @@ git push origin HEAD
 ```
 
 Use `prodmode` for publishable project state. It pins the Unity dependency to
-the current published source commit and removes the package lock entry so Unity
-can re-resolve it.
+the published release tag matching the package version and removes the package
+lock entry so Unity can re-resolve it.
 
 Stop criteria:
 
-- `prodmode` says the source HEAD is not advertised by the remote
+- `prodmode` says the package release tag is not advertised by the remote
 - Unity package re-resolution fails
 - the project remains in devmode when the task is a release or publish closeout
 - package refresh succeeds but health probe or compile validation fails
@@ -924,7 +923,7 @@ Evidence to report:
 - mode selected: `devmode` or `prodmode`
 - previous and new `com.xuunity.light-mcp` dependency value
 - whether the package-lock entry was removed
-- published source commit or tag for prodmode
+- published release tag for prodmode
 - project refresh and health-probe result after switching
 - validation gap if Unity could not re-resolve packages
 
@@ -956,7 +955,7 @@ Avoid these agent behaviors:
 - rerunning timed-out operations before checking `request-final-status`
 - treating Game View reflection support as universal
 - leaving a release-bound project in `devmode`
-- hand-editing `Packages/manifest.json` to fake `prodmode` around an unpublished source commit
+- hand-editing `Packages/manifest.json` to fake `prodmode` around a missing release tag
 - hiding skipped Windows/Linux/client smoke validation
 - storing credentials in scenario files, expectation files, logs, or generated reports
 - using project-private details in public docs or examples
