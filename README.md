@@ -348,6 +348,21 @@ stack.
 
 </details>
 
+## Opening A Useful Issue
+
+If MCP setup or Unity automation behaves strangely, ask your agent to run the
+public [chat retro prompt](docs/archive/retros/CHAT_RETRO_PROMPT.md) on the
+current chat/session before opening an issue. Paste the sanitized summary into
+the GitHub issue so maintainers can see what was tried, what failed, command
+outputs, request ids if available, Unity version, package version, client name,
+and the smallest reproduction steps.
+
+```text
+Use the XUUnity Light Unity MCP chat retro prompt to summarize this session for
+a public GitHub issue. Remove secrets, private project details, and unrelated
+logs.
+```
+
 ## Documentation
 
 [Install](INSTALL.md) | [Features](docs/reference/FEATURES.md) | [AI integration](docs/agents/AI_INTEGRATION.md) |

@@ -15,6 +15,8 @@
   the package metadata version instead of falling back to `v0.0.0`.
 - Added a README install simulation audit covering single-project, hub,
   mixed-version, nested-repo, and optional Test Framework setup paths.
+- Added README guidance for collecting a sanitized chat retro before opening a
+  GitHub issue about MCP setup or automation failures.
 
 ## 0.3.13
 
