@@ -350,17 +350,18 @@ stack.
 
 ## Opening A Useful Issue
 
-If MCP setup or Unity automation behaves strangely, ask your agent to run the
-public [chat retro prompt](docs/archive/retros/CHAT_RETRO_PROMPT.md) on the
-current chat/session before opening an issue. Paste the sanitized summary into
-the GitHub issue so maintainers can see what was tried, what failed, command
-outputs, request ids if available, Unity version, package version, client name,
-and the smallest reproduction steps.
+If MCP install or first setup failed, ask your agent to run the public
+[install retro prompt](docs/archive/retros/INSTALL_RETRO_PROMPT.md) before
+opening an issue. For runtime, lifecycle, or automation failures after setup,
+use the public [chat retro prompt](docs/archive/retros/CHAT_RETRO_PROMPT.md).
+Paste the sanitized summary into the GitHub issue so maintainers can see what
+was tried, what failed, command outputs, Unity version, package version, client
+name, project topology, and the smallest reproduction steps.
 
 ```text
-Use the XUUnity Light Unity MCP chat retro prompt to summarize this session for
-a public GitHub issue. Remove secrets, private project details, and unrelated
-logs.
+Use the XUUnity Light Unity MCP install retro prompt to summarize this setup
+failure for a public GitHub issue. Remove secrets, private project details, and
+unrelated logs.
 ```
 
 ## Documentation

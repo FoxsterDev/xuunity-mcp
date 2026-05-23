@@ -17,6 +17,8 @@
   mixed-version, nested-repo, and optional Test Framework setup paths.
 - Added README guidance for collecting a sanitized chat retro before opening a
   GitHub issue about MCP setup or automation failures.
+- Added an install-specific retro prompt for collecting structured MCP setup
+  evidence before opening a GitHub issue.
 
 ## 0.3.13
 

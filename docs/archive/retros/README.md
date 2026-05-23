@@ -27,6 +27,7 @@ operator or lifecycle behavior.
 ## Current Retros
 
 - `CHAT_RETRO_PROMPT.md`
+- `INSTALL_RETRO_PROMPT.md`
 - `2026-05-09_cleanup_and_regression_lessons.md`
 - `2026-05-11_operator_and_backend_lessons.md`
 - `2026-05-11_chat_retro_playmode_lifecycle_reset.md`
