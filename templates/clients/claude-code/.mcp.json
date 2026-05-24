@@ -1,4 +1,11 @@
 {
+  "$schema": "https://modelcontextprotocol.io/schema/mcp.json",
+  "description": "xuunity-light-unity-mcp configuration for Claude Code",
+  "metadata": {
+    "ai_integration_guide": "AIRoot/Operations/XUUnityLightUnityMcp/docs/agents/AI_INTEGRATION.md",
+    "agent_workflows": "AIRoot/Operations/XUUnityLightUnityMcp/docs/agents/AGENT_WORKFLOWS.md",
+    "unity_test_rules": ".claude/rules/unity-mcp-test-execution.md"
+  },
   "mcpServers": {
     "xuunity_light_unity": {
       "type": "stdio",

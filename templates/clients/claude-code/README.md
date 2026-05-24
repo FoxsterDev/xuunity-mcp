@@ -25,10 +25,13 @@ Override path with `CLAUDE_TOOLS_HOME` if you want a non-default location.
 
 ## What This Folder Provides
 
-- `.mcp.json` — project-scope snippet. Drop at the repo root (`<repo>/.mcp.json`)
+- `.mcp.json` — project-scope snippet with metadata pointing to AI integration guides. Drop at the repo root (`<repo>/.mcp.json`)
   and Claude Code picks it up automatically the next time `claude` is launched
   from that repo. Project-scope config is checked into git, so the whole team
   inherits it after `git pull`.
+
+- `.claude/rules/unity-mcp-test-execution.md` — Claude Code rules file with best practices for Unity test execution via MCP.
+  This file is automatically loaded in every Claude Code session when placed at `<repo>/.claude/rules/`.
 
 ## Install Routes
 
@@ -55,20 +58,22 @@ Three scope options. Pick by intent.
 
 #### Project scope (team-wide, under git)
 
-Recommended for monorepos. Copy this snippet to the repo root on Linux/macOS:
+Recommended for monorepos. Copy the configuration files to the repo root on Linux/macOS:
 
 ```bash
 cp templates/clients/claude-code/.mcp.json .mcp.json
+cp -r templates/clients/claude-code/.claude .claude
 ```
 
 Native Windows:
 
 ```powershell
 Copy-Item templates\clients\claude-code\.mcp.windows.json .mcp.json
+Copy-Item -Recurse templates\clients\claude-code\.claude .claude
 ```
 
-Then commit `.mcp.json`. Every team member running `claude` from the repo root
-gets the same MCP server registration. On first launch Claude Code asks the
+Then commit `.mcp.json` and `.claude/` directory. Every team member running `claude` from the repo root
+gets the same MCP server registration and AI behavior rules. On first launch Claude Code asks the
 user to approve the project-scoped server; that approval is per-user and is
 not shared.
 

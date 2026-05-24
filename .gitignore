@@ -108,3 +108,7 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# XUUnity Light MCP setup plans (may contain private paths)
+xuunity-setup-plan.json
+*-setup-plan.json

@@ -88,10 +88,10 @@ nested repositories, prefer the guided plan/apply flow:
 ```bash
 bash xuunity_light_unity_mcp.sh setup-plan \
   --workspace-root /path/to/workspace \
-  --recursive > xuunity-setup-plan.json
+  --recursive > /tmp/xuunity-setup-plan.json
 
 bash xuunity_light_unity_mcp.sh setup-apply \
-  --plan-file xuunity-setup-plan.json \
+  --plan-file /tmp/xuunity-setup-plan.json \
   --yes
 
 bash xuunity_light_unity_mcp.sh validate-setup \
