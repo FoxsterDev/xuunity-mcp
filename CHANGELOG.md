@@ -14,7 +14,31 @@ https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuu
 
 ### Changed
 
-- Released `v0.3.15` package metadata with Unity `2021.3` as the default
+- Added license-aware batch lane selection: `license-capabilities`,
+  `xuunity_license_capabilities`, `--batch-fallback-mode auto|off|require-batch`,
+  GUI fallback summaries, and Unity-side `unity.build_player` for player-build
+  fallback when real batchmode is blocked.
+- Added `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto` for wrapper
+  helper resolution so Codex contexts prefer `.codex-tools` without breaking
+  Claude-side `.claude-tools` installs.
+- Documented optional Codex/Codex-style MCP client wiring for trusted local
+  Unity projects.
+- Released `v0.3.15` package metadata, server metadata, package manifests, and
+  Git UPM examples.
+
+## 0.3.14
+
+Release tag: `v0.3.14`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
+```
+
+### Changed
+
+- Released `v0.3.14` package metadata with Unity `2021.3` as the default
   minimum and removed the hard `com.unity.test-framework` dependency.
 - Added optional Test Framework capability wiring through asmdef Version
   Defines and `XUUNITY_LIGHT_MCP_TESTS_CAPABILITY`.
@@ -23,6 +47,11 @@ https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuu
   installation.
 - Added capability statuses for optional test support, including missing and
   too-old dependency states that do not make core MCP health fail.
+- Added closed-editor batch lifecycle hardening: explicit editor-close
+  verification, process visibility diagnostics, `request-editor-quit
+  --wait-for-exit`, and `restore-editor-state --require-closed`.
+- Hardened public source-root/package-mode selection so the wrapper resolves the
+  operation package source before generic `AIRoot/templates` paths.
 - Fixed installed-helper setup planning so the default Git UPM dependency uses
   the package metadata version instead of falling back to `v0.0.0`.
 - Added a README install simulation audit covering single-project, hub,
@@ -32,14 +61,7 @@ https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuu
 - Added an install-specific retro prompt for collecting structured MCP setup
   evidence before opening a GitHub issue.
 - Changed `prodmode` to pin the published package release tag, such as
-  `#v0.3.15`, instead of a raw source commit SHA.
-- Added license-aware batch lane selection: `license-capabilities`,
-  `xuunity_license_capabilities`, `--batch-fallback-mode auto|off|require-batch`,
-  GUI fallback summaries, and Unity-side `unity.build_player` for player-build
-  fallback when real batchmode is blocked.
-- Added `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto` for wrapper
-  helper resolution so Codex contexts prefer `.codex-tools` without breaking
-  Claude-side `.claude-tools` installs.
+  `#v0.3.14`, instead of a raw source commit SHA.
 
 ## 0.3.13
 
