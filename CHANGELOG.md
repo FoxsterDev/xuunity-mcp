@@ -2,7 +2,19 @@
 
 ## Unreleased
 
-- Prepared `v0.3.14` package metadata with Unity `2021.3` as the default
+## 0.3.15
+
+Release tag: `v0.3.15`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15
+```
+
+### Changed
+
+- Released `v0.3.15` package metadata with Unity `2021.3` as the default
   minimum and removed the hard `com.unity.test-framework` dependency.
 - Added optional Test Framework capability wiring through asmdef Version
   Defines and `XUUNITY_LIGHT_MCP_TESTS_CAPABILITY`.
@@ -20,7 +32,7 @@
 - Added an install-specific retro prompt for collecting structured MCP setup
   evidence before opening a GitHub issue.
 - Changed `prodmode` to pin the published package release tag, such as
-  `#v0.3.14`, instead of a raw source commit SHA.
+  `#v0.3.15`, instead of a raw source commit SHA.
 - Added license-aware batch lane selection: `license-capabilities`,
   `xuunity_license_capabilities`, `--batch-fallback-mode auto|off|require-batch`,
   GUI fallback summaries, and Unity-side `unity.build_player` for player-build

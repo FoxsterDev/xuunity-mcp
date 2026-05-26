@@ -1,7 +1,7 @@
 # Install XUUnity Light Unity MCP
 
 Date: `2026-05-23`
-Status: `current for v0.3.14`
+Status: `current for v0.3.15`
 
 XUUnity Light Unity MCP has two pieces:
 
@@ -20,7 +20,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15"
   }
 }
 ```
@@ -258,7 +258,7 @@ After package import and bridge enablement:
 
 Do not treat the install as ready until status, capabilities, and health probe all succeed.
 
-For package-level verification after upgrading to `v0.3.14`, run:
+For package-level verification after upgrading to `v0.3.15`, run:
 
 ```bash
 templates/smoke/run_package_self_tests.sh \

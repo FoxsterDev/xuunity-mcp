@@ -1,7 +1,7 @@
 # AI Integration Instructions
 
 Date: `2026-05-23`
-Status: `current for package v0.3.14`
+Status: `current for package v0.3.15`
 
 Use this document when an AI agent is integrating this Unity package into a new
 project.
@@ -32,7 +32,7 @@ The full system requires:
 Current Git UPM package URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15
 ```
 
 ## Safety Rules

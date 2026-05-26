@@ -206,7 +206,7 @@ Minimum evidence object:
   "workflowId": "post_change_validation",
   "projectRoot": "$PROJECT_ROOT",
   "unityVersion": "6000.0.58f2",
-  "packageVersion": "0.3.14",
+  "packageVersion": "0.3.15",
   "packageSourceMode": "git",
   "verdict": "pass",
   "checks": [
@@ -913,7 +913,7 @@ Production route:
 
 ```bash
 # First publish the package release tag that matches package.json, for example:
-git push origin v0.3.14
+git push origin v0.3.15
 
 "$WRAPPER" prodmode \
   --project-root "$PROJECT_ROOT"

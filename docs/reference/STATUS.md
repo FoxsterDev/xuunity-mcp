@@ -4,7 +4,7 @@ Date: `2026-05-23`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
-for MCP-capable AI agents. The current source line is `v0.3.14`.
+for MCP-capable AI agents. The current source line is `v0.3.15`.
 
 ## Current Package
 
@@ -17,7 +17,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15
 ```
 
 Current package path:
@@ -32,6 +32,8 @@ Migration note:
 - `v0.3.12+` uses `packages/com.xuunity.light-mcp`.
 - `v0.3.14+` keeps the default package metadata on Unity `2021.3` and makes
   Test Framework-backed operations optional.
+- `v0.3.15+` adds license-aware batch fallback and Codex helper install-target
+  selection.
 - The old path is kept only as a migration pointer for users pinned to
   `v0.3.11`.
 
@@ -111,16 +113,17 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest source validation for `v0.3.14`:
+Latest source validation for `v0.3.15`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.14`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `scripts/testing/run_host_python_tests.sh` | `133/133` passed after license-aware batch fallback changes |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.15`, `unity=2021.3`, no hard Test Framework dependency |
+| Host Python tests | `scripts/testing/run_host_python_tests.sh` | `136/136` passed during the `v0.3.15` release pass |
 | Package self-tests | Clean devmode projects on installed Unity editors | EditMode `6/6`, PlayMode `5/5` on `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`, `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1` after offline optional Test Framework setup. `2021.3.45f2` is classified as `skipped/create_project_license_unavailable` on this host because Unity reports no valid editor license before package import. |
-| Git UPM release smoke | Clean Unity `2021.3.58f1` project pinned to `#v0.3.14` | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package EditMode `6/6` and PlayMode `5/5` passed, and closeout verified `process_exit_verified=true`. |
+| Previous Git UPM release smoke | Clean Unity `2021.3.58f1` project pinned to `#v0.3.14` | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package EditMode `6/6` and PlayMode `5/5` passed, and closeout verified `process_exit_verified=true`. |
+| Release prodmode check | Temporary Unity project pinned to `#v0.3.15` | `prodmode` must verify the tag on `origin` and write the matching Git UPM dependency before release closeout. |
 | Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
-| Git tag visibility | Git refs | Release tag `v0.3.14` is visible on `origin` and resolves to the release source commit. |
+| Git tag visibility | Git refs | Release tag `v0.3.15` is visible on `origin` and resolves to the release source commit. |
 
 Cross-platform status:
 
@@ -140,7 +143,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15"
   }
 }
 ```
@@ -166,7 +169,7 @@ Rules:
 
 - `devmode` points a Unity project at the local package working tree.
 - `prodmode` pins the Unity project to the published release tag that matches
-  the package version, for example `#v0.3.14`.
+  the package version, for example `#v0.3.15`.
 - `prodmode` refuses to pin when that release tag is not visible on `origin`.
 - both modes remove the package lock entry so Unity re-resolves honestly.
 
