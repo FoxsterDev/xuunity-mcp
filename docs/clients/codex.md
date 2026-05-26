@@ -3,6 +3,11 @@
 Use the Codex-style config when the client reads MCP servers from
 `~/.codex/config.toml`.
 
+Optional: connect XUUnity MCP to Codex/Codex-style clients when you want Codex
+to validate Unity status, compile, tests, and setup directly from the chat. Use
+this only on trusted local projects. If you also use Rider or VS Code MCP,
+avoid running concurrent commands against the same Unity project.
+
 ## Install The Server
 
 Install the host-side server files:

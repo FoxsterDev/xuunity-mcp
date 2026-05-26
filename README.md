@@ -280,6 +280,11 @@ templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 - [Codex-style agents](docs/clients/codex.md)
 - custom stdio MCP clients
 
+Optional: connect XUUnity MCP to Codex/Codex-style clients when you want Codex
+to validate Unity status, compile, tests, and setup directly from the chat. Use
+this only on trusted local projects. If you also use Rider or VS Code MCP,
+avoid running concurrent commands against the same Unity project.
+
 Manual macOS/Linux and Windows configs live in `templates/clients/`.
 
 <details>
