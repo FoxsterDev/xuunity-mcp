@@ -43,6 +43,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 BuildEditModeTestsCapability(),
                 BuildPlayModeTestsCapability(),
                 BuildCompileCapability(),
+                BuildBuildPlayerCapability(),
                 BuildPlayModeCapability(),
                 BuildGameViewCapability()
             };
@@ -277,6 +278,22 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 {
                     "unity.compile.player_scripts",
                     "unity.compile.matrix"
+                }
+            };
+        }
+
+        static XUUnityLightMcpCapabilityRecord BuildBuildPlayerCapability()
+        {
+            return new XUUnityLightMcpCapabilityRecord
+            {
+                capability_id = XUUnityLightMcpCapabilityRegistry.BuildPlayerCapability,
+                adapter_id = "build_player_pipeline_v1",
+                supported = true,
+                status = "supported",
+                reason = "",
+                operations = new List<string>
+                {
+                    "unity.build_player"
                 }
             };
         }

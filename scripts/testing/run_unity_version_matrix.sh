@@ -96,7 +96,7 @@ DISCOVERED_EDITORS_TSV="$RUN_ROOT/discovered_editors.tsv"
 
 mkdir -p "$PROJECTS_ROOT" "$RESULTS_ROOT"
 
-echo -e "unity_version\tresult\tfailed_step\tproject_root\tresult_dir\tnotes" > "$SUMMARY_TSV"
+echo -e "unity_version\tresult\tfailed_step\tbatchmode_supported\tlicense_blocker_code\teffective_execution_lane\tproject_root\tresult_dir\tnotes" > "$SUMMARY_TSV"
 
 discover_installed_editors() {
   python3 - <<'PY'
@@ -352,13 +352,69 @@ record_summary_row() {
   local project_root="$4"
   local result_dir="$5"
   local notes="$6"
-  printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
+  printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
     "$unity_version" \
     "$result" \
     "$failed_step" \
+    "${CURRENT_BATCHMODE_SUPPORTED:-}" \
+    "${CURRENT_LICENSE_BLOCKER_CODE:-}" \
+    "${CURRENT_EFFECTIVE_EXECUTION_LANE:-}" \
     "$project_root" \
     "$result_dir" \
     "$notes" >> "$SUMMARY_TSV"
+}
+
+capture_license_fields() {
+  local json_path="$1"
+  if [[ ! -f "$json_path" ]]; then
+    return 0
+  fi
+  local fields
+  fields="$(python3 - "$json_path" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+except Exception:
+    print("\t\t")
+    raise SystemExit(0)
+
+batchmode_supported = payload.get("license_batchmode_supported", payload.get("batchmode_supported", ""))
+if batchmode_supported is True:
+    batchmode_supported = "true"
+elif batchmode_supported is False:
+    batchmode_supported = "false"
+elif batchmode_supported is None:
+    batchmode_supported = "unknown"
+else:
+    batchmode_supported = str(batchmode_supported or "")
+
+license_blocker_code = str(payload.get("license_blocker_code", payload.get("batchmode_blocker_code", "")) or "")
+effective_execution_lane = str(payload.get("effective_execution_lane", payload.get("recommended_execution_lane", "")) or "")
+print(f"{batchmode_supported}\t{license_blocker_code}\t{effective_execution_lane}")
+PY
+)"
+  IFS=$'\t' read -r CURRENT_BATCHMODE_SUPPORTED CURRENT_LICENSE_BLOCKER_CODE CURRENT_EFFECTIVE_EXECUTION_LANE <<< "$fields"
+}
+
+default_matrix_compile_target() {
+  case "$(uname -s)" in
+    Darwin)
+      echo "StandaloneOSX"
+      ;;
+    Linux)
+      echo "StandaloneLinux64"
+      ;;
+    MINGW*|MSYS*|CYGWIN*|Windows_NT)
+      echo "StandaloneWindows64"
+      ;;
+    *)
+      echo "StandaloneLinux64"
+      ;;
+  esac
 }
 
 copy_if_exists() {
@@ -445,6 +501,9 @@ run_version_matrix_entry() {
   local result="passed"
   local failed_step="none"
   local notes=""
+  CURRENT_BATCHMODE_SUPPORTED=""
+  CURRENT_LICENSE_BLOCKER_CODE=""
+  CURRENT_EFFECTIVE_EXECUTION_LANE=""
 
   if [[ ! -x "$unity_path" ]]; then
     result="editor_missing"
@@ -463,6 +522,9 @@ run_version_matrix_entry() {
     notes="${create_project_classification#*|}"
     if [[ "$failed_step" == "create_project_license_unavailable" ]]; then
       result="skipped"
+      CURRENT_BATCHMODE_SUPPORTED="false"
+      CURRENT_LICENSE_BLOCKER_CODE="no_valid_editor_license"
+      CURRENT_EFFECTIVE_EXECUTION_LANE="none"
     fi
     write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
     record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
@@ -494,6 +556,16 @@ run_version_matrix_entry() {
     result="failed"
     failed_step="validate_setup_include_tests"
     notes="validate-setup --include-tests failed before editor open"
+  elif ! run_step \
+    "license-capabilities-before-open" \
+    "$result_dir/license_capabilities.stdout.json" \
+    "$result_dir/license_capabilities.stderr.txt" \
+    "$WRAPPER" license-capabilities --project-root "$project_root" --unity-app "$unity_path" --refresh --timeout-ms 30000; then
+    result="failed"
+    failed_step="license_capabilities"
+    notes="license-capabilities failed before editor open"
+  else
+    capture_license_fields "$result_dir/license_capabilities.stdout.json"
   fi
 
   if [[ "$result" != "passed" ]]; then
@@ -582,6 +654,27 @@ run_version_matrix_entry() {
     --timeout-ms 30000 >"$result_dir/restore_editor_state.stdout.txt" 2>"$result_dir/restore_editor_state.stderr.txt" || true
   restore_needed="false"
   trap - RETURN
+
+  if [[ "$result" == "passed" ]]; then
+    local compile_target
+    compile_target="$(default_matrix_compile_target)"
+    if ! run_step \
+      "batch-compile-license-aware" \
+      "$result_dir/batch_compile_license_aware.stdout.json" \
+      "$result_dir/batch_compile_license_aware.stderr.txt" \
+      "$WRAPPER" batch-compile \
+        --project-root "$project_root" \
+        --target "$compile_target" \
+        --name "license-aware-matrix" \
+        --batch-fallback-mode auto \
+        --timeout-ms 300000 \
+        --no-progress-stdout; then
+      result="failed"
+      failed_step="batch_compile_license_aware"
+      notes="License-aware batch compile validation failed"
+    fi
+    capture_license_fields "$result_dir/batch_compile_license_aware.stdout.json"
+  fi
 
   write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
   record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"

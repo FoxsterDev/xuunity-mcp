@@ -91,6 +91,7 @@ Implemented host-side MCP tools and helpers:
 - `setup-apply`
 - `validate-setup`
 - `install-test-framework`
+- `license-capabilities`
 - `open-editor`
 - `ensure-ready`
 - `recover-editor-session`
@@ -115,7 +116,7 @@ Latest source validation for `v0.3.14`:
 | Area | Evidence | Result |
 | --- | --- | --- |
 | Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.14`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `scripts/testing/run_host_python_tests.sh` | `123/123` passed |
+| Host Python tests | `scripts/testing/run_host_python_tests.sh` | `133/133` passed after license-aware batch fallback changes |
 | Package self-tests | Clean devmode projects on installed Unity editors | EditMode `6/6`, PlayMode `5/5` on `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`, `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1` after offline optional Test Framework setup. `2021.3.45f2` is classified as `skipped/create_project_license_unavailable` on this host because Unity reports no valid editor license before package import. |
 | Git UPM release smoke | Clean Unity `2021.3.58f1` project pinned to `#v0.3.14` | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package EditMode `6/6` and PlayMode `5/5` passed, and closeout verified `process_exit_verified=true`. |
 | Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
@@ -130,6 +131,7 @@ Cross-platform status:
 | Native Windows clients | `templates provided` | `run.cmd`, `run.ps1`, and Windows client configs exist; native Windows MCP connection still needs host execution proof. |
 | Unity 2021.3+ | `default package line` | Checked-in package metadata targets Unity `2021.3`; setup wizard chooses optional Test Framework recommendations per project. |
 | Optional Test Framework | `capability-gated` | Core readiness stays healthy when missing; tests report `disabled_missing_dependency`, `disabled_dependency_too_old`, or supported with `upgrade_recommended` when an existing dependency should be reviewed. |
+| License-aware batch fallback | `implemented; host validated` | `license-capabilities` reports batchmode support, blocker code, probe log, and recommended lane. `batch-*` commands default to `--batch-fallback-mode auto` and emit lane summary fields. Live installed-editor matrix remains follow-up evidence. |
 
 ## Package Source Modes
 
@@ -227,6 +229,8 @@ Current limitations:
 - OpenUPM publication is still pending
 - Linux and native Windows need live host smoke proof before strong support claims
 - Game View operations remain reflection-gated and must be capability-probed
+- License-aware batch fallback is host-capability based; unknown probe failures
+  keep batch as a diagnostic path instead of pretending GUI fallback is safe
 - device/runtime automation is outside the base package
 - broad unrestricted editor mutation is intentionally out of scope
 

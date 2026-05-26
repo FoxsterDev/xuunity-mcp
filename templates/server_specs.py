@@ -107,6 +107,13 @@ OPERATION_LIFECYCLE_POLICIES: dict[str, dict[str, Any]] = {
         "idle_stable_cycles_after": 2,
         "post_reset_recovery_cap_ms": 300000,
     },
+    "unity.build_player": {
+        "activate_unity": True,
+        "wait_for_idle_before": True,
+        "wait_for_idle_after": True,
+        "idle_stable_cycles_after": 2,
+        "post_reset_recovery_cap_ms": 600000,
+    },
     "unity.tests.run_editmode": {
         "activate_unity": True,
         "wait_for_idle_before": True,
@@ -291,6 +298,19 @@ TOOLS: dict[str, dict[str, Any]] = {
             "properties": {
                 "projectRoot": {"type": "string"},
                 "includeTests": {"type": "boolean", "default": False}
+            },
+            "required": ["projectRoot"]
+        }
+    },
+    "xuunity_license_capabilities": {
+        "description": "Probe and report Unity batchmode/editor UI execution capability for one project/editor session.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "unityApp": {"type": "string"},
+                "refresh": {"type": "boolean", "default": False},
+                "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot"]
         }
@@ -719,6 +739,28 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
             },
             "required": ["projectRoot", "configurations"]
+        }
+    },
+    "unity_build_player": {
+        "bridgeOperation": "unity.build_player",
+        "description": "Run a Unity BuildPipeline player build through the active editor bridge.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "buildTarget": {"type": "string"},
+                "outputPath": {"type": "string"},
+                "scenePaths": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "buildOptions": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "timeoutMs": {"type": "integer", "default": 600000, "minimum": 1000}
+            },
+            "required": ["projectRoot", "buildTarget"]
         }
     },
     "unity_compile_build_config_matrix": {

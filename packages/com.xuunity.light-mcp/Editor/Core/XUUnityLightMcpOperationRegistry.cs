@@ -33,6 +33,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.game_view.screenshot", new XUUnityLightMcpGameViewScreenshotOperation() },
             { "unity.compile.player_scripts", new XUUnityLightMcpCompilePlayerScriptsOperation() },
             { "unity.compile.matrix", new XUUnityLightMcpCompileMatrixOperation() },
+            { "unity.build_player", new XUUnityLightMcpBuildPlayerOperation() },
             { "unity.scenario.validate", new XUUnityLightMcpScenarioValidateOperation() },
             { "unity.scenario.run", new XUUnityLightMcpScenarioRunOperation() },
             { "unity.scenario.result", new XUUnityLightMcpScenarioResultOperation() }

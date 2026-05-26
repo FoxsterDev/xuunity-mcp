@@ -21,6 +21,10 @@
   evidence before opening a GitHub issue.
 - Changed `prodmode` to pin the published package release tag, such as
   `#v0.3.14`, instead of a raw source commit SHA.
+- Added license-aware batch lane selection: `license-capabilities`,
+  `xuunity_license_capabilities`, `--batch-fallback-mode auto|off|require-batch`,
+  GUI fallback summaries, and Unity-side `unity.build_player` for player-build
+  fallback when real batchmode is blocked.
 
 ## 0.3.13
 

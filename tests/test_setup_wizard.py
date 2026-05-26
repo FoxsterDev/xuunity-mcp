@@ -95,6 +95,16 @@ class SetupWizardTests(unittest.TestCase):
             for token in forbidden:
                 self.assertNotIn(token, text, str(path))
 
+    def test_build_player_operation_is_registered_in_core_and_health_probe(self) -> None:
+        registry = (PACKAGE_ROOT / "Editor" / "Core" / "XUUnityLightMcpOperationRegistry.cs").read_text(encoding="utf-8")
+        capability = (PACKAGE_ROOT / "Editor" / "Core" / "XUUnityLightMcpCapabilityRegistry.cs").read_text(encoding="utf-8")
+        health_probe = (PACKAGE_ROOT / "Editor" / "Helpers" / "XUUnityLightMcpHealthProbe.cs").read_text(encoding="utf-8")
+
+        self.assertIn('"unity.build_player"', registry)
+        self.assertIn("new XUUnityLightMcpBuildPlayerOperation()", registry)
+        self.assertIn('"unity.build_player"', capability)
+        self.assertIn("BuildBuildPlayerCapability()", health_probe)
+
     def test_compatibility_policy_does_not_directly_call_newer_package_info_api(self) -> None:
         text = (PACKAGE_ROOT / "Editor" / "Core" / "XUUnityLightMcpCompatibilityPolicy.cs").read_text(encoding="utf-8")
         self.assertNotIn(".FindForPackageName(", text)

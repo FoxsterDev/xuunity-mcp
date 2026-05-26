@@ -1,7 +1,7 @@
 # Features
 
-Date: `2026-05-23`
-Status: `current for v0.3.14`
+Date: `2026-05-26`
+Status: `current for v0.3.15-dev`
 
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
 automation: status, compile, tests, scene checks, Game View evidence, scenario
@@ -42,7 +42,8 @@ Unity MCP implementations when the user wants safe production validation.
 | Request journal final accounting | `Core` | `unity_request_final_status`, `request-final-status`, and request journals recover terminal state after reloads or wrapper timeouts. | Separates transport churn from actual Unity operation results. |
 | Compact low-token summaries | `Core` | `unity_status_summary`, scenario summaries, and final-status payloads compress evidence for agents. | Agents get actionable evidence without dumping logs. |
 | Same-host multi-project routing | `Core` | Host-side project context registry maps requests to concrete Unity project/editor state. | Supports multiple Unity projects on one workstation. |
-| Closed-project batch validation lanes | `Host helper` | `batch-compile`, `batch-compile-matrix`, `batch-build-config-compile-matrix`, and `batch-editmode-tests`. | Lets agents validate closed projects through non-interactive Unity batchmode. |
+| License-aware batch lane selection | `Host helper` | `license-capabilities`, `xuunity_license_capabilities`, and `--batch-fallback-mode auto|off|require-batch`. | Lets agents prefer real batchmode when proven, use safe GUI fallback when batchmode is blocked, and fail closed when restore safety is unknown. |
+| Closed-project batch validation lanes | `Host helper` | `batch-compile`, `batch-compile-matrix`, `batch-build-config-compile-matrix`, `batch-editmode-tests`, and `batch-build-player`. | Lets agents validate closed projects through non-interactive Unity batchmode or safe GUI fallback when needed. |
 | Build-config-driven compile matrix | `Project-dependent` | `unity_compile_build_config_matrix` and `batch-build-config-compile-matrix` resolve project build-config assets. | Strong fit for projects with named Android/iOS build profiles. |
 | Bounded scenario workflows | `Project-dependent` | `unity_scenario_validate`, `unity_scenario_run`, result summaries, and persisted scenario artifacts. | Supports repeatable validation recipes without opening arbitrary mutation. |
 | Game View screenshot and resolution control | `Reflection-gated` | `unity_game_view_configure` and `unity_game_view_screenshot` are capability-probed editor features. | Provides visual evidence while acknowledging Unity-version sensitivity. |
@@ -56,6 +57,7 @@ Unity MCP implementations when the user wants safe production validation.
 | --- | --- | --- | --- |
 | Editor health | `unity_status` | `Core` | Normalized editor and bridge readiness state. |
 | Capabilities | `unity_capabilities` | `Core` | Capability and health report used to gate version-sensitive operations. |
+| Host/license capabilities | `xuunity_license_capabilities` | `Host helper` | Probes batchmode support, UI fallback viability, normalized blocker code, and recommended lane. |
 | Health | `unity_health_probe` | `Core` | Re-runs Unity-side health checks and persists a fresh report. |
 | Status summary | `unity_status_summary` | `Core` | Compact polling-friendly project status summary. |
 | Final accounting | `unity_request_final_status` | `Core` | Resolves final request disposition from journal plus current bridge state. |
@@ -76,6 +78,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Compile | `unity_compile_player_scripts` | `Core` | Compiles player scripts for one target/options/defines combination without active target switch. |
 | Compile | `unity_compile_matrix` | `Core` | Runs multiple compile checks across targets/options/defines. |
 | Compile | `unity_compile_build_config_matrix` | `Project-dependent` | Resolves build profiles from Unity build-config assets and runs matrix validation. |
+| Build | `unity_build_player` | `Project-dependent` | Runs a plain BuildPipeline player build through the GUI bridge; used as the GUI fallback for `batch-build-player`. |
 | Scenarios | `unity_scenario_validate` | `Project-dependent` | Validates scripted scenario JSON before execution. |
 | Scenarios | `unity_scenario_run` | `Project-dependent` | Starts asynchronous scenario execution inside Unity. |
 | Scenarios | `unity_scenario_result` | `Project-dependent` | Reads current or completed scenario result. |
@@ -93,6 +96,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Setup | `setup-apply` | `Host helper` | Applies an approved setup plan only after explicit approval. |
 | Setup | `validate-setup` | `Host helper` | Reports core readiness and optional Test Framework capability state. |
 | Setup | `install-test-framework` | `Host helper` | Installs the optional Test Framework dependency in `Packages/manifest.json` after explicit approval; prefer before opening Unity so package resolution happens on startup. |
+| License capabilities | `license-capabilities` | `Host helper` | Reports `batchmode_supported`, `editor_ui_supported`, blocker code, probe log path, and recommended execution lane. |
 | Discovery | `project-discovery-report` | `Host helper` | Explains bridge, editor, package, and stale-artifact state for one project. |
 | Registry | `registry-context-report` | `Host helper` | Reports same-host project context cache state. |
 | Registry | `registry-prune-contexts` | `Host helper` | Prunes stale same-host project context entries. |
@@ -107,12 +111,12 @@ Unity MCP implementations when the user wants safe production validation.
 | Request state | `request-latest-status` | `Host helper` | Recovers latest matching operation from the request journal. |
 | Request state | `request-cancel` | `Host helper` | Best-effort cancellation marker for in-flight requests. |
 | Request state | `request-stale-cleanup` | `Host helper` | Cleans old request artifacts. |
-| Batch compile | `batch-compile` | `Host helper` | Closed-project Unity batchmode player-script compile lane. |
-| Batch compile | `batch-compile-matrix` | `Host helper` | Closed-project compile matrix lane. |
-| Batch compile | `batch-build-config-compile-matrix` | `Project-dependent` | Build-config-driven closed-project matrix lane. |
-| Batch tests | `batch-editmode-tests` | `Host helper` | Closed-project EditMode test lane. |
+| Batch compile | `batch-compile` | `Host helper` | Batch player-script compile lane with license-aware GUI fallback to `unity.compile.player_scripts`. |
+| Batch compile | `batch-compile-matrix` | `Host helper` | Compile matrix lane with license-aware GUI fallback to `unity.compile.matrix`. |
+| Batch compile | `batch-build-config-compile-matrix` | `Project-dependent` | Build-config-driven matrix lane with license-aware GUI fallback. |
+| Batch tests | `batch-editmode-tests` | `Host helper` | EditMode test lane with license-aware GUI fallback to `unity.tests.run_editmode`. |
 | Batch tests | `batch-test-framework-version-regression` | `Host helper` | Test Framework version sweep across direct and batch validation lanes. |
-| Build | `batch-build-player` | `Project-dependent` | Generic plain Unity batch build lane; requires project build setup. |
+| Build | `batch-build-player` | `Project-dependent` | Generic plain Unity build lane; uses batchmode when supported and GUI `unity.build_player` fallback when safe. |
 | Artifacts | `artifact-probe` | `Host helper` | Checks build artifact files, ZIP entries, and manifest text expectations. |
 | Maintenance | `maintenance-prune` | `Host helper` | Prunes stale local MCP artifacts. |
 

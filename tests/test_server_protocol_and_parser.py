@@ -33,6 +33,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "setup-apply",
                 "validate-setup",
                 "install-test-framework",
+                "license-capabilities",
                 "request-status",
                 "request-status-summary",
                 "request-final-status",
@@ -49,6 +50,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "registry-context-report",
                 "registry-prune-contexts",
                 "request-compile",
+                "request-build-player",
                 "request-editmode-tests",
                 "ensure-ready",
                 "recover-editor-session",
@@ -72,9 +74,11 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("xuunity_setup_plan", tool_names)
         self.assertIn("xuunity_setup_apply", tool_names)
         self.assertIn("xuunity_setup_validate", tool_names)
+        self.assertIn("xuunity_license_capabilities", tool_names)
         self.assertIn("unity_package_install_test_framework", tool_names)
         self.assertIn("unity_request_final_status", tool_names)
         self.assertIn("unity_compile_build_config_matrix", tool_names)
+        self.assertIn("unity_build_player", tool_names)
         self.assertIn("unity_edm4u_resolve", tool_names)
         self.assertIn("unity_sdk_dependency_verify", tool_names)
         self.assertIn("unity_scenario_run_and_wait", tool_names)

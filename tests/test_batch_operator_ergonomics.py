@@ -194,6 +194,20 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
     def test_parser_contains_artifact_probe_command(self) -> None:
         self.assertIn("artifact-probe", get_subparser_choices(server.build_parser()))
 
+    def test_batch_commands_accept_fallback_mode(self) -> None:
+        parser = server.build_parser()
+        commands = (
+            ["batch-compile", "--project-root", "/tmp/FakeProject", "--target", "Android"],
+            ["batch-compile-matrix", "--project-root", "/tmp/FakeProject", "--config-file", "/tmp/config.json"],
+            ["batch-build-config-compile-matrix", "--project-root", "/tmp/FakeProject"],
+            ["batch-editmode-tests", "--project-root", "/tmp/FakeProject"],
+            ["batch-build-player", "--project-root", "/tmp/FakeProject", "--build-target", "Android"],
+        )
+        for command in commands:
+            with self.subTest(command=command[0]):
+                parsed = parser.parse_args([*command, "--batch-fallback-mode", "require-batch"])
+                self.assertEqual("require-batch", parsed.batch_fallback_mode)
+
 
 if __name__ == "__main__":
     unittest.main()

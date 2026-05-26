@@ -283,11 +283,13 @@ Manual macOS/Linux and Windows configs live in `templates/clients/`.
 Popular MCP tools:
 
 `xuunity_setup_plan` | `xuunity_setup_apply` | `xuunity_setup_validate` |
+`xuunity_license_capabilities` |
 `unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
 `unity_console_tail` | `unity_scene_snapshot` | `unity_scene_assert` |
 `unity_compile_player_scripts` | `unity_compile_matrix` |
 `unity_compile_build_config_matrix` | `unity_tests_run_editmode` |
 `unity_tests_run_playmode` | `unity_playmode_state` | `unity_playmode_set` |
+`unity_build_player` |
 `unity_game_view_configure` | `unity_game_view_screenshot` |
 `unity_scenario_validate` | `unity_scenario_run_and_wait` |
 `unity_request_final_status` | `unity_project_refresh` |
@@ -295,10 +297,11 @@ Popular MCP tools:
 `unity_sdk_dependency_verify`
 
 Host helper commands include `setup-plan`, `setup-apply`, `validate-setup`,
-`install-test-framework`, `ensure-ready`, `verify-editor-closed`,
+`install-test-framework`, `license-capabilities`, `ensure-ready`, `verify-editor-closed`,
 `request-editor-quit --wait-for-exit`, `restore-editor-state`,
-`recover-editor-session`, `batch-compile`, `batch-editmode-tests`,
-`batch-build-config-compile-matrix`, `artifact-probe`, `devmode`, and `prodmode`.
+`recover-editor-session`, `batch-compile`, `batch-compile-matrix`,
+`batch-editmode-tests`, `batch-build-config-compile-matrix`,
+`batch-build-player`, `artifact-probe`, `devmode`, and `prodmode`.
 
 See [FEATURES.md](docs/reference/FEATURES.md) for maturity levels and implementation evidence.
 
@@ -331,6 +334,13 @@ Troubleshooting:
   only that dependency after approval. If Unity 6000 already has `1.1.33`,
   tests may run, but setup reports an optional upgrade recommendation to
   `1.5.1`.
+- Batchmode unavailable: run
+  `license-capabilities --project-root <project> --refresh --timeout-ms 30000`.
+  Batch helpers default to `--batch-fallback-mode auto`: if batchmode is blocked
+  by a known license/Hub/headless condition and GUI fallback is viable, the MCP
+  runs the equivalent GUI lane and reports `effective_execution_lane=gui`.
+  Use `--batch-fallback-mode require-batch` when a CI or release lane must fail
+  unless real Unity batchmode is proven.
 - Long operation timed out: recover with `request-final-status`.
 - Closed-project batch refused because the editor is open: run
   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`,

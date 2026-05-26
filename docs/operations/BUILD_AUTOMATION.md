@@ -1,7 +1,7 @@
 # Build Automation Surface
 
-Date: `2026-05-23`
-Status: `current for v0.3.14`
+Date: `2026-05-26`
+Status: `current for v0.3.15-dev`
 
 This document defines the public-safe build automation surface for the
 standalone `xuunity-light-unity-mcp` repository.
@@ -18,7 +18,9 @@ Current public operations:
 - `unity.build_target.switch`
 - `unity.compile.player_scripts`
 - `unity.compile.matrix`
+- `unity.build_player`
 - `unity_compile_build_config_matrix`
+- `xuunity_license_capabilities`
 - `unity.edm4u.resolve`
 - `unity.sdk.dependency.verify`
 - `unity_status_summary`
@@ -39,6 +41,7 @@ Current public host-side batch helpers:
 - `batch-editmode-tests`
 - `batch-build-player`
 - `artifact-probe`
+- `license-capabilities`
 
 ## Lane Selection Rule
 
@@ -112,6 +115,80 @@ Do not use the live interactive scenario lane as the primary waiter for
 long-running artifact builds. It is the right control plane for editor-aware
 inspection and short bounded work, but it is the wrong data plane for build
 correctness.
+
+## License-Aware Batch Fallback
+
+Before a public `batch-*` command starts Unity batchmode, the host wrapper checks
+the actual execution capability for the resolved editor and project:
+
+```bash
+python3 templates/server.py \
+  license-capabilities \
+  --project-root /path/to/UnityProject \
+  --refresh \
+  --timeout-ms 30000
+```
+
+The report intentionally treats capability as the source of truth instead of
+claiming a precise legal edition when Unity does not expose one. Important fields:
+- `batchmode_supported`
+- `editor_ui_supported`
+- `license_kind_inferred`
+- `batchmode_blocker_code`
+- `batchmode_probe_log_path`
+- `recommended_execution_lane`
+- `source_evidence`
+
+Known batch blockers are normalized as stable codes:
+- `no_valid_editor_license`
+- `access_token_unavailable`
+- `no_ulf_license`
+- `headless_entitlement_missing`
+- `licensing_client_ipc_failure`
+- `unknown_batch_failure`
+
+Batch helpers accept:
+
+```bash
+--batch-fallback-mode auto|off|require-batch
+```
+
+Default `auto` behavior:
+- run real batchmode when `batchmode_supported=true`
+- use the equivalent GUI bridge operation when a known blocker proves batchmode
+  unavailable and editor UI fallback is not known to be unavailable
+- reuse an already-open editor only when it is idle in Edit Mode
+- open a closed project, run the GUI operation, then restore/close the
+  host-opened editor and require verified process exit
+- fail closed on `process_visibility_restricted` because restore safety cannot
+  be proven
+
+`off` keeps the historical batch behavior but still includes license diagnostics.
+`require-batch` fails unless real batchmode support is proven.
+
+Structured summaries include:
+- `requested_execution_lane`
+- `effective_execution_lane`
+- `lane_fallback_reason`
+- `license_batchmode_supported`
+- `license_blocker_code`
+- `start_editor_state`
+- `restore_editor_state`
+- `gui_fallback_log_path`
+- `next_distinct_action`
+
+Relevant Unity constraints are documented by Unity: batchmode is a command-line
+Editor mode, Personal activation is Hub-oriented rather than serial/manual CLI,
+Build Server licenses do not provide normal Editor UI, and closed-platform builds
+can require Pro or platform entitlement. The MCP therefore probes capability and
+reports evidence instead of hard-coding edition names.
+
+References:
+- [Unity Editor command line arguments](https://docs.unity3d.com/Manual/EditorCommandLineArguments.html)
+- [Unity license activation methods](https://docs.unity.cn/Manual/LicenseActivationMethods.html)
+- [Unity manual activation limitations](https://support.unity.com/hc/en-us/articles/4401914348436-How-do-I-manually-activate-my-Unity-license)
+- [Unity Build Server Editor UI limitation](https://support.unity.com/hc/en-us/articles/4401984205204-Why-am-I-not-able-to-open-the-Unity-Editor-with-a-Build-Server-license)
+- [Unity Personal restrictions](https://unity.com/products/unity-personal)
 
 ## Scenario Lane Constraint
 
@@ -265,6 +342,10 @@ Notes:
   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`
   and then `verify-editor-closed --project-root <project> --timeout-ms 30000`
   before retrying
+- if batchmode is blocked by license/Hub/headless state, default
+  `--batch-fallback-mode auto` uses the GUI bridge equivalent when safe
+- use `--batch-fallback-mode require-batch` for CI lanes that must fail without
+  proven batchmode support
 - host process visibility must be available; `process_visibility_restricted`
   means the lane cannot prove the editor is closed
 - it uses the current project settings and enabled scenes unless scenes are passed explicitly

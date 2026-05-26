@@ -676,6 +676,22 @@ Only rerun the batch helper after `same_project_editor_closed=true` and
 the command to a host context that can list local processes; do not treat an
 empty PID list as proof while visibility is restricted.
 
+Before assuming a closed-project batch command can run as real Unity batchmode,
+check the host capability report:
+
+```bash
+"$WRAPPER" license-capabilities \
+  --project-root "$PROJECT_ROOT" \
+  --refresh \
+  --timeout-ms 30000
+```
+
+Default batch helpers use `--batch-fallback-mode auto`. If the report proves
+batchmode is blocked by a known license, Hub, or headless condition, the helper
+uses the equivalent GUI bridge lane when the editor is idle enough to restore
+safely. Use `--batch-fallback-mode require-batch` when the workflow must fail
+unless real batchmode is proven.
+
 Compile route:
 
 ```bash
@@ -709,6 +725,9 @@ Evidence to report:
 - batch log path
 - result file path
 - exit code/operator verdict
+- `requested_execution_lane` and `effective_execution_lane`
+- `license_blocker_code` and `batchmode_probe_log_path` when present
+- `restore_editor_state` when GUI fallback opened the editor
 - workspace side-effect summary when available
 - reason if batch lane refused to run because an Editor was open
 

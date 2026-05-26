@@ -369,6 +369,16 @@ def build_batch_prepare_failure_summary(
         "process_visibility_error_code",
         "closeout_classification",
         "next_distinct_action",
+        "requested_execution_lane",
+        "effective_execution_lane",
+        "lane_fallback_reason",
+        "batch_fallback_mode",
+        "license_batchmode_supported",
+        "license_blocker_code",
+        "batchmode_probe_log_path",
+        "start_editor_state",
+        "restore_editor_state",
+        "gui_fallback_log_path",
     ):
         if key in details:
             summary[key] = details[key]
