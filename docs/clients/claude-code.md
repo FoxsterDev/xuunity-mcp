@@ -11,6 +11,15 @@ Install the Claude-side server files:
 bash init_xuunity_light_unity_mcp.sh --target claude
 ```
 
+The wrapper still supports Claude-first installs. Outside a Codex-style
+environment, `auto` preserves an existing
+`${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}` helper. To force the Claude-side
+helper from any shell, set:
+
+```bash
+export XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=claude
+```
+
 Enable the bridge for the Unity project without changing package mode:
 
 ```bash

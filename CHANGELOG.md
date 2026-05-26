@@ -25,6 +25,9 @@
   `xuunity_license_capabilities`, `--batch-fallback-mode auto|off|require-batch`,
   GUI fallback summaries, and Unity-side `unity.build_player` for player-build
   fallback when real batchmode is blocked.
+- Added `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto` for wrapper
+  helper resolution so Codex contexts prefer `.codex-tools` without breaking
+  Claude-side `.claude-tools` installs.
 
 ## 0.3.13
 

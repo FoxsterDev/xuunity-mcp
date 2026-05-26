@@ -30,23 +30,75 @@ resolve_source_root() {
 
 SOURCE_ROOT="$(resolve_source_root)"
 
+CODEX_INSTALL_DIR="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp"
+CLAUDE_INSTALL_DIR="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp"
+
+codex_context_detected() {
+  [[ -n "${CODEX_SHELL:-}" ]] ||
+    [[ -n "${CODEX_THREAD_ID:-}" ]] ||
+    [[ -n "${CODEX_SANDBOX:-}" ]] ||
+    [[ -n "${CODEX_HOME:-}" ]] ||
+    [[ -n "${CODEX_CI:-}" ]] ||
+    [[ "${CODEX_INTERNAL_ORIGINATOR_OVERRIDE:-}" == *Codex* ]]
+}
+
+claude_context_detected() {
+  [[ -n "${CLAUDE_CODE:-}" ]] ||
+    [[ -n "${CLAUDECODE:-}" ]] ||
+    [[ -n "${CLAUDE_CONFIG_PATH:-}" ]]
+}
+
+resolve_install_dir() {
+  local install_target="${XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET:-auto}"
+  case "$install_target" in
+    codex)
+      printf '%s\n' "$CODEX_INSTALL_DIR"
+      return 0
+      ;;
+    claude)
+      printf '%s\n' "$CLAUDE_INSTALL_DIR"
+      return 0
+      ;;
+    auto)
+      if codex_context_detected; then
+        printf '%s\n' "$CODEX_INSTALL_DIR"
+        return 0
+      fi
+      if claude_context_detected; then
+        printf '%s\n' "$CLAUDE_INSTALL_DIR"
+        return 0
+      fi
+      if [[ -f "$CLAUDE_INSTALL_DIR/server.py" ]]; then
+        printf '%s\n' "$CLAUDE_INSTALL_DIR"
+        return 0
+      fi
+      if [[ -f "$CODEX_INSTALL_DIR/server.py" ]]; then
+        printf '%s\n' "$CODEX_INSTALL_DIR"
+        return 0
+      fi
+      printf '%s\n' "$CODEX_INSTALL_DIR"
+      return 0
+      ;;
+    *)
+      echo "invalid XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=$install_target (expected codex, claude, or auto)" >&2
+      exit 1
+      ;;
+  esac
+}
+
 # Resolve the host install location agent-agnostically.
 # Priority order:
 #   1. XUUNITY_LIGHT_UNITY_MCP_SERVER explicit override
-#   2. CLAUDE_TOOLS_HOME / ~/.claude-tools  (Claude-side install)
-#   3. CODEX_TOOLS_HOME / ~/.codex-tools    (Codex-side install)
-#   4. CODEX_TOOLS_HOME default location (used as install hint when nothing is installed)
+#   2. XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude explicit target
+#   3. auto target: Codex context -> CODEX_TOOLS_HOME / ~/.codex-tools
+#   4. auto target: Claude context -> CLAUDE_TOOLS_HOME / ~/.claude-tools
+#   5. auto target: preserve existing helper when no client context is known
+#   6. CODEX_TOOLS_HOME default location (used as install hint when nothing is installed)
 if [[ -n "${XUUNITY_LIGHT_UNITY_MCP_SERVER:-}" ]]; then
   SERVER_PATH="$XUUNITY_LIGHT_UNITY_MCP_SERVER"
   INSTALL_DIR="$(cd "$(dirname "$SERVER_PATH")" && pwd)"
-elif [[ -f "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/server.py" ]]; then
-  INSTALL_DIR="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp"
-  SERVER_PATH="$INSTALL_DIR/server.py"
-elif [[ -f "${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/server.py" ]]; then
-  INSTALL_DIR="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp"
-  SERVER_PATH="$INSTALL_DIR/server.py"
 else
-  INSTALL_DIR="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp"
+  INSTALL_DIR="$(resolve_install_dir)"
   SERVER_PATH="$INSTALL_DIR/server.py"
 fi
 RUN_PATH="$INSTALL_DIR/run.sh"

@@ -11,6 +11,14 @@ Install the host-side server files:
 bash init_xuunity_light_unity_mcp.sh --target codex
 ```
 
+When the wrapper runs from a Codex-style environment, its default `auto`
+install target prefers `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}` even if a
+Claude-side helper also exists. To make that explicit in scripts, set:
+
+```bash
+export XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex
+```
+
 Enable the bridge for the Unity project without changing package mode:
 
 ```bash

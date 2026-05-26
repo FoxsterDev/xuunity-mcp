@@ -31,3 +31,8 @@ bash init_xuunity_light_unity_mcp.sh --target codex
 
 Clients that should use the Claude-side install can change `CODEX_TOOLS_HOME`
 to `CLAUDE_TOOLS_HOME` and `.codex-tools` to `.claude-tools`.
+
+Direct wrapper invocations also honor
+`XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto`. In `auto`, Codex
+contexts prefer `.codex-tools`; non-Codex sessions with an existing Claude
+helper keep using `.claude-tools`.

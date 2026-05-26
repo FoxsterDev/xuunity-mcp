@@ -231,6 +231,11 @@ cp templates/clients/cursor/mcp.json .cursor/mcp.json
 Native Windows templates are included next to the Unix templates as
 `.windows.json` files.
 
+When running the wrapper directly, the host helper install target can be pinned
+with `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto`. `auto`
+prefers `~/.codex-tools` inside Codex-style environments and preserves the
+Claude-side `~/.claude-tools` helper for Claude clients.
+
 ### 4. Verify Connection
 
 ```bash

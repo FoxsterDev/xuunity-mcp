@@ -127,6 +127,110 @@ class WrapperSourceRootTests(unittest.TestCase):
             installed_version = json.loads(installed_package_json.read_text(encoding="utf-8"))["version"]
             self.assertEqual(package_version, installed_version)
 
+    def test_auto_install_target_prefers_codex_home_in_codex_context(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        wrapper = repo_root / "xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            project_root = self.create_fake_project(temp_root / "FakeProject")
+            codex_tools = temp_root / "codex-tools"
+            claude_tools = temp_root / "claude-tools"
+            stale_claude_install = claude_tools / "xuunity-light-unity-mcp"
+            stale_claude_install.mkdir(parents=True)
+            stale_server = stale_claude_install / "server.py"
+            stale_server.write_text("# stale claude helper\n", encoding="utf-8")
+
+            env = dict(os.environ)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET", None)
+            env["CODEX_TOOLS_HOME"] = str(codex_tools)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+            env["CODEX_SHELL"] = "1"
+
+            completed = subprocess.run(
+                [str(wrapper), "setup-plan", "--project-root", str(project_root)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertTrue((codex_tools / "xuunity-light-unity-mcp" / "server.py").is_file())
+            self.assertEqual("# stale claude helper\n", stale_server.read_text(encoding="utf-8"))
+
+    def test_explicit_install_target_can_force_claude_from_codex_context(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        wrapper = repo_root / "xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            project_root = self.create_fake_project(temp_root / "FakeProject")
+            codex_tools = temp_root / "codex-tools"
+            claude_tools = temp_root / "claude-tools"
+
+            env = dict(os.environ)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
+            env["XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET"] = "claude"
+            env["CODEX_TOOLS_HOME"] = str(codex_tools)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+            env["CODEX_SHELL"] = "1"
+
+            completed = subprocess.run(
+                [str(wrapper), "setup-plan", "--project-root", str(project_root)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertTrue((claude_tools / "xuunity-light-unity-mcp" / "server.py").is_file())
+            self.assertFalse((codex_tools / "xuunity-light-unity-mcp" / "server.py").exists())
+
+    def test_auto_install_target_preserves_existing_claude_helper_outside_codex_context(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        wrapper = repo_root / "xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            project_root = self.create_fake_project(temp_root / "FakeProject")
+            codex_tools = temp_root / "codex-tools"
+            claude_tools = temp_root / "claude-tools"
+            claude_install = claude_tools / "xuunity-light-unity-mcp"
+            claude_install.mkdir(parents=True)
+            claude_server = claude_install / "server.py"
+            claude_server.write_text("# stale claude helper\n", encoding="utf-8")
+
+            env = dict(os.environ)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET", None)
+            for key in list(env):
+                if key.startswith("CODEX"):
+                    env.pop(key, None)
+            env.pop("CLAUDE_CODE", None)
+            env.pop("CLAUDECODE", None)
+            env.pop("CLAUDE_CONFIG_PATH", None)
+            env["CODEX_TOOLS_HOME"] = str(codex_tools)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+
+            completed = subprocess.run(
+                [str(wrapper), "setup-plan", "--project-root", str(project_root)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertTrue(claude_server.is_file())
+            self.assertNotEqual("# stale claude helper\n", claude_server.read_text(encoding="utf-8"))
+            self.assertFalse((codex_tools / "xuunity-light-unity-mcp" / "server.py").exists())
+
     def test_prodmode_pins_package_version_release_tag_not_raw_commit(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         wrapper = repo_root / "xuunity_light_unity_mcp.sh"
