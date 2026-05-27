@@ -55,7 +55,7 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 - Unity 2021.3 LTS+; the current release has live validation on Unity 2021.3,
   2022.3, and 6000.x. See [Status](docs/reference/STATUS.md).
 - Python 3.10+
-- one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md)
+- one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md) with the [Codex visual setup guide](docs/clients/codex-unity-mcp-setup.md)
 
 ### Guided Setup Wizard
 
@@ -277,7 +277,7 @@ templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 - [Claude Desktop](docs/clients/claude-desktop.md)
 - [Cursor](docs/clients/cursor.md)
 - [Windsurf](docs/clients/windsurf.md)
-- [Codex-style agents](docs/clients/codex.md)
+- [Codex-style agents](docs/clients/codex.md) ([visual setup](docs/clients/codex-unity-mcp-setup.md))
 - custom stdio MCP clients
 
 Optional: connect XUUnity MCP to Codex/Codex-style clients when you want Codex

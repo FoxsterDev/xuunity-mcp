@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Codex MCP tool list verification for XUUnity Light Unity MCP</title>
+  <desc id="desc">A sanitized Codex chat example showing a prompt to list the xuunity_light_unity MCP tools and a successful tool list response.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .bubble { fill: #f4f4f5; }
+    .rule { stroke: #eeeeee; stroke-width: 2; }
+    .body { font: 400 25px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202124; }
+    .muted { font: 400 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #777b80; }
+    .mono { font: 400 23px "SFMono-Regular", Consolas, monospace; fill: #202124; }
+    .chip { fill: #f5f6f7; }
+  </style>
+  <rect class="bg" width="1200" height="760"/>
+  <rect x="514" y="34" width="632" height="70" rx="28" class="bubble"/>
+  <text class="body" x="544" y="78">Use xuunity_light_unity MCP and list tools</text>
+
+  <text class="muted" x="40" y="184">Worked for 17s</text>
+  <line class="rule" x1="40" y1="216" x2="1160" y2="216"/>
+  <text class="body" x="40" y="274">XUUnity Light Unity MCP is available.</text>
+  <text class="body" x="40" y="330">Available xuunity_light_unity tools include:</text>
+
+  <g transform="translate(40 372)">
+    <text class="body" x="0" y="28">-</text>
+    <rect class="chip" x="32" y="0" width="172" height="42" rx="10"/>
+    <text class="mono" x="46" y="29">unity_status</text>
+    <rect class="chip" x="220" y="0" width="274" height="42" rx="10"/>
+    <text class="mono" x="234" y="29">unity_status_summary</text>
+    <rect class="chip" x="510" y="0" width="238" height="42" rx="10"/>
+    <text class="mono" x="524" y="29">unity_capabilities</text>
+    <rect class="chip" x="764" y="0" width="238" height="42" rx="10"/>
+    <text class="mono" x="778" y="29">unity_health_probe</text>
+  </g>
+
+  <g transform="translate(40 436)">
+    <text class="body" x="0" y="28">-</text>
+    <rect class="chip" x="32" y="0" width="308" height="42" rx="10"/>
+    <text class="mono" x="46" y="29">unity_compile_player_scripts</text>
+    <rect class="chip" x="356" y="0" width="232" height="42" rx="10"/>
+    <text class="mono" x="370" y="29">unity_compile_matrix</text>
+    <rect class="chip" x="604" y="0" width="248" height="42" rx="10"/>
+    <text class="mono" x="618" y="29">unity_build_player</text>
+  </g>
+
+  <g transform="translate(40 500)">
+    <text class="body" x="0" y="28">-</text>
+    <rect class="chip" x="32" y="0" width="282" height="42" rx="10"/>
+    <text class="mono" x="46" y="29">unity_tests_run_editmode</text>
+    <rect class="chip" x="330" y="0" width="292" height="42" rx="10"/>
+    <text class="mono" x="344" y="29">unity_tests_run_playmode</text>
+    <rect class="chip" x="638" y="0" width="286" height="42" rx="10"/>
+    <text class="mono" x="652" y="29">unity_license_capabilities</text>
+  </g>
+
+  <g transform="translate(40 564)">
+    <text class="body" x="0" y="28">-</text>
+    <rect class="chip" x="32" y="0" width="230" height="42" rx="10"/>
+    <text class="mono" x="46" y="29">xuunity_setup_plan</text>
+    <rect class="chip" x="278" y="0" width="236" height="42" rx="10"/>
+    <text class="mono" x="292" y="29">xuunity_setup_apply</text>
+    <rect class="chip" x="530" y="0" width="254" height="42" rx="10"/>
+    <text class="mono" x="544" y="29">xuunity_setup_validate</text>
+  </g>
+
+  <text class="muted" x="40" y="684">Tip: include the Unity project path when asking for status, compile, tests, or setup.</text>
+</svg>

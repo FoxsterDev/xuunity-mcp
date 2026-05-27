@@ -8,6 +8,9 @@ to validate Unity status, compile, tests, and setup directly from the chat. Use
 this only on trusted local projects. If you also use Rider or VS Code MCP,
 avoid running concurrent commands against the same Unity project.
 
+For Codex Desktop's custom MCP server UI, use the visual guide:
+[Codex Unity MCP Setup](codex-unity-mcp-setup.md).
+
 ## Install The Server
 
 Install the host-side server files:
@@ -74,9 +77,19 @@ prefers `PYTHON`, then `py -3`, then `python`, then `python3`.
 ## Verify
 
 Start the client and confirm that `xuunity_light_unity` appears in the MCP
-server list. Then run:
+server list. Then ask the client to list the server tools:
 
-1. `unity.status`
-2. `unity.capabilities.get`
-3. `unity.health.probe`
-4. `unity.console.tail`
+```text
+Use xuunity_light_unity MCP and list tools.
+```
+
+Then verify a concrete Unity project:
+
+1. `unity_status_summary`
+2. `unity_capabilities`
+3. `unity_health_probe`
+4. `unity_console_tail`
+
+You can name the server explicitly while verifying setup. After that, natural
+requests such as `Run EditMode tests in /path/to/UnityProject` are usually
+enough as long as the Unity project path and desired operation are clear.

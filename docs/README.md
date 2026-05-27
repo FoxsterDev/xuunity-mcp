@@ -13,4 +13,5 @@ public entrypoints, install metadata, license, security, and MCP discovery.
 - [operations](operations/) - validation, smoke tests, build automation, package migration, and continuation notes
 - [architecture](architecture/) - design, roadmap, and design records
 - [archive](archive/) - historical reports and retrospectives
-- [clients](clients/) - client-specific setup docs
+- [clients](clients/) - client-specific setup docs, including the
+  [Codex visual setup guide](clients/codex-unity-mcp-setup.md)

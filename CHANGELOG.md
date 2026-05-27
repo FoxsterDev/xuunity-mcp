@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Added a visual Codex Desktop custom MCP setup guide with sanitized screenshots
+  and guidance for natural Unity requests through the `xuunity_light_unity`
+  server.
+
 ## 0.3.15
 
 Release tag: `v0.3.15`

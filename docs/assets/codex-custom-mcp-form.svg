@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Codex custom MCP form for XUUnity Light Unity MCP</title>
+  <desc id="desc">A sanitized Codex custom MCP server configuration example showing the stdio command, arguments, optional environment variable, and working directory.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .panel { fill: #ffffff; stroke: #e7e7e7; stroke-width: 2; }
+    .field { fill: #ffffff; stroke: #e5e5e5; stroke-width: 2; }
+    .button { fill: #f4f4f5; }
+    .title { font: 700 34px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202124; }
+    .label { font: 700 23px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202124; }
+    .muted { font: 400 22px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #6f7377; }
+    .mono { font: 400 22px "SFMono-Regular", Consolas, monospace; fill: #202124; }
+  </style>
+  <rect class="bg" width="1200" height="760"/>
+  <text class="title" x="42" y="58">Update xuunity_light_unity MCP</text>
+  <rect x="42" y="104" width="1116" height="596" rx="18" class="panel"/>
+
+  <text class="label" x="64" y="148">Command to launch</text>
+  <rect x="64" y="172" width="1072" height="58" rx="12" class="field"/>
+  <text class="mono" x="82" y="209">bash</text>
+
+  <text class="label" x="64" y="284">Arguments</text>
+  <rect x="64" y="308" width="1010" height="58" rx="12" class="field"/>
+  <text class="mono" x="82" y="345">-lc</text>
+  <rect x="64" y="386" width="1010" height="58" rx="12" class="field"/>
+  <text class="mono" x="82" y="423">exec "${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh"</text>
+  <rect x="64" y="466" width="1072" height="48" rx="12" class="button"/>
+  <text class="muted" x="488" y="498">+ Add argument</text>
+
+  <text class="label" x="64" y="572">Environment variables</text>
+  <rect x="64" y="596" width="470" height="58" rx="12" class="field"/>
+  <text class="mono" x="82" y="633">CODEX_TOOLS_HOME</text>
+  <rect x="552" y="596" width="522" height="58" rx="12" class="field"/>
+  <text class="mono" x="570" y="633">/path/to/.codex-tools</text>
+
+  <text class="label" x="64" y="724">Working directory</text>
+  <rect x="296" y="688" width="778" height="58" rx="12" class="field"/>
+  <text class="mono" x="314" y="725">/path/to/trusted/workspace</text>
+</svg>
