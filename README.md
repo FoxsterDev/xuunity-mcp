@@ -293,7 +293,7 @@ Manual macOS/Linux and Windows configs live in `templates/clients/`.
 Popular MCP tools:
 
 `xuunity_setup_plan` | `xuunity_setup_apply` | `xuunity_setup_validate` |
-`xuunity_license_capabilities` |
+`unity_license_capabilities` |
 `unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
 `unity_console_tail` | `unity_scene_snapshot` | `unity_scene_assert` |
 `unity_compile_player_scripts` | `unity_compile_matrix` |

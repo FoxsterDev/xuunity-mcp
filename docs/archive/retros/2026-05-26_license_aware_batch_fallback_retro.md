@@ -5,7 +5,7 @@ Status: `post-implementation notes`
 
 ## What Was Implemented
 
-- Added host `license-capabilities` and MCP `xuunity_license_capabilities`.
+- Added host `license-capabilities` and MCP `unity_license_capabilities`.
 - Added license/batch probe cache under `Library/XUUnityLightMcp/state/`.
 - Added `--batch-fallback-mode auto|off|require-batch` to public batch helpers.
 - Added GUI fallback mappings for compile, compile matrix, build-config matrix,

@@ -15,7 +15,7 @@ https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuu
 ### Changed
 
 - Added license-aware batch lane selection: `license-capabilities`,
-  `xuunity_license_capabilities`, `--batch-fallback-mode auto|off|require-batch`,
+  `unity_license_capabilities`, `--batch-fallback-mode auto|off|require-batch`,
   GUI fallback summaries, and Unity-side `unity.build_player` for player-build
   fallback when real batchmode is blocked.
 - Added `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto` for wrapper

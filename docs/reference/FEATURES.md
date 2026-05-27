@@ -42,7 +42,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Request journal final accounting | `Core` | `unity_request_final_status`, `request-final-status`, and request journals recover terminal state after reloads or wrapper timeouts. | Separates transport churn from actual Unity operation results. |
 | Compact low-token summaries | `Core` | `unity_status_summary`, scenario summaries, and final-status payloads compress evidence for agents. | Agents get actionable evidence without dumping logs. |
 | Same-host multi-project routing | `Core` | Host-side project context registry maps requests to concrete Unity project/editor state. | Supports multiple Unity projects on one workstation. |
-| License-aware batch lane selection | `Host helper` | `license-capabilities`, `xuunity_license_capabilities`, and `--batch-fallback-mode auto|off|require-batch`. | Lets agents prefer real batchmode when proven, use safe GUI fallback when batchmode is blocked, and fail closed when restore safety is unknown. |
+| License-aware batch lane selection | `Host helper` | `license-capabilities`, `unity_license_capabilities`, and `--batch-fallback-mode auto|off|require-batch`. | Lets agents prefer real batchmode when proven, use safe GUI fallback when batchmode is blocked, and fail closed when restore safety is unknown. |
 | Closed-project batch validation lanes | `Host helper` | `batch-compile`, `batch-compile-matrix`, `batch-build-config-compile-matrix`, `batch-editmode-tests`, and `batch-build-player`. | Lets agents validate closed projects through non-interactive Unity batchmode or safe GUI fallback when needed. |
 | Build-config-driven compile matrix | `Project-dependent` | `unity_compile_build_config_matrix` and `batch-build-config-compile-matrix` resolve project build-config assets. | Strong fit for projects with named Android/iOS build profiles. |
 | Bounded scenario workflows | `Project-dependent` | `unity_scenario_validate`, `unity_scenario_run`, result summaries, and persisted scenario artifacts. | Supports repeatable validation recipes without opening arbitrary mutation. |
@@ -57,7 +57,7 @@ Unity MCP implementations when the user wants safe production validation.
 | --- | --- | --- | --- |
 | Editor health | `unity_status` | `Core` | Normalized editor and bridge readiness state. |
 | Capabilities | `unity_capabilities` | `Core` | Capability and health report used to gate version-sensitive operations. |
-| Host/license capabilities | `xuunity_license_capabilities` | `Host helper` | Probes batchmode support, UI fallback viability, normalized blocker code, and recommended lane. |
+| Host/license capabilities | `unity_license_capabilities` | `Host helper` | Probes batchmode support, UI fallback viability, normalized blocker code, and recommended lane. |
 | Health | `unity_health_probe` | `Core` | Re-runs Unity-side health checks and persists a fresh report. |
 | Status summary | `unity_status_summary` | `Core` | Compact polling-friendly project status summary. |
 | Final accounting | `unity_request_final_status` | `Core` | Resolves final request disposition from journal plus current bridge state. |

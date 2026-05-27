@@ -20,7 +20,7 @@ Current public operations:
 - `unity.compile.matrix`
 - `unity.build_player`
 - `unity_compile_build_config_matrix`
-- `xuunity_license_capabilities`
+- `unity_license_capabilities`
 - `unity.edm4u.resolve`
 - `unity.sdk.dependency.verify`
 - `unity_status_summary`

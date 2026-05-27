@@ -302,7 +302,7 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["projectRoot"]
         }
     },
-    "xuunity_license_capabilities": {
+    "unity_license_capabilities": {
         "description": "Probe and report Unity batchmode/editor UI execution capability for one project/editor session.",
         "inputSchema": {
             "type": "object",

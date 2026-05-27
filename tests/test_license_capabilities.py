@@ -162,7 +162,7 @@ class LicenseCapabilitiesTests(unittest.TestCase):
             mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/tmp/Unity.app")),
             mock.patch.object(server, "build_license_capabilities", return_value=payload),
         ):
-            result = server.call_xuunity_license_capabilities_tool(
+            result = server.call_unity_license_capabilities_tool(
                 {"projectRoot": "/tmp/FakeProject", "timeoutMs": 1000}
             )
 

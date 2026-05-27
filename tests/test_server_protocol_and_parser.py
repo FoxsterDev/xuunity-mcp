@@ -74,7 +74,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("xuunity_setup_plan", tool_names)
         self.assertIn("xuunity_setup_apply", tool_names)
         self.assertIn("xuunity_setup_validate", tool_names)
-        self.assertIn("xuunity_license_capabilities", tool_names)
+        self.assertIn("unity_license_capabilities", tool_names)
         self.assertIn("unity_package_install_test_framework", tool_names)
         self.assertIn("unity_request_final_status", tool_names)
         self.assertIn("unity_compile_build_config_matrix", tool_names)

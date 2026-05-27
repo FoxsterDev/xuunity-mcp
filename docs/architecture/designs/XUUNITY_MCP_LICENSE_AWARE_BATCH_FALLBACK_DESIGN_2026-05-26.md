@@ -19,7 +19,7 @@ lane change explicitly.
   - `request-build-player --project-root PATH --build-target TARGET [...]`
   - `batch-* --batch-fallback-mode auto|off|require-batch`
 - MCP tools:
-  - `xuunity_license_capabilities`
+  - `unity_license_capabilities`
   - `unity_build_player`
 - Unity bridge operation:
   - `unity.build_player`
@@ -54,7 +54,7 @@ Batch summaries add:
 
 - [x] Add shared license/batch probe and cache in host runtime.
 - [x] Normalize known license/Hub/headless blocker logs.
-- [x] Add `license-capabilities` CLI and `xuunity_license_capabilities` MCP tool.
+- [x] Add `license-capabilities` CLI and `unity_license_capabilities` MCP tool.
 - [x] Add `--batch-fallback-mode` to public batch commands.
 - [x] Route compile, compile matrix, build-config matrix, EditMode tests, and
       player build through GUI equivalents when safe.

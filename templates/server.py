@@ -1736,7 +1736,7 @@ def call_xuunity_setup_validate_tool(arguments: dict[str, Any]) -> dict[str, Any
     return mcp_json_result(payload, is_error=payload.get("validation_status") == "blocked")
 
 
-def call_xuunity_license_capabilities_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+def call_unity_license_capabilities_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     project_root_value = arguments.get("projectRoot")
     if not isinstance(project_root_value, str) or not project_root_value.strip():
         raise JsonRpcError(-32602, "projectRoot is required.")
@@ -1768,7 +1768,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "xuunity_setup_plan": call_xuunity_setup_plan_tool,
             "xuunity_setup_apply": call_xuunity_setup_apply_tool,
             "xuunity_setup_validate": call_xuunity_setup_validate_tool,
-            "xuunity_license_capabilities": call_xuunity_license_capabilities_tool,
+            "unity_license_capabilities": call_unity_license_capabilities_tool,
             "unity_status_summary": call_unity_status_summary_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
             "unity_scenario_result_summary": call_unity_scenario_result_summary_tool,
