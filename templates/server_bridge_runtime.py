@@ -25,6 +25,14 @@ SUPPORTED_BRIDGE_TRANSPORTS = {
 }
 DEFAULT_HEARTBEAT_MAX_AGE_SECONDS = 10
 DEFAULT_IDLE_STABLE_CYCLES = 2
+COMPILE_RED_FAIL_FAST_OPERATIONS = frozenset(
+    {
+        "unity.tests.run_editmode",
+        "unity.tests.run_playmode",
+        "unity.playmode.set",
+        "unity.scenario.run",
+    }
+)
 
 
 def bridge_root(project_root: Path) -> Path:
@@ -142,6 +150,92 @@ def emit_request_not_submitted_ack(
         pass
 
 
+def emit_operation_progress_phase(
+    *,
+    project_root: Path,
+    operation: str,
+    phase: str,
+    request_id: str = "",
+    state: dict[str, Any] | None = None,
+    detail: str = "",
+) -> None:
+    bridge_generation, bridge_session_id = bridge_identity_from_state(state)
+    busy_reason = str((state or {}).get("busy_reason") or "")
+    message = (
+        "[xuunity-light-unity-mcp] operation_progress "
+        f"operation={operation} "
+        f"phase={phase} "
+        f"request_id={request_id or '-'} "
+        f"bridge_generation={bridge_generation} "
+        f"bridge_session_id={bridge_session_id or '-'} "
+        f"busy_reason={busy_reason or '-'} "
+        f"project_root={project_root}"
+    )
+    if detail:
+        message += f" detail={detail}"
+    try:
+        sys.stderr.write(message + "\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+def record_operation_progress_event(
+    *,
+    project_root: Path,
+    operation: str,
+    phase: str,
+    request_id: str = "",
+    state: dict[str, Any] | None = None,
+    detail: str = "",
+) -> Path:
+    bridge_generation, bridge_session_id = bridge_identity_from_state(state)
+    return write_host_request_journal_event(
+        project_root,
+        "operation_progress",
+        {
+            "request_id": request_id,
+            "operation": operation,
+            "phase": phase,
+            "detail": detail,
+            "bridge_generation": bridge_generation,
+            "bridge_session_id": bridge_session_id,
+            "busy_reason": str((state or {}).get("busy_reason") or ""),
+            "progress_event": True,
+        },
+    )
+
+
+def report_operation_progress_phase(
+    *,
+    project_root: Path,
+    operation: str,
+    phase: str,
+    request_id: str = "",
+    state: dict[str, Any] | None = None,
+    detail: str = "",
+) -> None:
+    emit_operation_progress_phase(
+        project_root=project_root,
+        operation=operation,
+        phase=phase,
+        request_id=request_id,
+        state=state,
+        detail=detail,
+    )
+    try:
+        record_operation_progress_event(
+            project_root=project_root,
+            operation=operation,
+            phase=phase,
+            request_id=request_id,
+            state=state,
+            detail=detail,
+        )
+    except Exception:
+        pass
+
+
 def record_request_submission_event(
     *,
     project_root: Path,
@@ -182,6 +276,43 @@ def bridge_identity_changed(
         return True
 
     return False
+
+
+def compiler_diagnostics_from_state(state: dict[str, Any] | None) -> dict[str, Any]:
+    effective = state or {}
+    diagnostics = effective.get("recent_compiler_diagnostics")
+    if not isinstance(diagnostics, list):
+        diagnostics = []
+    return {
+        "script_compilation_failed": bool(effective.get("script_compilation_failed")),
+        "compiler_error_count": max(0, int(effective.get("compiler_error_count") or 0)),
+        "recent_compiler_diagnostics": diagnostics[:5],
+        "compiler_diagnostics_source": str(effective.get("compiler_diagnostics_source") or ""),
+    }
+
+
+def fail_if_compile_broken_for_operation(
+    project_root: Path,
+    operation: str,
+    state: dict[str, Any] | None,
+) -> None:
+    if operation not in COMPILE_RED_FAIL_FAST_OPERATIONS:
+        return
+
+    diagnostics = compiler_diagnostics_from_state(state)
+    if not diagnostics["script_compilation_failed"] and diagnostics["compiler_error_count"] <= 0:
+        return
+
+    raise ToolInvocationError(
+        "compile_broken",
+        f"Unity has compilation errors; refusing to start {operation} before they are fixed.",
+        {
+            "project_root": str(project_root),
+            "operation": operation,
+            **diagnostics,
+            "recommended_next_action": "run_compile_gate_and_fix_errors",
+        },
+    )
 
 
 def write_host_request_journal_event(
@@ -583,6 +714,8 @@ def build_bridge_stabilization_summary(
         blocking_reasons.append("package_operation_in_progress")
     if bool(effective.get("compile_settle_pending")):
         blocking_reasons.append("compile_settle_pending")
+    if bool(effective.get("script_compilation_failed")) or int(effective.get("compiler_error_count") or 0) > 0:
+        blocking_reasons.append("compile_broken")
     if bool(effective.get("refresh_settle_pending")):
         blocking_reasons.append("refresh_settle_pending")
     if bool(effective.get("playmode_transition_pending")):

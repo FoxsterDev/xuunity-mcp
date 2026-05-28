@@ -22,7 +22,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 scenario_name = NormalizeScenarioName(scenario?.name),
             };
 
-            var steps = scenario?.steps ?? new List<XUUnityLightMcpScenarioStepDefinition>();
+            var steps = BuildExecutableSteps(scenario, out var cleanupStartIndex);
             payload.total_steps = steps.Count;
 
             if (string.IsNullOrWhiteSpace(scenario?.name))
@@ -30,7 +30,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 AddIssue(payload, "error", "missing_name", "Scenario name is required.", "", -1);
             }
 
-            if (steps.Count == 0)
+            if ((scenario?.steps ?? new List<XUUnityLightMcpScenarioStepDefinition>()).Count == 0)
             {
                 AddIssue(payload, "error", "missing_steps", "Scenario must contain at least one step.", "", -1);
             }
@@ -51,6 +51,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     AddIssue(payload, "error", "duplicate_step_id", $"Duplicate stepId '{stepId}'.", stepId, i);
                 }
 
+                ValidateStepDependencies(payload, step, stepId, i, seenStepIds);
                 ValidateStep(payload, step, stepId, i);
             }
 
@@ -72,21 +73,24 @@ namespace XUUnity.LightMcp.Editor.Helpers
             var nowUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
             var resultPath = BuildResultPath(runId, scenarioName);
 
+            var executableScenario = CloneScenarioWithExecutableSteps(scenario, out var cleanupStartIndex);
             var state = new XUUnityLightMcpScenarioRunState
             {
                 runId = runId,
-                scenario = scenario,
+                scenario = executableScenario,
                 status = "queued",
                 startedAtUtc = nowUtc,
                 updatedAtUtc = nowUtc,
                 completedAtUtc = "",
                 resultPath = resultPath,
                 currentStepIndex = 0,
+                cleanupStartIndex = cleanupStartIndex,
+                bodyFailed = false,
                 waitingUntilUtc = "",
                 steps = new List<XUUnityLightMcpScenarioStepResult>(),
             };
 
-            foreach (var step in scenario.steps)
+            foreach (var step in executableScenario.steps)
             {
                 state.steps.Add(new XUUnityLightMcpScenarioStepResult
                 {
@@ -126,6 +130,17 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
                 var step = state.scenario.steps[state.currentStepIndex];
                 var stepResult = state.steps[state.currentStepIndex];
+                if (ShouldSkipStepForDependencies(state, step, stepResult))
+                {
+                    PersistResult(state);
+                    SaveState(state);
+                    state.currentStepIndex++;
+                    state.waitingUntilUtc = "";
+                    PersistResult(state);
+                    SaveState(state);
+                    return;
+                }
+
                 var shouldAdvance = ProcessStep(state, step, stepResult);
 
                 PersistResult(state);
@@ -138,6 +153,14 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
                 if (stepResult.status == "failed" && state.scenario.stopOnFirstFailure)
                 {
+                    state.bodyFailed = true;
+                    if (TryJumpToCleanup(state))
+                    {
+                        PersistResult(state);
+                        SaveState(state);
+                        return;
+                    }
+
                     CompleteRun(state, "failed");
                     return;
                 }
@@ -209,6 +232,103 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             return TryReadPayload(latest, out payload, out errorCode, out errorMessage);
+        }
+
+        static XUUnityLightMcpScenarioDefinition CloneScenarioWithExecutableSteps(
+            XUUnityLightMcpScenarioDefinition scenario,
+            out int cleanupStartIndex)
+        {
+            var steps = BuildExecutableSteps(scenario, out cleanupStartIndex);
+            return new XUUnityLightMcpScenarioDefinition
+            {
+                name = scenario?.name ?? "",
+                description = scenario?.description ?? "",
+                stopOnFirstFailure = scenario?.stopOnFirstFailure ?? true,
+                steps = steps,
+                cleanupSteps = scenario?.cleanupSteps ?? new List<XUUnityLightMcpScenarioStepDefinition>(),
+            };
+        }
+
+        static List<XUUnityLightMcpScenarioStepDefinition> BuildExecutableSteps(
+            XUUnityLightMcpScenarioDefinition scenario,
+            out int cleanupStartIndex)
+        {
+            var bodySteps = scenario?.steps ?? new List<XUUnityLightMcpScenarioStepDefinition>();
+            var cleanupSteps = scenario?.cleanupSteps ?? new List<XUUnityLightMcpScenarioStepDefinition>();
+            cleanupStartIndex = cleanupSteps.Count > 0 ? bodySteps.Count : -1;
+
+            var result = new List<XUUnityLightMcpScenarioStepDefinition>(bodySteps.Count + cleanupSteps.Count);
+            result.AddRange(bodySteps);
+            result.AddRange(cleanupSteps);
+            return result;
+        }
+
+        static bool ShouldSkipStepForDependencies(
+            XUUnityLightMcpScenarioRunState state,
+            XUUnityLightMcpScenarioStepDefinition step,
+            XUUnityLightMcpScenarioStepResult stepResult)
+        {
+            var dependencies = DependencyIds(step).ToList();
+            if (dependencies.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var dependency in dependencies)
+            {
+                var dependencyResult = FindStepResult(state, dependency);
+                if (dependencyResult == null || dependencyResult.status != "passed")
+                {
+                    stepResult.status = "skipped";
+                    stepResult.outcome = $"dependency_not_passed:{dependency}";
+                    stepResult.error_code = "";
+                    stepResult.error_message = "";
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static IEnumerable<string> DependencyIds(XUUnityLightMcpScenarioStepDefinition step)
+        {
+            foreach (var dependency in step?.dependsOn ?? Array.Empty<string>())
+            {
+                if (!string.IsNullOrWhiteSpace(dependency))
+                {
+                    yield return dependency.Trim();
+                }
+            }
+
+            foreach (var dependency in step?.runIfStepPassed ?? Array.Empty<string>())
+            {
+                if (!string.IsNullOrWhiteSpace(dependency))
+                {
+                    yield return dependency.Trim();
+                }
+            }
+        }
+
+        static XUUnityLightMcpScenarioStepResult FindStepResult(
+            XUUnityLightMcpScenarioRunState state,
+            string stepId)
+        {
+            return state.steps.FirstOrDefault(item => string.Equals(item.stepId, stepId, StringComparison.Ordinal));
+        }
+
+        static bool TryJumpToCleanup(XUUnityLightMcpScenarioRunState state)
+        {
+            if (state.cleanupStartIndex < 0
+                || state.cleanupStartIndex >= state.scenario.steps.Count
+                || state.currentStepIndex >= state.cleanupStartIndex)
+            {
+                return false;
+            }
+
+            state.currentStepIndex = state.cleanupStartIndex;
+            state.waitingUntilUtc = "";
+            state.updatedAtUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+            return true;
         }
 
         static bool ProcessStep(XUUnityLightMcpScenarioRunState state, XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
@@ -1058,6 +1178,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 result_path = state.resultPath,
                 total_steps = state.steps.Count,
                 current_step_index = state.currentStepIndex,
+                waiting_until_utc = state.waitingUntilUtc,
                 steps = new List<XUUnityLightMcpScenarioStepResult>(state.steps),
                 passed_steps = CountSteps(state.steps, "passed"),
                 failed_steps = CountSteps(state.steps, "failed"),
@@ -1538,6 +1659,31 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 default:
                     AddIssue(payload, "error", "unsupported_kind", $"Unsupported scenario step kind '{kind}'.", stepId, index);
                     break;
+            }
+        }
+
+        static void ValidateStepDependencies(
+            XUUnityLightMcpScenarioValidatePayload payload,
+            XUUnityLightMcpScenarioStepDefinition step,
+            string stepId,
+            int index,
+            HashSet<string> knownPreviousOrCurrentStepIds)
+        {
+            foreach (var dependency in DependencyIds(step))
+            {
+                if (string.Equals(dependency, stepId, StringComparison.Ordinal))
+                {
+                    AddIssue(payload, "error", "self_dependency",
+                        $"Step '{stepId}' cannot depend on itself.", stepId, index);
+                    continue;
+                }
+
+                if (!knownPreviousOrCurrentStepIds.Contains(dependency))
+                {
+                    AddIssue(payload, "error", "unknown_dependency",
+                        $"Step '{stepId}' depends on unknown or later step '{dependency}'. Dependencies must reference earlier steps.",
+                        stepId, index);
+                }
             }
         }
 

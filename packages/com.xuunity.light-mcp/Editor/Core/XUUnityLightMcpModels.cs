@@ -60,6 +60,10 @@ namespace XUUnity.LightMcp.Editor.Core
         public string playmode_transition_completed_utc = "";
         public string playmode_transition_phase = "";
         public bool is_compiling;
+        public bool script_compilation_failed;
+        public int compiler_error_count;
+        public List<XUUnityLightMcpCompileErrorItem> recent_compiler_diagnostics = new();
+        public string compiler_diagnostics_source = "";
         public bool is_playing;
         public bool is_paused;
         public bool is_updating;
@@ -168,6 +172,10 @@ namespace XUUnity.LightMcp.Editor.Core
         public string playmode_transition_completed_utc = "";
         public string playmode_transition_phase = "";
         public bool is_compiling;
+        public bool script_compilation_failed;
+        public int compiler_error_count;
+        public List<XUUnityLightMcpCompileErrorItem> recent_compiler_diagnostics = new();
+        public string compiler_diagnostics_source = "";
         public bool is_playing;
         public bool is_paused;
         public bool is_updating;
@@ -827,6 +835,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public string description = "";
         public bool stopOnFirstFailure = true;
         public List<XUUnityLightMcpScenarioStepDefinition> steps = new();
+        public List<XUUnityLightMcpScenarioStepDefinition> cleanupSteps = new();
     }
 
     [Serializable]
@@ -834,6 +843,8 @@ namespace XUUnity.LightMcp.Editor.Core
     {
         public string stepId = "";
         public string kind = "";
+        public string[] dependsOn = null;
+        public string[] runIfStepPassed = null;
         public string action = "";
         public double durationSeconds;
         public double timeoutSeconds = 10.0d;
@@ -952,6 +963,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public int failed_steps;
         public int skipped_steps;
         public int current_step_index = -1;
+        public string waiting_until_utc = "";
         public double duration_seconds;
         public List<XUUnityLightMcpScenarioStepResult> steps = new();
         public string validation_evidence = "unity_mcp";
@@ -968,6 +980,8 @@ namespace XUUnity.LightMcp.Editor.Core
         public string completedAtUtc = "";
         public string resultPath = "";
         public int currentStepIndex;
+        public int cleanupStartIndex = -1;
+        public bool bodyFailed;
         public string waitingUntilUtc = "";
         public string pendingNestedRequestId = "";
         public string pendingNestedOperation = "";

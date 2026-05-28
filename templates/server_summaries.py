@@ -82,6 +82,10 @@ def build_status_summary(
         "bridge_generation": int(effective.get("bridge_generation") or 0),
         "bridge_session_id": str(effective.get("bridge_session_id") or ""),
         "playmode_state": str(effective.get("playmode_state") or ""),
+        "script_compilation_failed": bool(effective.get("script_compilation_failed")),
+        "compiler_error_count": int(effective.get("compiler_error_count") or 0),
+        "recent_compiler_diagnostics": list(effective.get("recent_compiler_diagnostics") or [])[:5],
+        "compiler_diagnostics_source": str(effective.get("compiler_diagnostics_source") or ""),
         "busy_reason": busy_reason,
         "busy_reason_detail": truncate_text(effective.get("busy_reason_detail") or ""),
         "pending_request_count": int(effective.get("pending_request_count") or 0),
@@ -296,11 +300,15 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
         "failed_steps": int(normalized.get("failed_steps") or 0),
         "skipped_steps": int(normalized.get("skipped_steps") or 0),
         "current_step_index": current_step_index,
+        "waiting_until_utc": str(normalized.get("waiting_until_utc") or ""),
         "result_path": str(normalized.get("result_path") or ""),
         "active_step": active_step,
         "last_completed_step": last_completed_step,
         "first_failed_step": first_failed_step,
     }
+    wait_remaining = scenario_wait_remaining_seconds(summary["waiting_until_utc"])
+    if wait_remaining is not None:
+        summary["wait_remaining_seconds"] = wait_remaining
     for key in ("structured_timing", "artifact_manifest"):
         if key in normalized:
             summary[key] = normalized.get(key)
@@ -373,6 +381,21 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
         }
 
     return summary
+
+
+def scenario_wait_remaining_seconds(waiting_until_utc: Any) -> float | None:
+    age = utc_age_seconds(waiting_until_utc)
+    if age is None:
+        return None
+    text = str(waiting_until_utc or "").strip()
+    try:
+        normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return round(max(0.0, parsed.timestamp() - time.time()), 3)
+    except Exception:
+        return None
 
 def list_files_under(root: Path) -> list[Path]:
     if not root.exists():

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+import calendar
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -17,6 +19,85 @@ TRANSIENT_SCENARIO_POLL_ERROR_CODES = frozenset(
 
 def is_terminal_scenario_status(status: Any, scenario_terminal_statuses: set[str]) -> bool:
     return isinstance(status, str) and status in scenario_terminal_statuses
+
+
+def parse_utc_seconds(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return float(calendar.timegm(time.strptime(text, "%Y-%m-%dT%H:%M:%SZ")))
+    except Exception:
+        return None
+
+
+def summarize_step_for_heartbeat(step: Any) -> str:
+    if not isinstance(step, dict):
+        return "-"
+    step_id = str(step.get("stepId") or step.get("step_id") or "")
+    kind = str(step.get("kind") or "")
+    status = str(step.get("status") or "")
+    label = step_id or kind or "-"
+    return f"{label}:{status or '-'}"
+
+
+def first_failed_step_label(steps: Any) -> str:
+    if not isinstance(steps, list):
+        return "-"
+    for step in steps:
+        if isinstance(step, dict) and str(step.get("status") or "") == "failed":
+            return summarize_step_for_heartbeat(step)
+    return "-"
+
+
+def emit_scenario_wait_heartbeat(
+    *,
+    project_root: Path,
+    payload: dict[str, Any],
+    last_key: str,
+    last_emit_unix: float,
+    min_interval_seconds: float = 15.0,
+) -> tuple[str, float]:
+    steps = payload.get("steps")
+    current_step_index = int(payload.get("current_step_index") or -1)
+    active_step = None
+    if isinstance(steps, list) and 0 <= current_step_index < len(steps):
+        active_step = steps[current_step_index]
+    waiting_until_utc = str(payload.get("waiting_until_utc") or "")
+    wait_remaining_seconds = None
+    wait_until_unix = parse_utc_seconds(waiting_until_utc)
+    if wait_until_unix is not None:
+        wait_remaining_seconds = round(max(0.0, wait_until_unix - time.time()), 1)
+    key = "|".join(
+        [
+            str(payload.get("status") or ""),
+            str(current_step_index),
+            summarize_step_for_heartbeat(active_step),
+            first_failed_step_label(steps),
+            waiting_until_utc,
+        ]
+    )
+    now = time.time()
+    if key == last_key and now - last_emit_unix < min_interval_seconds:
+        return last_key, last_emit_unix
+
+    message = (
+        "[xuunity-light-unity-mcp] scenario_wait "
+        f"scenario={payload.get('scenario_name') or ''} "
+        f"run_id={payload.get('run_id') or ''} "
+        f"status={payload.get('status') or ''} "
+        f"active_step={summarize_step_for_heartbeat(active_step)} "
+        f"first_failed_step={first_failed_step_label(steps)} "
+        f"waiting_until_utc={waiting_until_utc or '-'} "
+        f"remaining_seconds={wait_remaining_seconds if wait_remaining_seconds is not None else '-'} "
+        f"project_root={project_root}"
+    )
+    try:
+        sys.stderr.write(message + "\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+    return key, now
 
 
 def wait_for_scenario_result_data(
@@ -46,6 +127,8 @@ def wait_for_scenario_result_data(
     effective_poll_interval = max(0.1, poll_interval_ms / 1000.0)
     last_payload: dict[str, Any] | None = None
     recovery_attempt_count = 0
+    last_heartbeat_key = ""
+    last_heartbeat_unix = 0.0
 
     while time.time() < deadline:
         live_state = try_read_live_editor_state(project_root)
@@ -110,6 +193,13 @@ def wait_for_scenario_result_data(
             payload["wait_duration_seconds"] = round(time.time() - started_at, 3)
             payload["recovery_attempt_count"] = recovery_attempt_count
             return apply_discovery_to_scenario_payload(payload, project_root)
+
+        last_heartbeat_key, last_heartbeat_unix = emit_scenario_wait_heartbeat(
+            project_root=project_root,
+            payload=payload,
+            last_key=last_heartbeat_key,
+            last_emit_unix=last_heartbeat_unix,
+        )
 
         time.sleep(effective_poll_interval)
 

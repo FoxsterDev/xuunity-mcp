@@ -61,6 +61,10 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 playmode_transition_completed_utc = XUUnityLightMcpBridgeRuntimeState.PlayModeTransitionCompletedUtc,
                 playmode_transition_phase = XUUnityLightMcpBridgeRuntimeState.PlayModeTransitionPhase,
                 is_compiling = EditorApplication.isCompiling,
+                script_compilation_failed = EditorUtility.scriptCompilationFailed,
+                compiler_error_count = XUUnityLightMcpCompilerDiagnostics.ErrorCount,
+                recent_compiler_diagnostics = XUUnityLightMcpCompilerDiagnostics.Snapshot(5),
+                compiler_diagnostics_source = ResolveCompilerDiagnosticsSource(),
                 is_playing = EditorApplication.isPlaying,
                 is_paused = EditorApplication.isPaused,
                 is_updating = EditorApplication.isUpdating,
@@ -96,6 +100,17 @@ namespace XUUnity.LightMcp.Editor.Bridge
             };
 
             File.WriteAllText(XUUnityLightMcpFileIpcPaths.BridgeStatePath, JsonUtility.ToJson(state, true));
+        }
+
+        static string ResolveCompilerDiagnosticsSource()
+        {
+            var source = XUUnityLightMcpCompilerDiagnostics.DiagnosticsSource;
+            if (!string.IsNullOrWhiteSpace(source))
+            {
+                return source;
+            }
+
+            return EditorUtility.scriptCompilationFailed ? "script_compilation_failed_flag" : "";
         }
 
         static string ResolveBusyReason()

@@ -81,6 +81,39 @@ class BridgeRuntimeTests(unittest.TestCase):
         self.assertTrue(summary["transport_ready_for_requests"])
         self.assertNotIn("transport_listener_not_ready", summary["blocking_reasons"])
 
+    def test_compile_broken_state_blocks_test_and_play_operations(self) -> None:
+        state = {
+            "script_compilation_failed": True,
+            "compiler_error_count": 1,
+            "recent_compiler_diagnostics": [
+                {
+                    "file": "Assets/Foo.cs",
+                    "line": 12,
+                    "column": 3,
+                    "message": "error CS1002: ; expected",
+                }
+            ],
+            "compiler_diagnostics_source": "compilation_pipeline",
+        }
+
+        with self.assertRaises(server_bridge_runtime.ToolInvocationError) as raised:
+            server_bridge_runtime.fail_if_compile_broken_for_operation(
+                Path("/tmp/FakeProject"),
+                "unity.tests.run_editmode",
+                state,
+            )
+
+        self.assertEqual("compile_broken", raised.exception.code)
+        self.assertEqual(1, raised.exception.details["compiler_error_count"])
+        self.assertEqual("run_compile_gate_and_fix_errors", raised.exception.details["recommended_next_action"])
+
+    def test_compile_broken_state_does_not_block_status_operation(self) -> None:
+        server_bridge_runtime.fail_if_compile_broken_for_operation(
+            Path("/tmp/FakeProject"),
+            "unity.status",
+            {"script_compilation_failed": True, "compiler_error_count": 1},
+        )
+
     def test_resolve_bridge_transport_defaults_config_missing_transport_to_tcp_loopback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             project_root = Path(tmp_dir)

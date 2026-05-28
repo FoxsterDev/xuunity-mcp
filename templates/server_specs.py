@@ -185,6 +185,14 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
             "type": "string",
             "enum": ["enter", "exit", "pause", "resume"],
         },
+        "dependsOn": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "runIfStepPassed": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
         "durationSeconds": {
             "type": "number",
             "minimum": 0.0,
@@ -243,6 +251,11 @@ SCENARIO_DEFINITION_SCHEMA: dict[str, Any] = {
             "type": "array",
             "items": SCENARIO_STEP_SCHEMA,
             "minItems": 1,
+        },
+        "cleanupSteps": {
+            "type": "array",
+            "items": SCENARIO_STEP_SCHEMA,
+            "description": "Optional finally-style steps appended to the scenario and still run after a body failure when stopOnFirstFailure is true.",
         },
     },
     "required": ["name", "steps"],

@@ -48,6 +48,7 @@ from server_bridge_runtime import (
     default_editor_log_path,
     derive_busy_reason,
     expected_playmode_state_for_action,
+    fail_if_compile_broken_for_operation,
     heartbeat_age_seconds,
     inspect_stale_request_artifacts,
     inspect_bridge_state_liveness,
@@ -57,6 +58,7 @@ from server_bridge_runtime import (
     pid_is_alive,
     read_best_effort_bridge_state,
     read_request_journal_events,
+    report_operation_progress_phase,
     request_journal_dir,
     scenario_results_dir,
     summarize_state_for_error,
@@ -1241,6 +1243,11 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
 
         for attempt_index in range(max_attempts):
             pre_request_state = try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root)
+            progress_enabled = bool(
+                policy.get("activate_unity")
+                or policy.get("wait_for_idle_before")
+                or policy.get("wait_for_idle_after")
+            )
             lifecycle: dict[str, Any] = {
                 "operation": operation,
                 "attempt_index": attempt_index,
@@ -1257,6 +1264,12 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
 
             try:
                 if policy["activate_unity"]:
+                    report_operation_progress_phase(
+                        project_root=project_root,
+                        operation=operation,
+                        phase="activation",
+                        state=pre_request_state,
+                    )
                     lifecycle["activation_requested"] = True
                     lifecycle["activation"] = recover_project_bridge_for_reconciliation(
                         project_root,
@@ -1269,7 +1282,16 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                         allow_open_editor=True,
                     )
 
+                pre_idle_state = try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root)
+                fail_if_compile_broken_for_operation(project_root, operation, pre_idle_state)
+
                 if policy["wait_for_idle_before"]:
+                    report_operation_progress_phase(
+                        project_root=project_root,
+                        operation=operation,
+                        phase="wait_for_idle_before",
+                        state=pre_idle_state,
+                    )
                     lifecycle["idle_wait_before"] = wait_for_editor_idle(
                         project_root,
                         timeout_ms,
@@ -1278,6 +1300,20 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                         stable_cycles=1,
                     )
 
+                dispatch_state = try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root)
+                if progress_enabled:
+                    report_operation_progress_phase(
+                        project_root=project_root,
+                        operation=operation,
+                        phase="dispatching",
+                        state=dispatch_state,
+                    )
+                    report_operation_progress_phase(
+                        project_root=project_root,
+                        operation=operation,
+                        phase="waiting_for_response",
+                        state=dispatch_state,
+                    )
                 response, request_id, request_started_at, transport_metadata = invoke_bridge_transport(
                     project_root,
                     operation,
@@ -1290,6 +1326,14 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                 if operation == "unity.playmode.set":
                     expected_playmode_state = expected_playmode_state_for_action(str(args.get("action") or ""))
                     if expected_playmode_state:
+                        report_operation_progress_phase(
+                            project_root=project_root,
+                            operation=operation,
+                            phase="wait_for_idle_after",
+                            request_id=request_id,
+                            state=try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root),
+                            detail=f"playmode_target:{expected_playmode_state}",
+                        )
                         lifecycle["playmode_wait_after"] = wait_for_playmode_state(
                             project_root,
                             timeout_ms,
@@ -1301,6 +1345,13 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                             stable_cycles=int(policy["idle_stable_cycles_after"]),
                         )
                     elif policy["wait_for_idle_after"]:
+                        report_operation_progress_phase(
+                            project_root=project_root,
+                            operation=operation,
+                            phase="wait_for_idle_after",
+                            request_id=request_id,
+                            state=try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root),
+                        )
                         lifecycle["idle_wait_after"] = wait_for_editor_idle(
                             project_root,
                             timeout_ms,
@@ -1311,6 +1362,13 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                             stable_cycles=int(policy["idle_stable_cycles_after"]),
                         )
                 elif policy["wait_for_idle_after"]:
+                    report_operation_progress_phase(
+                        project_root=project_root,
+                        operation=operation,
+                        phase="wait_for_idle_after",
+                        request_id=request_id,
+                        state=try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root),
+                    )
                     lifecycle["idle_wait_after"] = wait_for_editor_idle(
                         project_root,
                         timeout_ms,

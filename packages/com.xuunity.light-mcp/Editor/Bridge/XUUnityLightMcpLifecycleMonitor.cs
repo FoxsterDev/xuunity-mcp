@@ -32,6 +32,8 @@ namespace XUUnity.LightMcp.Editor.Bridge
             CompilationPipeline.compilationStarted += OnCompilationStarted;
             CompilationPipeline.compilationFinished -= OnCompilationFinished;
             CompilationPipeline.compilationFinished += OnCompilationFinished;
+            CompilationPipeline.assemblyCompilationFinished -= OnAssemblyCompilationFinished;
+            CompilationPipeline.assemblyCompilationFinished += OnAssemblyCompilationFinished;
 
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
@@ -93,12 +95,18 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         static void OnCompilationStarted(object context)
         {
+            XUUnityLightMcpCompilerDiagnostics.MarkCompilationStarted();
             XUUnityLightMcpBridgeRuntimeState.MarkScriptReloadPending();
         }
 
         static void OnCompilationFinished(object context)
         {
             XUUnityLightMcpBridgeRuntimeState.MarkScriptReloadCompleted();
+        }
+
+        static void OnAssemblyCompilationFinished(string assemblyName, CompilerMessage[] messages)
+        {
+            XUUnityLightMcpCompilerDiagnostics.RecordAssemblyCompilationFinished(assemblyName, messages);
         }
 
         static void OnRegisteringPackages(PackageRegistrationEventArgs eventArgs)
