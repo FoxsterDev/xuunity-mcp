@@ -103,7 +103,7 @@ Inputs:
 - Unity project root: <absolute path to the Unity project>
 - Workspace/repository root: <absolute path to workspace; may equal project root>
 - MCP client: <Claude Code | Claude Desktop | Cursor | Windsurf | Codex | custom stdio MCP client>
-- Package mode: Git UPM release v0.3.16, unless this is local MCP development.
+- Package mode: Git UPM release v0.3.17, unless this is local MCP development.
 - Test operations: optional. Install Test Framework only after explicit approval.
 
 Principles:
@@ -161,7 +161,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16
+> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -169,7 +169,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17"
   }
 }
 ```

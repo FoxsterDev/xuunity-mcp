@@ -1,7 +1,7 @@
 # Discovery Guide
 
 Date: `2026-05-23`
-Status: `current for v0.3.16`
+Status: `current for v0.3.17`
 
 This project is relevant for searches like:
 
@@ -32,7 +32,7 @@ XUUnity Light Unity MCP is an open-source lightweight Unity MCP server for safe 
 Current Git UPM package URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17
 ```
 
 Use `packages/com.xuunity.light-mcp` as the canonical Unity package path.

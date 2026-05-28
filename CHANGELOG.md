@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 0.3.17
+
+Release tag: `v0.3.17`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17
+```
+
+### Added
+
+- Added `sync_release_version.py` to synchronize package metadata, server
+  metadata, package manifest templates, and current release-facing docs from the
+  package version source of truth.
+- Added `check_release_version_consistency.py` and host-suite coverage so stale
+  current-version references fail before release tagging.
+
+### Changed
+
+- Released `v0.3.17` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ## 0.3.16
 
 Release tag: `v0.3.16`

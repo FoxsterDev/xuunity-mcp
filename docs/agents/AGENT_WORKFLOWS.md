@@ -206,7 +206,7 @@ Minimum evidence object:
   "workflowId": "post_change_validation",
   "projectRoot": "$PROJECT_ROOT",
   "unityVersion": "6000.0.58f2",
-  "packageVersion": "0.3.16",
+  "packageVersion": "0.3.17",
   "packageSourceMode": "git",
   "verdict": "pass",
   "checks": [
@@ -912,8 +912,12 @@ lock entry so Unity can re-resolve the package.
 Production route:
 
 ```bash
-# First publish the package release tag that matches package.json, for example:
-git push origin v0.3.16
+# First synchronize release-facing version references, for example with
+# --version 0.3.17 when preparing the next patch release.
+python3 scripts/tools/sync_release_version.py --version <next-version>
+scripts/testing/run_host_python_tests.sh
+
+git push origin v<next-version>
 
 "$WRAPPER" prodmode \
   --project-root "$PROJECT_ROOT"
