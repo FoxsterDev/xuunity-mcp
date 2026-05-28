@@ -2,11 +2,40 @@
 
 ## Unreleased
 
+## 0.3.16
+
+Release tag: `v0.3.16`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16
+```
+
 ### Added
 
+- Added Unity bridge/status compiler diagnostics:
+  `script_compilation_failed`, `compiler_error_count`,
+  `recent_compiler_diagnostics`, and `compiler_diagnostics_source`.
+- Added host-side compile-red fail-fast for EditMode tests, PlayMode tests,
+  Play Mode transitions, and scenario runs before long editor-idle waits.
+- Added operator-visible pre-dispatch progress phases: `activation`,
+  `wait_for_idle_before`, `dispatching`, `waiting_for_response`, and
+  `wait_for_idle_after`.
+- Added scenario DSL dependency and cleanup support through `dependsOn`,
+  `runIfStepPassed`, and `cleanupSteps`.
+- Added compact scenario wait heartbeat output that reports active step, first
+  failed step, wait deadline, remaining seconds, and editor health context.
 - Added a visual Codex Desktop custom MCP setup guide with sanitized screenshots
   and guidance for natural Unity requests through the `xuunity_light_unity`
   server.
+
+### Changed
+
+- Scenario `stopOnFirstFailure` now jumps to cleanup steps when configured, so
+  project state can be restored even after the scenario body fails.
+- Released `v0.3.16` package metadata, server metadata, package manifests, and
+  Git UPM examples.
 
 ## 0.3.15
 
