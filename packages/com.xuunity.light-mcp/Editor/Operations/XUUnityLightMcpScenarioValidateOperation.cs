@@ -11,12 +11,21 @@ namespace XUUnity.LightMcp.Editor.Operations
 
         public XUUnityLightMcpResponse Execute(XUUnityLightMcpRequest request)
         {
-            var args = string.IsNullOrWhiteSpace(request.args_json)
-                ? new XUUnityLightMcpScenarioValidateArgs()
-                : JsonUtility.FromJson<XUUnityLightMcpScenarioValidateArgs>(request.args_json) ?? new XUUnityLightMcpScenarioValidateArgs();
-
             try
             {
+                if (!XUUnityLightMcpScenarioProjectActionNormalizer.TryNormalizeArgsJson(
+                        request.args_json,
+                        out var argsJson,
+                        out var errorCode,
+                        out var errorMessage))
+                {
+                    return XUUnityLightMcpResponseWriter.Error(request.request_id, errorCode, errorMessage);
+                }
+
+                var args = string.IsNullOrWhiteSpace(argsJson)
+                    ? new XUUnityLightMcpScenarioValidateArgs()
+                    : JsonUtility.FromJson<XUUnityLightMcpScenarioValidateArgs>(argsJson) ?? new XUUnityLightMcpScenarioValidateArgs();
+
                 var payload = XUUnityLightMcpScenarioRunner.Validate(args.scenario);
                 return XUUnityLightMcpResponseWriter.Success(
                     request.request_id,

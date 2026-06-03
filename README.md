@@ -103,7 +103,7 @@ Inputs:
 - Unity project root: <absolute path to the Unity project>
 - Workspace/repository root: <absolute path to workspace; may equal project root>
 - MCP client: <Claude Code | Claude Desktop | Cursor | Windsurf | Codex | custom stdio MCP client>
-- Package mode: Git UPM release v0.3.17, unless this is local MCP development.
+- Package mode: Git UPM release v0.3.18, unless this is local MCP development.
 - Test operations: optional. Install Test Framework only after explicit approval.
 
 Principles:
@@ -161,7 +161,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17
+> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.18
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -169,7 +169,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.18"
   }
 }
 ```
@@ -303,6 +303,8 @@ Popular MCP tools:
 `unity_game_view_configure` | `unity_game_view_screenshot` |
 `unity_scenario_validate` | `unity_scenario_run_and_wait` |
 `unity_request_final_status` | `unity_project_refresh` |
+`unity_project_action_list` | `unity_project_action_invoke` |
+`unity_artifact_register` | `unity_artifact_write_report` |
 `unity_package_install_test_framework` | `unity_edm4u_resolve` |
 `unity_sdk_dependency_verify`
 
@@ -311,7 +313,14 @@ Host helper commands include `setup-plan`, `setup-apply`, `validate-setup`,
 `request-editor-quit --wait-for-exit`, `restore-editor-state`,
 `recover-editor-session`, `batch-compile`, `batch-compile-matrix`,
 `batch-editmode-tests`, `batch-build-config-compile-matrix`,
-`batch-build-player`, `artifact-probe`, `devmode`, and `prodmode`.
+`batch-build-player`, `project-action-list`, `project-action-invoke`,
+`artifact-register`, `artifact-write-report`, `artifact-probe`, `devmode`,
+and `prodmode`.
+
+Scenario JSON may use Unity-native `project_action` steps for catalog-backed
+project actions. Unity resolves `project_actions.yaml`, enforces mutation
+approval, and executes the matching `project_defined_hook`; the host wrapper
+also performs the same normalization before dispatch as an early diagnostic.
 
 See [FEATURES.md](docs/reference/FEATURES.md) for maturity levels and implementation evidence.
 

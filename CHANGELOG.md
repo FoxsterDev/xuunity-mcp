@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+## 0.3.18
+
+Release tag: `v0.3.18`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.18
+```
+
+### Added
+
+- Added catalog-backed `project_action` scenario steps as a Unity-native
+  scenario contract. Unity now resolves `project_actions.yaml`, enforces
+  explicit approval for mutating actions, and executes the declared
+  `project_defined_hook` without requiring host-side scenario rewriting.
+- Added host-side `project_action` scenario preflight so MCP tools and wrapper
+  commands can fail early with the same mutation and catalog diagnostics before
+  dispatching to Unity.
+- Added host-side project action tools and commands for listing and invoking
+  catalog-backed project actions.
+- Added artifact registry/report helpers for project validation pipelines that
+  need stable report artifacts without importing them into Unity `Assets`.
+- Added regression coverage for typed project action scenario expansion,
+  mutation approval guards, `payloadJson` support, artifact registry helpers,
+  and Unity-side raw `project_action` normalization.
+
+### Changed
+
+- Updated scenario schemas and docs so `project_action` is documented as a
+  Unity-side contract with host preflight, rather than a host-only authoring
+  convenience.
+- Released `v0.3.18` package metadata, server metadata, package manifests, and
+  Git UPM examples.
+
 ## 0.3.17
 
 Release tag: `v0.3.17`

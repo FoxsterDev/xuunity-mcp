@@ -11,6 +11,10 @@ import time
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
+from server_artifact_registry import (
+    register_artifact,
+    write_artifact_report,
+)
 from server_artifact_probe import load_artifact_probe_config, run_artifact_probe
 from server_build_config import build_compile_matrix_args_from_build_config
 from server_batch_reporting import (
@@ -127,6 +131,14 @@ from server_operation_evidence import (
     attach_persisted_scenario_result_evidence,
     parse_utc_timestamp,
 )
+from server_project_actions import (
+    build_project_action_invocation_payload,
+    build_project_action_scenario,
+    load_project_action_catalog,
+    normalize_project_action_scenario,
+    project_action_catalog_payload,
+    resolve_project_action,
+)
 from server_project_context import (
     ensure_project_root as ensure_project_root_base,
     find_latest_request_event,
@@ -196,7 +208,7 @@ from server_workspace_effects import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-light-unity-mcp",
-    "version": "0.3.17",
+    "version": "0.3.18",
 }
 LIGHTWEIGHT_PACKAGE_NAME = "com.xuunity.light-mcp"
 
@@ -1531,6 +1543,10 @@ def call_unity_compile_build_config_matrix_tool(arguments: dict[str, Any]) -> di
 
 
 def call_unity_scenario_run_and_wait_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    try:
+        arguments = normalize_scenario_tool_arguments(arguments)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
     return call_unity_scenario_run_and_wait_tool_base(
         arguments,
         tool_invocation_error_type=ToolInvocationError,
@@ -1542,6 +1558,72 @@ def call_unity_scenario_run_and_wait_tool(arguments: dict[str, Any]) -> dict[str
         build_tool_error_payload=build_tool_error_payload,
         scenario_failure_tool_result=scenario_failure_tool_result,
     )
+
+
+def normalize_scenario_tool_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    scenario = arguments.get("scenario")
+    if not isinstance(project_root_value, str) or not project_root_value.strip() or not isinstance(scenario, dict):
+        return arguments
+
+    project_root = ensure_project_root(project_root_value)
+    normalized = dict(arguments)
+    normalized["projectRoot"] = str(project_root)
+    normalized["scenario"] = normalize_project_action_scenario(
+        project_root=project_root,
+        scenario=scenario,
+    )
+    return normalized
+
+
+def call_unity_scenario_validate_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    try:
+        arguments = normalize_scenario_tool_arguments(arguments)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+    scenario = arguments.get("scenario")
+    if not isinstance(scenario, dict):
+        raise JsonRpcError(-32602, "scenario must be an object.")
+
+    timeout_ms = arguments.get("timeoutMs", 5000)
+    if not isinstance(timeout_ms, int):
+        raise JsonRpcError(-32602, "timeoutMs must be an integer.")
+
+    try:
+        project_root = ensure_project_root(project_root_value)
+        response = invoke_bridge(str(project_root), "unity.scenario.validate", {"scenario": scenario}, timeout_ms)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return bridge_response_to_tool_result(response)
+
+
+def call_unity_scenario_run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    try:
+        arguments = normalize_scenario_tool_arguments(arguments)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+    scenario = arguments.get("scenario")
+    if not isinstance(scenario, dict):
+        raise JsonRpcError(-32602, "scenario must be an object.")
+
+    try:
+        project_root = ensure_project_root(project_root_value)
+        timeout_ms = resolve_operation_timeout_ms(
+            project_root,
+            "unity.scenario.run",
+            arguments.get("timeoutMs"),
+            5000,
+        )
+        response = invoke_bridge(str(project_root), "unity.scenario.run", {"scenario": scenario}, timeout_ms)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return bridge_response_to_tool_result(response)
 
 
 def call_unity_status_summary_tool(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -1817,6 +1899,208 @@ def call_unity_license_capabilities_tool(arguments: dict[str, Any]) -> dict[str,
     return mcp_json_result(payload)
 
 
+def call_unity_project_action_list_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    catalog_path = _optional_string_arg(arguments, "catalogPath")
+    try:
+        project_root = ensure_project_root(project_root_value)
+        catalog = load_project_action_catalog(project_root, catalog_path)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(project_action_catalog_payload(catalog))
+
+
+def call_unity_project_action_invoke_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    action_id = arguments.get("actionId")
+    if not isinstance(action_id, str) or not action_id.strip():
+        raise JsonRpcError(-32602, "actionId is required.")
+
+    payload = arguments.get("payload", {})
+    if not isinstance(payload, dict):
+        raise JsonRpcError(-32602, "payload must be an object when provided.")
+
+    wait_for_result = _optional_bool_arg(arguments, "waitForResult", True)
+    allow_mutating = _optional_bool_arg(arguments, "allowMutating", False)
+    poll_interval_ms = arguments.get("pollIntervalMs", 1000)
+    if not isinstance(poll_interval_ms, int):
+        raise JsonRpcError(-32602, "pollIntervalMs must be an integer.")
+
+    try:
+        project_root = ensure_project_root(project_root_value)
+        timeout_ms = resolve_operation_timeout_ms(
+            project_root,
+            "unity.scenario.run",
+            arguments.get("timeoutMs"),
+            600000,
+        )
+        result, is_error = invoke_project_action_from_catalog(
+            project_root=project_root,
+            requested_action=action_id,
+            action_payload=dict(payload),
+            catalog_path=_optional_string_arg(arguments, "catalogPath"),
+            scenario_name=_optional_string_arg(arguments, "scenarioName"),
+            timeout_ms=timeout_ms,
+            poll_interval_ms=poll_interval_ms,
+            wait_for_result=wait_for_result,
+            allow_mutating=allow_mutating,
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(result, is_error=is_error)
+
+
+def call_unity_artifact_register_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    path_value = arguments.get("path")
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise JsonRpcError(-32602, "path is required.")
+
+    metadata = arguments.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise JsonRpcError(-32602, "metadata must be an object when provided.")
+
+    try:
+        project_root = ensure_project_root(project_root_value)
+        payload = register_artifact(
+            project_root=project_root,
+            artifact_path=path_value,
+            destination=_optional_string_arg(arguments, "destination") or "repo_artifact",
+            kind=_optional_string_arg(arguments, "kind") or "artifact",
+            producer=_optional_string_arg(arguments, "producer") or "",
+            artifact_schema_version=_optional_string_arg(arguments, "artifactSchemaVersion") or "",
+            language=_optional_string_arg(arguments, "language") or "",
+            retention_policy=_optional_string_arg(arguments, "retentionPolicy") or "project",
+            metadata=dict(metadata),
+            workspace_root=_optional_string_arg(arguments, "workspaceRoot") or "",
+            allow_unity_assets=_optional_bool_arg(arguments, "allowUnityAssets", False),
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload)
+
+
+def call_unity_artifact_write_report_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    content = arguments.get("content")
+    if not isinstance(content, str):
+        raise JsonRpcError(-32602, "content is required and must be a string.")
+
+    metadata = arguments.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise JsonRpcError(-32602, "metadata must be an object when provided.")
+
+    try:
+        project_root = ensure_project_root(project_root_value)
+        payload = write_artifact_report(
+            project_root=project_root,
+            content=content,
+            destination=_optional_string_arg(arguments, "destination") or "repo_report",
+            category=_optional_string_arg(arguments, "category") or "XUUnityLightUnityMcp",
+            relative_path=_optional_string_arg(arguments, "relativePath") or "",
+            kind=_optional_string_arg(arguments, "kind") or "report",
+            producer=_optional_string_arg(arguments, "producer") or "",
+            artifact_schema_version=_optional_string_arg(arguments, "artifactSchemaVersion") or "",
+            language=_optional_string_arg(arguments, "language") or "",
+            retention_policy=_optional_string_arg(arguments, "retentionPolicy") or "project",
+            metadata=dict(metadata),
+            workspace_root=_optional_string_arg(arguments, "workspaceRoot") or "",
+            allow_unity_assets=_optional_bool_arg(arguments, "allowUnityAssets", False),
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload)
+
+
+def invoke_project_action_from_catalog(
+    *,
+    project_root: Path,
+    requested_action: str,
+    action_payload: dict[str, Any],
+    catalog_path: str,
+    scenario_name: str,
+    timeout_ms: int,
+    poll_interval_ms: int,
+    wait_for_result: bool,
+    allow_mutating: bool,
+) -> tuple[dict[str, Any], bool]:
+    catalog = load_project_action_catalog(project_root, catalog_path)
+    action_record = resolve_project_action(catalog, requested_action)
+    if bool(action_record.get("mutation")) and not allow_mutating:
+        raise ToolInvocationError(
+            "project_action_mutation_approval_required",
+            (
+                f"Project action '{action_record.get('action_id')}' declares mutations. "
+                "Pass allowMutating=true only after reviewing the action catalog contract."
+            ),
+            {
+                "action_id": str(action_record.get("action_id") or ""),
+                "mutates": list(action_record.get("mutates") or []),
+                "catalog_path": str(catalog.get("catalog_path") or ""),
+            },
+        )
+
+    scenario = build_project_action_scenario(
+        action_record=action_record,
+        action_payload=action_payload,
+        scenario_name=scenario_name,
+    )
+    run_response = invoke_bridge(
+        str(project_root),
+        "unity.scenario.run",
+        {"scenario": scenario},
+        max(5000, min(timeout_ms, 15000)),
+    )
+    run_tool_result = bridge_response_to_tool_result(run_response)
+    if run_tool_result.get("isError"):
+        return dict(run_tool_result.get("structuredContent") or {}), True
+
+    run_payload = run_tool_result.get("structuredContent") or {}
+    if not isinstance(run_payload, dict):
+        run_payload = {}
+
+    scenario_summary = None
+    if wait_for_result:
+        run_id = str(run_payload.get("run_id") or "")
+        effective_scenario_name = str(run_payload.get("scenario_name") or scenario.get("name") or "")
+        result_payload = wait_for_scenario_result(
+            project_root=project_root,
+            run_id=run_id,
+            scenario_name=effective_scenario_name,
+            timeout_ms=timeout_ms,
+            poll_interval_ms=poll_interval_ms,
+        )
+        scenario_summary = build_scenario_result_summary_from_context(
+            project_root,
+            result_payload if isinstance(result_payload, dict) else {},
+        )
+
+    result = build_project_action_invocation_payload(
+        project_root=project_root,
+        catalog=catalog,
+        action_record=action_record,
+        requested_action=requested_action,
+        action_payload=action_payload,
+        scenario=scenario,
+        run_payload=run_payload,
+        scenario_summary=scenario_summary,
+        wait_for_result=wait_for_result,
+    )
+    return result, wait_for_result and not bool(result.get("succeeded"))
+
+
 def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
     return call_tool_base(
         name,
@@ -1834,7 +2118,13 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_scenario_result_latest": call_unity_scenario_result_latest_tool,
             "unity_maintenance_prune": call_unity_maintenance_prune_tool,
             "unity_compile_build_config_matrix": call_unity_compile_build_config_matrix_tool,
+            "unity_scenario_validate": call_unity_scenario_validate_tool,
+            "unity_scenario_run": call_unity_scenario_run_tool,
             "unity_scenario_run_and_wait": call_unity_scenario_run_and_wait_tool,
+            "unity_project_action_list": call_unity_project_action_list_tool,
+            "unity_project_action_invoke": call_unity_project_action_invoke_tool,
+            "unity_artifact_register": call_unity_artifact_register_tool,
+            "unity_artifact_write_report": call_unity_artifact_write_report_tool,
         },
         tool_invocation_error_type=ToolInvocationError,
         ensure_project_root=ensure_project_root,
@@ -2446,6 +2736,125 @@ def load_json_file(path_value: str, error_code: str) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ToolInvocationError(error_code, str(exc)) from exc
+
+
+def load_project_action_payload_args(args) -> dict[str, Any]:
+    payload_json = str(getattr(args, "payload_json", "") or "").strip()
+    payload_file = str(getattr(args, "payload_file", "") or "").strip()
+    if payload_json and payload_file:
+        raise ToolInvocationError(
+            "project_action_payload_ambiguous",
+            "Use either --payload-json or --payload-file, not both.",
+        )
+    if not payload_json and not payload_file:
+        return {}
+
+    if payload_file:
+        payload = load_json_file(payload_file, "project_action_payload_invalid")
+    else:
+        try:
+            payload = json.loads(payload_json)
+        except json.JSONDecodeError as exc:
+            raise ToolInvocationError("project_action_payload_invalid", str(exc)) from exc
+
+    if not isinstance(payload, dict):
+        raise ToolInvocationError("project_action_payload_invalid", "Project action payload must be a JSON object.")
+    return payload
+
+
+def cmd_project_action_list(args):
+    project_root = ensure_project_root(args.project_root)
+    catalog = load_project_action_catalog(project_root, args.catalog_file or "")
+    print_json(project_action_catalog_payload(catalog))
+
+
+def cmd_project_action_invoke(args):
+    project_root = ensure_project_root(args.project_root)
+    result, is_error = invoke_project_action_from_catalog(
+        project_root=project_root,
+        requested_action=args.action_id,
+        action_payload=load_project_action_payload_args(args),
+        catalog_path=args.catalog_file or "",
+        scenario_name=args.scenario_name or "",
+        timeout_ms=resolve_operation_default_timeout_ms(project_root, "unity.scenario.run", 600000) if args.timeout_ms is None else args.timeout_ms,
+        poll_interval_ms=args.poll_interval_ms,
+        wait_for_result=not bool(args.no_wait),
+        allow_mutating=bool(args.allow_mutating),
+    )
+    print_json(result)
+    if is_error:
+        raise SystemExit(1)
+
+
+def load_optional_json_object(value: str, error_code: str) -> dict[str, Any]:
+    if not str(value or "").strip():
+        return {}
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ToolInvocationError(error_code, str(exc)) from exc
+    if not isinstance(payload, dict):
+        raise ToolInvocationError(error_code, "Expected a JSON object.")
+    return payload
+
+
+def load_report_content_args(args) -> str:
+    content = str(getattr(args, "content", "") or "")
+    content_file = str(getattr(args, "content_file", "") or "").strip()
+    if content and content_file:
+        raise ToolInvocationError(
+            "artifact_report_content_ambiguous",
+            "Use either --content or --content-file, not both.",
+        )
+    if content_file:
+        path = Path(content_file).expanduser().resolve()
+        if not path.is_file():
+            raise ToolInvocationError("artifact_report_content_not_found", f"Report content file not found: {path}")
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ToolInvocationError("artifact_report_content_unreadable", str(exc)) from exc
+    if content:
+        return content
+    raise ToolInvocationError("artifact_report_content_required", "Report content is required.")
+
+
+def cmd_artifact_register(args):
+    project_root = ensure_project_root(args.project_root)
+    payload = register_artifact(
+        project_root=project_root,
+        artifact_path=args.path,
+        destination=args.destination,
+        kind=args.kind,
+        producer=args.producer,
+        artifact_schema_version=args.artifact_schema_version,
+        language=args.language,
+        retention_policy=args.retention_policy,
+        metadata=load_optional_json_object(args.metadata_json, "artifact_metadata_invalid"),
+        workspace_root=args.workspace_root,
+        allow_unity_assets=bool(args.allow_unity_assets),
+    )
+    print_json(payload)
+
+
+def cmd_artifact_write_report(args):
+    project_root = ensure_project_root(args.project_root)
+    payload = write_artifact_report(
+        project_root=project_root,
+        content=load_report_content_args(args),
+        destination=args.destination,
+        category=args.category,
+        relative_path=args.relative_path,
+        kind=args.kind,
+        producer=args.producer,
+        artifact_schema_version=args.artifact_schema_version,
+        language=args.language,
+        retention_policy=args.retention_policy,
+        metadata=load_optional_json_object(args.metadata_json, "artifact_metadata_invalid"),
+        workspace_root=args.workspace_root,
+        allow_unity_assets=bool(args.allow_unity_assets),
+    )
+    print_json(payload)
 
 
 def resolve_workspace_root(project_root: Path, workspace_root_value: str | None) -> Path:
@@ -3928,9 +4337,13 @@ def run_single_test_framework_candidate(
 
 
 def cmd_request_scenario_validate(args):
-    scenario = load_json_file(args.scenario_file, "scenario_file_invalid")
+    project_root = ensure_project_root(args.project_root)
+    scenario = normalize_project_action_scenario(
+        project_root=project_root,
+        scenario=load_json_file(args.scenario_file, "scenario_file_invalid"),
+    )
     response = invoke_bridge(
-        args.project_root,
+        str(project_root),
         "unity.scenario.validate",
         {"scenario": scenario},
         args.timeout_ms,
@@ -3939,8 +4352,11 @@ def cmd_request_scenario_validate(args):
 
 
 def cmd_request_scenario_run(args):
-    scenario = load_json_file(args.scenario_file, "scenario_file_invalid")
     project_root = ensure_project_root(args.project_root)
+    scenario = normalize_project_action_scenario(
+        project_root=project_root,
+        scenario=load_json_file(args.scenario_file, "scenario_file_invalid"),
+    )
     response = invoke_bridge(
         str(project_root),
         "unity.scenario.run",
@@ -3951,8 +4367,11 @@ def cmd_request_scenario_run(args):
 
 
 def cmd_request_scenario_run_and_wait(args):
-    scenario = load_json_file(args.scenario_file, "scenario_file_invalid")
     project_root = ensure_project_root(args.project_root)
+    scenario = normalize_project_action_scenario(
+        project_root=project_root,
+        scenario=load_json_file(args.scenario_file, "scenario_file_invalid"),
+    )
     result = call_unity_scenario_run_and_wait_tool(
         {
             "projectRoot": str(project_root),
@@ -5032,6 +5451,67 @@ def build_parser():
     project_refresh_cmd.add_argument("--rerun-health-probe", dest="rerun_health_probe", action=argparse.BooleanOptionalAction, default=True)
     project_refresh_cmd.add_argument("--timeout-ms", type=int, default=None)
     project_refresh_cmd.set_defaults(func=cmd_request_project_refresh)
+
+    project_action_list_cmd = sub.add_parser(
+        "project-action-list",
+        help="Read the typed project action catalog for a Unity project.",
+    )
+    project_action_list_cmd.add_argument("--project-root", required=True)
+    project_action_list_cmd.add_argument("--catalog-file")
+    project_action_list_cmd.set_defaults(func=cmd_project_action_list)
+
+    project_action_invoke_cmd = sub.add_parser(
+        "project-action-invoke",
+        help="Invoke a typed project action by compiling it to a one-step Unity scenario.",
+    )
+    project_action_invoke_cmd.add_argument("--project-root", required=True)
+    project_action_invoke_cmd.add_argument("--action-id", required=True)
+    project_action_invoke_cmd.add_argument("--payload-json", default="")
+    project_action_invoke_cmd.add_argument("--payload-file", default="")
+    project_action_invoke_cmd.add_argument("--catalog-file")
+    project_action_invoke_cmd.add_argument("--scenario-name", default="")
+    project_action_invoke_cmd.add_argument("--allow-mutating", action="store_true")
+    project_action_invoke_cmd.add_argument("--no-wait", action="store_true")
+    project_action_invoke_cmd.add_argument("--timeout-ms", type=int, default=None)
+    project_action_invoke_cmd.add_argument("--poll-interval-ms", type=int, default=1000)
+    project_action_invoke_cmd.set_defaults(func=cmd_project_action_invoke)
+
+    artifact_register_cmd = sub.add_parser(
+        "artifact-register",
+        help="Register artifact metadata in the project MCP artifact registry.",
+    )
+    artifact_register_cmd.add_argument("--project-root", required=True)
+    artifact_register_cmd.add_argument("--path", required=True)
+    artifact_register_cmd.add_argument("--destination", default="repo_artifact")
+    artifact_register_cmd.add_argument("--kind", default="artifact")
+    artifact_register_cmd.add_argument("--producer", default="")
+    artifact_register_cmd.add_argument("--artifact-schema-version", default="")
+    artifact_register_cmd.add_argument("--language", default="")
+    artifact_register_cmd.add_argument("--retention-policy", default="project")
+    artifact_register_cmd.add_argument("--metadata-json", default="")
+    artifact_register_cmd.add_argument("--workspace-root", default="")
+    artifact_register_cmd.add_argument("--allow-unity-assets", action="store_true")
+    artifact_register_cmd.set_defaults(func=cmd_artifact_register)
+
+    artifact_write_report_cmd = sub.add_parser(
+        "artifact-write-report",
+        help="Write a report artifact to an approved output root and register it.",
+    )
+    artifact_write_report_cmd.add_argument("--project-root", required=True)
+    artifact_write_report_cmd.add_argument("--content", default="")
+    artifact_write_report_cmd.add_argument("--content-file", default="")
+    artifact_write_report_cmd.add_argument("--destination", default="repo_report")
+    artifact_write_report_cmd.add_argument("--category", default="XUUnityLightUnityMcp")
+    artifact_write_report_cmd.add_argument("--relative-path", default="")
+    artifact_write_report_cmd.add_argument("--kind", default="report")
+    artifact_write_report_cmd.add_argument("--producer", default="")
+    artifact_write_report_cmd.add_argument("--artifact-schema-version", default="")
+    artifact_write_report_cmd.add_argument("--language", default="")
+    artifact_write_report_cmd.add_argument("--retention-policy", default="project")
+    artifact_write_report_cmd.add_argument("--metadata-json", default="")
+    artifact_write_report_cmd.add_argument("--workspace-root", default="")
+    artifact_write_report_cmd.add_argument("--allow-unity-assets", action="store_true")
+    artifact_write_report_cmd.set_defaults(func=cmd_artifact_write_report)
 
     install_tf_bridge_cmd = sub.add_parser(
         "request-install-test-framework",

@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -12,6 +13,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server
+import server_project_actions
 
 
 def get_subparser_choices(parser: argparse.ArgumentParser) -> set[str]:
@@ -42,6 +44,10 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "request-scenario-results-list",
                 "request-scenario-result-latest",
                 "request-project-refresh",
+                "project-action-list",
+                "project-action-invoke",
+                "artifact-register",
+                "artifact-write-report",
                 "request-install-test-framework",
                 "verify-editor-closed",
                 "request-edm4u-resolve",
@@ -84,6 +90,590 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_scenario_run_and_wait", tool_names)
         self.assertIn("unity_scenario_results_list", tool_names)
         self.assertIn("unity_scenario_result_latest", tool_names)
+        self.assertIn("unity_project_action_list", tool_names)
+        self.assertIn("unity_project_action_invoke", tool_names)
+        self.assertIn("unity_artifact_register", tool_names)
+        self.assertIn("unity_artifact_write_report", tool_names)
+
+    def test_project_action_catalog_parser_resolves_aliases_and_hook_names(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            catalog_path = Path(temp_dir) / "project_actions.yaml"
+            catalog_path.write_text(
+                """
+schemaVersion: xuunity.project-actions.v1
+project: FakeProject
+hookName: ""
+actions:
+  project.safe:
+    aliases: [safe]
+    hookName: example.project
+    payload:
+      mode: string
+    mutates: []
+    evidence:
+      - compact_result
+    validationModes:
+      - project_action_contract
+""".strip(),
+                encoding="utf-8",
+            )
+
+            catalog = server_project_actions.load_project_action_catalog(
+                Path(temp_dir) / "FakeProject",
+                str(catalog_path),
+            )
+
+        listed = server_project_actions.project_action_catalog_payload(catalog)
+        self.assertEqual("xuunity.project-actions.v1", listed["schema_version"])
+        self.assertEqual(["project.safe"], listed["available_actions"])
+        self.assertEqual([], listed["validation_errors"])
+        action = server_project_actions.resolve_project_action(catalog, "safe")
+        self.assertEqual("project.safe", action["action_id"])
+        self.assertEqual("safe", action["resolved_by_alias"])
+        self.assertEqual("example.project", action["hook_name"])
+
+    def test_project_action_list_tool_returns_catalog_without_editor_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir) / "FakeProject"
+            project_root.mkdir()
+            catalog_path = Path(temp_dir) / "project_actions.yaml"
+            catalog_path.write_text(
+                """
+schemaVersion: xuunity.project-actions.v1
+project: FakeProject
+hookName: example.default
+actions:
+  project.safe:
+    aliases:
+      - safe
+    payload: {}
+    mutates: []
+    evidence:
+      - compact_result
+    validationModes:
+      - project_action_contract
+""".strip(),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(server, "ensure_project_root", return_value=project_root):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 20,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_project_action_list",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "catalogPath": str(catalog_path),
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        result = response["result"]
+        self.assertFalse(result["isError"])
+        self.assertEqual("unity_project_action_list", result["structuredContent"]["action"])
+        self.assertEqual(["project.safe"], result["structuredContent"]["available_actions"])
+        self.assertEqual("example.default", result["structuredContent"]["actions"][0]["hook_name"])
+
+    def test_project_action_invoke_tool_runs_typed_action_scenario_and_compact_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir) / "FakeProject"
+            project_root.mkdir()
+            catalog_path = Path(temp_dir) / "project_actions.yaml"
+            catalog_path.write_text(
+                """
+schemaVersion: xuunity.project-actions.v1
+project: FakeProject
+hookName: ""
+actions:
+  project.safe:
+    aliases:
+      - safe
+    hookName: example.project
+    payload:
+      foo: string
+    mutates: []
+    evidence:
+      - changed_file_count
+    validationModes:
+      - project_action_contract
+""".strip(),
+                encoding="utf-8",
+            )
+
+            invoke_calls: list[tuple[str, dict[str, object], int]] = []
+
+            def fake_invoke_bridge(
+                project_root_value: str,
+                operation: str,
+                operation_args: dict[str, object],
+                timeout_ms: int,
+            ) -> dict[str, object]:
+                invoke_calls.append((operation, dict(operation_args), timeout_ms))
+                return {
+                    "status": "ok",
+                    "payload_type": "unity.scenario.run",
+                    "payload_json": json.dumps(
+                        {
+                            "project_root": str(project_root),
+                            "run_id": "run-1",
+                            "scenario_name": "TypedActionSmoke",
+                            "status": "queued",
+                        }
+                    ),
+                }
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+                mock.patch.object(
+                    server,
+                    "wait_for_scenario_result",
+                    return_value={
+                        "project_root": str(project_root),
+                        "run_id": "run-1",
+                        "scenario_name": "TypedActionSmoke",
+                        "status": "passed",
+                        "total_steps": 1,
+                        "passed_steps": 1,
+                        "failed_steps": 0,
+                        "skipped_steps": 0,
+                        "steps": [
+                            {
+                                "stepId": "invoke_project_action",
+                                "kind": "project_defined_hook",
+                                "status": "passed",
+                                "outcome": "hook_succeeded",
+                                "hook_name": "example.project",
+                                "payload_json": json.dumps(
+                                    {
+                                        "outcome": "done",
+                                        "changed_file_count": 2,
+                                        "api_token": "do-not-surface",
+                                    }
+                                ),
+                            }
+                        ],
+                    },
+                ),
+                mock.patch.object(
+                    server,
+                    "refresh_project_context",
+                    return_value=mock.Mock(discovery_details={}, last_bridge_state={}),
+                ),
+            ):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 21,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_project_action_invoke",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "catalogPath": str(catalog_path),
+                                "actionId": "safe",
+                                "payload": {"foo": "bar"},
+                                "scenarioName": "TypedActionSmoke",
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        result = response["result"]
+        self.assertFalse(result["isError"])
+        structured = result["structuredContent"]
+        self.assertEqual("unity_project_action_invoke", structured["action"])
+        self.assertEqual("project.safe", structured["action_id"])
+        self.assertEqual("safe", structured["resolved_by_alias"])
+        self.assertTrue(structured["succeeded"])
+        hook_summary = structured["project_defined_hook_summary"]["hooks"][0]
+        self.assertEqual("done", hook_summary["outcome"])
+        self.assertEqual(2, hook_summary["payload_scalars"]["changed_file_count"])
+        self.assertNotIn("api_token", hook_summary.get("payload_scalars", {}))
+
+        self.assertEqual(1, len(invoke_calls))
+        operation, scenario_args, timeout_ms = invoke_calls[0]
+        self.assertEqual("unity.scenario.run", operation)
+        self.assertEqual(15000, timeout_ms)
+        scenario = scenario_args["scenario"]
+        hook_payload_json = scenario["steps"][0]["hookPayloadJson"]
+        hook_payload = json.loads(hook_payload_json)
+        self.assertEqual("project.safe", hook_payload["action"])
+        self.assertEqual("bar", hook_payload["foo"])
+
+    def test_project_action_invoke_tool_requires_explicit_mutation_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir) / "FakeProject"
+            project_root.mkdir()
+            catalog_path = Path(temp_dir) / "project_actions.yaml"
+            catalog_path.write_text(
+                """
+schemaVersion: xuunity.project-actions.v1
+project: FakeProject
+hookName: example.project
+actions:
+  project.mutating:
+    payload: {}
+    mutates:
+      - PlayerPrefs
+    validationModes:
+      - project_action_contract
+""".strip(),
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server, "invoke_bridge") as invoke_mock,
+            ):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 22,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_project_action_invoke",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "catalogPath": str(catalog_path),
+                                "actionId": "project.mutating",
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        result = response["result"]
+        self.assertTrue(result["isError"])
+        self.assertEqual(
+            "project_action_mutation_approval_required",
+            result["structuredContent"]["error"]["code"],
+        )
+        invoke_mock.assert_not_called()
+
+    def test_scenario_run_and_wait_expands_project_action_steps_before_unity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            project_root = workspace_root / "FakeProject"
+            project_root.mkdir()
+            catalog_path = (
+                workspace_root
+                / "AIOutput"
+                / "Projects"
+                / "FakeProject"
+                / "Operations"
+                / "XUUnityLightUnityMcp"
+                / "project_actions.yaml"
+            )
+            catalog_path.parent.mkdir(parents=True)
+            catalog_path.write_text(
+                """
+schemaVersion: xuunity.project-actions.v1
+project: FakeProject
+hookName: ""
+actions:
+  localization.list_actions:
+    hookName: example.localization
+    payload: {}
+    mutates: []
+    validationModes:
+      - localization_pipeline
+""".strip(),
+                encoding="utf-8",
+            )
+
+            invoke_calls: list[tuple[str, dict[str, object], int]] = []
+
+            def fake_invoke_bridge(
+                project_root_value: str,
+                operation: str,
+                operation_args: dict[str, object],
+                timeout_ms: int,
+            ) -> dict[str, object]:
+                invoke_calls.append((operation, dict(operation_args), timeout_ms))
+                return {
+                    "status": "ok",
+                    "payload_type": "unity.scenario.run",
+                    "payload_json": json.dumps(
+                        {
+                            "project_root": str(project_root),
+                            "run_id": "run-typed-scenario",
+                            "scenario_name": "TypedLocalizationScenario",
+                            "status": "queued",
+                        }
+                    ),
+                }
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+                mock.patch.object(
+                    server,
+                    "wait_for_scenario_result",
+                    return_value={
+                        "project_root": str(project_root),
+                        "run_id": "run-typed-scenario",
+                        "scenario_name": "TypedLocalizationScenario",
+                        "status": "passed",
+                        "succeeded": True,
+                        "terminal": True,
+                        "total_steps": 1,
+                        "passed_steps": 1,
+                        "failed_steps": 0,
+                        "skipped_steps": 0,
+                    },
+                ),
+            ):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 25,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_scenario_run_and_wait",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "scenario": {
+                                    "name": "TypedLocalizationScenario",
+                                    "steps": [
+                                        {
+                                            "stepId": "localization_list_actions",
+                                            "kind": "project_action",
+                                            "actionId": "localization.list_actions",
+                                            "payload": {},
+                                        }
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual(1, len(invoke_calls))
+        operation, scenario_args, _ = invoke_calls[0]
+        self.assertEqual("unity.scenario.run", operation)
+        sent_step = scenario_args["scenario"]["steps"][0]
+        self.assertEqual("project_defined_hook", sent_step["kind"])
+        self.assertEqual("example.localization", sent_step["hookName"])
+        self.assertEqual(
+            {"action": "localization.list_actions"},
+            json.loads(sent_step["hookPayloadJson"]),
+        )
+
+    def test_scenario_project_action_steps_accept_payload_json_escape_hatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            project_root = workspace_root / "FakeProject"
+            project_root.mkdir()
+            catalog_path = (
+                workspace_root
+                / "AIOutput"
+                / "Projects"
+                / "FakeProject"
+                / "Operations"
+                / "XUUnityLightUnityMcp"
+                / "project_actions.yaml"
+            )
+            catalog_path.parent.mkdir(parents=True)
+            catalog_path.write_text(
+                """
+schemaVersion: xuunity.project-actions.v1
+project: FakeProject
+hookName: example.localization
+actions:
+  localization.scan:
+    payload: {}
+    mutates:
+      - repo-level reports
+    validationModes:
+      - localization_pipeline
+""".strip(),
+                encoding="utf-8",
+            )
+
+            normalized = server_project_actions.normalize_project_action_scenario(
+                project_root=project_root,
+                scenario={
+                    "name": "PayloadJsonScenario",
+                    "steps": [
+                        {
+                            "stepId": "localization_scan",
+                            "kind": "project_action",
+                            "actionId": "localization.scan",
+                            "allowMutating": True,
+                            "payloadJson": "{\"target_language\":\"pt-BR\"}",
+                        }
+                    ],
+                },
+            )
+
+        sent_step = normalized["steps"][0]
+        self.assertEqual("project_defined_hook", sent_step["kind"])
+        self.assertNotIn("payloadJson", sent_step)
+        self.assertEqual(
+            {"target_language": "pt-BR", "action": "localization.scan"},
+            json.loads(sent_step["hookPayloadJson"]),
+        )
+
+    def test_scenario_project_action_steps_require_mutation_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            project_root = workspace_root / "FakeProject"
+            project_root.mkdir()
+            catalog_path = (
+                workspace_root
+                / "AIOutput"
+                / "Projects"
+                / "FakeProject"
+                / "Operations"
+                / "XUUnityLightUnityMcp"
+                / "project_actions.yaml"
+            )
+            catalog_path.parent.mkdir(parents=True)
+            catalog_path.write_text(
+                """
+schemaVersion: xuunity.project-actions.v1
+project: FakeProject
+hookName: example.localization
+actions:
+  localization.scan:
+    payload: {}
+    mutates:
+      - repo-level reports
+    validationModes:
+      - localization_pipeline
+""".strip(),
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server, "invoke_bridge") as invoke_mock,
+            ):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 26,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_scenario_validate",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "scenario": {
+                                    "name": "TypedLocalizationMutationGuard",
+                                    "steps": [
+                                        {
+                                            "stepId": "localization_scan",
+                                            "kind": "project_action",
+                                            "actionId": "localization.scan",
+                                        }
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        result = response["result"]
+        self.assertTrue(result["isError"])
+        self.assertEqual(
+            "project_action_mutation_approval_required",
+            result["structuredContent"]["error"]["code"],
+        )
+        invoke_mock.assert_not_called()
+
+    def test_artifact_write_report_tool_writes_repo_report_and_registry_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            project_root = workspace_root / "FakeProject"
+            project_root.mkdir()
+
+            with mock.patch.object(server, "ensure_project_root", return_value=project_root):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 23,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_artifact_write_report",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "workspaceRoot": str(workspace_root),
+                                "content": "# Report\n",
+                                "category": "Localization",
+                                "relativePath": "smoke/report.md",
+                                "kind": "localization_report",
+                                "producer": "test",
+                                "artifactSchemaVersion": "demo.v1",
+                                "language": "pt-BR",
+                                "metadata": {"api_token": "secret", "count": 1},
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+            result = response["result"]
+            self.assertFalse(result["isError"])
+            structured = result["structuredContent"]
+            self.assertEqual("repo_report", structured["destination"])
+            self.assertFalse(structured["unity_imported"])
+            self.assertEqual("AIOutput/Projects/FakeProject/Reports/Localization/smoke/report.md", structured["repo_relative_path"])
+            self.assertEqual("localization_report", structured["kind"])
+            self.assertEqual("demo.v1", structured["artifact_schema_version"])
+            self.assertEqual("pt-BR", structured["language"])
+            self.assertEqual("[REDACTED]", structured["metadata"]["api_token"])
+            self.assertEqual(1, structured["metadata"]["count"])
+
+            report_path = Path(structured["path"])
+            self.assertEqual("# Report\n", report_path.read_text(encoding="utf-8"))
+            registry_path = Path(structured["registry_path"])
+            registry_lines = registry_path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(1, len(registry_lines))
+            registry_record = json.loads(registry_lines[0])
+            self.assertEqual(structured["path"], registry_record["path"])
+            self.assertEqual("[REDACTED]", registry_record["metadata"]["api_token"])
+
+    def test_artifact_register_tool_requires_unity_assets_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_root = Path(temp_dir)
+            project_root = workspace_root / "FakeProject"
+            project_root.mkdir()
+
+            with mock.patch.object(server, "ensure_project_root", return_value=project_root):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 24,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_artifact_register",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "workspaceRoot": str(workspace_root),
+                                "path": "Assets/AIOutput/report.md",
+                                "destination": "unity_asset",
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        result = response["result"]
+        self.assertTrue(result["isError"])
+        self.assertEqual(
+            "artifact_unity_asset_approval_required",
+            result["structuredContent"]["error"]["code"],
+        )
 
     def test_tools_call_status_summary_happy_path(self) -> None:
         with (

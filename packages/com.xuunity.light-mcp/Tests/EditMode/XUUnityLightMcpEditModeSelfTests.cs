@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using NUnit.Framework;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
@@ -140,6 +142,78 @@ namespace XUUnity.LightMcp.Tests.EditMode
             Assert.That(payload.playmode_state, Is.Not.Empty);
             Assert.That(payload.health_status, Is.Not.Empty);
             Assert.That(payload.supported_operations, Does.Contain("unity.status"));
+        }
+
+        [Test]
+        public void ScenarioProjectActionNormalizer_ExpandsRawProjectActionPayload()
+        {
+            var catalogPath = WriteTemporaryProjectActionCatalog();
+            try
+            {
+                var argsJson = "{\"scenario\":{\"name\":\"native_project_action\",\"steps\":[{\"stepId\":\"scan\",\"kind\":\"project_action\",\"actionId\":\"localization.scan\",\"allowMutating\":true,\"payload\":{\"target_language\":\"pt-BR\",\"include_scripts\":true}}]}}";
+
+                var normalized = XUUnityLightMcpScenarioProjectActionNormalizer.TryNormalizeArgsJson(
+                    argsJson,
+                    catalogPath,
+                    out var normalizedArgsJson,
+                    out var errorCode,
+                    out var errorMessage);
+
+                Assert.That(normalized, Is.True, $"{errorCode}: {errorMessage}");
+                var args = JsonUtility.FromJson<XUUnityLightMcpScenarioValidateArgs>(normalizedArgsJson);
+                Assert.That(args.scenario.steps[0].kind, Is.EqualTo("project_defined_hook"));
+                Assert.That(args.scenario.steps[0].hookName, Is.EqualTo("apperfunhub.localization"));
+                Assert.That(args.scenario.steps[0].hookPayloadJson, Does.Contain("\"action\":\"localization.scan\""));
+                Assert.That(args.scenario.steps[0].hookPayloadJson, Does.Contain("\"target_language\":\"pt-BR\""));
+            }
+            finally
+            {
+                File.Delete(catalogPath);
+            }
+        }
+
+        [Test]
+        public void ScenarioProjectActionNormalizer_RequiresMutationApproval()
+        {
+            var catalogPath = WriteTemporaryProjectActionCatalog();
+            try
+            {
+                var argsJson = "{\"scenario\":{\"name\":\"native_project_action\",\"steps\":[{\"stepId\":\"scan\",\"kind\":\"project_action\",\"actionId\":\"localization.scan\",\"payload\":{\"target_language\":\"pt-BR\"}}]}}";
+
+                var normalized = XUUnityLightMcpScenarioProjectActionNormalizer.TryNormalizeArgsJson(
+                    argsJson,
+                    catalogPath,
+                    out _,
+                    out var errorCode,
+                    out var errorMessage);
+
+                Assert.That(normalized, Is.False);
+                Assert.That(errorCode, Is.EqualTo("project_action_mutation_approval_required"));
+                Assert.That(errorMessage, Does.Contain("localization.scan"));
+            }
+            finally
+            {
+                File.Delete(catalogPath);
+            }
+        }
+
+        static string WriteTemporaryProjectActionCatalog()
+        {
+            var catalogPath = Path.Combine(Path.GetTempPath(), $"xuunity_project_actions_{Guid.NewGuid():N}.yaml");
+            File.WriteAllText(
+                catalogPath,
+                "schemaVersion: xuunity.project-actions.v1\n"
+                + "project: SelfTest\n"
+                + "hookName: \"\"\n"
+                + "actions:\n"
+                + "  localization.scan:\n"
+                + "    aliases:\n"
+                + "      - localization.discovery\n"
+                + "    hookName: apperfunhub.localization\n"
+                + "    payload: {}\n"
+                + "    mutates:\n"
+                + "      - repo-level localization pipeline reports\n");
+            return catalogPath;
         }
     }
 }

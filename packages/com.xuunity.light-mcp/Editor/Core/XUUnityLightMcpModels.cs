@@ -876,6 +876,10 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool rerunHealthProbe = true;
         public string hookName = "";
         public string hookPayloadJson = "";
+        public string actionId = "";
+        public string projectAction = "";
+        public string payloadJson = "";
+        public bool allowMutating;
     }
 
     [Serializable]

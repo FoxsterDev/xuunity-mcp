@@ -178,6 +178,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
                 "tests_run_editmode",
                 "tests_run_playmode",
                 "game_view_configure",
+                "project_action",
                 "project_defined_hook",
             ],
         },
@@ -237,6 +238,11 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
         "rerunHealthProbe": {"type": "boolean"},
         "hookName": {"type": "string"},
         "hookPayloadJson": {"type": "string"},
+        "actionId": {"type": "string"},
+        "projectAction": {"type": "string"},
+        "payload": {"type": "object"},
+        "payloadJson": {"type": "string"},
+        "allowMutating": {"type": "boolean", "default": False},
     },
     "required": ["kind"],
 }
@@ -437,6 +443,109 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "timeoutMs": {"type": "integer", "default": 180000, "minimum": 1000}
             },
             "required": ["projectRoot"]
+        }
+    },
+    "unity_project_action_list": {
+        "description": "Read and normalize the typed project action catalog for a Unity project.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "catalogPath": {
+                    "type": "string",
+                    "description": "Optional explicit project_actions.yaml path. Defaults to the host output location for the project."
+                }
+            },
+            "required": ["projectRoot"]
+        }
+    },
+    "unity_project_action_invoke": {
+        "description": "Invoke a typed project action from project_actions.yaml through a one-step Unity scenario.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "actionId": {
+                    "type": "string",
+                    "description": "Catalog action id or alias."
+                },
+                "payload": {
+                    "type": "object",
+                    "description": "Action-specific JSON payload. The reserved action field is supplied from the catalog action id."
+                },
+                "catalogPath": {
+                    "type": "string",
+                    "description": "Optional explicit project_actions.yaml path. Defaults to the host output location for the project."
+                },
+                "scenarioName": {"type": "string"},
+                "allowMutating": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true for actions whose catalog entry declares mutates."
+                },
+                "waitForResult": {"type": "boolean", "default": True},
+                "timeoutMs": {"type": "integer", "default": 600000, "minimum": 1000},
+                "pollIntervalMs": {"type": "integer", "default": 1000, "minimum": 100}
+            },
+            "required": ["projectRoot", "actionId"]
+        }
+    },
+    "unity_artifact_register": {
+        "description": "Register artifact metadata in the project MCP artifact registry without invoking Unity.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "path": {"type": "string"},
+                "destination": {
+                    "type": "string",
+                    "enum": ["repo_report", "repo_artifact", "library", "unity_asset", "external"],
+                    "default": "repo_artifact"
+                },
+                "kind": {"type": "string", "default": "artifact"},
+                "producer": {"type": "string"},
+                "artifactSchemaVersion": {"type": "string"},
+                "language": {"type": "string"},
+                "retentionPolicy": {"type": "string", "default": "project"},
+                "metadata": {"type": "object"},
+                "workspaceRoot": {"type": "string"},
+                "allowUnityAssets": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true before registering Unity-imported Assets output."
+                }
+            },
+            "required": ["projectRoot", "path"]
+        }
+    },
+    "unity_artifact_write_report": {
+        "description": "Write a text report to an approved project output root and register it in the artifact registry.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "content": {"type": "string"},
+                "destination": {
+                    "type": "string",
+                    "enum": ["repo_report", "repo_artifact", "library", "unity_asset"],
+                    "default": "repo_report"
+                },
+                "category": {"type": "string", "default": "XUUnityLightUnityMcp"},
+                "relativePath": {"type": "string"},
+                "kind": {"type": "string", "default": "report"},
+                "producer": {"type": "string"},
+                "artifactSchemaVersion": {"type": "string"},
+                "language": {"type": "string"},
+                "retentionPolicy": {"type": "string", "default": "project"},
+                "metadata": {"type": "object"},
+                "workspaceRoot": {"type": "string"},
+                "allowUnityAssets": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true before writing Unity-imported Assets output."
+                }
+            },
+            "required": ["projectRoot", "content"]
         }
     },
     "unity_package_install_test_framework": {

@@ -367,6 +367,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     return ProcessPlayModeTestsStep(state, step, stepResult);
                 case "game_view_configure":
                     return ProcessGameViewConfigureStep(step, stepResult);
+                case "project_action":
+                    return ProcessProjectActionStep(step, stepResult);
                 case "project_defined_hook":
                     return ProcessProjectDefinedHookStep(step, stepResult);
                 default:
@@ -752,6 +754,24 @@ namespace XUUnity.LightMcp.Editor.Helpers
             };
 
             return ProcessNestedOperationStep("unity.game_view.configure", JsonUtility.ToJson(args), stepResult);
+        }
+
+        static bool ProcessProjectActionStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
+        {
+            if (!XUUnityLightMcpScenarioProjectActionNormalizer.TryBuildExecutableProjectActionStep(
+                    step,
+                    out var executableStep,
+                    out var errorCode,
+                    out var errorMessage))
+            {
+                stepResult.status = "failed";
+                stepResult.error_code = errorCode;
+                stepResult.error_message = errorMessage;
+                return true;
+            }
+
+            stepResult.hook_name = executableStep.hookName ?? "";
+            return ProcessProjectDefinedHookStep(executableStep, stepResult);
         }
 
         static bool ProcessProjectDefinedHookStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
@@ -1642,6 +1662,16 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     {
                         AddIssue(payload, "error", "invalid_resolution",
                             "game_view_configure requires width > 0 and height > 0.", stepId, index);
+                    }
+                    break;
+                case "project_action":
+                    if (!XUUnityLightMcpScenarioProjectActionNormalizer.TryBuildExecutableProjectActionStep(
+                            step,
+                            out _,
+                            out var actionErrorCode,
+                            out var actionErrorMessage))
+                    {
+                        AddIssue(payload, "error", actionErrorCode, actionErrorMessage, stepId, index);
                     }
                     break;
                 case "project_defined_hook":

@@ -1,7 +1,7 @@
 # Package Path Migration
 
 Date: `2026-05-23`
-Status: `current for v0.3.17`
+Status: `current for v0.3.18`
 
 XUUnity Light Unity MCP moved the Unity package to a registry-native path for
 OpenUPM and Unity Package Manager indexing.
@@ -25,7 +25,7 @@ Use this path for `v0.3.12+`.
 ## Git UPM URL
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.18
 ```
 
 ## Local Development Path
@@ -37,7 +37,7 @@ file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp
 ## Migration Steps
 
 1. Replace `?path=/templates/unity-package#v0.3.11` with
-   `?path=/packages/com.xuunity.light-mcp#v0.3.17`.
+   `?path=/packages/com.xuunity.light-mcp#v0.3.18`.
 2. Remove the `com.xuunity.light-mcp` entry from `Packages/packages-lock.json`
    or let `xuunity_light_unity_mcp.sh prodmode` do it.
 3. Let Unity re-resolve packages by reopening the project or refreshing the
