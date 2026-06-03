@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+## 0.3.19
+
+Release tag: `v0.3.19`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+```
+
+### Added
+
+- Added compact lifecycle churn output to the post-change validation runner,
+  including bridge generation/session transition, request abandoned and
+  reclassification counts, final health, final Play Mode state, compiler
+  errors, stale request count, and warning codes.
+- Added package self-test discovery output to the package self-test smoke
+  runner, including testables visibility, Test Framework version, package
+  source/hash, test asmdef count, test counts, and discovered MCP categories.
+
+### Fixed
+
+- Fixed package EditMode self-test compilation on Unity versions where
+  `Object.DestroyImmediate` is ambiguous between `UnityEngine.Object` and
+  `object`.
+- Fixed package self-test smoke accounting so an explicit package self-test
+  request fails on `no_tests` or `total=0` instead of reporting a top-level MCP
+  success as a test pass.
+- Fixed package self-test discovery blind spots so a requested self-test lane
+  fails before execution when the expected package test asmdefs, categories, or
+  lane test counts are not visible.
+
+### Changed
+
+- Released `v0.3.19` package metadata, server metadata, package manifests, and
+  Git UPM examples.
+
 ## 0.3.18
 
 Release tag: `v0.3.18`

@@ -107,6 +107,174 @@ else:
 PY
 }
 
+print_package_self_test_discovery() {
+  local lock_path="$PROJECT_ROOT/Packages/packages-lock.json"
+  python3 - "$MANIFEST_PATH" "$lock_path" "$PROJECT_ROOT" "$OPS_ROOT" "$RUN_MODE" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+lock_path = Path(sys.argv[2])
+project_root = Path(sys.argv[3])
+ops_root = Path(sys.argv[4])
+run_mode = sys.argv[5]
+
+
+def read_json(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def resolve_package_source(manifest, manifest_path, project_root, ops_root):
+    dependency = str((manifest.get("dependencies") or {}).get("com.xuunity.light-mcp") or "")
+    candidates = []
+
+    if dependency.startswith("file:"):
+        relative_path = dependency[len("file:") :]
+        candidates.append((manifest_path.parent / relative_path).resolve())
+
+    cache_root = project_root / "Library" / "PackageCache"
+    if cache_root.is_dir():
+        candidates.extend(
+            sorted(
+                (path for path in cache_root.glob("com.xuunity.light-mcp@*") if path.is_dir()),
+                key=lambda path: path.stat().st_mtime,
+                reverse=True,
+            )
+        )
+
+    candidates.append(ops_root / "packages" / "com.xuunity.light-mcp")
+    for candidate in candidates:
+        if (candidate / "Tests").is_dir():
+            return candidate
+    return candidates[0] if candidates else Path()
+
+
+def asmdef_name(path):
+    data = read_json(path)
+    return str(data.get("name") or path.stem)
+
+
+manifest = read_json(manifest_path)
+lock_data = read_json(lock_path)
+dependencies = manifest.get("dependencies") if isinstance(manifest.get("dependencies"), dict) else {}
+lock_dependencies = lock_data.get("dependencies") if isinstance(lock_data.get("dependencies"), dict) else {}
+package_lock = lock_dependencies.get("com.xuunity.light-mcp") if isinstance(lock_dependencies.get("com.xuunity.light-mcp"), dict) else {}
+test_framework_lock = lock_dependencies.get("com.unity.test-framework") if isinstance(lock_dependencies.get("com.unity.test-framework"), dict) else {}
+
+testables = manifest.get("testables") if isinstance(manifest.get("testables"), list) else []
+testables_enabled = "com.xuunity.light-mcp" in testables
+source_root = resolve_package_source(manifest, manifest_path, project_root, ops_root)
+tests_root = source_root / "Tests"
+
+asmdefs = sorted(tests_root.rglob("*.asmdef")) if tests_root.is_dir() else []
+asmdef_names = [asmdef_name(path) for path in asmdefs]
+cs_files = sorted(tests_root.rglob("*.cs")) if tests_root.is_dir() else []
+
+category_pattern = re.compile(r'\[Category\s*\(\s*"([^"]+)"\s*\)\s*\]')
+test_pattern = re.compile(r"\[(?:Unity)?Test(?:\s*\(|\])")
+
+categories = set()
+editmode_tests = 0
+playmode_tests = 0
+for cs_path in cs_files:
+    text = cs_path.read_text(encoding="utf-8", errors="replace")
+    categories.update(category_pattern.findall(text))
+    test_count = len(test_pattern.findall(text))
+    path_parts = set(cs_path.parts)
+    if "PlayMode" in path_parts:
+        playmode_tests += test_count
+    elif "EditMode" in path_parts:
+        editmode_tests += test_count
+
+required_by_mode = {
+    "all": {
+        "asmdefs": {"com.xuunity.light-mcp.Editor.Tests", "com.xuunity.light-mcp.PlayMode.Tests"},
+        "categories": {"XUUnity.MCP.SelfTest"},
+        "editmode_min": 1,
+        "playmode_min": 1,
+    },
+    "editmode": {
+        "asmdefs": {"com.xuunity.light-mcp.Editor.Tests"},
+        "categories": {"XUUnity.MCP.EditMode"},
+        "editmode_min": 1,
+        "playmode_min": 0,
+    },
+    "playmode": {
+        "asmdefs": {"com.xuunity.light-mcp.PlayMode.Tests"},
+        "categories": {"XUUnity.MCP.PlayMode"},
+        "editmode_min": 0,
+        "playmode_min": 1,
+    },
+    "fast": {
+        "asmdefs": {"com.xuunity.light-mcp.Editor.Tests", "com.xuunity.light-mcp.PlayMode.Tests"},
+        "categories": {"XUUnity.MCP.Fast"},
+        "editmode_min": 1,
+        "playmode_min": 1,
+    },
+    "scene": {
+        "asmdefs": {"com.xuunity.light-mcp.Editor.Tests", "com.xuunity.light-mcp.PlayMode.Tests"},
+        "categories": {"XUUnity.MCP.Scene"},
+        "editmode_min": 1,
+        "playmode_min": 1,
+    },
+    "lifecycle": {
+        "asmdefs": {"com.xuunity.light-mcp.PlayMode.Tests"},
+        "categories": {"XUUnity.MCP.Lifecycle"},
+        "editmode_min": 0,
+        "playmode_min": 1,
+    },
+}
+required = required_by_mode.get(run_mode, {})
+asmdef_name_set = set(asmdef_names)
+
+errors = []
+if not testables_enabled:
+    errors.append("package_not_in_manifest_testables")
+if not dependencies.get("com.unity.test-framework") and not test_framework_lock.get("version"):
+    errors.append("unity_test_framework_missing")
+if not tests_root.is_dir():
+    errors.append("package_tests_directory_missing")
+if not asmdefs:
+    errors.append("package_test_asmdefs_missing")
+for required_asmdef in sorted(required.get("asmdefs") or []):
+    if required_asmdef not in asmdef_name_set:
+        errors.append(f"missing_asmdef:{required_asmdef}")
+for category in sorted(required.get("categories") or []):
+    if category not in categories:
+        errors.append(f"missing_category:{category}")
+if editmode_tests < int(required.get("editmode_min") or 0):
+    errors.append("editmode_test_count_zero")
+if playmode_tests < int(required.get("playmode_min") or 0):
+    errors.append("playmode_test_count_zero")
+
+if errors:
+    raise SystemExit("package self-test discovery failed: " + ",".join(errors))
+
+package_source = str(package_lock.get("source") or "manifest")
+test_framework_manifest = str(dependencies.get("com.unity.test-framework") or "-")
+test_framework_version = str(test_framework_lock.get("version") or "-")
+categories_summary = ",".join(sorted(categories)) if categories else "-"
+print(
+    f"[pass] package-self-test-discovery "
+    f"mode={run_mode} "
+    f"package_source={package_source} "
+    f"package_hash={package_lock.get('hash') or '-'} "
+    f"testables=enabled "
+    f"test_framework=manifest:{test_framework_manifest}/lock:{test_framework_version} "
+    f"asmdefs={len(asmdefs)} "
+    f"editmode_tests={editmode_tests} "
+    f"playmode_tests={playmode_tests} "
+    f"categories={categories_summary} "
+    f"source_root={source_root}"
+)
+PY
+}
+
 ensure_ready_cmd=(
   "$WRAPPER" ensure-ready
   --project-root "$PROJECT_ROOT"
@@ -122,6 +290,7 @@ if [[ "$PATCH_RESULT" == "patched" ]]; then
   MANIFEST_WAS_PATCHED="true"
 fi
 "$WRAPPER" request-project-refresh --project-root "$PROJECT_ROOT" --timeout-ms 180000 >/dev/null
+print_package_self_test_discovery
 
 run_mcp_json_step() {
   local label="$1"
@@ -147,6 +316,41 @@ if status not in {"ok", "success"}:
     message = error.get("message") or f"{label} returned status {status}"
     print(f"{label} failed: {code}: {message}", file=sys.stderr)
     raise SystemExit(1)
+
+test_payload = payload
+if isinstance(payload.get("payload_json"), str) and payload.get("payload_json"):
+    try:
+        test_payload = json.loads(payload["payload_json"])
+    except json.JSONDecodeError as exc:
+        print(f"{label} failed: test payload JSON could not be decoded: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+test_status = str(test_payload.get("status") or "")
+total = int(test_payload.get("total") or test_payload.get("test_count") or 0)
+passed = int(test_payload.get("passed") or 0)
+failed = int(test_payload.get("failed") or 0)
+skipped = int(test_payload.get("skipped") or 0)
+
+if test_status == "no_tests" or total <= 0:
+    print(
+        f"{label} failed: package_self_tests_no_tests: "
+        f"Unity discovered no package self-tests for the requested filters.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+if failed > 0 or test_status not in {"passed", "ok", "success"}:
+    print(
+        f"{label} failed: package_self_tests_failed: "
+        f"status={test_status} total={total} passed={passed} failed={failed} skipped={skipped}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+print(
+    f"[pass] package-self-tests label={label} "
+    f"status={test_status} total={total} passed={passed} failed={failed} skipped={skipped}"
+)
 PY
 }
 

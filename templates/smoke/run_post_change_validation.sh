@@ -18,6 +18,7 @@ ACCEPTANCE_SCENARIO_TIMEOUT_MS="180000"
 CONTRACT_SCENARIO_TIMEOUT_MS="180000"
 TMP_DIR=""
 LAST_OUTPUT_FILE=""
+SUITE_STARTED_UNIX=""
 
 usage() {
   cat <<'EOF'
@@ -178,6 +179,105 @@ PY
   fi
 }
 
+print_lifecycle_summary() {
+  local initial_file="$1"
+  local final_file="$2"
+  local verdict="$3"
+
+  python3 - "$initial_file" "$final_file" "$SUITE_STARTED_UNIX" "$PROJECT_ROOT" "$verdict" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+initial_file = Path(sys.argv[1])
+final_file = Path(sys.argv[2])
+started_unix = float(sys.argv[3])
+project_root = Path(sys.argv[4])
+verdict = sys.argv[5]
+
+
+def read_json(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+initial = read_json(initial_file)
+final = read_json(final_file)
+initial_bridge = initial.get("bridge_state") or {}
+journal_dir = project_root / "Library" / "XUUnityLightMcp" / "journal" / "requests"
+
+event_counts = {
+    "request_abandoned": 0,
+    "request_reclassified": 0,
+    "bridge_bootstrap_attached": 0,
+    "request_completed": 0,
+}
+abandoned_request_ids = set()
+recovered_request_ids = set()
+
+if journal_dir.is_dir():
+    for event_path in journal_dir.glob("*.json"):
+        try:
+            if event_path.stat().st_mtime < started_unix:
+                continue
+            event = read_json(event_path)
+        except OSError:
+            continue
+
+        event_type = str(event.get("event_type") or "")
+        if event_type in event_counts:
+            event_counts[event_type] += 1
+
+        request_id = str(event.get("request_id") or "")
+        if event_type == "request_abandoned" and request_id:
+            abandoned_request_ids.add(request_id)
+        elif event_type in {"request_completed", "request_reclassified"} and request_id:
+            recovered_request_ids.add(request_id)
+
+initial_generation = int(initial_bridge.get("bridge_generation") or 0)
+final_generation = int(final.get("bridge_generation") or 0)
+generation_delta = final_generation - initial_generation if initial_generation and final_generation else 0
+stale_request_count = int(((final.get("stale_request_artifacts") or {}).get("candidate_count")) or 0)
+unrecovered_abandoned = sorted(abandoned_request_ids - recovered_request_ids)
+
+warning_codes = []
+if generation_delta > 5:
+    warning_codes.append("high_bridge_generation_churn")
+if unrecovered_abandoned:
+    warning_codes.append("unrecovered_request_abandoned")
+if final.get("health_status") != "healthy":
+    warning_codes.append("final_health_not_healthy")
+if final.get("playmode_state") != "edit":
+    warning_codes.append("final_playmode_not_edit")
+if int(final.get("compiler_error_count") or 0) != 0:
+    warning_codes.append("compiler_errors_present")
+if stale_request_count != 0:
+    warning_codes.append("stale_requests_present")
+
+label = "warn" if warning_codes else "pass"
+print(
+    f"[{label}] lifecycle-churn "
+    f"initial_generation={initial_generation} "
+    f"final_generation={final_generation} "
+    f"generation_delta={generation_delta} "
+    f"initial_session={initial_bridge.get('bridge_session_id') or '-'} "
+    f"final_session={final.get('bridge_session_id') or '-'} "
+    f"bridge_bootstraps={event_counts['bridge_bootstrap_attached']} "
+    f"reclassified={event_counts['request_reclassified']} "
+    f"abandoned={event_counts['request_abandoned']} "
+    f"unrecovered_abandoned={len(unrecovered_abandoned)} "
+    f"terminal_verdict={verdict} "
+    f"final_health={final.get('health_status') or '-'} "
+    f"final_playmode={final.get('playmode_state') or '-'} "
+    f"compiler_errors={int(final.get('compiler_error_count') or 0)} "
+    f"stale_requests={stale_request_count} "
+    f"warning_codes={','.join(warning_codes) if warning_codes else 'none'}"
+)
+PY
+}
+
 maybe_reuse_healthy_editor() {
   local status_summary_file="$TMP_DIR/status_summary_preflight.json"
 
@@ -214,6 +314,11 @@ PY
 }
 
 echo "[mcp-validate] project_root=$PROJECT_ROOT"
+SUITE_STARTED_UNIX="$(python3 - <<'PY'
+import time
+print(f"{time.time():.6f}")
+PY
+)"
 
 if [[ "$OPEN_EDITOR" == "true" ]]; then
   maybe_reuse_healthy_editor
@@ -306,5 +411,11 @@ if [[ -n "$PLAYMODE_REGRESSION_ASSEMBLY_NAME" ]]; then
     --no-restore-editor-state
   echo "[pass] playmode-lifecycle-retry-smoke"
 fi
+
+run_step final_status \
+  "$WRAPPER" request-status-summary \
+  --project-root "$PROJECT_ROOT" \
+  --timeout-ms 15000
+print_lifecycle_summary "$TMP_DIR/ensure_ready.json" "$TMP_DIR/final_status.json" "passed"
 
 echo "[pass] suite overall"

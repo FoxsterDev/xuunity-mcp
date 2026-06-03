@@ -21,7 +21,7 @@ namespace XUUnity.LightMcp.Tests.EditMode
         {
             if (_createdRoot != null)
             {
-                Object.DestroyImmediate(_createdRoot);
+                UnityEngine.Object.DestroyImmediate(_createdRoot);
                 _createdRoot = null;
             }
         }

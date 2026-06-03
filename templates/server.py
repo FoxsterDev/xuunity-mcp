@@ -208,7 +208,7 @@ from server_workspace_effects import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-light-unity-mcp",
-    "version": "0.3.18",
+    "version": "0.3.19",
 }
 LIGHTWEIGHT_PACKAGE_NAME = "com.xuunity.light-mcp"
 
