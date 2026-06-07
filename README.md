@@ -22,7 +22,9 @@ small editor-only Unity package.
   <img alt="OpenUPM planned" src="https://img.shields.io/badge/OpenUPM-planned-lightgrey.svg">
 </p>
 
-[Quick Start](#quick-start) |
+[Agent Quick Start](#agent-quick-start) |
+[Manual Install](#manual-install) |
+[Verify Existing Install](#verify-existing-install) |
 [AI Setup Prompt](#ai-agent-setup-prompt) |
 [Features](docs/reference/FEATURES.md) |
 [Client Docs](#supported-clients) |
@@ -50,6 +52,12 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 
 ## Quick Start
 
+Choose one path first:
+
+- [Agent Quick Start](#agent-quick-start) for AI-driven setup from a short prompt
+- [Manual Install](#manual-install) for direct human setup
+- [Verify Existing Install](#verify-existing-install) when the helper or client wiring may already exist
+
 ### Prerequisites
 
 - Unity 2021.3 LTS+; the current release has live validation on Unity 2021.3,
@@ -57,8 +65,25 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 - Python 3.10+
 - one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Rider](docs/clients/rider.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md) with the [Codex visual setup guide](docs/clients/codex-unity-mcp-setup.md)
 
-<details>
-<summary><strong>Agent Setup Contract</strong></summary>
+Before running the helper, verify which Python it will use:
+
+```bash
+command -v python3
+python3 --version
+```
+
+If your default `python3` is older than `3.10`, set `PYTHON` explicitly before
+running `run.sh` or `xuunity_light_unity_mcp.sh`.
+
+Important:
+
+- UI auto-review, sandbox auto-approval, or tool-level approval is not the same
+  thing as user approval of setup mutations.
+- If `~/.codex-tools/xuunity-light-unity-mcp/run.sh` or the equivalent
+  host-tools install already exists, reuse it. Do not clone the repo locally
+  unless the helper is missing or local MCP development is the goal.
+
+## Agent Quick Start
 
 This section is the fast-path for AI agents that need to install MCP into a new
 repo and run the first MCP command or EditMode tests correctly.
@@ -79,6 +104,8 @@ Agent defaults:
   target
 - prefer Git UPM package mode unless the user explicitly asks for local package
   development
+- if the host helper is already installed locally, reuse it before asking to
+  clone the repo
 
 ### Required Sequence
 
@@ -121,6 +148,26 @@ Agent defaults:
 - whether setup will modify user-level client config
 - files planned for mutation
 - commands planned after approval
+- whether the client must restart or refresh its MCP server list afterward
+
+### Required Preflight Review Template
+
+Every agent should show a short review block like this before `setup-apply`:
+
+```text
+Preflight review
+- Current client: <detected client>
+- Wiring target: <target client>
+- Unity project root: <approved project root>
+- Additional discovered Unity projects: <none or list>
+- Existing helper install: <reuse existing helper | clone required>
+- Planned project file changes: <manifest, bridge config, lockfile, none>
+- Planned user-level config changes: <exact file paths or none>
+- Restart or refresh required after mutation: <yes/no and which client>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
+
+Do not run setup-apply until the user explicitly approves this review.
+```
 
 ### Safe Inspect Before Approval
 
@@ -148,6 +195,7 @@ For one explicitly requested Unity project, produce a non-mutating plan first:
 bash xuunity_light_unity_mcp.sh setup-plan \
   --project-root /path/to/UnityProject > /tmp/xuunity-setup-plan.json
 
+# Stop here. Review the plan with the user before continuing.
 bash xuunity_light_unity_mcp.sh setup-apply \
   --plan-file /tmp/xuunity-setup-plan.json \
   --project-root /path/to/UnityProject \
@@ -165,7 +213,7 @@ bash xuunity_light_unity_mcp.sh setup-plan \
   --workspace-root /path/to/workspace \
   --recursive > /tmp/xuunity-setup-plan.json
 
-# Review the plan. Then apply only to the intended Unity project roots.
+# Stop here. Review the plan. Then apply only to the intended Unity project roots.
 bash xuunity_light_unity_mcp.sh setup-apply \
   --plan-file /tmp/xuunity-setup-plan.json \
   --project-root /path/to/UnityProject \
@@ -209,6 +257,9 @@ Rules:
   wiring target unless the user explicitly requests another client.
 - Prefer Git UPM release v0.3.19 unless the user explicitly requests local
   package development.
+- Reuse an existing installed host helper if one is already present locally.
+  Clone the repo only when the helper is missing or local MCP development is
+  explicitly requested.
 - Preserve existing config. Merge the `xuunity_light_unity` server block; do
   not overwrite unrelated MCP servers, editor settings, or package entries.
 - Keep the package editor-only. Do not add runtime/player dependencies.
@@ -238,7 +289,9 @@ Required procedure:
    - intended wiring target
    - requested Unity project root
    - additional discovered Unity projects
+   - whether an existing helper install will be reused or a clone is required
    - files that will change, including user-level config
+   - whether the client must restart or refresh after the change
    - commands that will run after approval
 6. Wait for approval before applying changes.
 7. Apply the approved plan only to the approved Unity project roots:
@@ -257,13 +310,12 @@ Required procedure:
     summary is healthy.
 13. Finish with a concise report listing files changed, commands run, readiness
     verification, the first MCP command result, any requested post-setup
-    operation result, and whether a client restart is still required.
+    operation result, whether a client restart is still required, and whether
+    any failing compile or test result is an MCP setup failure or a project
+    runtime failure.
 ```
 
-</details>
-
-<details>
-<summary><strong>Human Manual Install</strong></summary>
+## Manual Install
 
 ### 1. Install The Unity Package
 
@@ -311,6 +363,10 @@ bash init_xuunity_light_unity_mcp.sh \
 
 The installer writes Unix and Windows launchers: `run.sh`, `run.cmd`, and
 `run.ps1`.
+
+If this helper is already installed under `~/.codex-tools`,
+`~/.claude-tools`, or another explicit host-tools path, reuse it instead of
+cloning a fresh copy just to run setup.
 
 For local MCP package iteration, switch package mode explicitly:
 
@@ -365,7 +421,29 @@ Treat `unity_status_summary` as the canonical first MCP smoke-check. After it
 reports a healthy bridge, confirm `unity_capabilities` and `unity_health_probe`
 before moving on to tests or builds.
 
-</details>
+Install success means:
+
+- `validate-setup` reports a ready configuration
+- `ensure-ready` brings the editor to a healthy bridge state
+- `unity_status_summary` reports a healthy bridge
+- `unity_capabilities` and `unity_health_probe` succeed
+
+If those checks pass but a later compile or test run fails, treat that as a
+Unity project or runtime failure unless the failure explicitly points back to
+bridge readiness, package import, or unsupported capability.
+
+## Verify Existing Install
+
+Use this path when the helper, client wiring, or package may already exist:
+
+1. check whether the host helper already exists locally
+2. inspect the client config instead of rewriting it blindly
+3. run `validate-setup`
+4. run `ensure-ready --open-editor` only if Unity is not already ready
+5. run `unity_status_summary` as the first live smoke-check
+
+This avoids duplicate MCP server blocks, unnecessary repo clones, and silent
+rewrites of user-level config.
 
 Then try:
 

@@ -8,6 +8,13 @@ current host client that is executing the request as the default wiring target.
 For prompts coming from Codex, wire Codex by default and show that assumption in
 the preflight review before mutating files.
 
+Important:
+
+- Codex UI auto-review or tool-level approval is not the same thing as user
+  approval of setup mutations.
+- A preflight review still has to be shown in chat before `setup-apply`,
+  installer mutations, or user-level config changes.
+
 Optional: connect XUUnity MCP to Codex/Codex-style clients when you want Codex
 to validate Unity status, compile, tests, and setup directly from the chat. Use
 this only on trusted local projects. If you also use Rider or VS Code MCP,
@@ -32,6 +39,10 @@ Claude-side helper also exists. To make that explicit in scripts, set:
 export XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex
 ```
 
+If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh`
+already exists, reuse that helper install instead of cloning a fresh repo just
+to run the installer again.
+
 Enable the bridge for the Unity project without changing package mode:
 
 ```bash
@@ -55,6 +66,10 @@ bash init_xuunity_light_unity_mcp.sh \
 
 If the current Codex session does not hot-reload newly installed MCP servers,
 restart the client after this change.
+
+If `~/.codex/config.toml` already contains
+`[mcp_servers.xuunity_light_unity]`, merge or verify the existing block instead
+of appending a duplicate entry.
 
 ## Manual Config
 
@@ -82,6 +97,32 @@ required = false
 The Windows config uses `run.cmd`, which resolves `server.py` beside itself and
 prefers `PYTHON`, then `py -3`, then `python`, then `python3`.
 
+Manual or automatic Codex config only wires the client to the host helper. It
+does not prove that a specific Unity project has the MCP package dependency,
+bridge config, or test capability enabled yet. Treat user-level client wiring
+and per-project Unity setup as separate stages in the review.
+
+## Required Preflight Review
+
+Before mutating a Unity project or `~/.codex/config.toml`, show a short review
+like this:
+
+```text
+Preflight review
+- Current client: Codex
+- Wiring target: Codex
+- Unity project root: <approved project root>
+- Additional discovered Unity projects: <none or list>
+- Existing helper install: <reuse existing helper | clone required>
+- Existing Codex MCP block: <present | missing>
+- Planned project file changes: <manifest, bridge config, lockfile, none>
+- Planned user-level config changes: <exact file paths or none>
+- Restart or refresh required after mutation: <yes/no>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
+
+Do not run setup-apply until the user explicitly approves this review.
+```
+
 ## Verify
 
 Start the client and confirm that `xuunity_light_unity` appears in the MCP
@@ -101,6 +142,12 @@ Then verify a concrete Unity project:
 Treat `unity_status_summary` as the canonical first MCP smoke-check after
 setup. Only move on to tests or builds after the status summary reports a
 healthy bridge.
+
+Install success means Codex can reach a healthy Unity bridge. If
+`unity_status_summary`, `unity_capabilities`, and `unity_health_probe` succeed
+but a later compile or test run fails, treat that as a Unity project or runtime
+failure unless the error explicitly points back to MCP setup or capability
+support.
 
 You can name the server explicitly while verifying setup. After that, natural
 requests such as `Run EditMode tests in /path/to/UnityProject` are usually

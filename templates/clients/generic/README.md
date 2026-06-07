@@ -13,6 +13,16 @@ point.
 Use `templates/clients/generic/stdio-mcp.windows.json` for native Windows
 clients.
 
+Important:
+
+- Reuse an existing local helper install if it is already present.
+- Merge only the `mcpServers.xuunity_light_unity` block when the destination
+  config already contains other MCP servers.
+- Refresh or restart the client after wiring if the current session does not
+  hot-reload new MCP servers.
+- Client wiring does not prove Unity project readiness. Validate the target
+  Unity project separately after wiring.
+
 The command intentionally goes through `bash -lc` so `$HOME` and optional
 tool-home overrides are resolved by the shell instead of relying on client-side
 tilde expansion.
@@ -36,3 +46,8 @@ Direct wrapper invocations also honor
 `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto`. In `auto`, Codex
 contexts prefer `.codex-tools`; non-Codex sessions with an existing Claude
 helper keep using `.claude-tools`.
+
+After wiring, treat `unity_status_summary` as the canonical first live
+smoke-check. If it is healthy but a later compile or test run fails, treat that
+as a Unity project or runtime failure unless the error explicitly points back
+to MCP setup or unsupported capability.

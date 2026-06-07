@@ -43,6 +43,9 @@ The public convenience CLI entrypoint is:
 When a host repo has its own wrapper, the wrapper can delegate to this script.
 Otherwise this script falls back to the installed helper in `~/.codex-tools/`.
 
+If the helper is already installed locally, reuse that install before cloning a
+fresh copy of the repo just to run setup.
+
 ## Integration Goals
 
 When integrating into a new repo or project, the agent should:
@@ -84,6 +87,7 @@ bash xuunity_light_unity_mcp.sh setup-plan \
   --workspace-root /path/to/workspace \
   --recursive > /tmp/xuunity-setup-plan.json
 
+# Stop here. Show a user-visible preflight review before any mutation.
 bash xuunity_light_unity_mcp.sh setup-apply \
   --plan-file /tmp/xuunity-setup-plan.json \
   --yes
@@ -94,6 +98,20 @@ bash xuunity_light_unity_mcp.sh validate-setup \
 
 Do not globally apply one dependency version across a mixed-version hub. The
 plan computes per-project actions.
+
+UI auto-review, sandbox approval, or tool-level approval is not a replacement
+for a user-visible preflight review. Before `setup-apply`, installer mutation,
+or user-level client config changes, show the user:
+
+- detected current client
+- intended wiring target
+- approved Unity project root
+- additional discovered Unity projects
+- whether an existing helper install will be reused or a clone is required
+- exact project files that will change
+- exact user-level config files that will change
+- whether the client must restart or refresh after mutation
+- exact commands planned after approval
 
 Test operations are optional. If `validate-setup --include-tests` reports
 `disabled_missing_dependency`, ask for approval before opening Unity, then run:
@@ -192,6 +210,10 @@ Only after that:
 - play mode
 - screenshots
 - scenario runs
+
+If readiness checks succeed but a later compile or test run fails, treat that as
+a Unity project or runtime failure unless the error explicitly points back to
+bridge readiness, package import, or unsupported capability.
 
 ## Agent Behavior Rules
 

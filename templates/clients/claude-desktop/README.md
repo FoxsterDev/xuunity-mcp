@@ -5,6 +5,17 @@ Status: `active` for macOS local stdio configuration.
 Claude Desktop uses a separate MCP configuration from Claude Code. A Claude
 Code `.mcp.json` file does not register tools in the Desktop chat app.
 
+Important:
+
+- Reuse an existing helper install under `${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}`
+  if it already exists.
+- Merge only the `mcpServers.xuunity_light_unity` block if the target Desktop
+  config already has other MCP servers.
+- Restart Claude Desktop after changing the config unless the app clearly
+  refreshes MCP servers on its own.
+- Client wiring does not prove Unity project readiness. Validate the project
+  separately after wiring.
+
 ## Install The Server
 
 Install the host-side server into the default Claude tools location:
@@ -65,3 +76,8 @@ Restart Claude Desktop after changing the config.
 Open Claude Desktop settings, check the Developer or Connectors view, and
 confirm that `xuunity_light_unity` is connected before asking Claude to run
 Unity validation tools.
+
+Treat `unity_status_summary` as the canonical first live smoke-check after
+setup. If it is healthy but a later compile or test run fails, treat that as a
+Unity project or runtime failure unless the error explicitly points back to MCP
+setup or unsupported capability.

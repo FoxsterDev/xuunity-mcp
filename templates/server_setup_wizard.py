@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import re
 from pathlib import Path
 from typing import Any
@@ -213,6 +215,337 @@ def default_git_dependency(package_version: str) -> str:
     return f"{DEFAULT_GIT_REPO_URL}?path=/packages/com.xuunity.light-mcp#v{package_version}"
 
 
+def platform_kind() -> str:
+    system = platform.system().lower()
+    if system == "darwin":
+        return "macos"
+    if system == "windows":
+        return "windows"
+    if system == "linux":
+        return "linux"
+    return system or "unknown"
+
+
+def codex_context_detected() -> bool:
+    env = os.environ
+    return bool(
+        env.get("CODEX_SHELL")
+        or env.get("CODEX_THREAD_ID")
+        or env.get("CODEX_SANDBOX")
+        or env.get("CODEX_HOME")
+        or env.get("CODEX_CI")
+        or ("Codex" in str(env.get("CODEX_INTERNAL_ORIGINATOR_OVERRIDE") or ""))
+    )
+
+
+def claude_code_context_detected() -> bool:
+    env = os.environ
+    return bool(
+        env.get("CLAUDE_CODE")
+        or env.get("CLAUDECODE")
+        or env.get("CLAUDE_CONFIG_PATH")
+    )
+
+
+def codex_detection_basis() -> list[str]:
+    env = os.environ
+    basis: list[str] = []
+    if env.get("CODEX_SHELL"):
+        basis.append("env:CODEX_SHELL")
+    if env.get("CODEX_THREAD_ID"):
+        basis.append("env:CODEX_THREAD_ID")
+    if env.get("CODEX_SANDBOX"):
+        basis.append("env:CODEX_SANDBOX")
+    if env.get("CODEX_HOME"):
+        basis.append("env:CODEX_HOME")
+    if env.get("CODEX_CI"):
+        basis.append("env:CODEX_CI")
+    if "Codex" in str(env.get("CODEX_INTERNAL_ORIGINATOR_OVERRIDE") or ""):
+        basis.append("env:CODEX_INTERNAL_ORIGINATOR_OVERRIDE")
+    return basis
+
+
+def claude_code_detection_basis() -> list[str]:
+    env = os.environ
+    basis: list[str] = []
+    if env.get("CLAUDE_CODE"):
+        basis.append("env:CLAUDE_CODE")
+    if env.get("CLAUDECODE"):
+        basis.append("env:CLAUDECODE")
+    if env.get("CLAUDE_CONFIG_PATH"):
+        basis.append("env:CLAUDE_CONFIG_PATH")
+    return basis
+
+
+def detect_client_context() -> dict[str, Any]:
+    codex_basis = codex_detection_basis()
+    claude_basis = claude_code_detection_basis()
+    if codex_basis and not claude_basis:
+        return {
+            "detected_client": "codex",
+            "detection_basis": codex_basis,
+            "client_context_confidence": "high",
+        }
+    if claude_basis and not codex_basis:
+        return {
+            "detected_client": "claude_code",
+            "detection_basis": claude_basis,
+            "client_context_confidence": "high",
+        }
+    if codex_basis and claude_basis:
+        return {
+            "detected_client": "codex",
+            "detection_basis": codex_basis + claude_basis,
+            "client_context_confidence": "medium",
+        }
+    return {
+        "detected_client": "unknown",
+        "detection_basis": [],
+        "client_context_confidence": "low",
+    }
+
+
+def detect_current_host_client() -> str:
+    return str(detect_client_context()["detected_client"])
+
+
+def intended_wiring_target_for_detected_client(detected_client: str) -> str:
+    if detected_client == "codex":
+        return "codex"
+    if detected_client == "claude_code":
+        return "claude_code"
+    return "manual_selection_required"
+
+
+def helper_install_targets() -> list[dict[str, Any]]:
+    home = Path.home()
+    codex_tools_home = Path(os.environ.get("CODEX_TOOLS_HOME") or home / ".codex-tools")
+    claude_tools_home = Path(os.environ.get("CLAUDE_TOOLS_HOME") or home / ".claude-tools")
+    detected_client = detect_current_host_client()
+    targets: list[dict[str, Any]] = []
+    for client_id, tools_home in (
+        ("codex", codex_tools_home),
+        ("claude_code", claude_tools_home),
+    ):
+        install_dir = tools_home / "xuunity-light-unity-mcp"
+        run_path = install_dir / "run.sh"
+        server_path = install_dir / "server.py"
+        installed = run_path.is_file() and server_path.is_file()
+        targets.append(
+            {
+                "client_id": client_id,
+                "tools_home": str(tools_home),
+                "install_dir": str(install_dir),
+                "run_path": str(run_path),
+                "server_path": str(server_path),
+                "installed": installed,
+                "helper_action": "reuse_existing_helper" if installed else "install_helper",
+                "selected_by_default": client_id == intended_wiring_target_for_detected_client(detected_client),
+            }
+        )
+    return targets
+
+
+def toml_contains_server_block(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return bool(re.search(r"^\[mcp_servers\.xuunity_light_unity\]", text, flags=re.MULTILINE))
+
+
+def json_contains_server_block(path: Path) -> bool:
+    try:
+        payload = read_json(path)
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    servers = payload.get("mcpServers")
+    return isinstance(servers, dict) and "xuunity_light_unity" in servers
+
+
+def build_client_config_targets(primary_project_root: Path | None) -> list[dict[str, Any]]:
+    home = Path.home()
+    current_platform = platform_kind()
+    detected_client = detect_current_host_client()
+    codex_home = Path(os.environ.get("CODEX_HOME") or home / ".codex")
+    claude_config_path = Path(os.environ.get("CLAUDE_CONFIG_PATH") or home / ".claude.json")
+    targets: list[dict[str, Any]] = []
+
+    def append_target(
+        *,
+        client_id: str,
+        scope: str,
+        path: Path,
+        config_format: str,
+        restart_or_refresh_required: str,
+    ) -> None:
+        if config_format == "toml":
+            has_server_block = toml_contains_server_block(path) if path.is_file() else False
+        else:
+            has_server_block = json_contains_server_block(path) if path.is_file() else False
+        if has_server_block:
+            config_action = "verify_existing_server_block"
+        elif path.is_file():
+            config_action = "merge_add_server_block"
+        else:
+            config_action = "create_config_with_server_block"
+        targets.append(
+            {
+                "client_id": client_id,
+                "scope": scope,
+                "path": str(path),
+                "exists": path.is_file(),
+                "server_block_present": has_server_block,
+                "config_action": config_action,
+                "merge_only": True,
+                "selected_by_default": client_id == intended_wiring_target_for_detected_client(detected_client),
+                "restart_or_refresh_required": restart_or_refresh_required,
+            }
+        )
+
+    append_target(
+        client_id="codex",
+        scope="user",
+        path=codex_home / "config.toml",
+        config_format="toml",
+        restart_or_refresh_required="refresh_or_restart_codex_if_not_hot_reloaded",
+    )
+    append_target(
+        client_id="claude_code",
+        scope="user",
+        path=claude_config_path,
+        config_format="json",
+        restart_or_refresh_required="restart_or_refresh_claude_code_if_not_hot_reloaded",
+    )
+    if primary_project_root is not None:
+        append_target(
+            client_id="claude_code",
+            scope="project",
+            path=primary_project_root / ".mcp.json",
+            config_format="json",
+            restart_or_refresh_required="restart_or_refresh_claude_code_if_not_hot_reloaded",
+        )
+        append_target(
+            client_id="cursor",
+            scope="project",
+            path=primary_project_root / ".cursor" / "mcp.json",
+            config_format="json",
+            restart_or_refresh_required="refresh_cursor_mcp_server_list_if_not_hot_reloaded",
+        )
+    append_target(
+        client_id="cursor",
+        scope="user",
+        path=home / ".cursor" / "mcp.json",
+        config_format="json",
+        restart_or_refresh_required="refresh_cursor_mcp_server_list_if_not_hot_reloaded",
+    )
+    append_target(
+        client_id="windsurf",
+        scope="user",
+        path=home / ".codeium" / "windsurf" / "mcp_config.json",
+        config_format="json",
+        restart_or_refresh_required="refresh_windsurf_mcp_panel_if_not_hot_reloaded",
+    )
+    if current_platform == "macos":
+        append_target(
+            client_id="claude_desktop",
+            scope="user",
+            path=home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
+            config_format="json",
+            restart_or_refresh_required="restart_claude_desktop_after_config_change",
+        )
+    elif current_platform == "windows":
+        appdata = Path(os.environ.get("APPDATA") or (home / "AppData" / "Roaming"))
+        append_target(
+            client_id="claude_desktop",
+            scope="user",
+            path=appdata / "Claude" / "claude_desktop_config.json",
+            config_format="json",
+            restart_or_refresh_required="restart_claude_desktop_after_config_change",
+        )
+    return targets
+
+
+def planned_project_file_changes(project_root: Path, planned_actions: list[dict[str, Any]]) -> list[str]:
+    changed_paths: set[str] = set()
+    for action in planned_actions:
+        kind = str(action.get("kind") or "")
+        if kind in {
+            "set_manifest_dependency",
+            "install_test_framework_dependency",
+            "upgrade_test_framework_dependency",
+        }:
+            changed_paths.add(str(project_root / "Packages" / "manifest.json"))
+            changed_paths.add(str(project_root / "Packages" / "packages-lock.json"))
+        elif kind == "write_bridge_config":
+            changed_paths.add(str(project_root / "Library" / "XUUnityLightMcp" / "config" / "bridge_config.json"))
+    return sorted(changed_paths)
+
+
+def render_preferred_review_summary(
+    *,
+    detected_client: str,
+    detection_basis: list[str],
+    client_context_confidence: str,
+    intended_wiring_target: str,
+    selected_project_roots: list[str],
+    additional_discovered_project_roots: list[str],
+    helper_targets: list[dict[str, Any]],
+    project_file_changes: list[str],
+    client_config_targets: list[dict[str, Any]],
+    restart_or_refresh_required: list[str],
+    recommended_next_step: str,
+) -> str:
+    lines: list[str] = ["Preflight review"]
+    lines.append(f"- Current client: {detected_client}")
+    lines.append(f"- Detection basis: {', '.join(detection_basis) if detection_basis else 'none'}")
+    lines.append(f"- Client detection confidence: {client_context_confidence}")
+    lines.append(f"- Wiring target: {intended_wiring_target}")
+    lines.append(
+        f"- Unity project root: {selected_project_roots[0] if selected_project_roots else 'none'}"
+    )
+    lines.append(
+        "- Additional discovered Unity projects: "
+        + (", ".join(additional_discovered_project_roots) if additional_discovered_project_roots else "none")
+    )
+
+    selected_helpers = [item for item in helper_targets if item.get("selected_by_default")]
+    if selected_helpers:
+        helper = selected_helpers[0]
+        lines.append(
+            "- Existing helper install: "
+            + f"{helper.get('helper_action')} ({helper.get('run_path')})"
+        )
+    else:
+        lines.append("- Existing helper install: manual selection required")
+
+    lines.append(
+        "- Planned project file changes: "
+        + (", ".join(project_file_changes) if project_file_changes else "none")
+    )
+
+    selected_client_targets = [item for item in client_config_targets if item.get("selected_by_default")]
+    if selected_client_targets:
+        config_parts = [
+            f"{item.get('path')} [{item.get('config_action')}]"
+            for item in selected_client_targets
+        ]
+        lines.append("- Planned client config review targets: " + ", ".join(config_parts))
+    else:
+        lines.append("- Planned client config review targets: none")
+
+    lines.append(
+        "- Restart or refresh required after mutation: "
+        + (", ".join(restart_or_refresh_required) if restart_or_refresh_required else "none")
+    )
+    lines.append(f"- Recommended next step after approval: {recommended_next_step}")
+    lines.append("")
+    lines.append("Do not run setup-apply until the user explicitly approves this review.")
+    return "\n".join(lines)
+
+
 def build_setup_plan(
     *,
     workspace_root: str | None,
@@ -243,8 +576,15 @@ def build_setup_plan(
         "recursive": recursive,
         "include_test_framework": include_test_framework,
         "package_source": package_source,
+        "detected_client": detect_client_context()["detected_client"],
+        "detection_basis": detect_client_context()["detection_basis"],
+        "client_context_confidence": detect_client_context()["client_context_confidence"],
+        "intended_wiring_target": intended_wiring_target_for_detected_client(str(detect_client_context()["detected_client"])),
+        "helper_install_targets": helper_install_targets(),
         "projects": [],
     }
+    primary_project_root = explicit_project_roots[0] if explicit_project_roots else (projects[0] if projects else None)
+    client_config_targets = build_client_config_targets(primary_project_root)
 
     git_dependency = default_git_dependency(package_version)
     for project_root in projects:
@@ -341,6 +681,7 @@ def build_setup_plan(
             validation_status = "manual_action_recommended"
         else:
             validation_status = "already_configured"
+        project_file_changes = planned_project_file_changes(project_root, planned_actions)
 
         selection_state = "explicit_project_root" if explicit_project_roots else "workspace_discovered"
         result["projects"].append(
@@ -354,14 +695,25 @@ def build_setup_plan(
                 "test_framework_state": tf_state,
                 "test_capabilities_state": test_capabilities_state(tf_state),
                 "planned_actions": planned_actions,
+                "planned_project_file_changes": project_file_changes,
                 "manual_actions": manual_actions,
                 "validation_status": validation_status,
             }
         )
 
+    aggregate_project_file_changes = sorted(
+        {
+            changed_path
+            for project in result["projects"]
+            for changed_path in project.get("planned_project_file_changes") or []
+        }
+    )
     review_notes: list[str] = [
         "Review planned manifest, bridge, and user-level client config changes before applying setup."
     ]
+    review_notes.append(
+        "setup-plan covers project-level MCP package and bridge mutations only; review client wiring separately with the matching client guide."
+    )
     if explicit_project_roots:
         review_notes.append("The plan is scoped to the explicitly requested Unity project roots only.")
     elif len(projects) > 1:
@@ -375,6 +727,29 @@ def build_setup_plan(
         "selected_project_count": len(projects),
         "selected_project_roots": [item["project_root"] for item in result["projects"]],
         "mutating_actions_require_approval": True,
+        "planned_project_file_changes": aggregate_project_file_changes,
+        "planned_user_level_config_changes": [
+            item["path"]
+            for item in client_config_targets
+            if item["scope"] == "user"
+            and item["selected_by_default"]
+            and item["config_action"] != "verify_existing_server_block"
+        ],
+        "planned_client_config_targets": client_config_targets,
+        "client_wiring_review": {
+            "status": "required_separate_check",
+            "reason": "setup-plan reports likely client config targets, but client wiring still requires an explicit merge-safe review.",
+            "detected_client": result["detected_client"],
+            "detection_basis": result["detection_basis"],
+            "client_context_confidence": result["client_context_confidence"],
+            "restart_or_refresh_required": sorted(
+                {
+                    item["restart_or_refresh_required"]
+                    for item in client_config_targets
+                    if item["selected_by_default"]
+                }
+            ),
+        },
         "notes": review_notes,
         "recommended_next_step": (
             "Run setup-apply with the approved project_root selection after user review."
@@ -382,6 +757,23 @@ def build_setup_plan(
             else "Review the plan, approve mutations, then run setup-apply."
         ),
     }
+    result["preflight_review"]["preferred_review_summary"] = render_preferred_review_summary(
+        detected_client=str(result["detected_client"]),
+        detection_basis=list(result["detection_basis"]),
+        client_context_confidence=str(result["client_context_confidence"]),
+        intended_wiring_target=str(result["intended_wiring_target"]),
+        selected_project_roots=list(result["preflight_review"]["selected_project_roots"]),
+        additional_discovered_project_roots=[
+            item["project_root"]
+            for item in result["projects"]
+            if item["project_root"] not in result["preflight_review"]["selected_project_roots"]
+        ],
+        helper_targets=list(result["helper_install_targets"]),
+        project_file_changes=list(result["preflight_review"]["planned_project_file_changes"]),
+        client_config_targets=list(result["preflight_review"]["planned_client_config_targets"]),
+        restart_or_refresh_required=list(result["preflight_review"]["client_wiring_review"]["restart_or_refresh_required"]),
+        recommended_next_step=str(result["preflight_review"]["recommended_next_step"]),
+    )
     return result
 
 

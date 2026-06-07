@@ -10,6 +10,14 @@ XUUnity Light Unity MCP has two pieces:
 
 Install both before expecting an AI client to control Unity.
 
+Important:
+
+- UI auto-review, sandbox auto-approval, or tool-level approval is not the same
+  thing as user approval of setup mutations.
+- If the host helper is already installed locally under `~/.codex-tools`,
+  `~/.claude-tools`, or another explicit tools path, reuse it before cloning a
+  fresh copy of the repo.
+
 ## Agent Preflight Rules
 
 For short agent requests such as "setup MCP from this repo into
@@ -28,10 +36,40 @@ For short agent requests such as "setup MCP from this repo into
    - requested Unity project root
    - additional discovered Unity projects
    - files that will change, including user-level client config
+   - whether the client must restart or refresh after the change
 6. wait for approval before `git clone`, installer runs, `setup-apply`,
    manifest edits, lockfile edits, or user-level client config changes
 7. treat `unity_status_summary` as the canonical first MCP smoke-check after
    `ensure-ready`
+
+Before running the helper, verify which Python it will use:
+
+```bash
+command -v python3
+python3 --version
+```
+
+If the selected interpreter is older than `3.10`, set `PYTHON` explicitly
+before `run.sh` or `xuunity_light_unity_mcp.sh`.
+
+## Required Preflight Review Template
+
+Before `setup-apply`, show the user a short review like this and wait:
+
+```text
+Preflight review
+- Current client: <detected client>
+- Wiring target: <target client>
+- Unity project root: <approved project root>
+- Additional discovered Unity projects: <none or list>
+- Existing helper install: <reuse existing helper | clone required>
+- Planned project file changes: <manifest, bridge config, lockfile, none>
+- Planned user-level config changes: <exact file paths or none>
+- Restart or refresh required after mutation: <yes/no and which client>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
+
+Do not run setup-apply until the user explicitly approves this review.
+```
 
 ## Option 1: Git UPM Package
 
@@ -111,6 +149,7 @@ For one explicitly requested Unity project, prefer a scoped plan/apply flow:
 bash xuunity_light_unity_mcp.sh setup-plan \
   --project-root /path/to/UnityProject > /tmp/xuunity-setup-plan.json
 
+# Stop here. Review the plan with the user before continuing.
 bash xuunity_light_unity_mcp.sh setup-apply \
   --plan-file /tmp/xuunity-setup-plan.json \
   --project-root /path/to/UnityProject \
@@ -128,6 +167,7 @@ bash xuunity_light_unity_mcp.sh setup-plan \
   --workspace-root /path/to/workspace \
   --recursive > /tmp/xuunity-setup-plan.json
 
+# Stop here. Review the plan and approve the exact target project roots first.
 bash xuunity_light_unity_mcp.sh setup-apply \
   --plan-file /tmp/xuunity-setup-plan.json \
   --project-root /path/to/UnityProject \
@@ -141,6 +181,10 @@ bash xuunity_light_unity_mcp.sh validate-setup \
 version globally across mixed Unity versions. When the plan contains more than
 one discovered Unity project, require an explicit project selection before
 `setup-apply`.
+
+If the current host already has the helper installed, prefer using that helper
+for `setup-plan`, `setup-apply`, and verification instead of cloning a fresh
+repo copy only to run the same commands.
 
 The MCP core package works without `com.unity.test-framework`. EditMode and
 PlayMode test operations are optional capabilities enabled by Unity asmdef
@@ -199,6 +243,9 @@ bash init_xuunity_light_unity_mcp.sh --install-codex-config
 
 If the current Codex session does not hot-reload new MCP servers, restart the
 client after this change.
+
+If `~/.codex/config.toml` already contains `[mcp_servers.xuunity_light_unity]`,
+merge or verify the existing block instead of appending a duplicate entry.
 
 Template:
 
@@ -301,6 +348,11 @@ After package import and bridge enablement:
 6. call `unity.health.probe`
 
 Do not treat the install as ready until status, capabilities, and health probe all succeed.
+
+Install success means the MCP package, bridge, and client wiring are working.
+If those checks succeed but a later compile or test run fails, treat that as a
+Unity project or runtime failure unless the error explicitly points back to
+bridge readiness, package import, or unsupported capability.
 
 For package-level verification after upgrading to `v0.3.19`, run:
 

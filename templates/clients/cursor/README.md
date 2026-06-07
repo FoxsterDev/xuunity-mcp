@@ -5,6 +5,17 @@ Status: `active`.
 Cursor uses JSON MCP configuration files. Use the template in this folder as
 either a project-scoped config or a user-global config.
 
+Important:
+
+- Reuse an existing local helper install if it is already present.
+- Merge only the `mcpServers.xuunity_light_unity` block when the destination
+  file already contains other MCP servers.
+- Refresh Cursor's MCP server list after changing the config if the current
+  session does not auto-detect the update.
+- Client wiring does not prove Unity project readiness. Run `validate-setup`,
+  `ensure-ready`, and `unity_status_summary` for the target project after
+  wiring.
+
 ## Install The Server
 
 Install the host-side server into the default Codex-compatible tools location:
@@ -64,3 +75,8 @@ cursor-agent mcp list-tools xuunity_light_unity
 
 Inside Cursor, open MCP settings and confirm that `xuunity_light_unity` is
 connected before asking the agent to run Unity validation tools.
+
+Treat `unity_status_summary` as the canonical first live smoke-check after
+setup. If it is healthy but a later compile or test run fails, treat that as a
+Unity project or runtime failure unless the error explicitly points back to MCP
+setup or unsupported capability.

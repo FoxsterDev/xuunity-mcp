@@ -23,6 +23,17 @@ either alone. Neither install references the other.
 
 Override path with `CLAUDE_TOOLS_HOME` if you want a non-default location.
 
+Important:
+
+- Reuse an existing helper install under `${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}`
+  if it already exists.
+- Merge only the `mcpServers.xuunity_light_unity` block when `.mcp.json` or
+  `~/.claude.json` already contains other MCP servers.
+- Refresh Claude Code or start a fresh session after changing MCP config if the
+  current session does not hot-reload the new server.
+- Client wiring alone does not prove Unity project readiness. Validate the
+  target project separately after wiring.
+
 ## What This Folder Provides
 
 - `.mcp.json` — project-scope snippet with metadata pointing to AI integration guides. Drop at the repo root (`<repo>/.mcp.json`)
@@ -128,6 +139,11 @@ Useful first-pass tools for any Unity work:
 - `unity.tests.run_editmode`
 
 Follow the recommended first-validation pass in `../../../docs/agents/AI_INTEGRATION.md`.
+
+Treat `unity_status_summary` as the canonical first live smoke-check after
+setup. If it is healthy but a later compile or test run fails, treat that as a
+Unity project or runtime failure unless the error explicitly points back to MCP
+setup or unsupported capability.
 
 ## Agent Behavior Rules
 

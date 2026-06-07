@@ -5,6 +5,10 @@ custom MCP server UI. Use this only on trusted local projects. If Rider, VS
 Code, or another MCP client is also connected, avoid concurrent commands against
 the same Unity project.
 
+This visual setup only wires Codex to the host helper. It does not by itself
+prove that a specific Unity project already has the MCP package dependency,
+bridge config, or optional test capability enabled.
+
 The images below are sanitized examples based on the Codex Desktop custom MCP
 flow.
 
@@ -40,6 +44,14 @@ Install or update the host-side helper before using the server:
 bash init_xuunity_light_unity_mcp.sh --target codex
 ```
 
+If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh`
+already exists, reuse that helper instead of cloning a fresh repo just to run
+setup again.
+
+If `~/.codex/config.toml` already contains
+`[mcp_servers.xuunity_light_unity]`, verify or merge the existing block instead
+of creating a duplicate entry through the UI or config file.
+
 ## Verify
 
 Restart or refresh the Codex MCP server list, then ask Codex:
@@ -65,6 +77,38 @@ If the bridge is not ready yet, ask Codex to run the host helper first:
 
 ```text
 Run xuunity_light_unity_mcp.sh ensure-ready for /path/to/UnityProject, open the editor if needed, then check unity_status_summary.
+```
+
+Treat `unity_status_summary` as the canonical first live smoke-check after
+setup. Only move on to tests or builds after it reports a healthy bridge, then
+confirm `unity_capabilities` and `unity_health_probe`.
+
+If those checks succeed but a later compile or test run fails, treat that as a
+Unity project or runtime failure unless the error explicitly points back to MCP
+setup or unsupported capability.
+
+## Preflight Review In Codex
+
+Before asking Codex to mutate a project or `~/.codex/config.toml`, require a
+short review in chat. UI auto-review or sandbox approval is not a replacement
+for that review.
+
+Suggested review format:
+
+```text
+Preflight review
+- Current client: Codex
+- Wiring target: Codex
+- Unity project root: <approved project root>
+- Additional discovered Unity projects: <none or list>
+- Existing helper install: <reuse existing helper | clone required>
+- Existing Codex MCP block: <present | missing>
+- Planned project file changes: <manifest, bridge config, lockfile, none>
+- Planned user-level config changes: <exact file paths or none>
+- Restart or refresh required after mutation: <yes/no>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
+
+Do not run setup-apply until the user explicitly approves this review.
 ```
 
 ## How To Ask Codex

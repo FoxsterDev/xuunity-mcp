@@ -5,6 +5,16 @@ Status: `active`.
 Windsurf Cascade reads MCP servers from
 `~/.codeium/windsurf/mcp_config.json`.
 
+Important:
+
+- Reuse an existing local helper install if it is already present.
+- Merge only the `mcpServers.xuunity_light_unity` block when the destination
+  file already contains other MCP servers.
+- Refresh Windsurf's MCP panel after changing the config if the current session
+  does not auto-detect the update.
+- Client wiring does not prove Unity project readiness. Validate the project
+  separately after wiring.
+
 ## Install The Server
 
 Install the host-side server into the default Codex-compatible tools location:
@@ -44,3 +54,8 @@ If you already have other MCP servers, merge the
 
 Open Cascade, open the MCP panel, and confirm that `xuunity_light_unity` is
 connected before asking the agent to run Unity validation tools.
+
+Treat `unity_status_summary` as the canonical first live smoke-check after
+setup. If it is healthy but a later compile or test run fails, treat that as a
+Unity project or runtime failure unless the error explicitly points back to MCP
+setup or unsupported capability.
