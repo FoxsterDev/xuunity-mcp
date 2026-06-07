@@ -59,3 +59,20 @@ Treat `unity_status_summary` as the canonical first live smoke-check after
 setup. If it is healthy but a later compile or test run fails, treat that as a
 Unity project or runtime failure unless the error explicitly points back to MCP
 setup or unsupported capability.
+
+## Remove Or Reset
+
+Use `uninstall-plan` before deleting project setup, Windsurf config, or helper
+files.
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Project-only mode keeps Windsurf config and the helper install. For a current-user
+reset, use `--mode full-reset-current-user --client windsurf`, review the exact
+config/helper removals, then run `uninstall-apply --plan-file ... --yes` only
+after explicit approval. Remove only `mcpServers.xuunity_light_unity`; do not
+delete whole config files or unrelated MCP servers.

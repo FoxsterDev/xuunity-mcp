@@ -33,6 +33,8 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "bridge-state",
                 "setup-plan",
                 "setup-apply",
+                "uninstall-plan",
+                "uninstall-apply",
                 "validate-setup",
                 "install-test-framework",
                 "license-capabilities",
@@ -79,6 +81,8 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_status_summary", tool_names)
         self.assertIn("xuunity_setup_plan", tool_names)
         self.assertIn("xuunity_setup_apply", tool_names)
+        self.assertIn("xuunity_uninstall_plan", tool_names)
+        self.assertIn("xuunity_uninstall_apply", tool_names)
         self.assertIn("xuunity_setup_validate", tool_names)
         self.assertIn("unity_license_capabilities", tool_names)
         self.assertIn("unity_package_install_test_framework", tool_names)
@@ -113,6 +117,37 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertEqual("setup-apply", args.command)
         self.assertEqual(["/tmp/ProjectA", "/tmp/ProjectB"], args.project_root)
         self.assertTrue(args.yes)
+
+    def test_uninstall_parser_accepts_modes_and_client_scope(self) -> None:
+        parser = server.build_parser()
+        plan_args = parser.parse_args(
+            [
+                "uninstall-plan",
+                "--mode",
+                "full-reset-current-user",
+                "--project-root",
+                "/tmp/ProjectA",
+                "--client",
+                "codex",
+                "--include-other-client-helpers",
+            ]
+        )
+        apply_args = parser.parse_args(
+            [
+                "uninstall-apply",
+                "--plan-file",
+                "/tmp/uninstall-plan.json",
+                "--yes",
+            ]
+        )
+
+        self.assertEqual("uninstall-plan", plan_args.command)
+        self.assertEqual("full-reset-current-user", plan_args.mode)
+        self.assertEqual(["/tmp/ProjectA"], plan_args.project_root)
+        self.assertEqual("codex", plan_args.client)
+        self.assertTrue(plan_args.include_other_client_helpers)
+        self.assertEqual("uninstall-apply", apply_args.command)
+        self.assertTrue(apply_args.yes)
 
     def test_project_action_catalog_parser_resolves_aliases_and_hook_names(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

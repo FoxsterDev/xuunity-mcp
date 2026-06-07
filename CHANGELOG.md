@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+
+- Added `uninstall-plan` and `uninstall-apply` host helper commands plus
+  `xuunity_uninstall_plan` and `xuunity_uninstall_apply` MCP tools for safe
+  project cleanup and current-user reset flows.
+- Added uninstall guidance across install, agent, client, template, and
+  reference docs, including project-only cleanup and full reset modes.
+
+### Changed
+
+- Documented uninstall as a preflight-first flow that removes only the selected
+  `xuunity_light_unity` client config block, selected helper install, and
+  explicit project-level MCP setup after approval.
+
 ## 0.3.19
 
 Release tag: `v0.3.19`

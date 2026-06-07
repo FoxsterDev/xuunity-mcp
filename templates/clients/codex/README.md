@@ -24,6 +24,10 @@ Important:
   verify the target project with `validate-setup`, `ensure-ready`, and
   `request-status-summary`; after Codex can see the MCP server, use
   `unity_status_summary` as the first live MCP-tool smoke-check.
+- To remove Codex wiring, use `uninstall-plan --mode full-reset-current-user
+  --client codex` and review it before `uninstall-apply`. Remove only the
+  `[mcp_servers.xuunity_light_unity]` block; do not delete the whole
+  `config.toml` or unrelated MCP server blocks.
 
 Snippets:
 

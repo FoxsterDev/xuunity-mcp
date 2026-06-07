@@ -1,8 +1,10 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 if str(TEMPLATES_DIR) not in sys.path:
@@ -263,6 +265,156 @@ class SetupWizardTests(unittest.TestCase):
         self.assertEqual([str(project_a.resolve())], result["skipped_project_roots"])
         self.assertNotIn("com.xuunity.light-mcp", manifest_a["dependencies"])
         self.assertIn("com.xuunity.light-mcp", manifest_b["dependencies"])
+
+    def test_uninstall_project_only_plan_keeps_user_config_and_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_root = create_unity_project(
+                root / "Project",
+                unity_version="2022.3.60f1",
+                dependencies={"com.xuunity.light-mcp": "git-url"},
+            )
+            wizard.write_bridge_config(project_root)
+            codex_home = root / "codex-home"
+            codex_tools = root / "codex-tools"
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "CODEX_HOME": str(codex_home),
+                    "CODEX_TOOLS_HOME": str(codex_tools),
+                    "CODEX_SHELL": "1",
+                },
+                clear=False,
+            ):
+                plan = wizard.build_uninstall_plan(
+                    mode="project-only-cleanup",
+                    project_roots=[str(project_root)],
+                )
+
+        review = plan["preflight_review"]
+        project_actions = plan["projects"][0]["planned_actions"]
+        self.assertEqual("uninstall_plan", plan["action"])
+        self.assertEqual("project-only-cleanup", plan["mode"])
+        self.assertEqual([], review["planned_user_level_config_changes"])
+        self.assertEqual([], review["helper_installs_to_remove"])
+        self.assertTrue(any(action["kind"] == "remove_manifest_dependency" for action in project_actions))
+        self.assertTrue(any(action["kind"] == "remove_project_bridge_directory" for action in project_actions))
+        self.assertIn("keep_helper_install", {target["uninstall_action"] for target in review["planned_helper_install_targets"]})
+
+    def test_uninstall_project_only_apply_cleans_only_selected_project(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_root = create_unity_project(
+                root / "Project",
+                unity_version="2022.3.60f1",
+                dependencies={"com.xuunity.light-mcp": "git-url", "com.example.keep": "1.0.0"},
+            )
+            sibling_root = create_unity_project(
+                root / "Sibling",
+                unity_version="2022.3.60f1",
+                dependencies={"com.xuunity.light-mcp": "git-url"},
+            )
+            write_json(
+                project_root / "Packages" / "packages-lock.json",
+                {"dependencies": {"com.xuunity.light-mcp": {"version": "git-url"}, "com.example.keep": {"version": "1.0.0"}}},
+            )
+            wizard.write_bridge_config(project_root)
+            wizard.write_bridge_config(sibling_root)
+            plan = wizard.build_uninstall_plan(
+                mode="project-only-cleanup",
+                project_roots=[str(project_root)],
+                workspace_root=str(root),
+            )
+
+            result = wizard.apply_uninstall_plan(plan, approve=True)
+            manifest = json.loads((project_root / "Packages" / "manifest.json").read_text(encoding="utf-8"))
+            sibling_manifest = json.loads((sibling_root / "Packages" / "manifest.json").read_text(encoding="utf-8"))
+            lock = json.loads((project_root / "Packages" / "packages-lock.json").read_text(encoding="utf-8"))
+
+            self.assertEqual("uninstall_apply", result["action"])
+            self.assertNotIn("com.xuunity.light-mcp", manifest["dependencies"])
+            self.assertEqual("1.0.0", manifest["dependencies"]["com.example.keep"])
+            self.assertNotIn("com.xuunity.light-mcp", lock["dependencies"])
+            self.assertFalse((project_root / "Library" / "XUUnityLightMcp").exists())
+            self.assertIn("com.xuunity.light-mcp", sibling_manifest["dependencies"])
+            self.assertTrue((sibling_root / "Library" / "XUUnityLightMcp").exists())
+
+    def test_uninstall_full_reset_removes_only_codex_block_and_selected_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_home = root / "codex-home"
+            codex_config = codex_home / "config.toml"
+            codex_config.parent.mkdir(parents=True)
+            codex_config.write_text(
+                "\n".join(
+                    [
+                        "[mcp_servers.other]",
+                        "command = \"other\"",
+                        "",
+                        "[mcp_servers.xuunity_light_unity]",
+                        "command = \"bash\"",
+                        "args = [\"-lc\", \"exec run.sh\"]",
+                        "",
+                        "[profiles.default]",
+                        "model = \"gpt\"",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            codex_helper = root / "codex-tools" / "xuunity-light-unity-mcp"
+            codex_helper.mkdir(parents=True)
+            (codex_helper / "server.py").write_text("# helper\n", encoding="utf-8")
+            (codex_helper / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            claude_helper = root / "claude-tools" / "xuunity-light-unity-mcp"
+            claude_helper.mkdir(parents=True)
+            (claude_helper / "server.py").write_text("# helper\n", encoding="utf-8")
+            (claude_helper / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "CODEX_HOME": str(codex_home),
+                    "CODEX_TOOLS_HOME": str(root / "codex-tools"),
+                    "CLAUDE_TOOLS_HOME": str(root / "claude-tools"),
+                    "CODEX_SHELL": "1",
+                },
+                clear=False,
+            ):
+                plan = wizard.build_uninstall_plan(
+                    mode="full-reset-current-user",
+                    project_roots=[],
+                    client="codex",
+                )
+                result = wizard.apply_uninstall_plan(plan, approve=True)
+
+            config_text = codex_config.read_text(encoding="utf-8")
+            self.assertEqual("uninstall_apply", result["action"])
+            self.assertNotIn("[mcp_servers.xuunity_light_unity]", config_text)
+            self.assertIn("[mcp_servers.other]", config_text)
+            self.assertIn("[profiles.default]", config_text)
+            self.assertFalse(codex_helper.exists())
+            self.assertTrue(claude_helper.exists())
+            self.assertEqual(1, len(result["client_config_changes"]))
+            self.assertEqual(1, len(result["helper_install_changes"]))
+
+    def test_uninstall_apply_requires_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = create_unity_project(
+                Path(tmp) / "Project",
+                unity_version="2022.3.60f1",
+                dependencies={"com.xuunity.light-mcp": "git-url"},
+            )
+            plan = wizard.build_uninstall_plan(
+                mode="project-only-cleanup",
+                project_roots=[str(project_root)],
+            )
+
+            with self.assertRaises(wizard.ToolInvocationError) as cm:
+                wizard.apply_uninstall_plan(plan, approve=False)
+
+        self.assertEqual("approval_required", cm.exception.code)
 
     def test_install_test_framework_rejects_explicit_version_below_capability_minimum(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

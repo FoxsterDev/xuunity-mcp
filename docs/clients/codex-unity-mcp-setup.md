@@ -116,6 +116,24 @@ Do not run setup-apply, installer commands, helper sync, or Codex config edits
 until the user explicitly approves this review.
 ```
 
+## Remove Or Reset In Codex
+
+Ask Codex to plan removal before it deletes anything:
+
+```text
+Run xuunity_light_unity_mcp.sh uninstall-plan --mode project-only-cleanup --project-root /path/to/UnityProject, show the preflight review, and wait for approval before uninstall-apply.
+```
+
+For a Codex current-user reset, use:
+
+```text
+Run xuunity_light_unity_mcp.sh uninstall-plan --mode full-reset-current-user --client codex, include --project-root only if a project was named, show exact Codex config and helper removals, and wait for approval before uninstall-apply.
+```
+
+Project-only mode keeps `~/.codex/config.toml` and the Codex helper install. Full
+reset removes only `[mcp_servers.xuunity_light_unity]` from Codex config and
+the selected Codex helper install by default.
+
 ## How To Ask Codex
 
 You do not need to spell out the MCP server name every time once the server is

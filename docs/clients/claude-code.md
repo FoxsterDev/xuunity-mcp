@@ -123,3 +123,34 @@ connected. Then verify Unity with:
 3. `unity.health.probe`
 
 Do not run compile, tests, Play Mode, or screenshots until the health probe succeeds.
+
+## Remove Or Reset
+
+Use `uninstall-plan` before deleting project setup, Claude config, or helper
+files.
+
+Project-only cleanup:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Review the plan in chat, then run `uninstall-apply --plan-file ... --yes` only
+after explicit approval. Project-only mode keeps `.mcp.json`, `~/.claude.json`, and
+`${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp`.
+
+Full current-user reset for Claude Code:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --client claude_code \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Full reset removes only the selected current-user
+`mcpServers.xuunity_light_unity` block and the selected Claude helper install
+by default. Remove project-scoped `.mcp.json` entries manually or with a
+project-approved edit; do not delete unrelated MCP servers.

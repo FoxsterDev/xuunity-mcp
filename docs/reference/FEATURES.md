@@ -49,7 +49,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Game View screenshot and resolution control | `Reflection-gated` | `unity_game_view_configure` and `unity_game_view_screenshot` are capability-probed editor features. | Provides visual evidence while acknowledging Unity-version sensitivity. |
 | SDK/EDM4U validation helpers | `Project-dependent` | `unity_edm4u_resolve`, `unity_sdk_dependency_verify`, and artifact expectation checks. | Useful for mobile SDK dependency restore/export/build workflows. |
 | Cross-platform client templates | `Template provided` | Linux/macOS configs use `run.sh`; native Windows configs use `run.cmd`; PowerShell launcher is also shipped. | Covers common MCP clients without relying on one OS shell model. |
-| Easy disable/uninstall path | `Core` | Bridge config/state is local to `Library/XUUnityLightMcp/`; install script supports disable/uninstall flows. | Keeps project cleanup understandable. |
+| Easy disable/uninstall path | `Core` | `uninstall-plan` and `uninstall-apply` separate project-only cleanup from current-user reset. | Keeps project cleanup understandable and avoids over-deleting client config. |
 
 ## MCP Tool Surface
 
@@ -94,6 +94,8 @@ Unity MCP implementations when the user wants safe production validation.
 | --- | --- | --- | --- |
 | Setup | `setup-plan` | `Host helper` | Discovers single projects, flat hubs, mixed Unity versions, and nested project roots before mutation. |
 | Setup | `setup-apply` | `Host helper` | Applies an approved setup plan only after explicit approval. |
+| Setup | `uninstall-plan` | `Host helper` | Plans project-only cleanup or current-user reset before any removal. |
+| Setup | `uninstall-apply` | `Host helper` | Applies an approved uninstall plan; removes only planned project state, selected MCP config block, and selected helper install. |
 | Setup | `validate-setup` | `Host helper` | Reports core readiness and optional Test Framework capability state. |
 | Setup | `install-test-framework` | `Host helper` | Installs the optional Test Framework dependency in `Packages/manifest.json` after explicit approval; prefer before opening Unity so package resolution happens on startup. |
 | License capabilities | `license-capabilities` | `Host helper` | Reports `batchmode_supported`, `editor_ui_supported`, blocker code, probe log path, and recommended execution lane. |

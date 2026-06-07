@@ -24,4 +24,6 @@ specific MCP client guide.
 - When a client guide references config snippets, verify the matching template before changing the guide.
 - Do not overwrite or generalize client-specific constraints across all clients unless the shared integration docs also support the change.
 - Prefer exact file paths and merge-safe setup language for MCP config instructions.
-
+- Keep uninstall language merge-safe too: use `uninstall-plan` before deletion,
+  remove only the `xuunity_light_unity` MCP server block from client config,
+  and never delete whole config files or sibling Unity project setup silently.

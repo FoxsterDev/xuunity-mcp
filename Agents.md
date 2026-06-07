@@ -38,7 +38,7 @@ this router plus the local docs as the source of truth.
 - For client setup tasks, load `docs/clients/Agents.md` when it exists, then the requested client guide.
 - For AI integration or workflow tasks, load `docs/agents/AI_INTEGRATION.md` or `docs/agents/AGENT_WORKFLOWS.md` as appropriate.
 - For Unity package implementation, edit `packages/com.xuunity.light-mcp/` and validate through the repo's test or smoke guidance.
-- For installer, wrapper, setup-plan, or setup-apply behavior, work in `scripts/`, `templates/`, and the root shell entrypoints.
+- For installer, wrapper, setup-plan/setup-apply, or uninstall-plan/uninstall-apply behavior, work in `scripts/`, `templates/`, and the root shell entrypoints.
 - For parent-workspace tasks, keep `XUUnityLightUnityMcp` as the implementation target and state any external Unity project used only as a validation target.
 - For public documentation, keep examples generic and public-safe. Do not add host-private paths, credentials, project names, or local workstation assumptions unless the task is explicitly host-local.
 

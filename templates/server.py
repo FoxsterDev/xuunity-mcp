@@ -177,7 +177,9 @@ from server_setup_wizard import (
     LIGHT_MCP_PACKAGE_NAME as SETUP_LIGHT_MCP_PACKAGE_NAME,
     TEST_FRAMEWORK_CAPABILITY_DEFINE,
     TEST_FRAMEWORK_PACKAGE_NAME,
+    apply_uninstall_plan,
     apply_setup_plan,
+    build_uninstall_plan,
     build_setup_plan,
     classify_test_framework_state,
     install_test_framework,
@@ -1862,6 +1864,35 @@ def call_xuunity_setup_apply_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     return mcp_json_result(payload)
 
 
+def call_xuunity_uninstall_plan_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    mode = _optional_string_arg(arguments, "mode") or "project-only-cleanup"
+    client = _optional_string_arg(arguments, "client") or "auto"
+    try:
+        payload = build_uninstall_plan(
+            mode=mode,
+            project_roots=_optional_string_list_arg(arguments, "projectRoots"),
+            workspace_root=_optional_string_arg(arguments, "workspaceRoot") or None,
+            recursive=_optional_bool_arg(arguments, "recursive", False),
+            client=client,
+            include_other_client_helpers=_optional_bool_arg(arguments, "includeOtherClientHelpers", False),
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload)
+
+
+def call_xuunity_uninstall_apply_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    plan = arguments.get("plan")
+    if not isinstance(plan, dict):
+        raise JsonRpcError(-32602, "plan must be an object.")
+    approve = _optional_bool_arg(arguments, "approve", False)
+    try:
+        payload = apply_uninstall_plan(plan, approve=approve)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload)
+
+
 def call_xuunity_setup_validate_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     project_root_value = arguments.get("projectRoot")
     if not isinstance(project_root_value, str) or not project_root_value.strip():
@@ -2110,6 +2141,8 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
         special_tool_handlers={
             "xuunity_setup_plan": call_xuunity_setup_plan_tool,
             "xuunity_setup_apply": call_xuunity_setup_apply_tool,
+            "xuunity_uninstall_plan": call_xuunity_uninstall_plan_tool,
+            "xuunity_uninstall_apply": call_xuunity_uninstall_apply_tool,
             "xuunity_setup_validate": call_xuunity_setup_validate_tool,
             "unity_license_capabilities": call_unity_license_capabilities_tool,
             "unity_status_summary": call_unity_status_summary_tool,
@@ -2189,6 +2222,27 @@ def cmd_setup_apply(args):
         approve=bool(args.yes),
         selected_project_roots=list(args.project_root or []),
     )
+    print_json(payload)
+
+
+def cmd_uninstall_plan(args):
+    payload = build_uninstall_plan(
+        mode=args.mode,
+        project_roots=list(args.project_root or []),
+        workspace_root=args.workspace_root,
+        recursive=bool(args.recursive),
+        client=args.client,
+        include_other_client_helpers=bool(args.include_other_client_helpers),
+    )
+    print_json(payload)
+
+
+def cmd_uninstall_apply(args):
+    plan_path = Path(args.plan_file).expanduser()
+    if not plan_path.is_absolute():
+        plan_path = (Path.cwd() / plan_path).resolve()
+    plan = read_json(plan_path)
+    payload = apply_uninstall_plan(plan, approve=bool(args.yes))
     print_json(payload)
 
 
@@ -5312,6 +5366,30 @@ def build_parser():
     setup_apply_cmd.add_argument("--project-root", action="append", default=[])
     setup_apply_cmd.add_argument("--yes", action="store_true")
     setup_apply_cmd.set_defaults(func=cmd_setup_apply)
+
+    uninstall_plan_cmd = sub.add_parser(
+        "uninstall-plan",
+        help="Print a safe XUUnity Light MCP uninstall plan before removing project, client, or helper state.",
+    )
+    uninstall_plan_cmd.add_argument("--mode", required=True, choices=["project-only-cleanup", "full-reset-current-user"])
+    uninstall_plan_cmd.add_argument("--workspace-root")
+    uninstall_plan_cmd.add_argument("--project-root", action="append", default=[])
+    uninstall_plan_cmd.add_argument("--recursive", action="store_true")
+    uninstall_plan_cmd.add_argument(
+        "--client",
+        choices=["auto", "codex", "claude_code", "cursor", "windsurf", "claude_desktop"],
+        default="auto",
+    )
+    uninstall_plan_cmd.add_argument("--include-other-client-helpers", action="store_true")
+    uninstall_plan_cmd.set_defaults(func=cmd_uninstall_plan)
+
+    uninstall_apply_cmd = sub.add_parser(
+        "uninstall-apply",
+        help="Apply an approved uninstall plan from uninstall-plan. Requires --yes.",
+    )
+    uninstall_apply_cmd.add_argument("--plan-file", required=True)
+    uninstall_apply_cmd.add_argument("--yes", action="store_true")
+    uninstall_apply_cmd.set_defaults(func=cmd_uninstall_apply)
 
     validate_setup_cmd = sub.add_parser(
         "validate-setup",

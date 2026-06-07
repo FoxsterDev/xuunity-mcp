@@ -113,6 +113,43 @@ or user-level client config changes, show the user:
 - whether the client must restart or refresh after mutation
 - exact commands planned after approval
 
+## Preferred Guided Uninstall
+
+For cleanup requests, prefer the uninstall wizard over manual deletion:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+
+# Stop here. Show the uninstall preflight review before any removal.
+bash xuunity_light_unity_mcp.sh uninstall-apply \
+  --plan-file /tmp/xuunity-uninstall-plan.json \
+  --yes
+```
+
+Use `project-only-cleanup` when the goal is to make one Unity project look
+not yet set up. It removes only the selected project's package dependency,
+matching package-lock entry, and `Library/XUUnityLightMcp` bridge state. It
+keeps client config and helper installs.
+
+Use `full-reset-current-user` when the goal is current-user removal:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --client auto \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Before `uninstall-apply`, show the user the mode, detected client, selected
+client, target project, additional discovered projects, exact project cleanup
+paths, exact user-level config cleanup paths, helper installs to remove or keep,
+and restart/refresh requirements. Full reset removes only the selected
+`xuunity_light_unity` MCP server block and selected current-user helper install
+by default. Do not delete whole config files, unrelated MCP servers, or sibling
+Unity project setup.
+
 Test operations are optional. If `validate-setup --include-tests` reports
 `disabled_missing_dependency`, ask for approval before opening Unity, then run:
 

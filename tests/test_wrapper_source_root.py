@@ -131,6 +131,44 @@ class WrapperSourceRootTests(unittest.TestCase):
             )
             self.assertFalse(installed_package_json.exists())
 
+    def test_uninstall_plan_uses_source_without_installed_helper_sync(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        wrapper = repo_root / "xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            project_root = self.create_fake_project(temp_root / "FakeProject")
+            codex_tools = temp_root / "codex-tools"
+            claude_tools = temp_root / "claude-tools"
+
+            env = self.make_env()
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
+            env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
+            env["CODEX_TOOLS_HOME"] = str(codex_tools)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+
+            completed = subprocess.run(
+                [
+                    str(wrapper),
+                    "uninstall-plan",
+                    "--mode",
+                    "project-only-cleanup",
+                    "--project-root",
+                    str(project_root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            plan = json.loads(completed.stdout)
+            self.assertEqual("uninstall_plan", plan["action"])
+            self.assertEqual("project-only-cleanup", plan["mode"])
+            self.assertFalse((codex_tools / "xuunity-light-unity-mcp").exists())
+            self.assertFalse((claude_tools / "xuunity-light-unity-mcp").exists())
+
     def test_auto_install_target_prefers_codex_home_in_codex_context(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         wrapper = repo_root / "xuunity_light_unity_mcp.sh"

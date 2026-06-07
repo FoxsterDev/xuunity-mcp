@@ -103,3 +103,32 @@ cursor-agent mcp list-tools xuunity_light_unity
 
 Inside Cursor, confirm the server is connected in MCP settings. Then run
 `unity.status`, `unity.capabilities.get`, and `unity.health.probe`.
+
+## Remove Or Reset
+
+Use `uninstall-plan` before deleting project setup, Cursor config, or helper
+files.
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Project-only mode removes only project-level MCP setup and keeps `.cursor/mcp.json`,
+`~/.cursor/mcp.json`, and the helper install.
+
+For a current-user Cursor reset:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --client cursor \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Review the plan, then run `uninstall-apply --plan-file ... --yes` only after
+explicit approval. Full reset removes only the selected current-user
+`mcpServers.xuunity_light_unity` block and selected helper install by default.
+Remove project-scoped `.cursor/mcp.json` entries only with an explicit
+project-approved edit.

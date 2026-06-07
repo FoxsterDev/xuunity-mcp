@@ -174,6 +174,7 @@ Current implemented MCP tool surface:
 Host helpers also cover:
 
 - project discovery reports
+- setup and uninstall plan/apply flows with explicit approval boundaries
 - same-host registry context reports
 - ready-state recovery
 - request final-status recovery

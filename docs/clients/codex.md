@@ -133,6 +133,54 @@ does not prove that a specific Unity project has the MCP package dependency,
 bridge config, or test capability enabled yet. Treat user-level client wiring
 and per-project Unity setup as separate stages in the review.
 
+## Remove Or Reset
+
+Use `uninstall-plan` before removing project setup, Codex config, or helper
+files. Codex UI approval or sandbox approval is not a substitute for user
+approval of the uninstall preflight review.
+
+Project-only cleanup for one project:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+
+# Review the plan in chat first.
+bash xuunity_light_unity_mcp.sh uninstall-apply \
+  --plan-file /tmp/xuunity-uninstall-plan.json \
+  --yes
+```
+
+Project-only mode removes only the selected project's MCP package dependency,
+package-lock entry, and `Library/XUUnityLightMcp` bridge state. It keeps
+`~/.codex/config.toml` and
+`${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp`.
+
+Full current-user reset for Codex:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --client codex \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+
+# Review exact config/helper removals in chat first.
+bash xuunity_light_unity_mcp.sh uninstall-apply \
+  --plan-file /tmp/xuunity-uninstall-plan.json \
+  --yes
+```
+
+Omit `--project-root` for a Codex user-only reset. Full reset removes only the
+`[mcp_servers.xuunity_light_unity]` block from `~/.codex/config.toml`; it does
+not delete the config file or unrelated MCP server blocks. It removes only the
+selected Codex helper install by default. Other known helper installs are kept
+unless `--include-other-client-helpers` is explicitly present in the reviewed
+plan.
+
+Restart or refresh Codex after removing the config block. Do not classify stale
+Unity `Library` cache as active installation by itself.
+
 ## Verify
 
 First verify the concrete Unity project with helper commands:

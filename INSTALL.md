@@ -62,6 +62,12 @@ files under `~/.codex-tools` or `~/.claude-tools`, edit manifests, or change
 user-level client config. If helper refresh is required, do it only after the
 preflight review is approved.
 
+For uninstall or cleanup requests, use `uninstall-plan` before any removal.
+Minimal clean mode keeps user-level client config and helper installs. Full
+reset mode is current-user scoped and removes only the selected
+`xuunity_light_unity` server block plus selected helper install after approval.
+Neither mode silently mutates sibling Unity projects.
+
 ## Required Preflight Review Template
 
 Before `setup-apply`, show the user a short review like this and wait:
@@ -81,6 +87,12 @@ Preflight review
 Do not run setup-apply, installer commands, helper sync, or client config edits
 until the user explicitly approves this review.
 ```
+
+For uninstall, show the `preferred_review_summary` from `uninstall-plan` before
+`uninstall-apply`. It must list the mode, selected client, target project,
+additional discovered projects, exact project cleanup paths, exact user config
+cleanup paths, helper installs to remove or keep, and restart/refresh
+requirements.
 
 ## Option 1: Git UPM Package
 
@@ -234,6 +246,53 @@ bash xuunity_light_unity_mcp.sh validate-setup \
 When the Unity bridge is already healthy, clients may use
 `unity_package_install_test_framework` with `approve: true` to install the same
 optional dependency through Unity Package Manager.
+
+## Guided Uninstall And Reset
+
+Use this path when you want to remove XUUnity Light Unity MCP safely.
+
+Project-only cleanup:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+
+# Stop here. Review the plan and get explicit approval.
+bash xuunity_light_unity_mcp.sh uninstall-apply \
+  --plan-file /tmp/xuunity-uninstall-plan.json \
+  --yes
+```
+
+Project-only mode removes only the selected project's `com.xuunity.light-mcp`
+manifest dependency, its package-lock entry, and `Library/XUUnityLightMcp`
+bridge state. It keeps current-user client config and helper installs.
+
+Full reset for the current user:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --client auto \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+
+# Stop here. Review exact user config and helper removals.
+bash xuunity_light_unity_mcp.sh uninstall-apply \
+  --plan-file /tmp/xuunity-uninstall-plan.json \
+  --yes
+```
+
+Omit `--project-root` for a user-only reset. Use
+`--client codex|claude_code|cursor|windsurf|claude_desktop` when auto-detection
+is not enough. Full reset removes only the `xuunity_light_unity` server block
+from the selected current-user config file and removes only the selected
+current-user helper install. Other known helper installs are kept unless
+`--include-other-client-helpers` is explicitly present in the reviewed plan.
+
+Do not treat stale Unity `Library` cache as active installation by itself.
+`Library/XUUnityLightMcp` is removed as project bridge state; broader Unity
+cache wiping is outside this uninstall flow and should be a separate explicit
+project-maintenance action.
 
 If the project already declares `com.unity.test-framework`, the setup wizard
 does not treat every existing version the same way. A version at or above

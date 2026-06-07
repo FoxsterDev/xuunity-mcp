@@ -154,9 +154,10 @@ When using batch-mode operations (tests, compilation) through xuunity_light_unit
 
 For workspaces with multiple Unity projects (like AIFoxsterDevHub):
 
-1. The setup wizard automatically configures all Unity projects in the workspace
-2. Each project gets its own bridge configuration
-3. Specify `--project-root` when invoking MCP tools to target a specific project
+1. The setup wizard can discover all Unity projects in the workspace
+2. Review the plan before mutation
+3. Apply setup only to explicit `--project-root` values chosen from the plan
+4. Specify `--project-root` when invoking MCP tools to target a specific project
 
 Example:
 
@@ -166,11 +167,37 @@ python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py setup-plan \
   --workspace-root /path/to/workspace \
   --recursive > setup-plan.json
 
-# Apply setup to all projects
+# Apply setup only to the reviewed target project
 python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py setup-apply \
   --plan-file setup-plan.json \
+  --project-root /path/to/UnityProject \
   --yes
 ```
+
+## Remove Or Reset
+
+Use `uninstall-plan` before deleting project setup, Rider/Claude config, or
+helper files. For direct script invocation:
+
+```bash
+python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > uninstall-plan.json
+```
+
+Review the plan in the AI Assistant, then run:
+
+```bash
+python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py uninstall-apply \
+  --plan-file uninstall-plan.json \
+  --yes
+```
+
+Project-only mode removes only project-level MCP setup. For a current-user reset,
+use `--mode full-reset-current-user --client claude_code` for Claude-side
+helper/config cleanup or `--client codex` for the Codex-style workaround. Full
+reset removes only the selected `xuunity_light_unity` server block and selected
+helper install by default.
 
 ## Troubleshooting
 

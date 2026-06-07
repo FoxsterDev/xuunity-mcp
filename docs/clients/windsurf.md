@@ -88,3 +88,31 @@ Then run:
 3. `unity.health.probe`
 
 Treat failures in those checks as setup issues before running validation workflows.
+
+## Remove Or Reset
+
+Use `uninstall-plan` before deleting project setup, Windsurf config, or helper
+files.
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Project-only mode removes only project-level MCP setup and keeps
+`~/.codeium/windsurf/mcp_config.json` plus the helper install.
+
+For a current-user Windsurf reset:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --client windsurf \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Review the plan, then run `uninstall-apply --plan-file ... --yes` only after
+explicit approval. Full reset removes only
+`mcpServers.xuunity_light_unity` from the selected Windsurf config and the
+selected helper install by default. Refresh Windsurf's MCP panel afterward.

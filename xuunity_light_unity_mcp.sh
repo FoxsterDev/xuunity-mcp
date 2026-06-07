@@ -651,11 +651,14 @@ Wrapper commands:
       Arrange Unity and agent windows on macOS.
 
 Server commands:
-  setup-plan runs from the source checkout and does not refresh or write the
-  installed helper. Other server commands refresh the installed helper from
-  this source checkout and delegate to server.py. Common commands include:
+  setup-plan, uninstall-plan, and uninstall-apply run from the source checkout
+  and do not refresh or write the installed helper. Other server commands
+  refresh the installed helper from this source checkout and delegate to
+  server.py. Common commands include:
     setup-plan
     setup-apply
+    uninstall-plan
+    uninstall-apply
     validate-setup
     install-test-framework
     ensure-ready
@@ -742,6 +745,24 @@ case "${1:-}" in
       exit 1
     fi
     run_server_with_optional_compact_summary "$SOURCE_SERVER_PATH" setup-plan "$@"
+    exit 0
+    ;;
+  uninstall-plan)
+    shift
+    if [[ ! -f "$SOURCE_SERVER_PATH" ]]; then
+      echo "xuunity-light-unity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
+      exit 1
+    fi
+    run_server_with_optional_compact_summary "$SOURCE_SERVER_PATH" uninstall-plan "$@"
+    exit 0
+    ;;
+  uninstall-apply)
+    shift
+    if [[ ! -f "$SOURCE_SERVER_PATH" ]]; then
+      echo "xuunity-light-unity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
+      exit 1
+    fi
+    run_server_with_optional_compact_summary "$SOURCE_SERVER_PATH" uninstall-apply "$@"
     exit 0
     ;;
   server-help)

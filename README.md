@@ -180,6 +180,8 @@ until the user explicitly approves this review.
 - checking Python and Unity versions
 - `setup-plan` from this wrapper, which must not refresh or write the installed
   helper
+- `uninstall-plan` from this wrapper, which must not refresh, write, or remove
+  the installed helper
 - reading manifest, lockfile, and client config
 - topology inspection
 
@@ -188,9 +190,11 @@ until the user explicitly approves this review.
 - `git clone`
 - installer runs
 - `setup-apply`
+- `uninstall-apply`
 - `install-test-framework`
 - manifest or lockfile edits
 - user-level client config updates
+- helper install removal
 - `devmode` or `prodmode`
 
 ### Guided Setup Wizard
@@ -241,6 +245,76 @@ normal startup.
 
 The helper recommends `com.unity.test-framework@1.1.33` for Unity 2021/2022 and
 `@1.5.1` for Unity 6000+, while the capability gate remains `>= 1.1.33`.
+
+### Guided Uninstall Wizard
+
+Use `uninstall-plan` before any removal. It prints structured JSON and a
+human-readable `preferred_review_summary`.
+
+Project-only cleanup makes one Unity project look not yet set up while
+keeping current-user client wiring and helper installs:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+
+# Stop here. Review the plan with the user before continuing.
+bash xuunity_light_unity_mcp.sh uninstall-apply \
+  --plan-file /tmp/xuunity-uninstall-plan.json \
+  --yes
+```
+
+Project-only mode removes only the approved project-level MCP package dependency,
+the matching packages-lock entry, and `Library/XUUnityLightMcp` bridge state
+from the selected Unity project. It keeps `~/.codex/config.toml`,
+`~/.claude.json`, and helper installs such as
+`~/.codex-tools/xuunity-light-unity-mcp`.
+
+Full reset for the current user removes the selected current-user client
+wiring and helper install in addition to optional project cleanup:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --project-root /path/to/UnityProject \
+  --client auto > /tmp/xuunity-uninstall-plan.json
+
+# Stop here. Review exact project, user config, and helper removals.
+bash xuunity_light_unity_mcp.sh uninstall-apply \
+  --plan-file /tmp/xuunity-uninstall-plan.json \
+  --yes
+```
+
+Use `--client codex|claude_code|cursor|windsurf|claude_desktop` when the
+current client cannot be detected. Full reset removes only the
+`xuunity_light_unity` block from the selected user config file; it does not
+delete the whole config file or unrelated MCP servers. Known helper installs
+for other clients are kept unless the plan is created with
+`--include-other-client-helpers`.
+
+For workspace or nested project contexts, pass `--workspace-root` and
+`--recursive` only to report additional discovered Unity projects. The uninstall
+flow mutates only explicit `--project-root` values and never silently removes
+setup from sibling Unity projects.
+
+Suggested short prompt for agents:
+
+```text
+Remove XUUnity Light Unity MCP from <UNITY_PROJECT_ROOT> in project-only cleanup mode.
+Read README.md and INSTALL.md, run uninstall-plan --mode project-only-cleanup
+--project-root "<UNITY_PROJECT_ROOT>", show the preflight review, wait for
+approval, then run uninstall-apply --plan-file <reviewed plan> --yes.
+```
+
+For a current-user reset:
+
+```text
+Fully reset XUUnity Light Unity MCP for the current user. Run uninstall-plan
+--mode full-reset-current-user, include --project-root only if a Unity project
+was named, show exact user config/helper removals, wait for approval, then run
+uninstall-apply with the reviewed plan.
+```
 
 ### AI Agent Setup Prompt
 
@@ -514,6 +588,7 @@ Manual macOS/Linux and Windows configs live in `templates/clients/`.
 Popular MCP tools:
 
 `xuunity_setup_plan` | `xuunity_setup_apply` | `xuunity_setup_validate` |
+`xuunity_uninstall_plan` | `xuunity_uninstall_apply` |
 `unity_license_capabilities` |
 `unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
 `unity_console_tail` | `unity_scene_snapshot` | `unity_scene_assert` |
@@ -529,8 +604,9 @@ Popular MCP tools:
 `unity_package_install_test_framework` | `unity_edm4u_resolve` |
 `unity_sdk_dependency_verify`
 
-Host helper commands include `setup-plan`, `setup-apply`, `validate-setup`,
-`install-test-framework`, `license-capabilities`, `ensure-ready`, `verify-editor-closed`,
+Host helper commands include `setup-plan`, `setup-apply`, `uninstall-plan`,
+`uninstall-apply`, `validate-setup`, `install-test-framework`,
+`license-capabilities`, `ensure-ready`, `verify-editor-closed`,
 `request-editor-quit --wait-for-exit`, `restore-editor-state`,
 `recover-editor-session`, `batch-compile`, `batch-compile-matrix`,
 `batch-editmode-tests`, `batch-build-config-compile-matrix`,

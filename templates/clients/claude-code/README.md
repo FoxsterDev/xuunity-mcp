@@ -165,3 +165,21 @@ transport.
 - The Claude-side install (`~/.claude-tools/`) is fully independent from any
   Codex-side install (`~/.codex-tools/`). Removing or upgrading one does not
   affect the other.
+
+## Remove Or Reset
+
+Use `uninstall-plan` before deleting project setup, Claude config, or helper
+files.
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Project-only mode removes only project-level MCP setup and keeps `.mcp.json`,
+`~/.claude.json`, and the Claude helper install. For a current-user reset, use
+`--mode full-reset-current-user --client claude_code`, review the exact config
+and helper removals, then run `uninstall-apply --plan-file ... --yes` only
+after explicit approval. Remove only `mcpServers.xuunity_light_unity`; do not
+delete whole config files or unrelated MCP servers.

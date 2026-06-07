@@ -84,6 +84,8 @@ Use these MCP tools from compatible clients:
 - `unity_project_refresh`
 - `unity_edm4u_resolve`
 - `unity_sdk_dependency_verify`
+- `xuunity_uninstall_plan`
+- `xuunity_uninstall_apply`
 
 Use the CLI examples below when you need a deterministic local fallback or when
 you are documenting exactly what an agent did.

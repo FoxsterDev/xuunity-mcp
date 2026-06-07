@@ -4,6 +4,7 @@ import json
 import os
 import platform
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,10 @@ TEST_FRAMEWORK_PACKAGE_NAME = "com.unity.test-framework"
 TEST_FRAMEWORK_MINIMUM_VERSION = "1.1.33"
 TEST_FRAMEWORK_CAPABILITY_DEFINE = "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY"
 DEFAULT_GIT_REPO_URL = "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git"
+UNINSTALL_MODE_PROJECT_ONLY = "project-only-cleanup"
+UNINSTALL_MODE_FULL_RESET = "full-reset-current-user"
+UNINSTALL_MODES = {UNINSTALL_MODE_PROJECT_ONLY, UNINSTALL_MODE_FULL_RESET}
+SUPPORTED_USER_CLIENTS = {"codex", "claude_code", "cursor", "windsurf", "claude_desktop"}
 
 
 def parse_unity_version(project_root: Path) -> str:
@@ -396,6 +401,7 @@ def build_client_config_targets(primary_project_root: Path | None) -> list[dict[
                 "client_id": client_id,
                 "scope": scope,
                 "path": str(path),
+                "config_format": config_format,
                 "exists": path.is_file(),
                 "server_block_present": has_server_block,
                 "config_action": config_action,
@@ -482,6 +488,319 @@ def planned_project_file_changes(project_root: Path, planned_actions: list[dict[
         elif kind == "write_bridge_config":
             changed_paths.add(str(project_root / "Library" / "XUUnityLightMcp" / "config" / "bridge_config.json"))
     return sorted(changed_paths)
+
+
+def project_bridge_root(project_root: Path) -> Path:
+    return project_root / "Library" / "XUUnityLightMcp"
+
+
+def remove_manifest_dependency(project_root: Path, package_name: str) -> bool:
+    manifest_path = project_root / "Packages" / "manifest.json"
+    payload = load_manifest(project_root)
+    dependencies = payload.get("dependencies")
+    if not isinstance(dependencies, dict) or package_name not in dependencies:
+        return False
+    dependencies.pop(package_name, None)
+    write_json(manifest_path, payload)
+    return True
+
+
+def selected_uninstall_client(requested_client: str | None) -> str:
+    requested = (requested_client or "auto").strip()
+    if requested and requested != "auto":
+        if requested not in SUPPORTED_USER_CLIENTS:
+            raise ToolInvocationError(
+                "unsupported_client",
+                f"Unsupported uninstall client: {requested}",
+                {"supported_clients": sorted(SUPPORTED_USER_CLIENTS)},
+            )
+        return requested
+    detected = intended_wiring_target_for_detected_client(detect_current_host_client())
+    if detected in SUPPORTED_USER_CLIENTS:
+        return detected
+    return "manual_selection_required"
+
+
+def uninstall_project_actions(project_root: Path) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    package_dependency = manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME)
+    if package_dependency:
+        actions.append(
+            {
+                "kind": "remove_manifest_dependency",
+                "package": LIGHT_MCP_PACKAGE_NAME,
+                "path": str(project_root / "Packages" / "manifest.json"),
+                "lock_path": str(project_root / "Packages" / "packages-lock.json"),
+                "current_value": package_dependency,
+            }
+        )
+    bridge_root = project_bridge_root(project_root)
+    if bridge_root.exists():
+        actions.append(
+            {
+                "kind": "remove_project_bridge_directory",
+                "path": str(bridge_root),
+                "reason": "remove_project_bridge_config_state_and_request_artifacts",
+            }
+        )
+    return actions
+
+
+def uninstall_project_file_changes(project_root: Path, planned_actions: list[dict[str, Any]]) -> list[str]:
+    changed_paths: set[str] = set()
+    for action in planned_actions:
+        kind = str(action.get("kind") or "")
+        if kind == "remove_manifest_dependency":
+            changed_paths.add(str(project_root / "Packages" / "manifest.json"))
+            changed_paths.add(str(project_root / "Packages" / "packages-lock.json"))
+        elif kind == "remove_project_bridge_directory":
+            changed_paths.add(str(project_bridge_root(project_root)))
+    return sorted(changed_paths)
+
+
+def additional_workspace_projects(
+    *,
+    workspace_root: str | None,
+    selected_project_roots: list[Path],
+    recursive: bool,
+) -> list[str]:
+    if not workspace_root:
+        return []
+    selected = {str(root) for root in selected_project_roots}
+    discovered = discover_unity_projects(workspace_root=workspace_root, project_roots=None, recursive=recursive)
+    return [str(root) for root in discovered if str(root) not in selected]
+
+
+def uninstall_client_config_targets(
+    *,
+    mode: str,
+    selected_client: str,
+    project_root: Path | None,
+) -> list[dict[str, Any]]:
+    targets = build_client_config_targets(project_root)
+    for target in targets:
+        target["uninstall_action"] = "keep_client_config"
+        target["remove_server_block"] = False
+    if mode != UNINSTALL_MODE_FULL_RESET or selected_client == "manual_selection_required":
+        return targets
+    for target in targets:
+        if (
+            target.get("scope") == "user"
+            and target.get("client_id") == selected_client
+            and target.get("server_block_present")
+        ):
+            target["uninstall_action"] = "remove_xuunity_server_block"
+            target["remove_server_block"] = True
+        elif target.get("scope") == "user" and target.get("client_id") == selected_client:
+            target["uninstall_action"] = "verify_absent"
+    return targets
+
+
+def uninstall_helper_targets(
+    *,
+    mode: str,
+    selected_client: str,
+    include_other_client_helpers: bool,
+) -> list[dict[str, Any]]:
+    targets = helper_install_targets()
+    for target in targets:
+        client_id = str(target.get("client_id") or "")
+        remove = False
+        if mode == UNINSTALL_MODE_FULL_RESET:
+            remove = client_id == selected_client or (
+                include_other_client_helpers
+                and selected_client != "manual_selection_required"
+                and bool(target.get("installed"))
+            )
+        target["uninstall_action"] = (
+            "remove_helper_install" if remove and target.get("installed") else "keep_helper_install"
+        )
+        target["remove_helper_install"] = bool(remove and target.get("installed"))
+        target["selected_by_default"] = client_id == selected_client
+    return targets
+
+
+def render_uninstall_review_summary(
+    *,
+    mode: str,
+    detected_client: str,
+    detection_basis: list[str],
+    client_context_confidence: str,
+    selected_client: str,
+    selected_project_roots: list[str],
+    additional_discovered_project_roots: list[str],
+    project_file_changes: list[str],
+    user_config_changes: list[str],
+    helper_removals: list[str],
+    helper_kept: list[str],
+    restart_or_refresh_required: list[str],
+) -> str:
+    lines: list[str] = ["Uninstall preflight review"]
+    lines.append(f"- Mode: {mode}")
+    lines.append(f"- Current client: {detected_client}")
+    lines.append(f"- Detection basis: {', '.join(detection_basis) if detection_basis else 'none'}")
+    lines.append(f"- Client detection confidence: {client_context_confidence}")
+    lines.append(f"- Selected client cleanup target: {selected_client}")
+    lines.append(
+        "- Unity project root: "
+        + (", ".join(selected_project_roots) if selected_project_roots else "none")
+    )
+    lines.append(
+        "- Additional discovered Unity projects: "
+        + (", ".join(additional_discovered_project_roots) if additional_discovered_project_roots else "none")
+    )
+    lines.append(
+        "- Planned project cleanup: "
+        + (", ".join(project_file_changes) if project_file_changes else "none")
+    )
+    lines.append(
+        "- Planned user-level config cleanup: "
+        + (", ".join(user_config_changes) if user_config_changes else "none")
+    )
+    lines.append(
+        "- Helper installs to remove: "
+        + (", ".join(helper_removals) if helper_removals else "none")
+    )
+    lines.append(
+        "- Helper installs to keep: "
+        + (", ".join(helper_kept) if helper_kept else "none")
+    )
+    lines.append(
+        "- Restart or refresh required after mutation: "
+        + (", ".join(restart_or_refresh_required) if restart_or_refresh_required else "none")
+    )
+    lines.append("")
+    lines.append("Do not run uninstall-apply until the user explicitly approves this review.")
+    return "\n".join(lines)
+
+
+def build_uninstall_plan(
+    *,
+    mode: str,
+    project_roots: list[str] | None,
+    workspace_root: str | None = None,
+    recursive: bool = False,
+    client: str | None = None,
+    include_other_client_helpers: bool = False,
+) -> dict[str, Any]:
+    if mode not in UNINSTALL_MODES:
+        raise ToolInvocationError(
+            "invalid_uninstall_mode",
+            f"Unsupported uninstall mode: {mode}",
+            {"supported_modes": sorted(UNINSTALL_MODES)},
+        )
+    if mode == UNINSTALL_MODE_PROJECT_ONLY and not project_roots:
+        raise ToolInvocationError(
+            "project_root_required",
+            f"{UNINSTALL_MODE_PROJECT_ONLY} requires --project-root.",
+            {"recommended_next_step": "Run uninstall-plan with --project-root /path/to/UnityProject."},
+        )
+    normalized_project_roots = [normalize_project_root(value) for value in project_roots or []]
+    detected = detect_client_context()
+    selected_client = selected_uninstall_client(client)
+    primary_project_root = normalized_project_roots[0] if normalized_project_roots else None
+    client_config_targets = uninstall_client_config_targets(
+        mode=mode,
+        selected_client=selected_client,
+        project_root=primary_project_root,
+    )
+    helper_targets = uninstall_helper_targets(
+        mode=mode,
+        selected_client=selected_client,
+        include_other_client_helpers=include_other_client_helpers,
+    )
+
+    projects: list[dict[str, Any]] = []
+    aggregate_project_file_changes: list[str] = []
+    for project_root in normalized_project_roots:
+        actions = uninstall_project_actions(project_root)
+        file_changes = uninstall_project_file_changes(project_root, actions)
+        aggregate_project_file_changes.extend(file_changes)
+        projects.append(
+            {
+                "project_root": str(project_root),
+                "selection_state": "explicit_project_root",
+                "unity_version": parse_unity_version(project_root),
+                "package_dependency": manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME),
+                "bridge_directory": str(project_bridge_root(project_root)),
+                "planned_actions": actions,
+                "planned_project_file_changes": file_changes,
+                "cleanup_status": "ready_to_apply" if actions else "already_clean",
+            }
+        )
+
+    user_config_changes = [
+        str(target.get("path"))
+        for target in client_config_targets
+        if target.get("scope") == "user" and target.get("remove_server_block")
+    ]
+    helper_removals = [
+        str(target.get("install_dir"))
+        for target in helper_targets
+        if target.get("remove_helper_install")
+    ]
+    helper_kept = [
+        str(target.get("install_dir"))
+        for target in helper_targets
+        if not target.get("remove_helper_install")
+    ]
+    restart_or_refresh_required = sorted(
+        {
+            str(target.get("restart_or_refresh_required"))
+            for target in client_config_targets
+            if target.get("remove_server_block")
+        }
+    )
+    additional_projects = additional_workspace_projects(
+        workspace_root=workspace_root,
+        selected_project_roots=normalized_project_roots,
+        recursive=recursive,
+    )
+    plan: dict[str, Any] = {
+        "action": "uninstall_plan",
+        "mode": mode,
+        "workspace_root": str(Path(workspace_root).expanduser().resolve()) if workspace_root else "",
+        "recursive": recursive,
+        "requested_project_roots": [str(root) for root in normalized_project_roots],
+        "additional_discovered_project_roots": additional_projects,
+        "detected_client": detected["detected_client"],
+        "detection_basis": detected["detection_basis"],
+        "client_context_confidence": detected["client_context_confidence"],
+        "selected_client": selected_client,
+        "include_other_client_helpers": include_other_client_helpers,
+        "apply_requires_approval": True,
+        "projects": projects,
+        "preflight_review": {
+            "review_required": True,
+            "mode": mode,
+            "selected_project_roots": [str(root) for root in normalized_project_roots],
+            "additional_discovered_project_roots": additional_projects,
+            "planned_project_file_changes": sorted(set(aggregate_project_file_changes)),
+            "planned_user_level_config_changes": user_config_changes,
+            "planned_client_config_targets": client_config_targets,
+            "planned_helper_install_targets": helper_targets,
+            "helper_installs_to_remove": helper_removals,
+            "helper_installs_to_keep": helper_kept,
+            "restart_or_refresh_required": restart_or_refresh_required,
+            "mutating_actions_require_approval": True,
+            "recommended_next_step": "Review the uninstall plan, approve mutations, then run uninstall-apply.",
+        },
+    }
+    plan["preflight_review"]["preferred_review_summary"] = render_uninstall_review_summary(
+        mode=mode,
+        detected_client=str(detected["detected_client"]),
+        detection_basis=list(detected["detection_basis"]),
+        client_context_confidence=str(detected["client_context_confidence"]),
+        selected_client=selected_client,
+        selected_project_roots=[str(root) for root in normalized_project_roots],
+        additional_discovered_project_roots=additional_projects,
+        project_file_changes=sorted(set(aggregate_project_file_changes)),
+        user_config_changes=user_config_changes,
+        helper_removals=helper_removals,
+        helper_kept=helper_kept,
+        restart_or_refresh_required=restart_or_refresh_required,
+    )
+    return plan
 
 
 def render_preferred_review_summary(
@@ -922,6 +1241,175 @@ def apply_setup_plan(
         "selected_project_roots": [item["project_root"] for item in applied_projects],
         "skipped_project_roots": skipped_project_roots,
         "projects": applied_projects,
+    }
+
+
+def remove_toml_server_block(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    lines = text.splitlines(keepends=True)
+    start_index = -1
+    for index, line in enumerate(lines):
+        if line.strip() == "[mcp_servers.xuunity_light_unity]":
+            start_index = index
+            break
+    if start_index < 0:
+        return False
+    end_index = len(lines)
+    for index in range(start_index + 1, len(lines)):
+        if lines[index].lstrip().startswith("["):
+            end_index = index
+            break
+    new_text = "".join(lines[:start_index] + lines[end_index:])
+    path.write_text(new_text, encoding="utf-8")
+    return True
+
+
+def remove_json_server_block(path: Path) -> bool:
+    try:
+        payload = read_json(path)
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    servers = payload.get("mcpServers")
+    if not isinstance(servers, dict) or "xuunity_light_unity" not in servers:
+        return False
+    servers.pop("xuunity_light_unity", None)
+    write_json(path, payload)
+    return True
+
+
+def remove_client_server_block(target: dict[str, Any]) -> bool:
+    path = Path(str(target.get("path") or "")).expanduser()
+    if not path.is_file():
+        return False
+    config_action = str(target.get("config_action") or "")
+    if not bool(target.get("remove_server_block")) and config_action != "remove_xuunity_server_block":
+        return False
+    config_format = str(target.get("config_format") or "")
+    if not config_format:
+        if path.suffix.lower() == ".toml":
+            config_format = "toml"
+        else:
+            config_format = "json"
+    if config_format == "toml":
+        return remove_toml_server_block(path)
+    return remove_json_server_block(path)
+
+
+def safe_remove_project_bridge_directory(project_root: Path, path_text: str) -> bool:
+    bridge_root = project_bridge_root(project_root).resolve()
+    target = Path(path_text).expanduser().resolve()
+    if target != bridge_root:
+        raise ToolInvocationError(
+            "unsafe_bridge_removal_path",
+            "Refusing to remove a project bridge directory that does not match the selected project root.",
+            {"project_root": str(project_root), "requested_path": str(target), "expected_path": str(bridge_root)},
+        )
+    if not target.exists():
+        return False
+    shutil.rmtree(target)
+    return True
+
+
+def safe_remove_helper_install(path_text: str) -> bool:
+    install_dir = Path(path_text).expanduser().resolve()
+    if install_dir.name != "xuunity-light-unity-mcp":
+        raise ToolInvocationError(
+            "unsafe_helper_removal_path",
+            "Refusing to remove a helper install path with an unexpected directory name.",
+            {"requested_path": str(install_dir)},
+        )
+    if not install_dir.exists():
+        return False
+    if not install_dir.is_dir():
+        raise ToolInvocationError(
+            "unsafe_helper_removal_path",
+            "Refusing to remove a helper install path that is not a directory.",
+            {"requested_path": str(install_dir)},
+        )
+    shutil.rmtree(install_dir)
+    return True
+
+
+def apply_uninstall_plan(plan: dict[str, Any], *, approve: bool) -> dict[str, Any]:
+    if not approve:
+        raise ToolInvocationError("approval_required", "uninstall-apply requires --yes or approve=true.")
+    if not isinstance(plan, dict) or plan.get("action") != "uninstall_plan":
+        raise ToolInvocationError("invalid_uninstall_plan", "Uninstall plan must be a JSON object from uninstall-plan.")
+    mode = str(plan.get("mode") or "")
+    if mode not in UNINSTALL_MODES:
+        raise ToolInvocationError(
+            "invalid_uninstall_mode",
+            f"Unsupported uninstall mode in plan: {mode}",
+            {"supported_modes": sorted(UNINSTALL_MODES)},
+        )
+
+    applied_projects: list[dict[str, Any]] = []
+    for project in list(plan.get("projects") or []):
+        project_root = normalize_project_root(str(project.get("project_root") or ""))
+        applied_actions: list[dict[str, Any]] = []
+        for action in list(project.get("planned_actions") or []):
+            kind = str(action.get("kind") or "")
+            if kind == "remove_manifest_dependency":
+                package_name = str(action.get("package") or LIGHT_MCP_PACKAGE_NAME)
+                removed_manifest_dependency = remove_manifest_dependency(project_root, package_name)
+                removed_lock_entries = remove_lock_entries(project_root, [package_name])
+                applied_actions.append(
+                    {
+                        **action,
+                        "removed_manifest_dependency": removed_manifest_dependency,
+                        "packages_lock_entries_removed": removed_lock_entries,
+                    }
+                )
+            elif kind == "remove_project_bridge_directory":
+                removed = safe_remove_project_bridge_directory(project_root, str(action.get("path") or ""))
+                applied_actions.append({**action, "removed": removed})
+        applied_projects.append({"project_root": str(project_root), "applied_actions": applied_actions})
+
+    applied_client_config_changes: list[dict[str, Any]] = []
+    for target in list((plan.get("preflight_review") or {}).get("planned_client_config_targets") or []):
+        if not target.get("remove_server_block"):
+            continue
+        removed = remove_client_server_block(target)
+        applied_client_config_changes.append(
+            {
+                "client_id": target.get("client_id"),
+                "path": target.get("path"),
+                "scope": target.get("scope"),
+                "removed_server_block": removed,
+            }
+        )
+
+    applied_helper_changes: list[dict[str, Any]] = []
+    for target in list((plan.get("preflight_review") or {}).get("planned_helper_install_targets") or []):
+        if not target.get("remove_helper_install"):
+            continue
+        removed = safe_remove_helper_install(str(target.get("install_dir") or ""))
+        applied_helper_changes.append(
+            {
+                "client_id": target.get("client_id"),
+                "install_dir": target.get("install_dir"),
+                "removed_helper_install": removed,
+            }
+        )
+
+    return {
+        "action": "uninstall_apply",
+        "approved": True,
+        "mode": mode,
+        "selected_client": plan.get("selected_client"),
+        "projects": applied_projects,
+        "client_config_changes": applied_client_config_changes,
+        "helper_install_changes": applied_helper_changes,
+        "restart_or_refresh_required": list((plan.get("preflight_review") or {}).get("restart_or_refresh_required") or []),
+        "remaining_risks": [
+            "Unity may keep stale Library cache data until the editor re-resolves packages; stale cache alone is not active installation.",
+            "Restart or refresh any client whose MCP config block was removed.",
+        ],
     }
 
 

@@ -78,6 +78,8 @@ Implemented host-side MCP tools and helpers:
 - `xuunity_setup_plan`
 - `xuunity_setup_apply`
 - `xuunity_setup_validate`
+- `xuunity_uninstall_plan`
+- `xuunity_uninstall_apply`
 - `unity_package_install_test_framework`
 - `unity_request_final_status`
 - `unity_scenario_result_summary`
@@ -91,6 +93,8 @@ Implemented host-side MCP tools and helpers:
 - `registry-prune-contexts`
 - `setup-plan`
 - `setup-apply`
+- `uninstall-plan`
+- `uninstall-apply`
 - `validate-setup`
 - `install-test-framework`
 - `license-capabilities`

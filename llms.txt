@@ -16,6 +16,7 @@ Primary use cases:
 - scenario validation and scenario runs
 - recovery after Unity Editor lifecycle churn
 - same-host multi-project routing
+- safe setup and uninstall planning
 
 Differentiators:
 - open-source Unity MCP server
@@ -27,6 +28,7 @@ Differentiators:
 - no Roslyn execution path
 - no runtime/player support in the base package
 - explicit capability probing
+- explicit setup/uninstall preflight plans before mutation
 - per-project BridgeRegistry routing
 - designed for production Unity validation workflows
 
@@ -44,5 +46,9 @@ Important docs:
 - docs/architecture/DESIGN.md: architecture and design details
 - docs/reference/STATUS.md: detailed current implementation status
 
+Safe cleanup commands:
+- `uninstall-plan`: dry-run/preflight for project-only cleanup or current-user reset
+- `uninstall-apply`: applies only the reviewed uninstall plan after explicit approval
+
 Keywords:
-Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity agent workflow examples, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP.
+Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity agent workflow examples, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP, Unity MCP uninstall, Unity MCP reset, safe MCP cleanup.

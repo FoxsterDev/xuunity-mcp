@@ -315,6 +315,52 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["plan", "approve"]
         }
     },
+    "xuunity_uninstall_plan": {
+        "description": "Produce a safe XUUnity Light MCP uninstall plan before removing project setup, user client wiring, or helper installs.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": ["project-only-cleanup", "full-reset-current-user"],
+                    "description": "project-only-cleanup removes only project-level setup; full-reset-current-user also plans current-user client/helper cleanup."
+                },
+                "workspaceRoot": {
+                    "type": "string",
+                    "description": "Optional workspace root used only to report additional discovered Unity projects."
+                },
+                "projectRoots": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Explicit Unity project roots to clean. Project-only mode requires at least one."
+                },
+                "recursive": {"type": "boolean", "default": False},
+                "client": {
+                    "type": "string",
+                    "enum": ["auto", "codex", "claude_code", "cursor", "windsurf", "claude_desktop"],
+                    "default": "auto",
+                    "description": "Current-user client wiring/helper target for full reset."
+                },
+                "includeOtherClientHelpers": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, full reset may remove other known current-user helper installs; client config cleanup remains selected-client scoped."
+                }
+            },
+            "required": ["mode"]
+        }
+    },
+    "xuunity_uninstall_apply": {
+        "description": "Apply an approved XUUnity Light MCP uninstall plan. Requires approve=true and removes only planned MCP project/client/helper state.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "plan": {"type": "object"},
+                "approve": {"type": "boolean", "default": False}
+            },
+            "required": ["plan", "approve"]
+        }
+    },
     "xuunity_setup_validate": {
         "description": "Validate one Unity project's XUUnity Light MCP setup, optionally requiring the Test Framework capability.",
         "inputSchema": {

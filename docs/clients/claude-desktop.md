@@ -102,3 +102,31 @@ confirm that `xuunity_light_unity` is connected. Then ask Claude to run:
 1. `unity.status`
 2. `unity.capabilities.get`
 3. `unity.health.probe`
+
+## Remove Or Reset
+
+Use `uninstall-plan` before deleting project setup, Claude Desktop config, or
+helper files.
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode project-only-cleanup \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Project-only mode removes only project-level MCP setup and keeps Claude Desktop
+config plus the Claude helper install.
+
+For a current-user Claude Desktop reset:
+
+```bash
+bash xuunity_light_unity_mcp.sh uninstall-plan \
+  --mode full-reset-current-user \
+  --client claude_desktop \
+  --project-root /path/to/UnityProject > /tmp/xuunity-uninstall-plan.json
+```
+
+Review the plan, then run `uninstall-apply --plan-file ... --yes` only after
+explicit approval. Full reset removes only
+`mcpServers.xuunity_light_unity` from the selected Claude Desktop config and
+the selected helper install by default. Restart Claude Desktop afterward.
