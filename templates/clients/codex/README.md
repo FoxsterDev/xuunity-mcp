@@ -22,7 +22,8 @@ Important:
   the current session does not hot-reload newly added servers.
 - Client wiring alone does not prove a Unity project is ready. After wiring,
   verify the target project with `validate-setup`, `ensure-ready`, and
-  `unity_status_summary`.
+  `request-status-summary`; after Codex can see the MCP server, use
+  `unity_status_summary` as the first live MCP-tool smoke-check.
 
 Snippets:
 

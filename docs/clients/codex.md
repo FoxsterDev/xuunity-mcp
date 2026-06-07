@@ -23,6 +23,37 @@ avoid running concurrent commands against the same Unity project.
 For Codex Desktop's custom MCP server UI, use the visual guide:
 [Codex Unity MCP Setup](codex-unity-mcp-setup.md).
 
+## Required Preflight Review
+
+Before mutating a Unity project, refreshing the host helper, running the
+installer, or editing `~/.codex/config.toml`, show a short review like this:
+
+```text
+Preflight review
+- Current client: Codex
+- Wiring target: Codex
+- Unity project root: <approved project root>
+- Additional discovered Unity projects: <none or list>
+- Existing helper install: <reuse existing helper | install or refresh after approval>
+- Existing Codex MCP block: <present | missing>
+- Planned project file changes: <manifest, bridge config, lockfile, none>
+- Planned user-level config changes: <exact file paths or none>
+- Restart or refresh required after mutation: <yes/no>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
+
+Do not run setup-apply, installer commands, helper sync, or Codex config edits
+until the user explicitly approves this review.
+```
+
+If `~/.codex/config.toml` already contains
+`[mcp_servers.xuunity_light_unity]`, the default action is verify-only:
+inspect the block, avoid adding a duplicate, and run project readiness checks.
+
+For one explicitly requested Unity project, use
+`setup-plan --project-root /path/to/UnityProject` by default even if sibling
+Unity projects exist nearby. Mention additional projects in the review, but do
+not mutate them unless the user approves those exact roots.
+
 ## Install The Server
 
 Install the host-side server files:
@@ -102,31 +133,30 @@ does not prove that a specific Unity project has the MCP package dependency,
 bridge config, or test capability enabled yet. Treat user-level client wiring
 and per-project Unity setup as separate stages in the review.
 
-## Required Preflight Review
-
-Before mutating a Unity project or `~/.codex/config.toml`, show a short review
-like this:
-
-```text
-Preflight review
-- Current client: Codex
-- Wiring target: Codex
-- Unity project root: <approved project root>
-- Additional discovered Unity projects: <none or list>
-- Existing helper install: <reuse existing helper | clone required>
-- Existing Codex MCP block: <present | missing>
-- Planned project file changes: <manifest, bridge config, lockfile, none>
-- Planned user-level config changes: <exact file paths or none>
-- Restart or refresh required after mutation: <yes/no>
-- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
-
-Do not run setup-apply until the user explicitly approves this review.
-```
-
 ## Verify
 
-Start the client and confirm that `xuunity_light_unity` appears in the MCP
-server list. Then ask the client to list the server tools:
+First verify the concrete Unity project with helper commands:
+
+```bash
+bash xuunity_light_unity_mcp.sh validate-setup \
+  --project-root /path/to/UnityProject
+
+bash xuunity_light_unity_mcp.sh ensure-ready \
+  --project-root /path/to/UnityProject \
+  --open-editor
+
+bash xuunity_light_unity_mcp.sh request-status-summary \
+  --project-root /path/to/UnityProject \
+  --timeout-ms 5000
+```
+
+Run these commands sequentially; do not run the status check before
+`ensure-ready` finishes. If the current Codex session does not hot-reload newly
+installed MCP servers, this helper status summary is the correct first
+verification.
+
+Then restart or refresh Codex if needed, confirm that `xuunity_light_unity`
+appears in the MCP server list, and ask the client to list the server tools:
 
 ```text
 Use xuunity_light_unity MCP and list tools.
@@ -139,9 +169,9 @@ Then verify a concrete Unity project:
 3. `unity_health_probe`
 4. `unity_console_tail`
 
-Treat `unity_status_summary` as the canonical first MCP smoke-check after
-setup. Only move on to tests or builds after the status summary reports a
-healthy bridge.
+Treat `unity_status_summary` as the canonical first live MCP-tool smoke-check
+after Codex can see the server. Only move on to tests or builds after the
+status summary reports a healthy bridge.
 
 Install success means Codex can reach a healthy Unity bridge. If
 `unity_status_summary`, `unity_capabilities`, and `unity_health_probe` succeed

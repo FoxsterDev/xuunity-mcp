@@ -39,8 +39,12 @@ For short agent requests such as "setup MCP from this repo into
    - whether the client must restart or refresh after the change
 6. wait for approval before `git clone`, installer runs, `setup-apply`,
    manifest edits, lockfile edits, or user-level client config changes
-7. treat `unity_status_summary` as the canonical first MCP smoke-check after
-   `ensure-ready`
+7. run `validate-setup`, then `ensure-ready`, then the status check
+   sequentially; do not run the status check before `ensure-ready` finishes
+8. use `request-status-summary` as the first helper verification when the
+   current client cannot see newly wired MCP tools yet; after restart or
+   refresh, treat `unity_status_summary` as the canonical first live MCP-tool
+   smoke-check
 
 Before running the helper, verify which Python it will use:
 
@@ -51,6 +55,12 @@ python3 --version
 
 If the selected interpreter is older than `3.10`, set `PYTHON` explicitly
 before `run.sh` or `xuunity_light_unity_mcp.sh`.
+
+`setup-plan` is the only setup wizard command intended for pre-approval
+inspection. It must not clone, run the installer, refresh installed helper
+files under `~/.codex-tools` or `~/.claude-tools`, edit manifests, or change
+user-level client config. If helper refresh is required, do it only after the
+preflight review is approved.
 
 ## Required Preflight Review Template
 
@@ -66,9 +76,10 @@ Preflight review
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no and which client>
-- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 
-Do not run setup-apply until the user explicitly approves this review.
+Do not run setup-apply, installer commands, helper sync, or client config edits
+until the user explicitly approves this review.
 ```
 
 ## Option 1: Git UPM Package
@@ -182,9 +193,20 @@ version globally across mixed Unity versions. When the plan contains more than
 one discovered Unity project, require an explicit project selection before
 `setup-apply`.
 
-If the current host already has the helper installed, prefer using that helper
-for `setup-plan`, `setup-apply`, and verification instead of cloning a fresh
-repo copy only to run the same commands.
+If the user gave one explicit Unity project path, default to
+`setup-plan --project-root /path/to/UnityProject` even when sibling or nested
+Unity projects exist nearby. Mention additional projects in the review, but do
+not mutate them unless the user approves those exact roots.
+
+If the current host already has the helper installed, prefer reusing it for
+`setup-apply` and verification instead of cloning a fresh repo copy only to run
+the same commands. For `setup-plan`, use the available non-mutating entrypoint:
+the wrapper runs it from the source checkout, and an installed helper may run
+it directly when no source checkout is available.
+
+If the helper is missing but the repo checkout is available, `setup-plan` can
+run from the source checkout for preflight. Install or refresh the host helper
+only after approval, or when the user explicitly asked for helper installation.
 
 The MCP core package works without `com.unity.test-framework`. EditMode and
 PlayMode test operations are optional capabilities enabled by Unity asmdef

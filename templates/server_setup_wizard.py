@@ -542,7 +542,10 @@ def render_preferred_review_summary(
     )
     lines.append(f"- Recommended next step after approval: {recommended_next_step}")
     lines.append("")
-    lines.append("Do not run setup-apply until the user explicitly approves this review.")
+    lines.append(
+        "Do not run setup-apply, installer commands, helper sync, or client config edits until "
+        "the user explicitly approves this review."
+    )
     return "\n".join(lines)
 
 
@@ -713,6 +716,9 @@ def build_setup_plan(
     ]
     review_notes.append(
         "setup-plan covers project-level MCP package and bridge mutations only; review client wiring separately with the matching client guide."
+    )
+    review_notes.append(
+        "setup-plan is pre-approval inspection only; it must not refresh installed helper files or mutate user-level client config."
     )
     if explicit_project_roots:
         review_notes.append("The plan is scoped to the explicitly requested Unity project roots only.")

@@ -73,13 +73,17 @@ For a real Unity project check, include the project path:
 Use xuunity_light_unity MCP to run unity_status_summary for /path/to/UnityProject.
 ```
 
-If the bridge is not ready yet, ask Codex to run the host helper first:
+If the bridge is not ready yet or this Codex session has not hot-reloaded the
+MCP server yet, ask Codex to run the host helper checks first:
 
 ```text
-Run xuunity_light_unity_mcp.sh ensure-ready for /path/to/UnityProject, open the editor if needed, then check unity_status_summary.
+Run xuunity_light_unity_mcp.sh validate-setup for /path/to/UnityProject, then run ensure-ready, wait for it to finish, and check request-status-summary. After Codex can see the MCP server, check unity_status_summary.
 ```
 
-Treat `unity_status_summary` as the canonical first live smoke-check after
+Run helper checks sequentially; do not start the status check before
+`ensure-ready` finishes. Use `request-status-summary` as the first helper
+verification when Codex has not loaded the MCP server yet. Treat
+`unity_status_summary` as the canonical first live MCP-tool smoke-check after
 setup. Only move on to tests or builds after it reports a healthy bridge, then
 confirm `unity_capabilities` and `unity_health_probe`.
 
@@ -106,9 +110,10 @@ Preflight review
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no>
-- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 
-Do not run setup-apply until the user explicitly approves this review.
+Do not run setup-apply, installer commands, helper sync, or Codex config edits
+until the user explicitly approves this review.
 ```
 
 ## How To Ask Codex

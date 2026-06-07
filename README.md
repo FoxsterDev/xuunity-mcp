@@ -126,9 +126,13 @@ Agent defaults:
    clone, installer run, manifest change, or user-level client config update.
 5. After approval, apply setup only to the approved project roots.
 6. Run `validate-setup`.
-7. Run `ensure-ready --open-editor` when Unity is not already ready.
-8. Run the first MCP smoke check:
-   - `unity_status_summary`
+7. Run `ensure-ready --open-editor` when Unity is not already ready and wait
+   for it to finish before checking status.
+8. Run the first status check:
+   - use `request-status-summary` when the current client session cannot see
+     newly wired MCP tools yet
+   - use `unity_status_summary` as the first live MCP-tool smoke check after
+     the client has loaded the server
 9. When the user requested tests, run EditMode tests after the status summary is
    healthy.
 10. Finish with:
@@ -164,16 +168,18 @@ Preflight review
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no and which client>
-- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, unity_status_summary, ...>
+- Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 
-Do not run setup-apply until the user explicitly approves this review.
+Do not run setup-apply, installer commands, helper sync, or client config edits
+until the user explicitly approves this review.
 ```
 
 ### Safe Inspect Before Approval
 
 - reading docs
 - checking Python and Unity versions
-- `setup-plan`
+- `setup-plan` from this wrapper, which must not refresh or write the installed
+  helper
 - reading manifest, lockfile, and client config
 - topology inspection
 
@@ -277,14 +283,14 @@ Required procedure:
 2. If the MCP repo is missing locally, ask before cloning
    https://github.com/FoxsterDev/xuunity-light-unity-mcp.git outside the Unity
    Assets folder and treat it as <MCP_REPO_ROOT>.
-3. Run the host installer from <MCP_REPO_ROOT>:
-   bash init_xuunity_light_unity_mcp.sh
-4. Produce a non-mutating setup plan:
+3. Produce a non-mutating setup plan from <MCP_REPO_ROOT>. `setup-plan` must
+   not clone, run the installer, sync helper files, edit manifests, or change
+   user-level client config:
    - for one requested Unity project:
      bash xuunity_light_unity_mcp.sh setup-plan --project-root "<UNITY_PROJECT_ROOT>" > /tmp/xuunity-setup-plan.json
    - for a workspace or nested hub:
      bash xuunity_light_unity_mcp.sh setup-plan --workspace-root "<WORKSPACE_ROOT>" --recursive > /tmp/xuunity-setup-plan.json
-5. Show a short preflight review with:
+4. Show a short preflight review with:
    - detected current client
    - intended wiring target
    - requested Unity project root
@@ -293,7 +299,12 @@ Required procedure:
    - files that will change, including user-level config
    - whether the client must restart or refresh after the change
    - commands that will run after approval
-6. Wait for approval before applying changes.
+5. Wait for approval before cloning, installer runs, helper sync, client
+   wiring, setup-apply, manifest edits, lockfile edits, or user-level config
+   changes.
+6. After approval, install or refresh the host helper only if it is missing or
+   stale enough to block the requested setup:
+   bash init_xuunity_light_unity_mcp.sh
 7. Apply the approved plan only to the approved Unity project roots:
    bash xuunity_light_unity_mcp.sh setup-apply --plan-file /tmp/xuunity-setup-plan.json --project-root "<UNITY_PROJECT_ROOT>" --yes
 8. Wire the selected client using templates/clients/ or the matching
@@ -304,8 +315,11 @@ Required procedure:
 10. Verify readiness:
     bash xuunity_light_unity_mcp.sh validate-setup --project-root "<UNITY_PROJECT_ROOT>"
     bash xuunity_light_unity_mcp.sh ensure-ready --project-root "<UNITY_PROJECT_ROOT>" --open-editor
-11. Treat `unity_status_summary` as the canonical first MCP smoke-check after
-    setup. Then verify `unity_capabilities` and `unity_health_probe`.
+    bash xuunity_light_unity_mcp.sh request-status-summary --project-root "<UNITY_PROJECT_ROOT>" --timeout-ms 5000
+11. If the current client session cannot see the new MCP server, restart or
+    refresh the client now. Then treat `unity_status_summary` as the canonical
+    first live MCP-tool smoke-check after setup. Verify `unity_capabilities`
+    and `unity_health_probe` after the status summary is healthy.
 12. If a post-setup operation was requested, run it only after the status
     summary is healthy.
 13. Finish with a concise report listing files changed, commands run, readiness
@@ -417,15 +431,21 @@ bash xuunity_light_unity_mcp.sh request-status-summary \
   --project-root /path/to/UnityProject
 ```
 
-Treat `unity_status_summary` as the canonical first MCP smoke-check. After it
-reports a healthy bridge, confirm `unity_capabilities` and `unity_health_probe`
-before moving on to tests or builds.
+Run these helper commands sequentially; do not start the status check before
+`ensure-ready` finishes. If the current client session has not hot-reloaded the
+new MCP server yet, `request-status-summary` is the first verification command.
+After the client can see the server, treat `unity_status_summary` as the
+canonical first live MCP-tool smoke-check. After it reports a healthy bridge,
+confirm `unity_capabilities` and `unity_health_probe` before moving on to tests
+or builds.
 
 Install success means:
 
 - `validate-setup` reports a ready configuration
 - `ensure-ready` brings the editor to a healthy bridge state
-- `unity_status_summary` reports a healthy bridge
+- `request-status-summary` reports a healthy bridge before live MCP tools are
+  available, or `unity_status_summary` reports a healthy bridge after the
+  client loads the server
 - `unity_capabilities` and `unity_health_probe` succeed
 
 If those checks pass but a later compile or test run fails, treat that as a
@@ -440,7 +460,9 @@ Use this path when the helper, client wiring, or package may already exist:
 2. inspect the client config instead of rewriting it blindly
 3. run `validate-setup`
 4. run `ensure-ready --open-editor` only if Unity is not already ready
-5. run `unity_status_summary` as the first live smoke-check
+5. run `request-status-summary` first if the client has not loaded the MCP
+   server yet, then restart or refresh the client and run `unity_status_summary`
+   as the first live smoke-check
 
 This avoids duplicate MCP server blocks, unnecessary repo clones, and silent
 rewrites of user-level config.

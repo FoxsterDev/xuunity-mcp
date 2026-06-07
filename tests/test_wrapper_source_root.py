@@ -89,7 +89,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertEqual(operation_package.resolve(), resolved_dependency)
             self.assertIn(f"package_source={operation_package}", completed.stdout)
 
-    def test_setup_plan_default_version_survives_installed_helper_sync(self) -> None:
+    def test_setup_plan_default_version_uses_source_without_installed_helper_sync(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         wrapper = repo_root / "xuunity_light_unity_mcp.sh"
         package_json = repo_root / "packages" / "com.xuunity.light-mcp" / "package.json"
@@ -129,9 +129,7 @@ class WrapperSourceRootTests(unittest.TestCase):
                 / "com.xuunity.light-mcp"
                 / "package.json"
             )
-            self.assertTrue(installed_package_json.is_file())
-            installed_version = json.loads(installed_package_json.read_text(encoding="utf-8"))["version"]
-            self.assertEqual(package_version, installed_version)
+            self.assertFalse(installed_package_json.exists())
 
     def test_auto_install_target_prefers_codex_home_in_codex_context(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -156,7 +154,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CODEX_SHELL"] = "1"
 
             completed = subprocess.run(
-                [str(wrapper), "setup-plan", "--project-root", str(project_root)],
+                [str(wrapper), "server-help"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -186,7 +184,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CODEX_SHELL"] = "1"
 
             completed = subprocess.run(
-                [str(wrapper), "setup-plan", "--project-root", str(project_root)],
+                [str(wrapper), "server-help"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -225,7 +223,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
 
             completed = subprocess.run(
-                [str(wrapper), "setup-plan", "--project-root", str(project_root)],
+                [str(wrapper), "server-help"],
                 check=False,
                 capture_output=True,
                 text=True,

@@ -103,6 +103,7 @@ else
 fi
 RUN_PATH="$INSTALL_DIR/run.sh"
 SERVER_TEMPLATE_RELATIVE_PATH="templates/server.py"
+SOURCE_SERVER_PATH="$SOURCE_ROOT/$SERVER_TEMPLATE_RELATIVE_PATH"
 RUN_TEMPLATE_RELATIVE_PATH="templates/run.sh"
 SERVER_MODULES_TEMPLATE_RELATIVE_GLOB="templates/server_*.py"
 RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH="templates/xuunity_light_unity_mcp_runtime_defaults.json"
@@ -304,15 +305,18 @@ PY
 }
 
 run_server_with_optional_compact_summary() {
+  local server_path="$1"
+  shift
+
   if [[ "$COMPACT_SUMMARY" != "true" ]]; then
-    exec python3 "$SERVER_PATH" "$@"
+    exec python3 "$server_path" "$@"
   fi
 
   local stdout_file
   stdout_file="$(mktemp)"
   local exit_code=0
 
-  if python3 "$SERVER_PATH" "$@" >"$stdout_file"; then
+  if python3 "$server_path" "$@" >"$stdout_file"; then
     exit_code=0
   else
     exit_code=$?
@@ -647,8 +651,9 @@ Wrapper commands:
       Arrange Unity and agent windows on macOS.
 
 Server commands:
-  Any other command refreshes the installed helper from this source checkout and
-  delegates to server.py. Common commands include:
+  setup-plan runs from the source checkout and does not refresh or write the
+  installed helper. Other server commands refresh the installed helper from
+  this source checkout and delegate to server.py. Common commands include:
     setup-plan
     setup-apply
     validate-setup
@@ -729,12 +734,20 @@ case "${1:-}" in
     ;;
 esac
 
-sync_installed_helper_if_needed
-
 case "${1:-}" in
+  setup-plan)
+    shift
+    if [[ ! -f "$SOURCE_SERVER_PATH" ]]; then
+      echo "xuunity-light-unity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
+      exit 1
+    fi
+    run_server_with_optional_compact_summary "$SOURCE_SERVER_PATH" setup-plan "$@"
+    exit 0
+    ;;
   server-help)
     shift
-    run_server_with_optional_compact_summary --help "$@"
+    sync_installed_helper_if_needed
+    run_server_with_optional_compact_summary "$SERVER_PATH" --help "$@"
     exit 0
     ;;
   arrange-unity-windows)
@@ -762,10 +775,12 @@ case "${1:-}" in
     ;;
 esac
 
+sync_installed_helper_if_needed
+
 if [[ ! -f "$SERVER_PATH" ]]; then
   echo "xuunity-light-unity-mcp server not found: $SERVER_PATH" >&2
   echo "Install it with: bash init_xuunity_light_unity_mcp.sh" >&2
   exit 1
 fi
 
-run_server_with_optional_compact_summary "$@"
+run_server_with_optional_compact_summary "$SERVER_PATH" "$@"
