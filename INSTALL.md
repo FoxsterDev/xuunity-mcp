@@ -45,6 +45,9 @@ For short agent requests such as "setup MCP from this repo into
    current client cannot see newly wired MCP tools yet; after restart or
    refresh, treat `unity_status_summary` as the canonical first live MCP-tool
    smoke-check
+9. if `ensure-ready --open-editor` opens Unity for the workflow
+   (`opened_by_host: true`), run `restore-editor-state` and then
+   `verify-editor-closed` before the final report
 
 Before running the helper, verify which Python it will use:
 
@@ -429,6 +432,23 @@ After package import and bridge enablement:
 6. call `unity.health.probe`
 
 Do not treat the install as ready until status, capabilities, and health probe all succeed.
+
+When an automated setup or verification step opens Unity with
+`ensure-ready --open-editor`, inspect the result for `opened_by_host`. If it is
+`true`, close only that helper-owned editor session before finishing:
+
+```bash
+bash xuunity_light_unity_mcp.sh restore-editor-state \
+  --project-root /path/to/UnityProject
+
+bash xuunity_light_unity_mcp.sh verify-editor-closed \
+  --project-root /path/to/UnityProject \
+  --timeout-ms 0
+```
+
+The final install report should state whether the editor was reused or opened
+by the helper, and include the closeout verification result when the helper
+opened it.
 
 Install success means the MCP package, bridge, and client wiring are working.
 If those checks succeed but a later compile or test run fails, treat that as a

@@ -127,7 +127,8 @@ Agent defaults:
 5. After approval, apply setup only to the approved project roots.
 6. Run `validate-setup`.
 7. Run `ensure-ready --open-editor` when Unity is not already ready and wait
-   for it to finish before checking status.
+   for it to finish before checking status. Record whether the result reports
+   `opened_by_host: true`.
 8. Run the first status check:
    - use `request-status-summary` when the current client session cannot see
      newly wired MCP tools yet
@@ -135,13 +136,18 @@ Agent defaults:
      the client has loaded the server
 9. When the user requested tests, run EditMode tests after the status summary is
    healthy.
-10. Finish with:
+10. If `ensure-ready --open-editor` opened Unity for this run
+    (`opened_by_host: true`), restore editor state before the final report:
+    - `xuunity_light_unity_mcp.sh restore-editor-state --project-root "<UNITY_PROJECT_ROOT>"`
+    - `xuunity_light_unity_mcp.sh verify-editor-closed --project-root "<UNITY_PROJECT_ROOT>" --timeout-ms 0`
+11. Finish with:
    - files changed
    - commands run
    - readiness result
    - first MCP command result
    - EditMode test result
    - whether a client restart is still required
+   - whether Unity was restored/closed when opened by the helper
 
 ### Preflight Review Checklist
 
@@ -389,6 +395,7 @@ Required procedure:
 10. Verify readiness:
     bash xuunity_light_unity_mcp.sh validate-setup --project-root "<UNITY_PROJECT_ROOT>"
     bash xuunity_light_unity_mcp.sh ensure-ready --project-root "<UNITY_PROJECT_ROOT>" --open-editor
+    Record whether the readiness result reports `opened_by_host: true`.
     bash xuunity_light_unity_mcp.sh request-status-summary --project-root "<UNITY_PROJECT_ROOT>" --timeout-ms 5000
 11. If the current client session cannot see the new MCP server, restart or
     refresh the client now. Then treat `unity_status_summary` as the canonical
@@ -396,11 +403,16 @@ Required procedure:
     and `unity_health_probe` after the status summary is healthy.
 12. If a post-setup operation was requested, run it only after the status
     summary is healthy.
-13. Finish with a concise report listing files changed, commands run, readiness
+13. If `ensure-ready --open-editor` opened Unity for this run
+    (`opened_by_host: true`), restore editor state before the final report:
+    bash xuunity_light_unity_mcp.sh restore-editor-state --project-root "<UNITY_PROJECT_ROOT>"
+    bash xuunity_light_unity_mcp.sh verify-editor-closed --project-root "<UNITY_PROJECT_ROOT>" --timeout-ms 0
+14. Finish with a concise report listing files changed, commands run, readiness
     verification, the first MCP command result, any requested post-setup
     operation result, whether a client restart is still required, and whether
-    any failing compile or test result is an MCP setup failure or a project
-    runtime failure.
+    Unity was restored/closed when opened by the helper. Also state whether any
+    failing compile or test result is an MCP setup failure or a project runtime
+    failure.
 ```
 
 ## Manual Install
@@ -513,6 +525,18 @@ canonical first live MCP-tool smoke-check. After it reports a healthy bridge,
 confirm `unity_capabilities` and `unity_health_probe` before moving on to tests
 or builds.
 
+If `ensure-ready --open-editor` reports `opened_by_host: true`, the install or
+test workflow owns that editor session. Before the final report, restore it:
+
+```bash
+bash xuunity_light_unity_mcp.sh restore-editor-state \
+  --project-root /path/to/UnityProject
+
+bash xuunity_light_unity_mcp.sh verify-editor-closed \
+  --project-root /path/to/UnityProject \
+  --timeout-ms 0
+```
+
 Install success means:
 
 - `validate-setup` reports a ready configuration
@@ -537,9 +561,12 @@ Use this path when the helper, client wiring, or package may already exist:
 5. run `request-status-summary` first if the client has not loaded the MCP
    server yet, then restart or refresh the client and run `unity_status_summary`
    as the first live smoke-check
+6. if `ensure-ready` opened Unity (`opened_by_host: true`), run
+   `restore-editor-state` and verify the editor is closed before finishing
 
 This avoids duplicate MCP server blocks, unnecessary repo clones, and silent
-rewrites of user-level config.
+rewrites of user-level config, while returning helper-opened editor sessions to
+their previous state.
 
 Then try:
 

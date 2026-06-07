@@ -221,6 +221,21 @@ Treat `unity_status_summary` as the canonical first live MCP-tool smoke-check
 after Codex can see the server. Only move on to tests or builds after the
 status summary reports a healthy bridge.
 
+If Codex used `ensure-ready --open-editor` and the result reports
+`opened_by_host: true`, Codex owns that temporary Unity editor session. Before
+the final response, run:
+
+```bash
+bash xuunity_light_unity_mcp.sh restore-editor-state \
+  --project-root /path/to/UnityProject
+
+bash xuunity_light_unity_mcp.sh verify-editor-closed \
+  --project-root /path/to/UnityProject \
+  --timeout-ms 0
+```
+
+Report the closeout result alongside the test, compile, or health-check result.
+
 Install success means Codex can reach a healthy Unity bridge. If
 `unity_status_summary`, `unity_capabilities`, and `unity_health_probe` succeed
 but a later compile or test run fails, treat that as a Unity project or runtime
