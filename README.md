@@ -353,7 +353,7 @@ Rules:
   editing files.
 - Use the current host client that is running this request as the default MCP
   wiring target unless the user explicitly requests another client.
-- Prefer Git UPM release v0.3.19 unless the user explicitly requests local
+- Prefer Git UPM release v0.3.20 unless the user explicitly requests local
   package development.
 - Reuse an existing installed host helper if one is already present locally.
   Clone the repo only when the helper is missing or local MCP development is
@@ -436,7 +436,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.20
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -444,7 +444,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.20"
   }
 }
 ```

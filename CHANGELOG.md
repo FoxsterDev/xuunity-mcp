@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.20
+
+Release tag: `v0.3.20`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.20
+```
+
 ### Added
 
 - Added `uninstall-plan` and `uninstall-apply` host helper commands plus
@@ -9,12 +19,24 @@
   project cleanup and current-user reset flows.
 - Added uninstall guidance across install, agent, client, template, and
   reference docs, including project-only cleanup and full reset modes.
+- Added a GitHub Pages-ready public site surface for `XUUnity MCP`, including
+  install, comparison, use-case, alternatives, and client-guide landing pages.
+- Added SEO/discovery operational docs, including listing metadata, publishing
+  checklist, SERP tracking guidance, and a live execution backlog.
 
 ### Changed
 
+- Renamed the public repository slug from
+  `FoxsterDev/xuunity-light-unity-mcp` to `FoxsterDev/xuunity-mcp`.
+- Updated the canonical Git UPM install path to the new repository URL while
+  keeping the package directory at `packages/com.xuunity.light-mcp`.
+- Updated release-facing docs, package metadata, MCP metadata, GitHub Pages
+  canonicals, and helper/client examples to use the new repo/site path.
 - Documented uninstall as a preflight-first flow that removes only the selected
   `xuunity_light_unity` client config block, selected helper install, and
   explicit project-level MCP setup after approval.
+- Released `v0.3.20` package metadata, server metadata, package manifests, and
+  Git UPM examples.
 
 ## 0.3.19
 
