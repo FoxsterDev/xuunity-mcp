@@ -443,10 +443,6 @@ Keep Git UPM as the default project state. Switch to the local `file:` source
 only through explicit `devmode`.
 OpenUPM is planned; use Git UPM until the package is published there.
 
-Migration note: `v0.3.11` used `templates/unity-package`. `v0.3.12+` uses
-`packages/com.xuunity.light-mcp` so the package path is registry-native for
-OpenUPM and Unity Package Manager indexing.
-
 ### 2. Install The Host MCP Helper
 
 ```bash
