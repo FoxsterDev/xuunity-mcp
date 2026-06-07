@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>XUUnity MCP vs Unity MCP: choosing a validation-first Unity MCP</title>
+    <meta name="description" content="Compare XUUnity MCP with broader Unity MCP options by workflow: safe setup, compile validation, tests, scene assertions, and editor-only footprint.">
+    <link rel="canonical" href="https://foxsterdev.github.io/xuunity-mcp/articles/xuunity-mcp-vs-unity-mcp.html">
+    <meta property="og:title" content="XUUnity MCP vs Unity MCP">
+    <meta property="og:description" content="A fair comparison frame for validation-first Unity MCP workflows.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://foxsterdev.github.io/xuunity-mcp/articles/xuunity-mcp-vs-unity-mcp.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "XUUnity MCP vs Unity MCP",
+        "url": "https://foxsterdev.github.io/xuunity-mcp/articles/xuunity-mcp-vs-unity-mcp.html",
+        "description": "A workflow-based comparison of XUUnity MCP and broader Unity MCP options."
+      }
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="topbar">
+        <a class="brand" href="../">XUUnity MCP</a>
+        <nav class="nav">
+          <a href="../install.html">Install</a>
+          <a href="../comparison.html">Comparison</a>
+          <a href="../use-cases.html">Use Cases</a>
+          <a href="../alternatives.html">Alternatives</a>
+          <a href="./">Articles</a>
+        </nav>
+      </div>
+
+      <article class="hero">
+        <div class="eyebrow">Comparison article</div>
+        <h1>XUUnity MCP vs Unity MCP</h1>
+        <p class="lede">
+          The best Unity MCP depends on the workflow. XUUnity MCP is strongest
+          when the job is safe setup, compile validation, tests, scene
+          assertions, and repeatable engineering evidence.
+        </p>
+      </article>
+
+      <section class="section">
+        <h2>Do not compare only by tool count</h2>
+        <p>
+          A broad Unity MCP can be the right choice when the team needs a large
+          mutation surface or runtime-heavy automation. XUUnity MCP intentionally
+          optimizes for a smaller default surface: editor-only package behavior,
+          setup preflight, explicit approval, and validation commands that help
+          close the loop after an AI-assisted change.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Workflow fit</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Workflow</th>
+              <th>Recommended direction</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Safe setup review before mutation</td><td><strong>XUUnity MCP</strong></td></tr>
+            <tr><td>Compile checks and Unity test lanes</td><td><strong>XUUnity MCP</strong></td></tr>
+            <tr><td>Scene assertions and Game View screenshots</td><td><strong>XUUnity MCP</strong></td></tr>
+            <tr><td>Broad editor mutation</td><td>Evaluate broader Unity MCP tools</td></tr>
+            <tr><td>Official vendor-managed path</td><td>Evaluate Unity's official MCP / Unity AI path</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>Short decision rule</h2>
+        <p>
+          Choose XUUnity MCP when you want a safe Unity MCP, a lightweight Unity
+          MCP, or a validation-first Unity MCP for production-facing Unity
+          repositories. Choose a broader tool when the primary requirement is
+          maximum mutation coverage rather than validation quality.
+        </p>
+        <div class="button-row">
+          <a class="button" href="../comparison.html">Open comparison page</a>
+          <a class="button secondary" href="../alternatives.html">Open alternatives page</a>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

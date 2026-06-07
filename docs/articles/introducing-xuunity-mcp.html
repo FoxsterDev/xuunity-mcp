@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Introducing XUUnity MCP: lightweight Unity MCP for safe Editor automation</title>
+    <meta name="description" content="Introducing XUUnity MCP, a lightweight Unity MCP server for safe Unity Editor automation, compile validation, tests, scene assertions, and recovery-aware workflows.">
+    <link rel="canonical" href="https://foxsterdev.github.io/xuunity-mcp/articles/introducing-xuunity-mcp.html">
+    <meta property="og:title" content="Introducing XUUnity MCP">
+    <meta property="og:description" content="A validation-first Unity MCP for safe editor automation and engineering proof loops.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://foxsterdev.github.io/xuunity-mcp/articles/introducing-xuunity-mcp.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "Introducing XUUnity MCP",
+        "url": "https://foxsterdev.github.io/xuunity-mcp/articles/introducing-xuunity-mcp.html",
+        "description": "Introducing XUUnity MCP as a lightweight Unity MCP server for safe Unity Editor automation."
+      }
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="topbar">
+        <a class="brand" href="../">XUUnity MCP</a>
+        <nav class="nav">
+          <a href="../install.html">Install</a>
+          <a href="../comparison.html">Comparison</a>
+          <a href="../use-cases.html">Use Cases</a>
+          <a href="../alternatives.html">Alternatives</a>
+          <a href="./">Articles</a>
+        </nav>
+      </div>
+
+      <article class="hero">
+        <div class="eyebrow">Launch article</div>
+        <h1>Introducing XUUnity MCP</h1>
+        <p class="lede">
+          XUUnity MCP is a lightweight Unity MCP server for safe Unity Editor
+          automation. The full technical package name is XUUnity Light Unity
+          MCP, and the product focus is deliberately narrow: validation-first
+          workflows for real Unity projects.
+        </p>
+      </article>
+
+      <section class="section">
+        <h2>Why this Unity MCP exists</h2>
+        <p>
+          Many Unity automation tools optimize for broad editor control. That
+          can be useful, but production-facing projects often need a different
+          default: inspect what will change, apply only what was approved, then
+          produce compile, test, scene, console, or screenshot evidence.
+        </p>
+        <p>
+          XUUnity MCP is built for that narrower loop. It connects MCP clients
+          such as Codex-style agents, Cursor, Claude Code, Claude Desktop,
+          Windsurf, Rider, and custom agents to Unity through a local stdio MCP
+          server and an editor-only Unity package.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>The positioning in one sentence</h2>
+        <p>
+          XUUnity MCP is a safe, lightweight, validation-first Unity MCP for
+          compile checks, tests, scene assertions, screenshots, and setup flows
+          that should not mutate files before review.
+        </p>
+        <div class="tags">
+          <span class="tag">xuunity mcp</span>
+          <span class="tag">safe unity mcp</span>
+          <span class="tag">lightweight unity mcp</span>
+          <span class="tag">validation-first unity mcp</span>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>What to try first</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Goal</th>
+              <th>Best first page</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Install safely</td><td><a href="../install.html">Install XUUnity MCP</a></td></tr>
+            <tr><td>Compare Unity MCP options</td><td><a href="../comparison.html">XUUnity MCP comparison</a></td></tr>
+            <tr><td>Understand fit by workflow</td><td><a href="../use-cases.html">Unity MCP use cases</a></td></tr>
+            <tr><td>Pick a client</td><td><a href="../clients/">Client setup guides</a></td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </body>
+</html>

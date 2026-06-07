@@ -32,4 +32,20 @@
     <loc>https://foxsterdev.github.io/xuunity-mcp/clients/</loc>
     <lastmod>2026-06-07</lastmod>
   </url>
+  <url>
+    <loc>https://foxsterdev.github.io/xuunity-mcp/articles/</loc>
+    <lastmod>2026-06-07</lastmod>
+  </url>
+  <url>
+    <loc>https://foxsterdev.github.io/xuunity-mcp/articles/introducing-xuunity-mcp.html</loc>
+    <lastmod>2026-06-07</lastmod>
+  </url>
+  <url>
+    <loc>https://foxsterdev.github.io/xuunity-mcp/articles/xuunity-mcp-vs-unity-mcp.html</loc>
+    <lastmod>2026-06-07</lastmod>
+  </url>
+  <url>
+    <loc>https://foxsterdev.github.io/xuunity-mcp/articles/run-unity-compile-checks-and-tests-through-mcp.html</loc>
+    <lastmod>2026-06-07</lastmod>
+  </url>
 </urlset>

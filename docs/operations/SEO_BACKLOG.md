@@ -57,9 +57,14 @@ Important:
 - [x] `docs/what-is-unity-mcp.html` created
 - [x] `docs/xuunity-vs-coplaydev-unity-mcp.html` created
 - [x] `docs/clients/index.html` created
+- [x] `docs/articles/index.html` created
+- [x] `docs/articles/introducing-xuunity-mcp.html` created
+- [x] `docs/articles/xuunity-mcp-vs-unity-mcp.html` created
+- [x] `docs/articles/run-unity-compile-checks-and-tests-through-mcp.html` created
 - [x] `docs/robots.txt` created
 - [x] `docs/sitemap.xml` created
 - [x] `docs/.nojekyll` created
+- [x] GitHub Actions Pages workflow added at `.github/workflows/pages.yml`
 
 ### Proof assets and conversion assets
 
@@ -79,8 +84,14 @@ Important:
 
 - [x] listing metadata bundle created:
   `docs/reference/LISTING_KIT.md`
+- [x] listing target tracker created:
+  `docs/reference/LISTING_SUBMISSION_TARGETS.md`
 - [x] manual publishing checklist created:
   `docs/operations/PUBLISHING_CHECKLIST.md`
+- [x] discovery publishing runbook created:
+  `docs/operations/DISCOVERY_PUBLISHING_RUNBOOK.md`
+- [x] public site verification utility created:
+  `scripts/testing/check_public_site.py`
 - [x] search tracking checklist created:
   `docs/operations/SERP_TRACKING.md`
 - [x] this live execution backlog created:
@@ -90,7 +101,8 @@ Important:
 
 ### GitHub UI / publishing setup
 
-- [ ] Enable or verify GitHub Pages publishing for the site
+- [x] Add repository workflow for GitHub Pages publishing from `docs/`
+- [ ] Enable or verify GitHub Pages publishing for the site in GitHub settings
 - [ ] Update GitHub repo `About` text manually in the GitHub UI
 - [ ] Update GitHub repo homepage manually in the GitHub UI
 - [ ] Add GitHub topic `xuunity` manually if it is still missing
@@ -114,9 +126,12 @@ Important:
 
 ### External authority signals
 
-- [ ] Publish launch post: `Introducing XUUnity MCP`
-- [ ] Publish comparison post: `XUUnity MCP vs Unity MCP`
-- [ ] Publish tutorial post: `How to run compile checks and Unity tests through MCP`
+- [x] Create owned launch article: `Introducing XUUnity MCP`
+- [x] Create owned comparison article: `XUUnity MCP vs Unity MCP`
+- [x] Create owned tutorial article: `How to run compile checks and Unity tests through MCP`
+- [ ] Publish launch post externally: `Introducing XUUnity MCP`
+- [ ] Publish comparison post externally: `XUUnity MCP vs Unity MCP`
+- [ ] Publish tutorial post externally: `How to run compile checks and Unity tests through MCP`
 - [ ] Add links from personal site / portfolio
 - [ ] Add links from GitHub profile / pinned repo / public profiles
 - [ ] Add links from relevant MCP or Unity community resources
@@ -124,6 +139,8 @@ Important:
 ### Remaining product-proof upgrades
 
 - [ ] Replace storyboard-only demo with a real short video asset (`.mp4` or `.webm`)
+- [x] Add real-video production plan and caption script:
+  `docs/operations/DEMO_VIDEO_PRODUCTION.md`
 - [ ] Add one real end-to-end case study or engineering usage example
 - [ ] Add social proof if real users/projects exist and can be named publicly
 
@@ -132,12 +149,13 @@ Important:
 ### Highest-impact next steps
 
 1. Publish the site publicly through GitHub Pages.
-2. Update GitHub UI metadata:
+2. Run `python3 scripts/testing/check_public_site.py` after the Pages workflow deploys.
+3. Update GitHub UI metadata:
    - About
    - Homepage
    - Topics
-3. Submit sitemap to Google and Bing.
-4. Push the first wave of directory/registry listings using `LISTING_KIT.md`.
+4. Submit sitemap to Google and Bing.
+5. Push the first wave of directory/registry listings using `LISTING_KIT.md`.
 
 ### Best next content moves
 
@@ -150,7 +168,8 @@ Important:
 ### Phase 1: publish what already exists
 
 - [ ] push/commit current repo changes
-- [ ] enable GitHub Pages
+- [x] add GitHub Pages workflow
+- [ ] enable GitHub Pages or set Pages source to GitHub Actions
 - [ ] verify public site loads
 - [ ] verify `robots.txt` and `sitemap.xml` are reachable
 
@@ -178,11 +197,13 @@ Important:
 - Strategy and positioning: `done`
 - Repo-level discovery metadata: `done`
 - Site structure and landing pages: `done`
+- Owned article cluster: `done`
 - Proof assets on the homepage: `mostly done`
 - Real video proof: `not done`
+- GitHub Pages workflow: `done`
 - GitHub UI publishing actions: `not done`
 - Search engine submission: `not done`
 - External listings and backlinks: `not done`
 
-Overall execution state: `about 60% of the repo/site work is done, but the
+Overall execution state: `about 70% of the repo/site work is done, but the
 highest-impact external distribution steps are still ahead`

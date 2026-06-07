@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>How to run Unity compile checks and tests through MCP with XUUnity MCP</title>
+    <meta name="description" content="Use XUUnity MCP for Unity compile validation, EditMode tests, PlayMode tests, status checks, and proof-oriented AI agent closeout workflows.">
+    <link rel="canonical" href="https://foxsterdev.github.io/xuunity-mcp/articles/run-unity-compile-checks-and-tests-through-mcp.html">
+    <meta property="og:title" content="Run Unity compile checks and tests through MCP">
+    <meta property="og:description" content="A validation-first workflow for compile checks, tests, and Unity project health evidence.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://foxsterdev.github.io/xuunity-mcp/articles/run-unity-compile-checks-and-tests-through-mcp.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="../assets/site.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "How to run Unity compile checks and tests through MCP with XUUnity MCP",
+        "url": "https://foxsterdev.github.io/xuunity-mcp/articles/run-unity-compile-checks-and-tests-through-mcp.html",
+        "description": "A validation-first workflow for Unity compile checks and tests through MCP."
+      }
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="topbar">
+        <a class="brand" href="../">XUUnity MCP</a>
+        <nav class="nav">
+          <a href="../install.html">Install</a>
+          <a href="../comparison.html">Comparison</a>
+          <a href="../use-cases.html">Use Cases</a>
+          <a href="../alternatives.html">Alternatives</a>
+          <a href="./">Articles</a>
+        </nav>
+      </div>
+
+      <article class="hero">
+        <div class="eyebrow">Workflow article</div>
+        <h1>How to run Unity compile checks and tests through MCP</h1>
+        <p class="lede">
+          XUUnity MCP is designed for AI-agent loops where the closeout needs
+          evidence: setup status, bridge health, compile validation, EditMode
+          tests, PlayMode tests, and scene-level proof when needed.
+        </p>
+      </article>
+
+      <section class="section">
+        <h2>Start with setup safety</h2>
+        <p>
+          Before an agent changes a Unity project or user-level MCP config, the
+          recommended path is to run a non-mutating setup plan. The plan should
+          identify the Unity project, client target, helper install, manifest
+          changes, bridge config changes, and whether the MCP client must
+          restart or refresh afterward.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Canonical validation sequence</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>setup-plan</code></td><td>Inspect proposed project and client mutations before approval.</td></tr>
+            <tr><td><code>setup-apply</code></td><td>Apply only the approved plan to selected Unity project roots.</td></tr>
+            <tr><td><code>validate-setup</code></td><td>Confirm package, bridge, helper, and client wiring state.</td></tr>
+            <tr><td><code>ensure-ready</code></td><td>Bring Unity to a known editor-ready state before live checks.</td></tr>
+            <tr><td><code>unity_status_summary</code></td><td>Use the first live MCP status proof after the client can see tools.</td></tr>
+            <tr><td>Compile and tests</td><td>Run compile matrix, EditMode tests, and PlayMode tests according to project risk.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>What a good closeout reports</h2>
+        <p>
+          A useful AI-agent closeout should report the commands run, setup
+          readiness, first MCP status result, compile result, test result,
+          relevant artifacts, and whether Unity was opened by the helper and
+          then restored. That is the difference between a generic “done” and a
+          validation-first Unity MCP workflow.
+        </p>
+        <div class="button-row">
+          <a class="button" href="../use-cases.html">Open use cases</a>
+          <a class="button secondary" href="../install.html">Open install guide</a>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

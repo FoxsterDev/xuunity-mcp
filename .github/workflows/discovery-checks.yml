@@ -1,0 +1,43 @@
+name: Discovery Checks
+
+on:
+  pull_request:
+    paths:
+      - "CHANGELOG.md"
+      - "docs/**"
+      - "llms.txt"
+      - "mcp-server.json"
+      - "packages/com.xuunity.light-mcp/package.json"
+      - "scripts/testing/check_release_version_consistency.py"
+      - "templates/**"
+  push:
+    branches:
+      - master
+    paths:
+      - "CHANGELOG.md"
+      - "docs/**"
+      - "llms.txt"
+      - "mcp-server.json"
+      - "packages/com.xuunity.light-mcp/package.json"
+      - "scripts/testing/check_release_version_consistency.py"
+      - "templates/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-bound-surfaces:
+    name: Release-bound discovery metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check release version consistency
+        run: python3 scripts/testing/check_release_version_consistency.py

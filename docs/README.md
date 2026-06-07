@@ -17,6 +17,8 @@ public entrypoints, install metadata, license, security, and MCP discovery.
   `XUUnity MCP vs Unity MCP`
 - [use-cases](use-cases.html) - compile, test, scene, and screenshot workflows
 - [alternatives](alternatives.html) - workflow-based Unity MCP alternatives page
+- [articles](articles/) - owned launch, comparison, and workflow articles that
+  can also seed external publishing
 - [agents](agents/) - AI integration rules and production agent workflows
 - [reference](reference/) - features, comparison, discovery, glossary, and implementation status
 - [operations](operations/) - validation, smoke tests, build automation, package migration, and continuation notes

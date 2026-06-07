@@ -69,3 +69,12 @@ bash init_xuunity_light_unity_mcp.sh
 - Install page: `docs/install.html`
 - Comparison page: `docs/comparison.html`
 - Client guides hub: `docs/clients/index.html`
+- Article hub: `docs/articles/index.html`
+- Launch article: `docs/articles/introducing-xuunity-mcp.html`
+- Comparison article: `docs/articles/xuunity-mcp-vs-unity-mcp.html`
+- Workflow article: `docs/articles/run-unity-compile-checks-and-tests-through-mcp.html`
+
+## Submission Tracker
+
+Use [LISTING_SUBMISSION_TARGETS.md](LISTING_SUBMISSION_TARGETS.md) to track
+third-party listing status and live permalink URLs.

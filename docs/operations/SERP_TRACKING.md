@@ -31,6 +31,8 @@ live.
 - GitHub Pages homepage
 - comparison page
 - alternatives page
+- articles hub
+- launch, comparison, and workflow article pages
 - client guides hub
 - registry and directory listings
 
@@ -40,3 +42,14 @@ live.
 - niche query returns the homepage or comparison page
 - head-term query begins surfacing at least one owned page plus at least one
   listing page
+
+## Public Site Smoke Check
+
+After every Pages deployment, run:
+
+```bash
+python3 scripts/testing/check_public_site.py
+```
+
+This check should pass before submitting new indexing requests or directory
+updates.

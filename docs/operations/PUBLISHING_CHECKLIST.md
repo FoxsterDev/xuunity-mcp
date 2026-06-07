@@ -69,7 +69,16 @@ Add or confirm GitHub topics:
 
 ## Search Engine Setup
 
-- enable GitHub Pages from the `docs/` folder if not already enabled
+- deploy GitHub Pages through the checked-in `.github/workflows/pages.yml`
+  workflow
+- if the public URL still returns 404, set GitHub Pages source to GitHub
+  Actions in repository settings and rerun the workflow
+- verify public pages with:
+
+```bash
+python3 scripts/testing/check_public_site.py
+```
+
 - submit `https://foxsterdev.github.io/xuunity-mcp/sitemap.xml`
   to Google Search Console
 - submit the same sitemap to Bing Webmaster Tools
@@ -86,6 +95,8 @@ to:
 - `mcpservers.org`
 - Model Context Protocol catalog pages
 
+Track submission status in `../reference/LISTING_SUBMISSION_TARGETS.md`.
+
 ## External Content Targets
 
 Recommended first wave:
@@ -93,3 +104,6 @@ Recommended first wave:
 - launch post: `Introducing XUUnity MCP`
 - comparison post: `XUUnity MCP vs Unity MCP`
 - workflow post: `How to run compile checks and Unity tests through MCP`
+
+Owned drafts are available in `../articles/` and can be adapted for external
+community posts.
