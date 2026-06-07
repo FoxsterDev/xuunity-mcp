@@ -29,6 +29,7 @@ CLAIM_PATTERNS = (
     re.compile(r"Release tag `v(\d+\.\d+\.\d+)` is prepared"),
     re.compile(r"Source package is `v(\d+\.\d+\.\d+)`"),
     re.compile(r'"packageVersion": "(\d+\.\d+\.\d+)"'),
+    re.compile(r'"softwareVersion": "v(\d+\.\d+\.\d+)"'),
     re.compile(r"git push origin v(\d+\.\d+\.\d+)"),
     re.compile(r"For package-level verification after upgrading to `v(\d+\.\d+\.\d+)`"),
 )
@@ -114,7 +115,8 @@ def claimed_versions(line: str) -> list[str]:
 
 def check_release_docs(source_root: Path, version: str) -> list[str]:
     errors: list[str] = []
-    for path in sorted(source_root.rglob("*.md")):
+    release_docs = sorted(source_root.rglob("*.md")) + sorted(source_root.rglob("*.html"))
+    for path in release_docs:
         relative_path = path.relative_to(source_root)
         if line_is_allowlisted(relative_path, ""):
             continue

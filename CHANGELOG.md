@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- Tightened the MCP release gate so `sync_release_version.py` and
+  `check_release_version_consistency.py` now treat the GitHub Pages site and
+  listing metadata as release-bound surfaces that must be updated before
+  tagging.
+
 ## 0.3.20
 
 Release tag: `v0.3.20`

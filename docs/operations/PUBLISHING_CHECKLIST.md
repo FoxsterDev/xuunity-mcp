@@ -6,6 +6,35 @@ Status: `manual follow-up after repo commit`
 These items are part of the search/discovery plan but cannot be completed only
 through repository file edits.
 
+## Hard Release Rule
+
+Every MCP release must update the public site before the release tag is pushed.
+Treat the GitHub Pages surface under `docs/` as release-bound product
+documentation, not as optional marketing copy.
+
+Release is blocked until all of the following are true:
+
+- `python3 scripts/tools/sync_release_version.py --version <next-version>` has
+  been run
+- `python3 scripts/testing/check_release_version_consistency.py` passes
+- `docs/index.html` shows the current `softwareVersion`
+- `docs/install.html` shows the current Git UPM tag
+- `docs/reference/LISTING_KIT.md` shows the current Git UPM tag
+- the top `CHANGELOG.md` section describes the release and current package URL
+
+Minimum release closeout sequence:
+
+```bash
+python3 scripts/tools/sync_release_version.py --version <next-version>
+python3 scripts/testing/check_release_version_consistency.py
+scripts/testing/run_host_python_tests.sh
+git push origin master
+git push origin v<next-version>
+```
+
+If the site version, install tag, or listing metadata is stale, do not tag the
+release and do not publish the package URL to consumers.
+
 ## GitHub Repository UI
 
 Set the repository homepage to:

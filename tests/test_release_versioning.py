@@ -65,6 +65,35 @@ class ReleaseVersioningTests(unittest.TestCase):
             ),
         )
         write_text(
+            root / "docs" / "index.html",
+            "\n".join(
+                [
+                    '<script type="application/ld+json">',
+                    '{"softwareVersion": "v0.3.16"}',
+                    "</script>",
+                    "",
+                ]
+            ),
+        )
+        write_text(
+            root / "docs" / "install.html",
+            "\n".join(
+                [
+                    "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16",
+                    "",
+                ]
+            ),
+        )
+        write_text(
+            root / "docs" / "reference" / "LISTING_KIT.md",
+            "\n".join(
+                [
+                    "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16",
+                    "",
+                ]
+            ),
+        )
+        write_text(
             root / "docs" / "reference" / "STATUS.md",
             "\n".join(
                 [
@@ -121,6 +150,15 @@ class ReleaseVersioningTests(unittest.TestCase):
             self.assertIn("#v0.3.17", readme)
             self.assertIn("templates/unity-package#v0.3.11", readme)
 
+            index = (root / "docs" / "index.html").read_text(encoding="utf-8")
+            self.assertIn('"softwareVersion": "v0.3.17"', index)
+
+            install = (root / "docs" / "install.html").read_text(encoding="utf-8")
+            self.assertIn("#v0.3.17", install)
+
+            listing_kit = (root / "docs" / "reference" / "LISTING_KIT.md").read_text(encoding="utf-8")
+            self.assertIn("#v0.3.17", listing_kit)
+
             status = (root / "docs" / "reference" / "STATUS.md").read_text(encoding="utf-8")
             self.assertIn("current source line is `v0.3.17`", status)
             self.assertIn("Latest source validation for `v0.3.17`", status)
@@ -152,6 +190,19 @@ class ReleaseVersioningTests(unittest.TestCase):
             errors = release_consistency.check_release_version_consistency(root)
 
             self.assertTrue(any("README.md:1" in error for error in errors), errors)
+
+    def test_release_version_consistency_detects_stale_site_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.create_minimal_release_tree(root)
+            (root / "docs" / "index.html").write_text(
+                '{"softwareVersion": "v0.3.15"}\n',
+                encoding="utf-8",
+            )
+
+            errors = release_consistency.check_release_version_consistency(root)
+
+            self.assertTrue(any("docs/index.html:1" in error for error in errors), errors)
 
 
 if __name__ == "__main__":

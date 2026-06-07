@@ -25,6 +25,8 @@ RELEASE_DOCS = (
     Path("templates") / "workflows" / "README.md",
     Path("templates") / "unity-package" / "README.md",
     Path("docs") / "README.md",
+    Path("docs") / "index.html",
+    Path("docs") / "install.html",
     Path("docs") / "agents" / "AGENT_WORKFLOWS.md",
     Path("docs") / "agents" / "AI_INTEGRATION.md",
     Path("docs") / "operations" / "BUILD_AUTOMATION.md",
@@ -35,6 +37,7 @@ RELEASE_DOCS = (
     Path("docs") / "reference" / "DISCOVERY.md",
     Path("docs") / "reference" / "FEATURES.md",
     Path("docs") / "reference" / "GLOSSARY.md",
+    Path("docs") / "reference" / "LISTING_KIT.md",
     Path("docs") / "reference" / "STATUS.md",
     Path("packages") / PACKAGE_NAME / "Documentation~" / "README.md",
     Path("packages") / PACKAGE_NAME / "Documentation~" / "AI_INTEGRATION.md",
@@ -124,6 +127,7 @@ def update_release_doc_text(text: str, old_version: str, version: str) -> str:
             "Source package is `",
             "Production Git UPM path is `",
             '"packageVersion": "',
+            '"softwareVersion": "',
             "git push origin ",
         ):
             if marker in candidate:

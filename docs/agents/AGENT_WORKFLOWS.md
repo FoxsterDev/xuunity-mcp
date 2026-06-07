@@ -917,6 +917,7 @@ Production route:
 # First synchronize release-facing version references, for example with
 # --version 0.3.17 when preparing the next patch release.
 python3 scripts/tools/sync_release_version.py --version <next-version>
+python3 scripts/testing/check_release_version_consistency.py
 scripts/testing/run_host_python_tests.sh
 
 git push origin v<next-version>

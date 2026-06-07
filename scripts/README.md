@@ -18,10 +18,12 @@ scripts/testing/run_host_python_tests.sh
 ```
 
 `sync_release_version.py` updates package metadata, server metadata, package
-manifest templates, and current release-facing docs without rewriting historical
-changelog or migration references. The host test suite runs
-`check_release_version_consistency.py` first so stale current-version references
-fail before tagging.
+manifest templates, the GitHub Pages site surfaces, listing metadata, and
+current release-facing docs without rewriting historical changelog or migration
+references. The host test suite runs `check_release_version_consistency.py`
+first so stale current-version references fail before tagging. Treat the public
+site as part of the release surface: if the site is stale, the MCP release is
+not ready to tag.
 
 Root-level setup wrappers remain at the repo root:
 

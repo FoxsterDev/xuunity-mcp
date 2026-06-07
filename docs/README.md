@@ -9,7 +9,8 @@ public entrypoints, install metadata, license, security, and MCP discovery.
 ## Sections
 
 - [homepage](index.html) - public GitHub Pages landing page for `xuunity mcp`
-  and `Unity MCP` search queries
+  and `Unity MCP` search queries; release-bound and required to stay in sync
+  with the current package version
 - [install](install.html) - install overview that preserves the README's
   AI-driven setup sequence
 - [comparison](comparison.html) - high-level positioning page for
