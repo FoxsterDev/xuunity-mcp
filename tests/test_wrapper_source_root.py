@@ -1,12 +1,18 @@
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
 class WrapperSourceRootTests(unittest.TestCase):
+    def make_env(self) -> dict[str, str]:
+        env = dict(os.environ)
+        env["PYTHON"] = sys.executable
+        return env
+
     def create_fake_project(self, root: Path, unity_version: str = "2021.3.58f1") -> Path:
         (root / "Assets").mkdir(parents=True)
         (root / "Packages").mkdir(parents=True)
@@ -64,7 +70,7 @@ class WrapperSourceRootTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            env = dict(os.environ)
+            env = self.make_env()
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
             env["XUUNITY_LIGHT_UNITY_MCP_AIRROOT"] = str(airroot)
 
@@ -95,7 +101,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             codex_tools = temp_root / "codex-tools"
             claude_tools = temp_root / "claude-tools"
 
-            env = dict(os.environ)
+            env = self.make_env()
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
             env["CODEX_TOOLS_HOME"] = str(codex_tools)
@@ -141,7 +147,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             stale_server = stale_claude_install / "server.py"
             stale_server.write_text("# stale claude helper\n", encoding="utf-8")
 
-            env = dict(os.environ)
+            env = self.make_env()
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
             env.pop("XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET", None)
@@ -171,7 +177,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             codex_tools = temp_root / "codex-tools"
             claude_tools = temp_root / "claude-tools"
 
-            env = dict(os.environ)
+            env = self.make_env()
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
             env["XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET"] = "claude"
@@ -205,7 +211,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             claude_server = claude_install / "server.py"
             claude_server.write_text("# stale claude helper\n", encoding="utf-8")
 
-            env = dict(os.environ)
+            env = self.make_env()
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
             env.pop("XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET", None)
@@ -278,7 +284,7 @@ class WrapperSourceRootTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            env = dict(os.environ)
+            env = self.make_env()
             env["XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT"] = str(source_root)
             env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
             env["CLAUDE_TOOLS_HOME"] = str(temp_root / "claude-tools")

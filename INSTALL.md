@@ -10,6 +10,29 @@ XUUnity Light Unity MCP has two pieces:
 
 Install both before expecting an AI client to control Unity.
 
+## Agent Preflight Rules
+
+For short agent requests such as "setup MCP from this repo into
+/path/to/UnityProject and run EditMode tests", prefer this default behavior:
+
+1. treat the current host client that is executing the request as the default
+   MCP wiring target unless the user explicitly names another client
+2. use `setup-plan` before any mutation
+3. for one explicitly requested Unity project, prefer
+   `setup-plan --project-root /path/to/UnityProject`
+4. for a multi-project workspace or nested repo, use
+   `setup-plan --workspace-root /path/to/workspace --recursive`
+5. show a short preflight review before any mutation:
+   - detected current client
+   - intended wiring target
+   - requested Unity project root
+   - additional discovered Unity projects
+   - files that will change, including user-level client config
+6. wait for approval before `git clone`, installer runs, `setup-apply`,
+   manifest edits, lockfile edits, or user-level client config changes
+7. treat `unity_status_summary` as the canonical first MCP smoke-check after
+   `ensure-ready`
+
 ## Option 1: Git UPM Package
 
 This is the current production install route until OpenUPM publication is
@@ -82,8 +105,23 @@ package source.
 
 ## Guided Workspace Setup
 
-For a single Unity project, a flat multi-project hub, mixed Unity versions, or
-nested repositories, prefer the guided plan/apply flow:
+For one explicitly requested Unity project, prefer a scoped plan/apply flow:
+
+```bash
+bash xuunity_light_unity_mcp.sh setup-plan \
+  --project-root /path/to/UnityProject > /tmp/xuunity-setup-plan.json
+
+bash xuunity_light_unity_mcp.sh setup-apply \
+  --plan-file /tmp/xuunity-setup-plan.json \
+  --project-root /path/to/UnityProject \
+  --yes
+
+bash xuunity_light_unity_mcp.sh validate-setup \
+  --project-root /path/to/UnityProject
+```
+
+For a flat multi-project hub, mixed Unity versions, or nested repositories,
+scan first and then apply only to the approved Unity project roots:
 
 ```bash
 bash xuunity_light_unity_mcp.sh setup-plan \
@@ -92,6 +130,7 @@ bash xuunity_light_unity_mcp.sh setup-plan \
 
 bash xuunity_light_unity_mcp.sh setup-apply \
   --plan-file /tmp/xuunity-setup-plan.json \
+  --project-root /path/to/UnityProject \
   --yes
 
 bash xuunity_light_unity_mcp.sh validate-setup \
@@ -99,7 +138,9 @@ bash xuunity_light_unity_mcp.sh validate-setup \
 ```
 
 `setup-plan` computes actions per project. It does not apply one dependency
-version globally across mixed Unity versions.
+version globally across mixed Unity versions. When the plan contains more than
+one discovered Unity project, require an explicit project selection before
+`setup-apply`.
 
 The MCP core package works without `com.unity.test-framework`. EditMode and
 PlayMode test operations are optional capabilities enabled by Unity asmdef
@@ -155,6 +196,9 @@ The installer can append a Codex MCP config block:
 ```bash
 bash init_xuunity_light_unity_mcp.sh --install-codex-config
 ```
+
+If the current Codex session does not hot-reload new MCP servers, restart the
+client after this change.
 
 Template:
 
@@ -252,7 +296,7 @@ After package import and bridge enablement:
 1. open the Unity project
 2. confirm the package appears in Package Manager
 3. confirm the bridge state appears under `Library/XUUnityLightMcp/`
-4. call `unity.status`
+4. call `unity.status` or `unity_status_summary`
 5. call `unity.capabilities.get`
 6. call `unity.health.probe`
 

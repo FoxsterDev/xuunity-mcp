@@ -112,3 +112,4 @@ InitTestScene*.unity*
 # XUUnity Light MCP setup plans (may contain private paths)
 xuunity-setup-plan.json
 *-setup-plan.json
+.idea

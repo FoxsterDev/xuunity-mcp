@@ -160,6 +160,34 @@ class SetupWizardTests(unittest.TestCase):
         self.assertEqual("upgrade_recommended", upgrade_actions_6000[0]["reason"])
         self.assertEqual("before_opening_unity", upgrade_actions_6000[0]["apply_phase"])
 
+    def test_setup_plan_prefers_explicit_project_roots_over_workspace_sibling_discovery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            target_project = create_unity_project(
+                workspace / "TargetProject",
+                unity_version="6000.0.45f1",
+            )
+            create_unity_project(
+                workspace / "TargetProject" / "NestedSample",
+                unity_version="6000.0.45f1",
+            )
+
+            plan = wizard.build_setup_plan(
+                workspace_root=str(target_project),
+                project_roots=[str(target_project)],
+                recursive=True,
+                include_test_framework="auto",
+                package_source="git",
+                package_version="0.3.14",
+                local_package_source="/tmp/light-mcp",
+            )
+
+        self.assertEqual(1, plan["discovered_project_count"])
+        self.assertEqual([str(target_project.resolve())], plan["requested_project_roots"])
+        self.assertFalse(plan["requires_explicit_project_selection_for_apply"])
+        self.assertEqual([str(target_project.resolve())], plan["preflight_review"]["selected_project_roots"])
+        self.assertEqual("explicit_project_root", plan["projects"][0]["selection_state"])
+
     def test_setup_apply_requires_approval_and_mutates_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = create_unity_project(Path(tmp) / "Project", unity_version="2021.3.45f1")
@@ -183,6 +211,58 @@ class SetupWizardTests(unittest.TestCase):
         self.assertEqual("setup_apply", result["action"])
         self.assertIn("com.xuunity.light-mcp", manifest["dependencies"])
         self.assertEqual("1.1.33", manifest["dependencies"]["com.unity.test-framework"])
+
+    def test_setup_apply_requires_explicit_project_selection_for_multi_project_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            project_a = create_unity_project(workspace / "ProjectA", unity_version="2021.3.45f1")
+            project_b = create_unity_project(workspace / "ProjectB", unity_version="6000.0.45f1")
+            plan = wizard.build_setup_plan(
+                workspace_root=str(workspace),
+                project_roots=None,
+                recursive=False,
+                include_test_framework="auto",
+                package_source="git",
+                package_version="0.3.14",
+                local_package_source="/tmp/light-mcp",
+            )
+
+            with self.assertRaises(wizard.ToolInvocationError) as cm:
+                wizard.apply_setup_plan(plan, approve=True)
+
+        self.assertEqual("explicit_project_selection_required", cm.exception.code)
+        self.assertEqual(
+            sorted([str(project_a.resolve()), str(project_b.resolve())]),
+            sorted(cm.exception.details["available_project_roots"]),
+        )
+
+    def test_setup_apply_can_filter_a_reviewed_multi_project_plan_to_one_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            project_a = create_unity_project(workspace / "ProjectA", unity_version="2021.3.45f1")
+            project_b = create_unity_project(workspace / "ProjectB", unity_version="6000.0.45f1")
+            plan = wizard.build_setup_plan(
+                workspace_root=str(workspace),
+                project_roots=None,
+                recursive=False,
+                include_test_framework="auto",
+                package_source="git",
+                package_version="0.3.14",
+                local_package_source="/tmp/light-mcp",
+            )
+
+            result = wizard.apply_setup_plan(
+                plan,
+                approve=True,
+                selected_project_roots=[str(project_b)],
+            )
+            manifest_a = json.loads((project_a / "Packages" / "manifest.json").read_text(encoding="utf-8"))
+            manifest_b = json.loads((project_b / "Packages" / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual([str(project_b.resolve())], result["selected_project_roots"])
+        self.assertEqual([str(project_a.resolve())], result["skipped_project_roots"])
+        self.assertNotIn("com.xuunity.light-mcp", manifest_a["dependencies"])
+        self.assertIn("com.xuunity.light-mcp", manifest_b["dependencies"])
 
     def test_install_test_framework_rejects_explicit_version_below_capability_minimum(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

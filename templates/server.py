@@ -1854,8 +1854,9 @@ def call_xuunity_setup_apply_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(plan, dict):
         raise JsonRpcError(-32602, "plan must be an object.")
     approve = _optional_bool_arg(arguments, "approve", False)
+    project_roots = _optional_string_list_arg(arguments, "projectRoots")
     try:
-        payload = apply_setup_plan(plan, approve=approve)
+        payload = apply_setup_plan(plan, approve=approve, selected_project_roots=project_roots)
     except ToolInvocationError as exc:
         return mcp_json_result(build_tool_error_payload(exc), is_error=True)
     return mcp_json_result(payload)
@@ -2183,7 +2184,11 @@ def cmd_setup_apply(args):
     if not plan_path.is_absolute():
         plan_path = (Path.cwd() / plan_path).resolve()
     plan = read_json(plan_path)
-    payload = apply_setup_plan(plan, approve=bool(args.yes))
+    payload = apply_setup_plan(
+        plan,
+        approve=bool(args.yes),
+        selected_project_roots=list(args.project_root or []),
+    )
     print_json(payload)
 
 
@@ -5304,6 +5309,7 @@ def build_parser():
         help="Apply an approved setup plan from setup-plan. Mutates manifests only with --yes.",
     )
     setup_apply_cmd.add_argument("--plan-file", required=True)
+    setup_apply_cmd.add_argument("--project-root", action="append", default=[])
     setup_apply_cmd.add_argument("--yes", action="store_true")
     setup_apply_cmd.set_defaults(func=cmd_setup_apply)
 

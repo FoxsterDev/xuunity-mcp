@@ -3,6 +3,11 @@
 Use the Codex-style config when the client reads MCP servers from
 `~/.codex/config.toml`.
 
+When a short install request does not name a client explicitly, treat the
+current host client that is executing the request as the default wiring target.
+For prompts coming from Codex, wire Codex by default and show that assumption in
+the preflight review before mutating files.
+
 Optional: connect XUUnity MCP to Codex/Codex-style clients when you want Codex
 to validate Unity status, compile, tests, and setup directly from the chat. Use
 this only on trusted local projects. If you also use Rider or VS Code MCP,
@@ -48,6 +53,9 @@ bash init_xuunity_light_unity_mcp.sh \
   --install-codex-config
 ```
 
+If the current Codex session does not hot-reload newly installed MCP servers,
+restart the client after this change.
+
 ## Manual Config
 
 Add this to `~/.codex/config.toml` on Linux/macOS:
@@ -89,6 +97,10 @@ Then verify a concrete Unity project:
 2. `unity_capabilities`
 3. `unity_health_probe`
 4. `unity_console_tail`
+
+Treat `unity_status_summary` as the canonical first MCP smoke-check after
+setup. Only move on to tests or builds after the status summary reports a
+healthy bridge.
 
 You can name the server explicitly while verifying setup. After that, natural
 requests such as `Run EditMode tests in /path/to/UnityProject` are usually

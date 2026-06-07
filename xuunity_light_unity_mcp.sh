@@ -138,6 +138,50 @@ resolve_repo_root() {
 }
 
 REPO_ROOT="$(resolve_repo_root)"
+MINIMUM_PYTHON_VERSION="3.10"
+
+resolve_python_bin() {
+  if [[ -n "${PYTHON:-}" ]]; then
+    printf '%s\n' "$PYTHON"
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    command -v python
+    return 0
+  fi
+  if command -v py >/dev/null 2>&1; then
+    printf '%s\n' "py -3"
+    return 0
+  fi
+  echo "Python 3 was not found. Install Python 3 or set PYTHON to its executable path." >&2
+  exit 1
+}
+
+python_version_supported() {
+  "$1" - "$MINIMUM_PYTHON_VERSION" <<'PY'
+import re
+import sys
+
+minimum = tuple(int(item) for item in re.findall(r"\d+", sys.argv[1])[:2])
+current = sys.version_info[:2]
+raise SystemExit(0 if current >= minimum else 1)
+PY
+}
+
+PYTHON_BIN="$(resolve_python_bin)"
+if ! python_version_supported "$PYTHON_BIN"; then
+  current_python_version="$("$PYTHON_BIN" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || printf 'unknown')"
+  printf 'Python %s or newer is required. Selected interpreter reports %s. Set PYTHON to a Python 3.10+ executable.\n' "$MINIMUM_PYTHON_VERSION" "$current_python_version" >&2
+  exit 1
+fi
+
+python3() {
+  "$PYTHON_BIN" "$@"
+}
 
 require_command() {
   local command_name="$1"

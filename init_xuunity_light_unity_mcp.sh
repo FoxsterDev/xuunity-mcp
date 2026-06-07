@@ -87,6 +87,7 @@ done
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 templates_dir="$script_dir/templates"
 package_metadata_source="$script_dir/packages/com.xuunity.light-mcp/package.json"
+minimum_python_version="3.10"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 codex_tools_home="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}"
 claude_tools_home="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}"
@@ -96,6 +97,49 @@ config_path="$codex_home/config.toml"
 claude_config_path="${CLAUDE_CONFIG_PATH:-$HOME/.claude.json}"
 codex_run_path="$codex_install_dir/run.sh"
 claude_run_path="$claude_install_dir/run.sh"
+
+resolve_python_bin() {
+  if [[ -n "${PYTHON:-}" ]]; then
+    printf '%s\n' "$PYTHON"
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    command -v python
+    return 0
+  fi
+  if command -v py >/dev/null 2>&1; then
+    printf '%s\n' "py -3"
+    return 0
+  fi
+  echo "Python 3 was not found. Install Python 3 or set PYTHON to its executable path." >&2
+  exit 1
+}
+
+python_version_supported() {
+  "$1" - "$minimum_python_version" <<'PY'
+import re
+import sys
+
+minimum = tuple(int(item) for item in re.findall(r"\d+", sys.argv[1])[:2])
+current = sys.version_info[:2]
+raise SystemExit(0 if current >= minimum else 1)
+PY
+}
+
+PYTHON_BIN="$(resolve_python_bin)"
+if ! python_version_supported "$PYTHON_BIN"; then
+  current_python_version="$("$PYTHON_BIN" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || printf 'unknown')"
+  printf 'Python %s or newer is required. Selected interpreter reports %s. Set PYTHON to a Python 3.10+ executable.\n' "$minimum_python_version" "$current_python_version" >&2
+  exit 1
+fi
+
+python3() {
+  "$PYTHON_BIN" "$@"
+}
 
 run() {
   if [[ $dry_run -eq 1 ]]; then
@@ -373,6 +417,7 @@ fi
 
 if [[ $install_codex_config -eq 1 ]]; then
   append_codex_block_if_missing
+  printf 'note: restart the current Codex client session if it does not hot-reload newly installed MCP servers.\n'
 else
   printf 'skipped Codex config install by default; use --install-codex-config to register the stdio MCP server in a real client.\n'
 fi

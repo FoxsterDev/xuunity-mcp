@@ -305,7 +305,12 @@ TOOLS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "plan": {"type": "object"},
-                "approve": {"type": "boolean", "default": False}
+                "approve": {"type": "boolean", "default": False},
+                "projectRoots": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Explicit project roots to mutate from a reviewed multi-project plan."
+                }
             },
             "required": ["plan", "approve"]
         }

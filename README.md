@@ -8,9 +8,9 @@
 
 **Open-source lightweight Unity MCP server for safe Unity Editor automation.**
 
-Connect Cursor, Claude Code, Claude Desktop, Windsurf, Codex-style agents, and
-custom MCP clients to Unity through a local stdio MCP server and a small
-editor-only Unity package.
+Connect Cursor, Claude Code, Claude Desktop, Rider, Windsurf, Codex-style
+agents, and custom MCP clients to Unity through a local stdio MCP server and a
+small editor-only Unity package.
 
 <p>
   <a href="https://github.com/FoxsterDev/xuunity-light-unity-mcp"><img alt="GitHub stars" src="https://img.shields.io/github/stars/FoxsterDev/xuunity-light-unity-mcp?style=flat&logo=github"></a>
@@ -55,24 +55,121 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 - Unity 2021.3 LTS+; the current release has live validation on Unity 2021.3,
   2022.3, and 6000.x. See [Status](docs/reference/STATUS.md).
 - Python 3.10+
-- one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md) with the [Codex visual setup guide](docs/clients/codex-unity-mcp-setup.md)
+- one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Rider](docs/clients/rider.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md) with the [Codex visual setup guide](docs/clients/codex-unity-mcp-setup.md)
+
+<details>
+<summary><strong>Agent Setup Contract</strong></summary>
+
+This section is the fast-path for AI agents that need to install MCP into a new
+repo and run the first MCP command or EditMode tests correctly.
+
+### Agent Defaults
+
+Use this contract when the user gives a short request such as:
+
+```text
+setup mcp from the repo README.md into the project /path/to/UnityProject and run edit mode tests there
+```
+
+Agent defaults:
+
+- treat the current host client that is executing the request as the default
+  MCP wiring target unless the user explicitly names a different client
+- treat the explicitly requested Unity project path as the only default setup
+  target
+- prefer Git UPM package mode unless the user explicitly asks for local package
+  development
+
+### Required Sequence
+
+1. Read `README.md`, `INSTALL.md`, and the matching `docs/clients/*` guide for
+   the current host client.
+2. Run a non-mutating preflight:
+   - confirm Python 3.10+
+   - confirm Unity project structure
+   - detect whether the request targets one Unity project or an entire workspace
+   - identify whether user-level client config such as `~/.codex/config.toml`
+     or `~/.claude.json` would change
+3. Produce a setup plan before mutating files:
+   - for one requested Unity project, use `setup-plan --project-root
+     "<UNITY_PROJECT_ROOT>"`
+   - for a workspace or nested hub, use `setup-plan --workspace-root
+     "<WORKSPACE_ROOT>" --recursive`
+4. Show a short preflight review and wait for approval before any mutation,
+   clone, installer run, manifest change, or user-level client config update.
+5. After approval, apply setup only to the approved project roots.
+6. Run `validate-setup`.
+7. Run `ensure-ready --open-editor` when Unity is not already ready.
+8. Run the first MCP smoke check:
+   - `unity_status_summary`
+9. When the user requested tests, run EditMode tests after the status summary is
+   healthy.
+10. Finish with:
+   - files changed
+   - commands run
+   - readiness result
+   - first MCP command result
+   - EditMode test result
+   - whether a client restart is still required
+
+### Preflight Review Checklist
+
+- detected current client
+- intended client wiring target
+- requested Unity project root
+- any additional discovered Unity projects
+- whether setup will modify user-level client config
+- files planned for mutation
+- commands planned after approval
+
+### Safe Inspect Before Approval
+
+- reading docs
+- checking Python and Unity versions
+- `setup-plan`
+- reading manifest, lockfile, and client config
+- topology inspection
+
+### Mutating Actions That Require Approval
+
+- `git clone`
+- installer runs
+- `setup-apply`
+- `install-test-framework`
+- manifest or lockfile edits
+- user-level client config updates
+- `devmode` or `prodmode`
 
 ### Guided Setup Wizard
 
-For single projects, flat hubs, mixed-version hubs, or nested repositories, ask
-the host helper to produce an explicit per-project plan before mutating files:
+For one explicitly requested Unity project, produce a non-mutating plan first:
 
 ```bash
 bash xuunity_light_unity_mcp.sh setup-plan \
-  --workspace-root /path/to/workspace \
-  --recursive > xuunity-setup-plan.json
+  --project-root /path/to/UnityProject > /tmp/xuunity-setup-plan.json
 
 bash xuunity_light_unity_mcp.sh setup-apply \
-  --plan-file xuunity-setup-plan.json \
+  --plan-file /tmp/xuunity-setup-plan.json \
+  --project-root /path/to/UnityProject \
   --yes
 
 bash xuunity_light_unity_mcp.sh validate-setup \
   --project-root /path/to/UnityProject
+```
+
+For flat hubs, mixed-version hubs, or nested repositories, scan the workspace
+first and require an explicit target selection before `setup-apply`:
+
+```bash
+bash xuunity_light_unity_mcp.sh setup-plan \
+  --workspace-root /path/to/workspace \
+  --recursive > /tmp/xuunity-setup-plan.json
+
+# Review the plan. Then apply only to the intended Unity project roots.
+bash xuunity_light_unity_mcp.sh setup-apply \
+  --plan-file /tmp/xuunity-setup-plan.json \
+  --project-root /path/to/UnityProject \
+  --yes
 ```
 
 The core MCP package works without `com.unity.test-framework`. Test operations
@@ -97,62 +194,76 @@ Copy this prompt into your coding agent from the Unity project you want to
 connect. Replace the placeholders before running it.
 
 ```text
-Configure XUUnity Light Unity MCP for this Unity project.
+Configure XUUnity Light Unity MCP for this Unity project and optionally run the
+first requested MCP operation after setup.
 
 Inputs:
 - Unity project root: <absolute path to the Unity project>
-- Workspace/repository root: <absolute path to workspace; may equal project root>
-- MCP client: <Claude Code | Claude Desktop | Cursor | Windsurf | Codex | custom stdio MCP client>
-- Package mode: Git UPM release v0.3.19, unless this is local MCP development.
-- Test operations: optional. Install Test Framework only after explicit approval.
+- Workspace root: <absolute path to workspace; may equal the project root>
+- First operation after setup: <optional, for example EditMode tests, health check, compile, or none>
 
-Principles:
-- Read the current README.md, INSTALL.md, and the matching docs/clients/*
-  guide before editing files.
-- Preserve existing user config. Merge the xuunity_light_unity MCP server block;
-  do not overwrite unrelated MCP servers, editor settings, or package entries.
-- Keep the Unity package editor-only. Do not add runtime/player dependencies.
-- Do not add com.unity.test-framework as a hard dependency of the MCP package.
-  Test features are optional capabilities gated by Version Defines.
-- Use the native template for the host OS: run.sh for macOS/Linux clients,
-  run.cmd or run.ps1 for native Windows clients.
-- If the MCP repo is missing locally, clone
-  https://github.com/FoxsterDev/xuunity-light-unity-mcp.git outside the Unity
-  Assets folder and treat that clone as <MCP_REPO_ROOT>.
-- Ask before destructive git operations, deleting user files, force-pushing,
-  killing unrelated Unity Editor sessions, or changing production package pins.
+Rules:
+- Read README.md, INSTALL.md, and the matching docs/clients/* guide before
+  editing files.
+- Use the current host client that is running this request as the default MCP
+  wiring target unless the user explicitly requests another client.
+- Prefer Git UPM release v0.3.19 unless the user explicitly requests local
+  package development.
+- Preserve existing config. Merge the `xuunity_light_unity` server block; do
+  not overwrite unrelated MCP servers, editor settings, or package entries.
+- Keep the package editor-only. Do not add runtime/player dependencies.
+- Treat `com.unity.test-framework` as optional. Install or upgrade it only
+  after explicit approval when the requested post-setup operation requires test
+  capability.
+- Ask before cloning the repo locally, running mutating installer steps,
+  editing user-level client config, mutating manifests or lockfiles, changing
+  more than one discovered Unity project, or doing destructive git/process
+  actions.
 
-Tasks:
-1. Confirm Python 3.10+, Unity project structure, selected MCP client, and
-   whether the workspace contains one project, a flat hub, mixed Unity versions,
-   or nested repositories.
-2. From <MCP_REPO_ROOT>, run the host installer
-   through macOS/Linux shell, Git Bash, or WSL:
+Required procedure:
+1. Confirm Python 3.10+, Unity project structure, current client, and workspace
+   topology.
+2. If the MCP repo is missing locally, ask before cloning
+   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git outside the Unity
+   Assets folder and treat it as <MCP_REPO_ROOT>.
+3. Run the host installer from <MCP_REPO_ROOT>:
    bash init_xuunity_light_unity_mcp.sh
-3. Produce and review a setup plan:
-   bash xuunity_light_unity_mcp.sh setup-plan --workspace-root "<WORKSPACE_ROOT>" --project-root "<UNITY_PROJECT_ROOT>" --recursive > xuunity-setup-plan.json
-4. Apply the plan only after user approval:
-   bash xuunity_light_unity_mcp.sh setup-apply --plan-file xuunity-setup-plan.json --yes
-5. If test operations are required and the plan reports
-   disabled_missing_dependency, ask for approval before opening Unity, then run:
+4. Produce a non-mutating setup plan:
+   - for one requested Unity project:
+     bash xuunity_light_unity_mcp.sh setup-plan --project-root "<UNITY_PROJECT_ROOT>" > /tmp/xuunity-setup-plan.json
+   - for a workspace or nested hub:
+     bash xuunity_light_unity_mcp.sh setup-plan --workspace-root "<WORKSPACE_ROOT>" --recursive > /tmp/xuunity-setup-plan.json
+5. Show a short preflight review with:
+   - detected current client
+   - intended wiring target
+   - requested Unity project root
+   - additional discovered Unity projects
+   - files that will change, including user-level config
+   - commands that will run after approval
+6. Wait for approval before applying changes.
+7. Apply the approved plan only to the approved Unity project roots:
+   bash xuunity_light_unity_mcp.sh setup-apply --plan-file /tmp/xuunity-setup-plan.json --project-root "<UNITY_PROJECT_ROOT>" --yes
+8. Wire the selected client using templates/clients/ or the matching
+   docs/clients guide.
+9. If the requested post-setup operation needs tests and the plan reports
+   missing or too-old Test Framework support, ask for approval and then run:
    bash xuunity_light_unity_mcp.sh install-test-framework --project-root "<UNITY_PROJECT_ROOT>" --yes
-   If the project already has Test Framework but the version is too old, treat
-   the same command as an approved package upgrade and review Unity's package
-   resolve/compile result afterward.
-6. Wire the selected MCP client using the files under templates/clients/.
-   Merge config if the target file already exists.
-7. Open or restart the Unity project if needed, then verify readiness with:
-   bash xuunity_light_unity_mcp.sh ensure-ready --project-root "<UNITY_PROJECT_ROOT>" --open-editor
-   bash xuunity_light_unity_mcp.sh request-status-summary --project-root "<UNITY_PROJECT_ROOT>"
-   bash xuunity_light_unity_mcp.sh validate-setup --project-root "<UNITY_PROJECT_ROOT>"
-   Use --include-tests only when test operations are expected.
-8. If your agent runtime can reload MCP tools, verify the MCP tools
-   xuunity_setup_validate, unity_status_summary, unity_capabilities, and
-   unity_health_probe. If it cannot reload tools in-process, provide the exact
-   restart steps for the user.
-9. Finish with a concise report listing files changed, commands run, verification
-   results, and any manual restart still required.
+10. Verify readiness:
+    bash xuunity_light_unity_mcp.sh validate-setup --project-root "<UNITY_PROJECT_ROOT>"
+    bash xuunity_light_unity_mcp.sh ensure-ready --project-root "<UNITY_PROJECT_ROOT>" --open-editor
+11. Treat `unity_status_summary` as the canonical first MCP smoke-check after
+    setup. Then verify `unity_capabilities` and `unity_health_probe`.
+12. If a post-setup operation was requested, run it only after the status
+    summary is healthy.
+13. Finish with a concise report listing files changed, commands run, readiness
+    verification, the first MCP command result, any requested post-setup
+    operation result, and whether a client restart is still required.
 ```
+
+</details>
+
+<details>
+<summary><strong>Human Manual Install</strong></summary>
 
 ### 1. Install The Unity Package
 
@@ -239,6 +350,9 @@ Claude-side `~/.claude-tools` helper for Claude clients.
 ### 4. Verify Connection
 
 ```bash
+bash xuunity_light_unity_mcp.sh validate-setup \
+  --project-root /path/to/UnityProject
+
 bash xuunity_light_unity_mcp.sh ensure-ready \
   --project-root /path/to/UnityProject \
   --open-editor
@@ -246,6 +360,12 @@ bash xuunity_light_unity_mcp.sh ensure-ready \
 bash xuunity_light_unity_mcp.sh request-status-summary \
   --project-root /path/to/UnityProject
 ```
+
+Treat `unity_status_summary` as the canonical first MCP smoke-check. After it
+reports a healthy bridge, confirm `unity_capabilities` and `unity_health_probe`
+before moving on to tests or builds.
+
+</details>
 
 Then try:
 
@@ -276,6 +396,7 @@ templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 - [Claude Code](docs/clients/claude-code.md)
 - [Claude Desktop](docs/clients/claude-desktop.md)
 - [Cursor](docs/clients/cursor.md)
+- [Rider](docs/clients/rider.md)
 - [Windsurf](docs/clients/windsurf.md)
 - [Codex-style agents](docs/clients/codex.md) ([visual setup](docs/clients/codex-unity-mcp-setup.md))
 - custom stdio MCP clients

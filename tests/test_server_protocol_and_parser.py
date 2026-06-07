@@ -95,6 +95,25 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_artifact_register", tool_names)
         self.assertIn("unity_artifact_write_report", tool_names)
 
+    def test_setup_apply_parser_accepts_explicit_project_roots(self) -> None:
+        parser = server.build_parser()
+        args = parser.parse_args(
+            [
+                "setup-apply",
+                "--plan-file",
+                "/tmp/plan.json",
+                "--project-root",
+                "/tmp/ProjectA",
+                "--project-root",
+                "/tmp/ProjectB",
+                "--yes",
+            ]
+        )
+
+        self.assertEqual("setup-apply", args.command)
+        self.assertEqual(["/tmp/ProjectA", "/tmp/ProjectB"], args.project_root)
+        self.assertTrue(args.yes)
+
     def test_project_action_catalog_parser_resolves_aliases_and_hook_names(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             catalog_path = Path(temp_dir) / "project_actions.yaml"

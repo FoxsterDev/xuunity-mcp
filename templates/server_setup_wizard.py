@@ -77,10 +77,15 @@ def discover_unity_projects(
     recursive: bool = False,
 ) -> list[Path]:
     discovered: dict[str, Path] = {}
+    explicit_project_roots = [normalize_project_root(value) for value in project_roots or []]
 
-    for value in project_roots or []:
-        root = normalize_project_root(value)
+    for root in explicit_project_roots:
         discovered[str(root)] = root
+
+    # When the caller already knows the exact Unity project target, prefer that
+    # explicit selection over scanning sibling projects under the same workspace.
+    if explicit_project_roots:
+        return [discovered[key] for key in sorted(discovered)]
 
     if workspace_root:
         workspace = Path(workspace_root).expanduser().resolve()
@@ -218,6 +223,7 @@ def build_setup_plan(
     package_version: str,
     local_package_source: str,
 ) -> dict[str, Any]:
+    explicit_project_roots = [normalize_project_root(value) for value in project_roots or []]
     projects = discover_unity_projects(
         workspace_root=workspace_root,
         project_roots=project_roots,
@@ -230,6 +236,10 @@ def build_setup_plan(
         "action": "setup_plan",
         "workspace_root": str(Path(workspace_root).expanduser().resolve()) if workspace_root else "",
         "workspace_kind": "multi_project" if len(projects) > 1 else "single_project",
+        "requested_project_roots": [str(root) for root in explicit_project_roots],
+        "discovered_project_count": len(projects),
+        "requires_explicit_project_selection_for_apply": len(projects) > 1,
+        "apply_requires_approval": True,
         "recursive": recursive,
         "include_test_framework": include_test_framework,
         "package_source": package_source,
@@ -331,9 +341,12 @@ def build_setup_plan(
             validation_status = "manual_action_recommended"
         else:
             validation_status = "already_configured"
+
+        selection_state = "explicit_project_root" if explicit_project_roots else "workspace_discovered"
         result["projects"].append(
             {
                 "project_root": str(project_root),
+                "selection_state": selection_state,
                 "unity_version": unity_version,
                 "package_dependency_state": package_dependency_state,
                 "package_dependency": package_dependency,
@@ -346,6 +359,29 @@ def build_setup_plan(
             }
         )
 
+    review_notes: list[str] = [
+        "Review planned manifest, bridge, and user-level client config changes before applying setup."
+    ]
+    if explicit_project_roots:
+        review_notes.append("The plan is scoped to the explicitly requested Unity project roots only.")
+    elif len(projects) > 1:
+        review_notes.append(
+            "Multiple Unity projects were discovered. Choose the intended target project before running setup-apply."
+        )
+
+    result["preflight_review"] = {
+        "review_required": True,
+        "detected_project_count": len(projects),
+        "selected_project_count": len(projects),
+        "selected_project_roots": [item["project_root"] for item in result["projects"]],
+        "mutating_actions_require_approval": True,
+        "notes": review_notes,
+        "recommended_next_step": (
+            "Run setup-apply with the approved project_root selection after user review."
+            if len(projects) > 1
+            else "Review the plan, approve mutations, then run setup-apply."
+        ),
+    }
     return result
 
 
@@ -393,15 +429,52 @@ def write_bridge_config(project_root: Path) -> None:
     )
 
 
-def apply_setup_plan(plan: dict[str, Any], *, approve: bool) -> dict[str, Any]:
+def apply_setup_plan(
+    plan: dict[str, Any],
+    *,
+    approve: bool,
+    selected_project_roots: list[str] | None = None,
+) -> dict[str, Any]:
     if not approve:
         raise ToolInvocationError("approval_required", "setup-apply requires --yes or approve=true.")
     if not isinstance(plan, dict):
         raise ToolInvocationError("invalid_setup_plan", "Setup plan must be a JSON object.")
+    plan_projects = list(plan.get("projects") or [])
+    if not plan_projects:
+        raise ToolInvocationError("invalid_setup_plan", "Setup plan does not contain any projects to apply.")
+
+    normalized_selected_roots = [normalize_project_root(value) for value in selected_project_roots or []]
+    available_project_roots = [str(normalize_project_root(str(project.get("project_root") or ""))) for project in plan_projects]
+    if len(plan_projects) > 1 and not normalized_selected_roots:
+        raise ToolInvocationError(
+            "explicit_project_selection_required",
+            "setup-apply refuses to mutate a multi-project plan without an explicit project selection.",
+            {
+                "available_project_roots": available_project_roots,
+                "recommended_next_step": "Re-run setup-apply with one or more --project-root values chosen from the plan.",
+            },
+        )
+
+    allowed_roots = {str(root) for root in normalized_selected_roots}
+    unknown_selected_roots = sorted(allowed_roots.difference(available_project_roots))
+    if unknown_selected_roots:
+        raise ToolInvocationError(
+            "selected_project_not_in_plan",
+            "One or more selected project roots are not present in the approved setup plan.",
+            {
+                "selected_project_roots": sorted(allowed_roots),
+                "available_project_roots": available_project_roots,
+                "unknown_selected_project_roots": unknown_selected_roots,
+            },
+        )
 
     applied_projects: list[dict[str, Any]] = []
-    for project in plan.get("projects") or []:
+    skipped_project_roots: list[str] = []
+    for project in plan_projects:
         project_root = normalize_project_root(str(project.get("project_root") or ""))
+        if allowed_roots and str(project_root) not in allowed_roots:
+            skipped_project_roots.append(str(project_root))
+            continue
         applied_actions: list[dict[str, Any]] = []
         for action in project.get("planned_actions") or []:
             kind = str(action.get("kind") or "")
@@ -445,7 +518,13 @@ def apply_setup_plan(plan: dict[str, Any], *, approve: bool) -> dict[str, Any]:
                 )
         applied_projects.append({"project_root": str(project_root), "applied_actions": applied_actions})
 
-    return {"action": "setup_apply", "approved": True, "projects": applied_projects}
+    return {
+        "action": "setup_apply",
+        "approved": True,
+        "selected_project_roots": [item["project_root"] for item in applied_projects],
+        "skipped_project_roots": skipped_project_roots,
+        "projects": applied_projects,
+    }
 
 
 def install_test_framework(project_root: Path, *, approve: bool, version: str = "") -> dict[str, Any]:
