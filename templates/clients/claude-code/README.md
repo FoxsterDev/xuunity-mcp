@@ -11,13 +11,13 @@ independent from any other agent.
 
 ```
 ~/.claude-tools/
-└── xuunity-light-unity-mcp/
+└── xuunity-mcp/
     ├── run.sh          # self-resolving stdio launcher
     ├── server.py       # MCP server
     └── server_*.py     # helper modules
 ```
 
-This is symmetric to `~/.codex-tools/xuunity-light-unity-mcp/` (used by Codex)
+This is symmetric to `~/.codex-tools/xuunity-mcp/` (used by Codex)
 but **independent** — you can have Claude Code without Codex, or both, or
 either alone. Neither install references the other.
 
@@ -53,7 +53,7 @@ bash init_xuunity_light_unity_mcp.sh \
   --target claude
 ```
 
-This drops the server into `~/.claude-tools/xuunity-light-unity-mcp/`. Does
+This drops the server into `~/.claude-tools/xuunity-mcp/`. Does
 not touch `~/.codex-tools/`. Does not touch any Codex config.
 
 To install both sides at once:
@@ -103,7 +103,7 @@ Adds the `xuunity_light_unity` server block to `~/.claude.json`
 
 ```bash
 claude mcp add --scope local --transport stdio xuunity_light_unity \
-  -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh"'
+  -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run.sh"'
 ```
 
 ## How To Verify
@@ -117,7 +117,7 @@ claude mcp list
 Expected line:
 
 ```
-xuunity_light_unity: bash -lc exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh"  - Connected
+xuunity_light_unity: bash -lc exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run.sh"  - Connected
 ```
 
 A failed connect typically means the Claude-side server was never installed

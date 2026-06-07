@@ -4,7 +4,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""
+        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""
       ]
     }
   }

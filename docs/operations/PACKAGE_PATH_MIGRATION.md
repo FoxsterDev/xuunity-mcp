@@ -25,13 +25,13 @@ Use this path for `v0.3.12+`.
 ## Git UPM URL
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
 ```
 
 ## Local Development Path
 
 ```text
-file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp
+file:/absolute/path/to/xuunity-mcp/packages/com.xuunity.light-mcp
 ```
 
 ## Migration Steps

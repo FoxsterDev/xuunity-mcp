@@ -23,7 +23,7 @@ Release tag: `v0.3.19`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
 ```
 
 ### Added
@@ -60,7 +60,7 @@ Release tag: `v0.3.18`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.18
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.18
 ```
 
 ### Added
@@ -95,7 +95,7 @@ Release tag: `v0.3.17`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.17
 ```
 
 ### Added
@@ -117,7 +117,7 @@ Release tag: `v0.3.16`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16
 ```
 
 ### Added
@@ -152,7 +152,7 @@ Release tag: `v0.3.15`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15
 ```
 
 ### Changed
@@ -176,7 +176,7 @@ Release tag: `v0.3.14`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.14
 ```
 
 ### Changed
@@ -213,7 +213,7 @@ Release tag: `v0.3.13`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13
 ```
 
 ### Changed
@@ -244,7 +244,7 @@ Release tag: `v0.3.12`
 Current Git UPM install URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12
 ```
 
 ### Changed
@@ -262,9 +262,9 @@ https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuu
 ### Migration Notes
 
 - New installs should use:
-  `https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12`
+  `https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.12`
 - Local MCP development should use:
-  `file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp`
+  `file:/absolute/path/to/xuunity-mcp/packages/com.xuunity.light-mcp`
 - Projects pinned to `v0.3.11` can continue using
   `templates/unity-package`; that old path is now migration-only.
 - To migrate a Unity project, replace
@@ -302,7 +302,7 @@ https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuu
 
 - Extracted XUUnity Light Unity MCP into a standalone public repository.
 - Added landing README, `llms.txt`, discovery metadata, install guide, feature table, security model, glossary, and client setup docs.
-- Updated package metadata to point at `FoxsterDev/xuunity-light-unity-mcp`.
+- Updated package metadata to point at `FoxsterDev/xuunity-mcp`.
 - Preserved detailed legacy implementation notes in `docs/reference/STATUS.md`.
 
 ## 0.3.9

@@ -82,7 +82,7 @@ def emit_scenario_wait_heartbeat(
         return last_key, last_emit_unix
 
     message = (
-        "[xuunity-light-unity-mcp] scenario_wait "
+        "[xuunity-mcp] scenario_wait "
         f"scenario={payload.get('scenario_name') or ''} "
         f"run_id={payload.get('run_id') or ''} "
         f"status={payload.get('status') or ''} "

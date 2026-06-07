@@ -47,7 +47,7 @@ Create or update `.mcp.json` in your project root with **both** JetBrains and xu
       "command": "bash",
       "args": [
         "-lc",
-        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh\""
+        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run.sh\""
       ],
       "timeout": 600000
     }
@@ -78,7 +78,7 @@ This adds the MCP server to `~/.codex/mcp-config.toml`:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "bash"
-args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""]
+args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""]
 required = false
 ```
 
@@ -90,15 +90,15 @@ If MCP integration doesn't work through Rider's AI Assistant, you can still use 
 
 ```bash
 # Check Unity project health
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py request-status-summary \
+python3 ~/.claude-tools/xuunity-mcp/server.py request-status-summary \
   --project-root /path/to/UnityProject
 
 # Run EditMode tests (batch mode, requires Unity license)
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py batch-editmode-tests \
+python3 ~/.claude-tools/xuunity-mcp/server.py batch-editmode-tests \
   --project-root /path/to/UnityProject
 
 # Compile player scripts
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py request-compile \
+python3 ~/.claude-tools/xuunity-mcp/server.py request-compile \
   --project-root /path/to/UnityProject
 ```
 
@@ -106,7 +106,7 @@ Example prompt for Rider's AI Assistant:
 
 ```
 Use Python to check Unity project health by running:
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py request-status-summary --project-root /path/to/UnityProject
+python3 ~/.claude-tools/xuunity-mcp/server.py request-status-summary --project-root /path/to/UnityProject
 ```
 
 This workaround provides full functionality while Rider's native MCP support is being improved.
@@ -123,10 +123,10 @@ If not working, verify:
 
 ```bash
 # Check server installation
-ls -la ~/.claude-tools/xuunity-light-unity-mcp/
+ls -la ~/.claude-tools/xuunity-mcp/
 
 # Test server directly
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py --help
+python3 ~/.claude-tools/xuunity-mcp/server.py --help
 ```
 
 ## Rider-Specific Notes
@@ -163,12 +163,12 @@ Example:
 
 ```bash
 # Generate setup plan for all projects
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py setup-plan \
+python3 ~/.claude-tools/xuunity-mcp/server.py setup-plan \
   --workspace-root /path/to/workspace \
   --recursive > setup-plan.json
 
 # Apply setup only to the reviewed target project
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py setup-apply \
+python3 ~/.claude-tools/xuunity-mcp/server.py setup-apply \
   --plan-file setup-plan.json \
   --project-root /path/to/UnityProject \
   --yes
@@ -180,7 +180,7 @@ Use `uninstall-plan` before deleting project setup, Rider/Claude config, or
 helper files. For direct script invocation:
 
 ```bash
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py uninstall-plan \
+python3 ~/.claude-tools/xuunity-mcp/server.py uninstall-plan \
   --mode project-only-cleanup \
   --project-root /path/to/UnityProject > uninstall-plan.json
 ```
@@ -188,7 +188,7 @@ python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py uninstall-plan \
 Review the plan in the AI Assistant, then run:
 
 ```bash
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py uninstall-apply \
+python3 ~/.claude-tools/xuunity-mcp/server.py uninstall-apply \
   --plan-file uninstall-plan.json \
   --yes
 ```
@@ -216,7 +216,7 @@ If Unity bridge shows as offline:
 
 ```bash
 # Open Unity Editor and ensure bridge ready
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py ensure-ready \
+python3 ~/.claude-tools/xuunity-mcp/server.py ensure-ready \
   --project-root /path/to/UnityProject \
   --open-editor
 ```
@@ -231,7 +231,7 @@ If Unity project has compilation errors, the MCP bridge cannot initialize:
 2. Or use batch-mode operations which work independently:
 
 ```bash
-python3 ~/.claude-tools/xuunity-light-unity-mcp/server.py batch-compile \
+python3 ~/.claude-tools/xuunity-mcp/server.py batch-compile \
   --project-root /path/to/UnityProject
 ```
 

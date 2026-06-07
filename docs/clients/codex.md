@@ -70,7 +70,7 @@ Claude-side helper also exists. To make that explicit in scripts, set:
 export XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex
 ```
 
-If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh`
+If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh`
 already exists, reuse that helper install instead of cloning a fresh repo just
 to run the installer again.
 
@@ -109,7 +109,7 @@ Add this to `~/.codex/config.toml` on Linux/macOS:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "bash"
-args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""]
+args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""]
 required = false
 ```
 
@@ -121,7 +121,7 @@ For native Windows, add this to `%USERPROFILE%\.codex\config.toml`:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "cmd.exe"
-args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-light-unity-mcp\run.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-light-unity-mcp\run.cmd")']
+args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run.cmd")']
 required = false
 ```
 
@@ -155,7 +155,7 @@ bash xuunity_light_unity_mcp.sh uninstall-apply \
 Project-only mode removes only the selected project's MCP package dependency,
 package-lock entry, and `Library/XUUnityLightMcp` bridge state. It keeps
 `~/.codex/config.toml` and
-`${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp`.
+`${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp`.
 
 Full current-user reset for Codex:
 

@@ -22,7 +22,7 @@ The Unity package is `com.xuunity.light-mcp`. It contains the editor-side bridge
 Current production Git UPM path:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
 ```
 
 ## Git UPM

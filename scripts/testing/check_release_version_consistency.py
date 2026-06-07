@@ -57,7 +57,7 @@ def package_version(source_root: Path) -> str:
 def server_info_version(source_root: Path) -> str:
     text = (source_root / SERVER_TEMPLATE).read_text(encoding="utf-8")
     match = re.search(
-        r'SERVER_INFO\s*=\s*\{\s*"name":\s*"xuunity-light-unity-mcp",\s*"version":\s*"([^"]+)"',
+        r'SERVER_INFO\s*=\s*\{\s*"name":\s*"xuunity-mcp",\s*"version":\s*"([^"]+)"',
         text,
         re.MULTILINE,
     )

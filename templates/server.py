@@ -209,7 +209,7 @@ from server_workspace_effects import (
 
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
-    "name": "xuunity-light-unity-mcp",
+    "name": "xuunity-mcp",
     "version": "0.3.19",
 }
 LIGHTWEIGHT_PACKAGE_NAME = "com.xuunity.light-mcp"
@@ -1052,7 +1052,7 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
     lane_fallback_reason = str(payload.get("lane_fallback_reason") or "")
     license_blocker_code = str(payload.get("license_blocker_code") or "")
 
-    parts = ["[xuunity-light-unity-mcp] request_failure"]
+    parts = ["[xuunity-mcp] request_failure"]
     if code:
         parts.append(f"code={code}")
     if request_submitted is not None:
@@ -1091,10 +1091,10 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
     try:
         sys.stderr.write(" ".join(parts) + "\n")
         if message:
-            sys.stderr.write(f"[xuunity-light-unity-mcp] error_message {message}\n")
+            sys.stderr.write(f"[xuunity-mcp] error_message {message}\n")
         if recommended_recovery_command:
             sys.stderr.write(
-                "[xuunity-light-unity-mcp] recovery_command "
+                "[xuunity-mcp] recovery_command "
                 f"{recommended_recovery_command}\n"
             )
         sys.stderr.flush()

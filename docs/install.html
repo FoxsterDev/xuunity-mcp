@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Install XUUnity MCP for Cursor, Claude Code, Codex, Windsurf, and Rider</title>
+    <meta name="description" content="Install XUUnity MCP safely with the existing README flow: setup-plan before mutation, setup-apply after approval, validate-setup, ensure-ready, and the first status summary.">
+    <link rel="canonical" href="https://foxsterdev.github.io/xuunity-mcp/install.html">
+    <meta property="og:title" content="Install XUUnity MCP">
+    <meta property="og:description" content="Safe install path for XUUnity MCP across Codex, Cursor, Claude, Windsurf, and Rider.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://foxsterdev.github.io/xuunity-mcp/install.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="assets/site.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "Install XUUnity MCP for Cursor, Claude Code, Codex, Windsurf, and Rider",
+        "url": "https://foxsterdev.github.io/xuunity-mcp/install.html",
+        "description": "Safe install path for XUUnity MCP that preserves the repository README and INSTALL flow."
+      }
+    </script>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="topbar">
+        <a class="brand" href="./">XUUnity MCP</a>
+        <nav class="nav">
+          <a href="install.html">Install</a>
+          <a href="comparison.html">Comparison</a>
+          <a href="use-cases.html">Use Cases</a>
+          <a href="alternatives.html">Alternatives</a>
+          <a href="clients/">Client Guides</a>
+        </nav>
+      </div>
+
+      <section class="hero">
+        <div class="eyebrow">Safe install path</div>
+        <h1>Install XUUnity MCP without breaking the AI setup flow</h1>
+        <p class="lede">
+          This page mirrors the existing repository install contract. It does
+          not replace the README; it makes the install intent indexable for
+          search while preserving the AI-driven setup sequence.
+        </p>
+        <div class="button-row">
+          <a class="button" href="https://github.com/FoxsterDev/xuunity-mcp/blob/master/README.md">Open README</a>
+          <a class="button secondary" href="https://github.com/FoxsterDev/xuunity-mcp/blob/master/INSTALL.md">Open INSTALL.md</a>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Canonical install flow</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>What stays true</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1. Read docs</td><td>Start with <code>README.md</code>, <code>INSTALL.md</code>, and the matching client guide.</td></tr>
+            <tr><td>2. Preflight</td><td>Confirm Python 3.10+, Unity project shape, target client, and whether user-level config would change.</td></tr>
+            <tr><td>3. Plan first</td><td>Run <code>setup-plan</code> before any mutation.</td></tr>
+            <tr><td>4. Review and approval</td><td>Show a short preflight review and wait for explicit approval before clone, installer runs, config edits, or <code>setup-apply</code>.</td></tr>
+            <tr><td>5. Apply</td><td>Run <code>setup-apply</code> only for the approved project roots.</td></tr>
+            <tr><td>6. Verify</td><td>Run <code>validate-setup</code>, then <code>ensure-ready</code>, then the first status check.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>Exact install command</h2>
+        <p>The documented production package route remains Git UPM:</p>
+        <pre><code>https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19</code></pre>
+        <p>Initialize the host-side helper from the repository root:</p>
+        <pre><code>bash init_xuunity_light_unity_mcp.sh</code></pre>
+      </section>
+
+      <section class="section">
+        <h2>Client-specific install references</h2>
+        <div class="card-grid">
+          <div class="card"><h3>Codex</h3><p>Codex-style config for <code>~/.codex/config.toml</code> plus safe review requirements.</p></div>
+          <div class="card"><h3>Cursor</h3><p>Project and user <code>mcp.json</code> guidance with merge-only behavior for existing servers.</p></div>
+          <div class="card"><h3>Claude Code / Desktop</h3><p>Templates and review expectations for helper reuse and explicit approval.</p></div>
+        </div>
+        <div class="button-row">
+          <a class="button secondary" href="clients/">Browse client guides</a>
+        </div>
+      </section>
+
+      <section class="faq">
+        <h2>Install FAQ</h2>
+        <div class="faq-item">
+          <h3>Can I skip setup-plan if I already know my project?</h3>
+          <p>No. The repository documentation treats <code>setup-plan</code> as the non-mutating preflight step before approval.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Can I install the package without Test Framework?</h3>
+          <p>Yes. Test operations are optional. The package works without making <code>com.unity.test-framework</code> a hard dependency.</p>
+        </div>
+        <div class="faq-item">
+          <h3>What is the first live MCP smoke check after install?</h3>
+          <p>Use <code>request-status-summary</code> if the current session cannot see new tools yet. After restart or refresh, use <code>unity_status_summary</code>.</p>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

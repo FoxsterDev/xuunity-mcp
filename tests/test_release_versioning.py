@@ -51,14 +51,14 @@ class ReleaseVersioningTests(unittest.TestCase):
         write_json(root / "templates" / "package-manifests" / "unity-package-6000.json", unity_6000_payload)
         write_text(
             root / "templates" / "server.py",
-            'SERVER_INFO = {\n    "name": "xuunity-light-unity-mcp",\n    "version": "0.3.16",\n}\n',
+            'SERVER_INFO = {\n    "name": "xuunity-mcp",\n    "version": "0.3.16",\n}\n',
         )
         write_text(
             root / "README.md",
             "\n".join(
                 [
                     "Status: `current for v0.3.16`",
-                    "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16",
+                    "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16",
                     "Historical migration uses `templates/unity-package#v0.3.11`.",
                     "",
                 ]
@@ -89,13 +89,13 @@ class ReleaseVersioningTests(unittest.TestCase):
                     "",
                     "Release tag: `v0.3.16`",
                     "",
-                    "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16",
+                    "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.16",
                     "",
                     "## 0.3.15",
                     "",
                     "Release tag: `v0.3.15`",
                     "",
-                    "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15",
+                    "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.15",
                     "",
                 ]
             ),

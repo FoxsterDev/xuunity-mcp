@@ -14,7 +14,7 @@ LIGHT_MCP_PACKAGE_NAME = "com.xuunity.light-mcp"
 TEST_FRAMEWORK_PACKAGE_NAME = "com.unity.test-framework"
 TEST_FRAMEWORK_MINIMUM_VERSION = "1.1.33"
 TEST_FRAMEWORK_CAPABILITY_DEFINE = "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY"
-DEFAULT_GIT_REPO_URL = "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git"
+DEFAULT_GIT_REPO_URL = "https://github.com/FoxsterDev/xuunity-mcp.git"
 UNINSTALL_MODE_PROJECT_ONLY = "project-only-cleanup"
 UNINSTALL_MODE_FULL_RESET = "full-reset-current-user"
 UNINSTALL_MODES = {UNINSTALL_MODE_PROJECT_ONLY, UNINSTALL_MODE_FULL_RESET}
@@ -332,7 +332,7 @@ def helper_install_targets() -> list[dict[str, Any]]:
         ("codex", codex_tools_home),
         ("claude_code", claude_tools_home),
     ):
-        install_dir = tools_home / "xuunity-light-unity-mcp"
+        install_dir = tools_home / "xuunity-mcp"
         run_path = install_dir / "run.sh"
         server_path = install_dir / "server.py"
         installed = run_path.is_file() and server_path.is_file()
@@ -1317,7 +1317,7 @@ def safe_remove_project_bridge_directory(project_root: Path, path_text: str) -> 
 
 def safe_remove_helper_install(path_text: str) -> bool:
     install_dir = Path(path_text).expanduser().resolve()
-    if install_dir.name != "xuunity-light-unity-mcp":
+    if install_dir.name != "xuunity-mcp":
         raise ToolInvocationError(
             "unsafe_helper_removal_path",
             "Refusing to remove a helper install path with an unexpected directory name.",

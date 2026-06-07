@@ -177,7 +177,7 @@ For production consumers, use the current Git UPM release path:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19"
   }
 }
 ```
@@ -188,7 +188,7 @@ folder only when you explicitly switch the consumer project into `devmode`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp"
+    "com.xuunity.light-mcp": "file:/absolute/path/to/xuunity-mcp/packages/com.xuunity.light-mcp"
   }
 }
 ```
@@ -274,7 +274,7 @@ An integrating agent should not:
 
 ## AI Agent Test Execution Guide
 
-When xuunity-light-unity-mcp is available, use MCP commands. Fallback to Unity CLI if MCP unavailable.
+When xuunity-mcp is available, use MCP commands. Fallback to Unity CLI if MCP unavailable.
 
 ### MCP Commands
 - EditMode batch: `batch-editmode-tests --project-root <path>`

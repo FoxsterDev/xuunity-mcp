@@ -44,7 +44,7 @@ Production config:
       "command": "bash",
       "args": [
         "-lc",
-        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""
+        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""
       ]
     }
   }
@@ -68,7 +68,7 @@ Windows config:
       "args": [
         "/d",
         "/c",
-        "if defined CODEX_TOOLS_HOME (call \"%CODEX_TOOLS_HOME%\\xuunity-light-unity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.codex-tools\\xuunity-light-unity-mcp\\run.cmd\")"
+        "if defined CODEX_TOOLS_HOME (call \"%CODEX_TOOLS_HOME%\\xuunity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.codex-tools\\xuunity-mcp\\run.cmd\")"
       ]
     }
   }

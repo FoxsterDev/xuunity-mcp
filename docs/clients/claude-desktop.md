@@ -40,7 +40,7 @@ Production config:
       "command": "bash",
       "args": [
         "-lc",
-        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp/run.sh\""
+        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run.sh\""
       ]
     }
   }
@@ -74,7 +74,7 @@ Production config:
       "args": [
         "/d",
         "/c",
-        "if defined CLAUDE_TOOLS_HOME (call \"%CLAUDE_TOOLS_HOME%\\xuunity-light-unity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.claude-tools\\xuunity-light-unity-mcp\\run.cmd\")"
+        "if defined CLAUDE_TOOLS_HOME (call \"%CLAUDE_TOOLS_HOME%\\xuunity-mcp\\run.cmd\") else (call \"%USERPROFILE%\\.claude-tools\\xuunity-mcp\\run.cmd\")"
       ]
     }
   }

@@ -162,7 +162,7 @@ def serve_stdio(
             msg_id = message.get("id") if isinstance(message, dict) else None
             emit_message(error_response(msg_id, exc.code, exc.message, exc.data))
         except Exception as exc:
-            log_stderr(f"[xuunity-light-unity-mcp] internal error: {exc}")
+            log_stderr(f"[xuunity-mcp] internal error: {exc}")
             msg_id = message.get("id") if isinstance(message, dict) else None
             emit_message(error_response(msg_id, -32603, "Internal error"))
 

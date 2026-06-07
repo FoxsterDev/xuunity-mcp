@@ -1545,7 +1545,7 @@ actions:
         )
 
         self.assertEqual(server.PROTOCOL_VERSION, response["result"]["protocolVersion"])
-        self.assertEqual("xuunity-light-unity-mcp", response["result"]["serverInfo"]["name"])
+        self.assertEqual("xuunity-mcp", response["result"]["serverInfo"]["name"])
 
 
 if __name__ == "__main__":

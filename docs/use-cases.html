@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Unity MCP use cases: compile validation, EditMode tests, PlayMode tests, and scene assertions</title>
+    <meta name="description" content="Use XUUnity MCP for compile validation, EditMode tests, PlayMode tests, scene snapshots, scene assertions, Game View screenshots, and recovery-aware Unity workflows.">
+    <link rel="canonical" href="https://foxsterdev.github.io/xuunity-mcp/use-cases.html">
+    <meta property="og:title" content="Unity MCP use cases with XUUnity MCP">
+    <meta property="og:description" content="Compile validation, tests, scene assertions, screenshots, and setup-safe Unity workflows.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://foxsterdev.github.io/xuunity-mcp/use-cases.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="assets/site.css">
+  </head>
+  <body>
+    <div class="shell">
+      <div class="topbar">
+        <a class="brand" href="./">XUUnity MCP</a>
+        <nav class="nav">
+          <a href="install.html">Install</a>
+          <a href="comparison.html">Comparison</a>
+          <a href="use-cases.html">Use Cases</a>
+          <a href="alternatives.html">Alternatives</a>
+          <a href="clients/">Client Guides</a>
+        </nav>
+      </div>
+
+      <section class="hero">
+        <div class="eyebrow">Validation-heavy workflows</div>
+        <h1>Unity MCP use cases that fit XUUnity MCP</h1>
+        <p class="lede">XUUnity MCP is strongest when the AI workflow has to prove project health, not just mutate editor state.</p>
+      </section>
+
+      <section class="section">
+        <div class="card-grid">
+          <div class="card">
+            <h3>Compile validation</h3>
+            <p>Run player script compile validation without switching the active build target, including matrix-style checks across targets and defines.</p>
+          </div>
+          <div class="card">
+            <h3>EditMode and PlayMode tests</h3>
+            <p>Execute tests with normalized result accounting while keeping Test Framework optional rather than a hard dependency.</p>
+          </div>
+          <div class="card">
+            <h3>Scene assertions</h3>
+            <p>Use scene snapshots and assertions when an agent needs proof of scene state instead of loose narrative summaries.</p>
+          </div>
+          <div class="card">
+            <h3>Console triage</h3>
+            <p>Use console tail and status summary commands to tighten feedback loops after edits, imports, or package changes.</p>
+          </div>
+          <div class="card">
+            <h3>Game View screenshots</h3>
+            <p>Capture screenshots for verification-oriented agent loops after capability probing confirms support.</p>
+          </div>
+          <div class="card">
+            <h3>Scenario replay</h3>
+            <p>Replay bounded scenarios with persisted result payloads for deterministic validation and recovery-aware follow-ups.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Recommended order of operations</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Workflow stage</th>
+              <th>Recommended action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Before mutation</td><td>Run <code>setup-plan</code> and review the proposed file/config changes.</td></tr>
+            <tr><td>After approval</td><td>Run <code>setup-apply</code>, then <code>validate-setup</code>.</td></tr>
+            <tr><td>When Unity may not be ready</td><td>Run <code>ensure-ready</code> before the first status or test command.</td></tr>
+            <tr><td>First live probe</td><td>Use <code>request-status-summary</code> or <code>unity_status_summary</code> depending on client reload state.</td></tr>
+            <tr><td>Validation phase</td><td>Run compile checks, tests, scene assertions, and screenshots as needed.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </body>
+</html>

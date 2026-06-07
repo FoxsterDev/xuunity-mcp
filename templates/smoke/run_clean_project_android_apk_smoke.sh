@@ -8,11 +8,11 @@ INIT_SCRIPT="$OPS_ROOT/init_xuunity_light_unity_mcp.sh"
 BUILD_HELPER_TEMPLATE="$SCRIPT_DIR/assets/AndroidBuildSmoke.cs"
 PACKAGE_MANIFEST="$OPS_ROOT/packages/com.xuunity.light-mcp/package.json"
 
-ARTIFACT_ROOT="${XUUNITY_LIGHT_UNITY_MCP_ANDROID_SMOKE_ROOT:-${TMPDIR:-/tmp}/xuunity-light-unity-mcp-android-smoke}"
+ARTIFACT_ROOT="${XUUNITY_LIGHT_UNITY_MCP_ANDROID_SMOKE_ROOT:-${TMPDIR:-/tmp}/xuunity-mcp-android-smoke}"
 RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')"
 RUN_ROOT="$ARTIFACT_ROOT/$RUN_ID"
 DEFAULT_PROJECT_ROOT="$RUN_ROOT/projects/XUUnityLightMcpAndroidSmoke"
-DEFAULT_APK_PATH="$RUN_ROOT/artifacts/xuunity-light-unity-mcp-android-smoke.apk"
+DEFAULT_APK_PATH="$RUN_ROOT/artifacts/xuunity-mcp-android-smoke.apk"
 DEFAULT_BUILD_LOG="$RUN_ROOT/logs/android_build.log"
 DEFAULT_CREATE_LOG="$RUN_ROOT/logs/create_project.log"
 SUMMARY_JSON="$RUN_ROOT/summary.json"
@@ -151,7 +151,7 @@ PY
 
 RUN_ROOT="$ARTIFACT_ROOT/$RUN_ID"
 DEFAULT_PROJECT_ROOT="$RUN_ROOT/projects/XUUnityLightMcpAndroidSmoke"
-DEFAULT_APK_PATH="$RUN_ROOT/artifacts/xuunity-light-unity-mcp-android-smoke.apk"
+DEFAULT_APK_PATH="$RUN_ROOT/artifacts/xuunity-mcp-android-smoke.apk"
 DEFAULT_BUILD_LOG="$RUN_ROOT/logs/android_build.log"
 DEFAULT_CREATE_LOG="$RUN_ROOT/logs/create_project.log"
 SUMMARY_JSON="$RUN_ROOT/summary.json"
@@ -457,7 +457,7 @@ print(str(payload.get("version") or "").strip())
 PY
 )"
 [[ -n "$PACKAGE_VERSION" ]] || fail "Could not resolve package version from $PACKAGE_MANIFEST"
-GIT_PACKAGE_DEPENDENCY="https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v$PACKAGE_VERSION"
+GIT_PACKAGE_DEPENDENCY="https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v$PACKAGE_VERSION"
 
 mkdir -p "$RUN_ROOT/logs" "$RUN_ROOT/artifacts" "$(dirname "$PROJECT_ROOT")"
 

@@ -20,7 +20,7 @@ The full system requires:
 ## Required Integration Steps
 
 1. add the package to `Packages/manifest.json`
-2. install the host-side service from `https://github.com/FoxsterDev/xuunity-light-unity-mcp`
+2. install the host-side service from `https://github.com/FoxsterDev/xuunity-mcp`
 3. enable the bridge for the target project
 4. open Unity
 5. verify:
@@ -32,7 +32,7 @@ The full system requires:
 Current Git UPM package URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
 ```
 
 ## Safety Rules

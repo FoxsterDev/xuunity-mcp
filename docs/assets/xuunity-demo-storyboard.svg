@@ -1,0 +1,39 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="720" rx="28" fill="#101726"/>
+  <rect x="28" y="28" width="1224" height="664" rx="24" fill="#161F33" stroke="#28314A" stroke-width="2"/>
+  <rect x="28" y="28" width="1224" height="56" rx="24" fill="#1D2740"/>
+  <circle cx="64" cy="56" r="8" fill="#D96B62"/>
+  <circle cx="92" cy="56" r="8" fill="#E2B767"/>
+  <circle cx="120" cy="56" r="8" fill="#67C390"/>
+  <text x="164" y="63" fill="#E9F1FF" font-family="SFMono-Regular, Menlo, monospace" font-size="21">XUUnity MCP demo walkthrough</text>
+  <rect x="72" y="126" width="520" height="488" rx="18" fill="#0E1524" stroke="#2B3550" stroke-width="2"/>
+  <text x="104" y="174" fill="#7AD0FF" font-family="SFMono-Regular, Menlo, monospace" font-size="22">$ bash xuunity_light_unity_mcp.sh setup-plan</text>
+  <text x="104" y="212" fill="#A6B2CC" font-family="SFMono-Regular, Menlo, monospace" font-size="19">project-root=/Games/SafeValidationProject</text>
+  <text x="104" y="260" fill="#E9F1FF" font-family="SFMono-Regular, Menlo, monospace" font-size="19">preflight: python=3.11.9  unity=2022.3.62f3</text>
+  <text x="104" y="294" fill="#E9F1FF" font-family="SFMono-Regular, Menlo, monospace" font-size="19">plan: manifest merge, bridge enable, client wiring review</text>
+  <text x="104" y="344" fill="#67C390" font-family="SFMono-Regular, Menlo, monospace" font-size="19">approve -> setup-apply</text>
+  <text x="104" y="378" fill="#E9F1FF" font-family="SFMono-Regular, Menlo, monospace" font-size="19">validate-setup: healthy</text>
+  <text x="104" y="412" fill="#E9F1FF" font-family="SFMono-Regular, Menlo, monospace" font-size="19">ensure-ready --open-editor</text>
+  <text x="104" y="462" fill="#67C390" font-family="SFMono-Regular, Menlo, monospace" font-size="19">unity_status_summary: bridge ready</text>
+  <text x="104" y="496" fill="#67C390" font-family="SFMono-Regular, Menlo, monospace" font-size="19">unity_compile_matrix: 38/38 lanes passed</text>
+  <text x="104" y="530" fill="#67C390" font-family="SFMono-Regular, Menlo, monospace" font-size="19">unity_tests_run_editmode: 6/6 passed</text>
+  <text x="104" y="564" fill="#67C390" font-family="SFMono-Regular, Menlo, monospace" font-size="19">unity_tests_run_playmode: 5/5 passed</text>
+  <rect x="656" y="126" width="532" height="230" rx="18" fill="#FFF9F2" stroke="#D8C8B1" stroke-width="2"/>
+  <text x="688" y="176" fill="#172033" font-family="Iowan Old Style, Georgia, serif" font-size="32" font-weight="700">Transcript summary</text>
+  <text x="688" y="220" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">1. Plan before mutation</text>
+  <text x="688" y="254" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">2. Apply only after approval</text>
+  <text x="688" y="288" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">3. Validate readiness and bridge health</text>
+  <text x="688" y="322" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">4. Run compile matrix and test evidence</text>
+  <rect x="656" y="388" width="250" height="190" rx="18" fill="#D9EFE7" stroke="#ACD9C9" stroke-width="2"/>
+  <text x="688" y="434" fill="#215B4B" font-family="Avenir Next, Segoe UI, sans-serif" font-size="20" font-weight="700">Validation proof</text>
+  <text x="688" y="474" fill="#172033" font-family="Iowan Old Style, Georgia, serif" font-size="40" font-weight="700">141/141</text>
+  <text x="688" y="506" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="20">Host Python tests</text>
+  <text x="688" y="542" fill="#172033" font-family="Iowan Old Style, Georgia, serif" font-size="40" font-weight="700">38/38</text>
+  <text x="688" y="574" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="20">Compile lanes passed</text>
+  <rect x="938" y="388" width="250" height="190" rx="18" fill="#FFE5D9" stroke="#F0C9B8" stroke-width="2"/>
+  <text x="970" y="434" fill="#A5451D" font-family="Avenir Next, Segoe UI, sans-serif" font-size="20" font-weight="700">Workflow shape</text>
+  <text x="970" y="474" fill="#172033" font-family="Iowan Old Style, Georgia, serif" font-size="40" font-weight="700">Safe</text>
+  <text x="970" y="506" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="20">Preflight + approval gated</text>
+  <text x="970" y="542" fill="#172033" font-family="Iowan Old Style, Georgia, serif" font-size="40" font-weight="700">Light</text>
+  <text x="970" y="574" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="20">Editor-only by default</text>
+</svg>

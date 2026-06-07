@@ -1,0 +1,27 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="720" rx="32" fill="#FBF6EE"/>
+  <rect x="40" y="40" width="1200" height="640" rx="28" fill="#FFFDF9" stroke="#E5D8C5" stroke-width="2"/>
+  <rect x="96" y="112" width="280" height="148" rx="24" fill="#FFE3D5" stroke="#CB5B2C" stroke-width="2"/>
+  <text x="126" y="156" fill="#A5451D" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22" font-weight="700">AI clients</text>
+  <text x="126" y="194" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="24">Cursor, Codex, Claude</text>
+  <text x="126" y="228" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="24">Desktop, Windsurf, Rider</text>
+  <rect x="500" y="86" width="280" height="202" rx="24" fill="#F8F2EA" stroke="#D9C7AD" stroke-width="2"/>
+  <text x="536" y="128" fill="#172033" font-family="Iowan Old Style, Georgia, serif" font-size="30" font-weight="700">XUUnity MCP</text>
+  <text x="536" y="164" fill="#5F6B80" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">Host-side stdio server</text>
+  <text x="536" y="206" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">setup-plan / setup-apply</text>
+  <text x="536" y="236" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">validate-setup / ensure-ready</text>
+  <text x="536" y="266" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22">status, compile, test, scenario tools</text>
+  <rect x="904" y="112" width="280" height="148" rx="24" fill="#D8EFE8" stroke="#215B4B" stroke-width="2"/>
+  <text x="940" y="156" fill="#215B4B" font-family="Avenir Next, Segoe UI, sans-serif" font-size="22" font-weight="700">Unity project</text>
+  <text x="940" y="194" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="24">Editor-only bridge package</text>
+  <text x="940" y="228" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="24">No player-build footprint by default</text>
+  <rect x="164" y="404" width="952" height="196" rx="28" fill="#FFF9F1" stroke="#E7D5BF" stroke-width="2"/>
+  <text x="204" y="454" fill="#172033" font-family="Iowan Old Style, Georgia, serif" font-size="34" font-weight="700">Validation-first workflow loop</text>
+  <text x="204" y="502" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="24">1. Preflight and plan before mutation</text>
+  <text x="204" y="538" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="24">2. Safe setup, readiness checks, and first status summary</text>
+  <text x="204" y="574" fill="#172033" font-family="Avenir Next, Segoe UI, sans-serif" font-size="24">3. Compile validation, EditMode tests, PlayMode tests, scene assertions, screenshots</text>
+  <path d="M376 186H484" stroke="#CB5B2C" stroke-width="6" stroke-linecap="round"/>
+  <path d="M780 186H888" stroke="#215B4B" stroke-width="6" stroke-linecap="round"/>
+  <path d="M640 288V374" stroke="#172033" stroke-width="6" stroke-linecap="round"/>
+  <path d="M624 356L640 374L656 356" stroke="#172033" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

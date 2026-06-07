@@ -4,7 +4,7 @@ Date: `2026-05-26`
 Status: `current for v0.3.19-dev`
 
 This document defines the public-safe build automation surface for the
-standalone `xuunity-light-unity-mcp` repository.
+standalone `xuunity-mcp` repository.
 
 The goal is to keep the public contract generic enough for:
 - plain Unity projects that only need normal batch builds

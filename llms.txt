@@ -1,6 +1,6 @@
-# XUUnity Light Unity MCP
+# XUUnity MCP
 
-XUUnity Light Unity MCP is an open-source lightweight Model Context Protocol server for Unity Editor automation.
+XUUnity MCP, full technical name XUUnity Light Unity MCP, is a lightweight Unity MCP server for safe Unity Editor automation.
 
 It connects MCP-compatible AI clients such as Cursor, Claude Code, Claude Desktop, Windsurf, Codex-style agents, and custom LLM agents to Unity Editor through a host-side MCP server and an editor-only Unity package.
 
@@ -19,8 +19,11 @@ Primary use cases:
 - safe setup and uninstall planning
 
 Differentiators:
+- XUUnity MCP brand query target
 - open-source Unity MCP server
 - lightweight Unity MCP
+- safe Unity MCP
+- validation-first Unity MCP
 - editor-only Unity package
 - disabled by default
 - zero player-build footprint by default
@@ -35,6 +38,11 @@ Differentiators:
 Important docs:
 - README.md: overview and quick start
 - INSTALL.md: installation and setup
+- docs/index.html: homepage for GitHub Pages / discovery landing surface
+- docs/install.html: install overview for Cursor, Claude Code, Codex, Claude Desktop, Rider, and Windsurf
+- docs/comparison.html: search-friendly summary page for XUUnity MCP vs Unity MCP options
+- docs/use-cases.html: compile validation, tests, scene assertions, and Game View use cases
+- docs/alternatives.html: best Unity MCP solutions by workflow type
 - docs/agents/AI_INTEGRATION.md: integration guide for AI agents
 - docs/agents/AGENT_WORKFLOWS.md: production-grade example workflows for AI agents
 - docs/reference/FEATURES.md: feature table and supported tools
@@ -51,4 +59,4 @@ Safe cleanup commands:
 - `uninstall-apply`: applies only the reviewed uninstall plan after explicit approval
 
 Keywords:
-Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity agent workflow examples, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP, Unity MCP uninstall, Unity MCP reset, safe MCP cleanup.
+xuunity, xuunity mcp, XUUnity MCP, Unity MCP, Unity MCP server, open-source Unity MCP, lightweight Unity MCP, safe Unity MCP, validation-first Unity MCP, MCP for Unity Editor, Unity Editor automation, Cursor Unity MCP, Claude Code Unity MCP, Claude Desktop Unity MCP, Windsurf Unity MCP, Codex Unity MCP, Unity AI Assistant alternative, Unity MCP without Unity AI subscription, Unity MCP without Unity AI Assistant, Unity agentic workflows, Unity agent workflow examples, Unity build automation, Unity PlayMode tests MCP, Unity EditMode tests MCP, Unity compile validation MCP, Unity MCP uninstall, Unity MCP reset, safe MCP cleanup.

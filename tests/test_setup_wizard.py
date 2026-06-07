@@ -363,11 +363,11 @@ class SetupWizardTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            codex_helper = root / "codex-tools" / "xuunity-light-unity-mcp"
+            codex_helper = root / "codex-tools" / "xuunity-mcp"
             codex_helper.mkdir(parents=True)
             (codex_helper / "server.py").write_text("# helper\n", encoding="utf-8")
             (codex_helper / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-            claude_helper = root / "claude-tools" / "xuunity-light-unity-mcp"
+            claude_helper = root / "claude-tools" / "xuunity-mcp"
             claude_helper.mkdir(parents=True)
             (claude_helper / "server.py").write_text("# helper\n", encoding="utf-8")
             (claude_helper / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")

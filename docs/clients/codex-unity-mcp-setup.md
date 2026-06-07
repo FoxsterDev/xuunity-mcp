@@ -23,7 +23,7 @@ Use these values:
 | Name | `xuunity_light_unity` |
 | Command to launch | `bash` |
 | Argument 1 | `-lc` |
-| Argument 2 | `exec "${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh"` |
+| Argument 2 | `exec "${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh"` |
 | Environment variable | `CODEX_TOOLS_HOME=/path/to/.codex-tools` if you do not want the default `$HOME/.codex-tools` |
 | Working directory | `/path/to/trusted/workspace` |
 
@@ -34,7 +34,7 @@ The same setup in `~/.codex/config.toml` looks like this on Linux/macOS:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "bash"
-args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh\""]
+args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""]
 required = false
 ```
 
@@ -44,7 +44,7 @@ Install or update the host-side helper before using the server:
 bash init_xuunity_light_unity_mcp.sh --target codex
 ```
 
-If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh`
+If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh`
 already exists, reuse that helper instead of cloning a fresh repo just to run
 setup again.
 

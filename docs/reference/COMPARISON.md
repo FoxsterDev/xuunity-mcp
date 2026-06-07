@@ -1,14 +1,18 @@
-# XUUnity Light Unity MCP Comparison
+# XUUnity MCP vs Unity MCP Solutions
 
 Date: `2026-05-22`
 Status: `public comparison snapshot`
-Scope: compare the lightweight `XUUnity Light Unity MCP` approach against the main Unity MCP reference options that informed its design
+Scope: compare the lightweight `XUUnity Light Unity MCP` approach against the
+main Unity MCP reference options that informed its design
 
 This is a positioning comparison, not a benchmark. Community MCP projects and Unity's official AI/MCP offering change quickly, so this document uses public primary sources plus repo-local evidence and avoids treating unknown public details as negative proof.
 
 If a project maintainer finds an incorrect entry, please open an issue or pull request with a primary-source link.
 
 ## Best Fit
+
+`XUUnity MCP` is the short public product name used in search/discovery
+surfaces. `XUUnity Light Unity MCP` remains the full technical package name.
 
 Use XUUnity Light Unity MCP when you want:
 

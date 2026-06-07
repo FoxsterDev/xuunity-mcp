@@ -89,7 +89,7 @@ def update_server_info(source_root: Path, old_version: str, version: str) -> lis
         return []
     text = path.read_text(encoding="utf-8")
     pattern = re.compile(
-        r'(SERVER_INFO\s*=\s*\{\s*"name":\s*"xuunity-light-unity-mcp",\s*"version":\s*")'
+        r'(SERVER_INFO\s*=\s*\{\s*"name":\s*"xuunity-mcp",\s*"version":\s*")'
         + re.escape(old_version)
         + r'(")',
         re.MULTILINE,
@@ -167,7 +167,7 @@ def update_top_changelog_section(source_root: Path, old_version: str, version: s
         f"Release tag: `v{version}`\n\n"
         "Current Git UPM install URL:\n\n"
         "```text\n"
-        "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp"
+        "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp"
         f"#v{version}\n"
         "```\n\n"
         "### Changed\n\n"

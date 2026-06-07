@@ -23,7 +23,7 @@
   <rect x="64" y="308" width="1010" height="58" rx="12" class="field"/>
   <text class="mono" x="82" y="345">-lc</text>
   <rect x="64" y="386" width="1010" height="58" rx="12" class="field"/>
-  <text class="mono" x="82" y="423">exec "${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp/run.sh"</text>
+  <text class="mono" x="82" y="423">exec "${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh"</text>
   <rect x="64" y="466" width="1072" height="48" rx="12" class="button"/>
   <text class="muted" x="488" y="498">+ Add argument</text>
 

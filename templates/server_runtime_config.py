@@ -9,7 +9,7 @@ from server_core import read_json
 
 RUNTIME_DEFAULTS_FILE_NAME = "xuunity_light_unity_mcp_runtime_defaults.json"
 RUNTIME_ENV_OVERRIDE = "XUUNITY_LIGHT_UNITY_MCP_RUNTIME_CONFIG"
-RUNTIME_USER_OVERRIDE_PATH = Path.home() / ".codex" / "xuunity-light-unity-mcp.runtime_config.json"
+RUNTIME_USER_OVERRIDE_PATH = Path.home() / ".codex" / "xuunity-mcp.runtime_config.json"
 RUNTIME_REPO_OVERRIDE_RELATIVE_PATH = Path("AIOutput/Operations/XUUnityLightUnityMcp/runtime_config.json")
 
 

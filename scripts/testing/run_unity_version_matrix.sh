@@ -10,7 +10,7 @@ ACCEPTANCE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/interactive_acceptance
 REFRESH_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/refresh_contract_smoke.json"
 COMPILE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/compile_contract_smoke.json"
 
-ARTIFACT_ROOT="${XUUNITY_LIGHT_UNITY_MCP_VERSION_MATRIX_ROOT:-${TMPDIR:-/tmp}/xuunity-light-unity-mcp-version-matrix}"
+ARTIFACT_ROOT="${XUUNITY_LIGHT_UNITY_MCP_VERSION_MATRIX_ROOT:-${TMPDIR:-/tmp}/xuunity-mcp-version-matrix}"
 RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')"
 RUN_ROOT="$ARTIFACT_ROOT/$RUN_ID"
 PROJECTS_ROOT="$RUN_ROOT/projects"

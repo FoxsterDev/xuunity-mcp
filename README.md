@@ -1,19 +1,21 @@
 <div align="center">
 
-<img src="docs/assets/xuunity-light-unity-mcp-preview.png" alt="XUUnity Light Unity MCP preview banner" width="100%">
+<img src="docs/assets/xuunity-mcp-preview.png" alt="XUUnity Light Unity MCP preview banner" width="100%">
 
 <br>
 
-# XUUnity Light Unity MCP
+# XUUnity MCP
 
-**Open-source lightweight Unity MCP server for safe Unity Editor automation.**
+**XUUnity MCP is a lightweight Unity MCP server for safe Unity Editor automation.**
 
 Connect Cursor, Claude Code, Claude Desktop, Rider, Windsurf, Codex-style
 agents, and custom MCP clients to Unity through a local stdio MCP server and a
 small editor-only Unity package.
 
+Full technical package name: **XUUnity Light Unity MCP**
+
 <p>
-  <a href="https://github.com/FoxsterDev/xuunity-light-unity-mcp"><img alt="GitHub stars" src="https://img.shields.io/github/stars/FoxsterDev/xuunity-light-unity-mcp?style=flat&logo=github"></a>
+  <a href="https://github.com/FoxsterDev/xuunity-mcp"><img alt="GitHub stars" src="https://img.shields.io/github/stars/FoxsterDev/xuunity-mcp?style=flat&logo=github"></a>
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-red.svg"></a>
   <img alt="Unity 2021.3+" src="https://img.shields.io/badge/Unity-2021.3%2B-black.svg?logo=unity&logoColor=white">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white">
@@ -26,6 +28,7 @@ small editor-only Unity package.
 [Manual Install](#manual-install) |
 [Verify Existing Install](#verify-existing-install) |
 [AI Setup Prompt](#ai-agent-setup-prompt) |
+[Pages Site](docs/index.html) |
 [Features](docs/reference/FEATURES.md) |
 [Client Docs](#supported-clients) |
 [Security](SECURITY.md) |
@@ -38,8 +41,8 @@ small editor-only Unity package.
 
 ## Why Use It
 
-Use XUUnity Light Unity MCP when you want a local-first Unity MCP for
-validation-heavy AI workflows, not broad unrestricted editor mutation.
+Use XUUnity MCP when you want a local-first, validation-first Unity MCP for
+safe editor automation, not broad unrestricted editor mutation.
 
 - compile checks without switching the active Unity build target
 - EditMode and PlayMode tests with normalized result accounting
@@ -47,6 +50,15 @@ validation-heavy AI workflows, not broad unrestricted editor mutation.
 - bounded scenario validation and request-journal recovery after editor reloads
 - same-host multi-project routing for workstations with multiple Unity projects
 - editor-only package, disabled by default, with no player-build footprint by default
+
+Search positioning keywords for this repo:
+
+- `xuunity mcp`
+- `unity mcp`
+- `lightweight unity mcp`
+- `safe unity mcp`
+- `validation-first unity mcp`
+- `unity mcp for compile checks and tests`
 
 ---
 
@@ -79,7 +91,7 @@ Important:
 
 - UI auto-review, sandbox auto-approval, or tool-level approval is not the same
   thing as user approval of setup mutations.
-- If `~/.codex-tools/xuunity-light-unity-mcp/run.sh` or the equivalent
+- If `~/.codex-tools/xuunity-mcp/run.sh` or the equivalent
   host-tools install already exists, reuse it. Do not clone the repo locally
   unless the helper is missing or local MCP development is the goal.
 
@@ -275,7 +287,7 @@ Project-only mode removes only the approved project-level MCP package dependency
 the matching packages-lock entry, and `Library/XUUnityLightMcp` bridge state
 from the selected Unity project. It keeps `~/.codex/config.toml`,
 `~/.claude.json`, and helper installs such as
-`~/.codex-tools/xuunity-light-unity-mcp`.
+`~/.codex-tools/xuunity-mcp`.
 
 Full reset for the current user removes the selected current-user client
 wiring and helper install in addition to optional project cleanup:
@@ -361,7 +373,7 @@ Required procedure:
 1. Confirm Python 3.10+, Unity project structure, current client, and workspace
    topology.
 2. If the MCP repo is missing locally, ask before cloning
-   https://github.com/FoxsterDev/xuunity-light-unity-mcp.git outside the Unity
+   https://github.com/FoxsterDev/xuunity-mcp.git outside the Unity
    Assets folder and treat it as <MCP_REPO_ROOT>.
 3. Produce a non-mutating setup plan from <MCP_REPO_ROOT>. `setup-plan` must
    not clone, run the installer, sync helper files, edit manifests, or change
@@ -424,7 +436,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -432,13 +444,13 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19"
   }
 }
 ```
 
 Local package source for MCP development:
-`file:/absolute/path/to/xuunity-light-unity-mcp/packages/com.xuunity.light-mcp`.
+`file:/absolute/path/to/xuunity-mcp/packages/com.xuunity.light-mcp`.
 Keep Git UPM as the default project state. Switch to the local `file:` source
 only through explicit `devmode`.
 OpenUPM is planned; use Git UPM until the package is published there.
@@ -721,4 +733,4 @@ unrelated logs.
 [Glossary](docs/reference/GLOSSARY.md) | [Status](docs/reference/STATUS.md) | [Build automation](docs/operations/BUILD_AUTOMATION.md) |
 [Smoke tests](docs/operations/SMOKE_TESTS.md) | [Roadmap](docs/architecture/ROADMAP.md)
 
-License: MIT. See [LICENSE](LICENSE). Need help? Open an [issue](https://github.com/FoxsterDev/xuunity-light-unity-mcp/issues).
+License: MIT. See [LICENSE](LICENSE). Need help? Open an [issue](https://github.com/FoxsterDev/xuunity-mcp/issues).

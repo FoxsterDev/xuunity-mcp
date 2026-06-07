@@ -27,5 +27,5 @@ Use `../../docs/agents/AGENT_WORKFLOWS.md` for the human-readable playbooks and 
 Current production package source for workflow evidence:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
 ```

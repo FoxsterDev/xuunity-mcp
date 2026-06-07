@@ -64,8 +64,8 @@ Usage:
 Options:
     --project-root <path>     Optional Unity project root for enabling or disabling the editor-only bridge under Library/.
   --target codex|claude|both  Choose which install location(s) receive the server files.
-                              codex  -> \$CODEX_TOOLS_HOME/xuunity-light-unity-mcp  (default \$HOME/.codex-tools)
-                              claude -> \$CLAUDE_TOOLS_HOME/xuunity-light-unity-mcp (default \$HOME/.claude-tools)
+                              codex  -> \$CODEX_TOOLS_HOME/xuunity-mcp  (default \$HOME/.codex-tools)
+                              claude -> \$CLAUDE_TOOLS_HOME/xuunity-mcp (default \$HOME/.claude-tools)
                               both   -> install into both. Default: both.
   --install-codex-config      Also append the Codex MCP config block.
   --install-claude-config     Also register the MCP server in ~/.claude.json (Claude Code user scope).
@@ -91,8 +91,8 @@ minimum_python_version="3.10"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 codex_tools_home="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}"
 claude_tools_home="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}"
-codex_install_dir="$codex_tools_home/xuunity-light-unity-mcp"
-claude_install_dir="$claude_tools_home/xuunity-light-unity-mcp"
+codex_install_dir="$codex_tools_home/xuunity-mcp"
+claude_install_dir="$claude_tools_home/xuunity-mcp"
 config_path="$codex_home/config.toml"
 claude_config_path="${CLAUDE_CONFIG_PATH:-$HOME/.claude.json}"
 codex_run_path="$codex_install_dir/run.sh"

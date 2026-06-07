@@ -9,7 +9,7 @@ packages/com.xuunity.light-mcp
 Use this Git UPM URL for new installs:
 
 ```text
-https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.19
 ```
 
 The old path was:

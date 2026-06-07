@@ -30,8 +30,8 @@ resolve_source_root() {
 
 SOURCE_ROOT="$(resolve_source_root)"
 
-CODEX_INSTALL_DIR="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-light-unity-mcp"
-CLAUDE_INSTALL_DIR="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-light-unity-mcp"
+CODEX_INSTALL_DIR="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp"
+CLAUDE_INSTALL_DIR="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp"
 
 codex_context_detected() {
   [[ -n "${CODEX_SHELL:-}" ]] ||
@@ -198,7 +198,7 @@ require_package_source_root() {
     return 0
   fi
 
-  echo "xuunity-light-unity-mcp source root preflight failed" >&2
+  echo "xuunity-mcp source root preflight failed" >&2
   echo "source_root=$SOURCE_ROOT" >&2
   echo "expected_package_source=$expected_package_source" >&2
   echo "airroot=${XUUNITY_LIGHT_UNITY_MCP_AIRROOT:-}" >&2
@@ -227,7 +227,7 @@ if not isinstance(payload, dict):
     raise SystemExit(0)
 
 def line(*parts):
-    sys.stderr.write("[xuunity-light-unity-mcp] compact " + " ".join(str(p) for p in parts if str(p)) + "\n")
+    sys.stderr.write("[xuunity-mcp] compact " + " ".join(str(p) for p in parts if str(p)) + "\n")
 
 if str(payload.get("reason") or "") == "assistive_access_not_granted":
     line("outcome=window_arrangement", "reason=assistive_access_not_granted", "remediation=grant_accessibility_permission_then_rerun")
@@ -531,7 +531,7 @@ PY
   update_manifest_dependency "$manifest_path" "$dependency_value"
   remove_lock_dependency "$lock_path"
 
-  echo "xuunity-light-unity-mcp mode switched: devmode"
+  echo "xuunity-mcp mode switched: devmode"
   echo "project_root=$project_root"
   echo "dependency=$dependency_value"
   echo "package_source=$package_source_path"
@@ -597,7 +597,7 @@ switch_project_to_prodmode() {
     worktree_dirty="true"
   fi
 
-  echo "xuunity-light-unity-mcp mode switched: prodmode"
+  echo "xuunity-mcp mode switched: prodmode"
   echo "project_root=$project_root"
   echo "dependency=$dependency_value"
   echo "source_remote=$remote_name"
@@ -741,7 +741,7 @@ case "${1:-}" in
   setup-plan)
     shift
     if [[ ! -f "$SOURCE_SERVER_PATH" ]]; then
-      echo "xuunity-light-unity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
+      echo "xuunity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
       exit 1
     fi
     run_server_with_optional_compact_summary "$SOURCE_SERVER_PATH" setup-plan "$@"
@@ -750,7 +750,7 @@ case "${1:-}" in
   uninstall-plan)
     shift
     if [[ ! -f "$SOURCE_SERVER_PATH" ]]; then
-      echo "xuunity-light-unity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
+      echo "xuunity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
       exit 1
     fi
     run_server_with_optional_compact_summary "$SOURCE_SERVER_PATH" uninstall-plan "$@"
@@ -759,7 +759,7 @@ case "${1:-}" in
   uninstall-apply)
     shift
     if [[ ! -f "$SOURCE_SERVER_PATH" ]]; then
-      echo "xuunity-light-unity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
+      echo "xuunity-mcp source server not found: $SOURCE_SERVER_PATH" >&2
       exit 1
     fi
     run_server_with_optional_compact_summary "$SOURCE_SERVER_PATH" uninstall-apply "$@"
@@ -799,7 +799,7 @@ esac
 sync_installed_helper_if_needed
 
 if [[ ! -f "$SERVER_PATH" ]]; then
-  echo "xuunity-light-unity-mcp server not found: $SERVER_PATH" >&2
+  echo "xuunity-mcp server not found: $SERVER_PATH" >&2
   echo "Install it with: bash init_xuunity_light_unity_mcp.sh" >&2
   exit 1
 fi

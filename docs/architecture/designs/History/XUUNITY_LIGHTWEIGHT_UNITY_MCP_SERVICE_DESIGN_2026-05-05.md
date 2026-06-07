@@ -913,7 +913,7 @@ What it should do:
 One explicit command:
 
 ```bash
-xuunity-light-unity-mcp status --project-root /path/to/project
+xuunity-mcp status --project-root /path/to/project
 ```
 
 If Unity is closed:
@@ -927,9 +927,9 @@ If Unity is open:
 Simple commands:
 
 ```bash
-xuunity-light-unity-mcp console-tail --project-root /path/to/project
-xuunity-light-unity-mcp scene-snapshot --project-root /path/to/project
-xuunity-light-unity-mcp tests-run-editmode --project-root /path/to/project
+xuunity-mcp console-tail --project-root /path/to/project
+xuunity-mcp scene-snapshot --project-root /path/to/project
+xuunity-mcp tests-run-editmode --project-root /path/to/project
 ```
 
 ### Extend

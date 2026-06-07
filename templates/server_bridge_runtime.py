@@ -114,7 +114,7 @@ def emit_request_submission_ack(
 ) -> None:
     bridge_generation, bridge_session_id = bridge_identity_from_state(state)
     message = (
-        "[xuunity-light-unity-mcp] request_submitted "
+        "[xuunity-mcp] request_submitted "
         f"operation={operation} "
         f"request_id={request_id} "
         f"transport={transport_name} "
@@ -137,7 +137,7 @@ def emit_request_not_submitted_ack(
     reason: str,
 ) -> None:
     message = (
-        "[xuunity-light-unity-mcp] request_not_submitted "
+        "[xuunity-mcp] request_not_submitted "
         f"operation={operation} "
         f"transport={transport_name} "
         f"reason={reason} "
@@ -162,7 +162,7 @@ def emit_operation_progress_phase(
     bridge_generation, bridge_session_id = bridge_identity_from_state(state)
     busy_reason = str((state or {}).get("busy_reason") or "")
     message = (
-        "[xuunity-light-unity-mcp] operation_progress "
+        "[xuunity-mcp] operation_progress "
         f"operation={operation} "
         f"phase={phase} "
         f"request_id={request_id or '-'} "

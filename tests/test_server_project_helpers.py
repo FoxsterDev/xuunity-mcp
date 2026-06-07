@@ -201,7 +201,7 @@ class ServerProjectHelperTests(unittest.TestCase):
                 json.dumps(
                     {
                         "dependencies": {
-                            "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-light-unity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
+                            "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.13"
                         }
                     },
                     indent=2,

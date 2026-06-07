@@ -124,7 +124,7 @@ class WrapperSourceRootTests(unittest.TestCase):
 
             installed_package_json = (
                 codex_tools
-                / "xuunity-light-unity-mcp"
+                / "xuunity-mcp"
                 / "packages"
                 / "com.xuunity.light-mcp"
                 / "package.json"
@@ -166,8 +166,8 @@ class WrapperSourceRootTests(unittest.TestCase):
             plan = json.loads(completed.stdout)
             self.assertEqual("uninstall_plan", plan["action"])
             self.assertEqual("project-only-cleanup", plan["mode"])
-            self.assertFalse((codex_tools / "xuunity-light-unity-mcp").exists())
-            self.assertFalse((claude_tools / "xuunity-light-unity-mcp").exists())
+            self.assertFalse((codex_tools / "xuunity-mcp").exists())
+            self.assertFalse((claude_tools / "xuunity-mcp").exists())
 
     def test_auto_install_target_prefers_codex_home_in_codex_context(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -178,7 +178,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             project_root = self.create_fake_project(temp_root / "FakeProject")
             codex_tools = temp_root / "codex-tools"
             claude_tools = temp_root / "claude-tools"
-            stale_claude_install = claude_tools / "xuunity-light-unity-mcp"
+            stale_claude_install = claude_tools / "xuunity-mcp"
             stale_claude_install.mkdir(parents=True)
             stale_server = stale_claude_install / "server.py"
             stale_server.write_text("# stale claude helper\n", encoding="utf-8")
@@ -200,7 +200,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
-            self.assertTrue((codex_tools / "xuunity-light-unity-mcp" / "server.py").is_file())
+            self.assertTrue((codex_tools / "xuunity-mcp" / "server.py").is_file())
             self.assertEqual("# stale claude helper\n", stale_server.read_text(encoding="utf-8"))
 
     def test_explicit_install_target_can_force_claude_from_codex_context(self) -> None:
@@ -230,8 +230,8 @@ class WrapperSourceRootTests(unittest.TestCase):
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
-            self.assertTrue((claude_tools / "xuunity-light-unity-mcp" / "server.py").is_file())
-            self.assertFalse((codex_tools / "xuunity-light-unity-mcp" / "server.py").exists())
+            self.assertTrue((claude_tools / "xuunity-mcp" / "server.py").is_file())
+            self.assertFalse((codex_tools / "xuunity-mcp" / "server.py").exists())
 
     def test_auto_install_target_preserves_existing_claude_helper_outside_codex_context(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -242,7 +242,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             project_root = self.create_fake_project(temp_root / "FakeProject")
             codex_tools = temp_root / "codex-tools"
             claude_tools = temp_root / "claude-tools"
-            claude_install = claude_tools / "xuunity-light-unity-mcp"
+            claude_install = claude_tools / "xuunity-mcp"
             claude_install.mkdir(parents=True)
             claude_server = claude_install / "server.py"
             claude_server.write_text("# stale claude helper\n", encoding="utf-8")
@@ -271,7 +271,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertEqual(0, completed.returncode, completed.stderr)
             self.assertTrue(claude_server.is_file())
             self.assertNotEqual("# stale claude helper\n", claude_server.read_text(encoding="utf-8"))
-            self.assertFalse((codex_tools / "xuunity-light-unity-mcp" / "server.py").exists())
+            self.assertFalse((codex_tools / "xuunity-mcp" / "server.py").exists())
 
     def test_prodmode_pins_package_version_release_tag_not_raw_commit(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
