@@ -105,6 +105,94 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
             self.assertEqual(0, status["failed"])
             self.assertIn('"projects_failed": 0', completed.stdout)
 
+    def test_gui_fallback_success_counts_as_success(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            project_root = temp_root / "ConsumerProject"
+            (project_root / "Packages").mkdir(parents=True)
+            (project_root / "ProjectSettings").mkdir()
+            (project_root / "Packages" / "manifest.json").write_text(
+                json.dumps({"dependencies": {"com.xuunity.light-mcp": "file:package"}}),
+                encoding="utf-8",
+            )
+            (project_root / "ProjectSettings" / "ProjectVersion.txt").write_text(
+                "m_EditorVersion: 6000.0.58f2\n",
+                encoding="utf-8",
+            )
+
+            wrapper_path = temp_root / "fake_xuunity_light_unity_mcp.sh"
+            wrapper_path.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    set -euo pipefail
+                    command_name="${1:-}"
+                    case "$command_name" in
+                      batch-build-config-compile-matrix)
+                        printf '{"event":"batch_progress","phase":"prepare_completed","message":"Batch preflight selected GUI fallback."}\\n'
+                        cat <<'JSON'
+                    {
+                      "action": "batch_build_config_compile_matrix",
+                      "succeeded": true,
+                      "result_summary": {
+                        "effective_execution_lane": "gui",
+                        "transport_outcome": "gui_operation_completed",
+                        "unity_outcome": "passed"
+                      },
+                      "summary_file": "/tmp/summary.json",
+                      "result_file": "/tmp/result.json",
+                      "log_path": "/tmp/editor.log"
+                    }
+                    JSON
+                        ;;
+                      recover-editor-session)
+                        printf '{"recovery_classification":"not_needed"}\\n'
+                        ;;
+                      *)
+                        echo "unexpected command: $command_name" >&2
+                        exit 2
+                        ;;
+                    esac
+                    """
+                ),
+                encoding="utf-8",
+            )
+            wrapper_path.chmod(0o755)
+
+            results_dir = temp_root / "results"
+            env = os.environ.copy()
+            env["XUUNITY_LIGHT_UNITY_MCP_WRAPPER"] = str(wrapper_path)
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(RUNNER),
+                    "--repo-root",
+                    str(temp_root),
+                    "--project-root",
+                    str(project_root),
+                    "--parallelism",
+                    "1",
+                    "--no-close-live-editors",
+                    "--results-dir",
+                    str(results_dir),
+                ],
+                cwd=OPS_ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr + completed.stdout)
+            status = json.loads((results_dir / "ConsumerProject_status.json").read_text(encoding="utf-8"))
+            self.assertTrue(status["succeeded"])
+            self.assertEqual("gui", status["effective_execution_lane"])
+            self.assertEqual("gui_operation_completed", status["transport_outcome"])
+            self.assertEqual("passed", status["unity_outcome"])
+            self.assertEqual("", status["matrix_status"])
+            self.assertIn('"projects_failed": 0', completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

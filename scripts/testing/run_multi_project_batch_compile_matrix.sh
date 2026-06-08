@@ -189,6 +189,7 @@ status = {
     "succeeded": bool(payload.get("succeeded")) if isinstance(payload, dict) else False,
     "unity_outcome": result_summary.get("unity_outcome", "") if isinstance(result_summary, dict) else "",
     "transport_outcome": result_summary.get("transport_outcome", "") if isinstance(result_summary, dict) else "",
+    "effective_execution_lane": result_summary.get("effective_execution_lane", "") if isinstance(result_summary, dict) else "",
     "matrix_status": matrix.get("status", "") if isinstance(matrix, dict) else "",
     "total": int(matrix.get("total", 0)) if isinstance(matrix, dict) else 0,
     "passed": int(matrix.get("passed", 0)) if isinstance(matrix, dict) else 0,
@@ -218,11 +219,17 @@ statuses = [json.loads(path.read_text(encoding="utf-8")) for path in status_file
 print("MULTI_PROJECT_BATCH_COMPILE_MATRIX_SUMMARY_BEGIN")
 overall_failed = 0
 for item in statuses:
+    gui_fallback_pass = (
+        item.get("succeeded") is True
+        and item.get("unity_outcome") == "passed"
+        and item.get("transport_outcome") == "gui_operation_completed"
+        and item.get("effective_execution_lane") == "gui"
+    )
     ok = (
         item.get("recover_rc", 0) == 0
         and item.get("batch_rc", 0) == 0
         and item.get("succeeded") is True
-        and item.get("matrix_status") == "passed"
+        and (item.get("matrix_status") == "passed" or gui_fallback_pass)
         and item.get("failed", 0) == 0
     )
     if not ok:
@@ -232,6 +239,9 @@ for item in statuses:
         f"recover_rc={item.get('recover_rc', 0)}",
         f"batch_rc={item.get('batch_rc', 0)}",
         f"succeeded={str(bool(item.get('succeeded'))).lower()}",
+        f"lane={item.get('effective_execution_lane', '')}",
+        f"transport={item.get('transport_outcome', '')}",
+        f"unity={item.get('unity_outcome', '')}",
         f"matrix_status={item.get('matrix_status', '')}",
         f"total={item.get('total', 0)}",
         f"passed={item.get('passed', 0)}",
