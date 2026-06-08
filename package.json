@@ -1,0 +1,17 @@
+{
+  "name": "xuunity-mcp-site-checks",
+  "version": "0.3.20",
+  "private": true,
+  "description": "Repo-owned Playwright checks for the XUUnity MCP public docs site.",
+  "scripts": {
+    "test:site:ui": "playwright test",
+    "test:site:ui:headed": "playwright test --headed",
+    "test:site:ui:debug": "playwright test --debug",
+    "test:site:ui:open": "playwright test --ui",
+    "report:site:ui": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.3",
+    "@playwright/test": "1.60.0"
+  }
+}

@@ -41,6 +41,7 @@ this router plus the local docs as the source of truth.
 - For installer, wrapper, setup-plan/setup-apply, or uninstall-plan/uninstall-apply behavior, work in `scripts/`, `templates/`, and the root shell entrypoints.
 - For parent-workspace tasks, keep `XUUnityLightUnityMcp` as the implementation target and state any external Unity project used only as a validation target.
 - For public documentation, keep examples generic and public-safe. Do not add host-private paths, credentials, project names, or local workstation assumptions unless the task is explicitly host-local.
+- For public site UX/UI, discovery, SEO, article, or docs navigation work under `docs/`, run the static checks plus `scripts/testing/run_site_ui_checks.sh` before final handoff when Node is available. Use the generated Playwright HTML report, JSON/JUnit results, failure screenshots, traces, and attached viewport screenshots to diagnose visual, overflow, accessibility, CTA, and route regressions.
 
 ## Git Boundary
 - In standalone mode, this directory is the git repo root.
