@@ -30,6 +30,35 @@ class LicenseCapabilitiesTests(unittest.TestCase):
                 result = server_license.classify_license_log(text, exit_code=1)
                 self.assertEqual(expected_code, result["batchmode_blocker_code"])
 
+    def test_license_log_classification_ignores_recovered_access_token_warning(self) -> None:
+        text = "\n".join(
+            [
+                "[Licensing::Module] Error: Access token is unavailable; failed to update",
+                "[Licensing::Client] Successfully resolved entitlement details",
+                "[Licensing::Module] License group:",
+                "  Product: Unity Enterprise",
+                "[Licensing::Client] Successfully updated license, isAsync: True, time: 0.00",
+            ]
+        )
+
+        result = server_license.classify_license_log(text, exit_code=0)
+
+        self.assertEqual("", result["batchmode_blocker_code"])
+
+    def test_license_log_classification_ignores_recovered_ipc_startup_warning(self) -> None:
+        text = "\n".join(
+            [
+                "[Licensing::IpcConnector] Channel LicenseClient-user doesn't exist",
+                "[Licensing::Module] Successfully launched the LicensingClient (PId: 3769)",
+                "[Licensing::Module] Successfully connected to LicensingClient on channel: \"LicenseClient-user\"",
+                "Exiting batchmode successfully now!",
+            ]
+        )
+
+        result = server_license.classify_license_log(text, exit_code=0)
+
+        self.assertEqual("", result["batchmode_blocker_code"])
+
     def test_batch_lane_preflight_auto_selects_gui_for_known_license_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             project_root = Path(tmp_dir)

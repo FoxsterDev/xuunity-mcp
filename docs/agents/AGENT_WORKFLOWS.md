@@ -208,7 +208,7 @@ Minimum evidence object:
   "workflowId": "post_change_validation",
   "projectRoot": "$PROJECT_ROOT",
   "unityVersion": "6000.0.58f2",
-  "packageVersion": "0.3.20",
+  "packageVersion": "0.3.21",
   "packageSourceMode": "git",
   "verdict": "pass",
   "checks": [
@@ -689,10 +689,12 @@ check the host capability report:
 ```
 
 Default batch helpers use `--batch-fallback-mode auto`. If the report proves
-batchmode is blocked by a known license, Hub, or headless condition, the helper
-uses the equivalent GUI bridge lane when the editor is idle enough to restore
-safely. Use `--batch-fallback-mode require-batch` when the workflow must fail
-unless real batchmode is proven.
+batchmode is blocked by a known license, Hub, account, Unity version, headless,
+or session condition, the helper uses the equivalent GUI bridge lane when the
+editor is idle enough to restore safely. Treat this as successful completion
+when the command succeeds and Unity reports a passed outcome; do not classify
+GUI fallback itself as failure. Use `--batch-fallback-mode require-batch` only
+when the workflow must fail unless real batchmode is proven.
 
 Compile route:
 

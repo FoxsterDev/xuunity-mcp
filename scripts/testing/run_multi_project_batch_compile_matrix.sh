@@ -8,6 +8,7 @@ WRAPPER_PATH="${XUUNITY_LIGHT_UNITY_MCP_WRAPPER:-$SOURCE_ROOT/xuunity_light_unit
 PARALLELISM=4
 CLOSE_LIVE_EDITORS="true"
 KEEP_RESULTS="true"
+BATCH_FALLBACK_MODE="auto"
 RESULTS_DIR=""
 PROJECT_ROOTS=()
 
@@ -50,6 +51,7 @@ Options:
   --project-root PATH      Include one explicit Unity project root. Repeatable.
   --close-live-editors     Try to recover/close live editors before batch compile. Default.
   --no-close-live-editors  Skip the recovery preflight and fail fast on editor conflicts.
+  --batch-fallback-mode M  Batch lane fallback policy: auto, off, or require-batch. Default: auto.
   --results-dir DIR        Write status artifacts to a persistent directory.
   --cleanup-results        Remove the results dir on exit instead of keeping it.
   --help                   Show this message.
@@ -58,6 +60,7 @@ Behavior:
   - auto-discovers direct child Unity projects under the selected repo root
   - filters to projects that already declare com.xuunity.light-mcp
   - runs batch-build-config-compile-matrix in parallel
+  - prefers real Unity batchmode and uses GUI fallback when --batch-fallback-mode auto allows it
   - emits one compact per-project summary plus a final aggregate summary
   - keeps results_dir by default so it can feed later GUI-subset runs
 EOF
@@ -112,7 +115,8 @@ discover_project_roots() {
 run_worker() {
   local results_dir="$1"
   local close_live_editors="$2"
-  local project_root="$3"
+  local batch_fallback_mode="$3"
+  local project_root="$4"
   local project_name
   project_name="$(basename "$project_root")"
   local worker_prefix="$results_dir/$project_name"
@@ -124,16 +128,20 @@ run_worker() {
   local batch_rc=0
 
   if [[ "$close_live_editors" == "true" ]]; then
-    if ! "$WRAPPER_PATH" recover-editor-session --project-root "$project_root" >"$recover_output_file" 2>&1; then
+    if "$WRAPPER_PATH" recover-editor-session --project-root "$project_root" >"$recover_output_file" 2>&1; then
+      :
+    else
       recover_rc=$?
     fi
   fi
 
-  if ! "$WRAPPER_PATH" batch-build-config-compile-matrix --project-root "$project_root" >"$stdout_file" 2>"$stderr_file"; then
+  if "$WRAPPER_PATH" batch-build-config-compile-matrix --project-root "$project_root" --batch-fallback-mode "$batch_fallback_mode" >"$stdout_file" 2>"$stderr_file"; then
+    :
+  else
     batch_rc=$?
   fi
 
-  python3 - "$project_name" "$project_root" "$stdout_file" "$stderr_file" "$status_file" "$recover_rc" "$batch_rc" <<'PY'
+  python3 - "$project_name" "$project_root" "$stdout_file" "$stderr_file" "$status_file" "$recover_rc" "$batch_rc" "$batch_fallback_mode" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -145,6 +153,7 @@ stderr_file = Path(sys.argv[4])
 status_file = Path(sys.argv[5])
 recover_rc = int(sys.argv[6])
 batch_rc = int(sys.argv[7])
+invoked_batch_fallback_mode = sys.argv[8]
 
 payload = {}
 parse_error = ""
@@ -179,6 +188,56 @@ if stderr_file.is_file():
     stderr_lines = stderr_file.read_text(encoding="utf-8", errors="replace").splitlines()
     stderr_tail = "\n".join(stderr_lines[-20:])
 
+def first_string(*values):
+    for value in values:
+        if value is None:
+            continue
+        text = str(value)
+        if text:
+            return text
+    return ""
+
+requested_execution_lane = first_string(
+    result_summary.get("requested_execution_lane") if isinstance(result_summary, dict) else "",
+    payload.get("requested_execution_lane") if isinstance(payload, dict) else "",
+    "batch",
+)
+effective_execution_lane = first_string(
+    result_summary.get("effective_execution_lane") if isinstance(result_summary, dict) else "",
+    payload.get("effective_execution_lane") if isinstance(payload, dict) else "",
+)
+batch_fallback_mode = first_string(
+    result_summary.get("batch_fallback_mode") if isinstance(result_summary, dict) else "",
+    payload.get("batch_fallback_mode") if isinstance(payload, dict) else "",
+    invoked_batch_fallback_mode,
+)
+lane_fallback_reason = first_string(
+    result_summary.get("lane_fallback_reason") if isinstance(result_summary, dict) else "",
+    payload.get("lane_fallback_reason") if isinstance(payload, dict) else "",
+)
+license_blocker_code = first_string(
+    result_summary.get("license_blocker_code") if isinstance(result_summary, dict) else "",
+    payload.get("license_blocker_code") if isinstance(payload, dict) else "",
+)
+unity_outcome = first_string(result_summary.get("unity_outcome") if isinstance(result_summary, dict) else "")
+transport_outcome = first_string(result_summary.get("transport_outcome") if isinstance(result_summary, dict) else "")
+matrix_status = first_string(matrix.get("status") if isinstance(matrix, dict) else "")
+gui_fallback_pass = (
+    bool(payload.get("succeeded")) if isinstance(payload, dict) else False
+) and unity_outcome == "passed" and transport_outcome == "gui_operation_completed" and effective_execution_lane == "gui"
+batch_matrix_pass = matrix_status == "passed" and effective_execution_lane in {"", "batch"}
+
+if recover_rc == 0 and batch_rc == 0 and bool(payload.get("succeeded")) and batch_matrix_pass and int(matrix.get("failed", 0)) == 0:
+    operator_verdict = "passed_via_batch"
+elif recover_rc == 0 and batch_rc == 0 and gui_fallback_pass:
+    operator_verdict = "passed_via_gui_fallback"
+elif unity_outcome in {"not_started", ""} and (batch_rc != 0 or transport_outcome.endswith("_blocked") or effective_execution_lane == "none"):
+    operator_verdict = "failed_before_unity"
+elif unity_outcome and unity_outcome != "passed":
+    operator_verdict = "failed_in_unity"
+else:
+    operator_verdict = "failed_wrapper_unity_unproven"
+
 status = {
     "project": project_name,
     "project_root": project_root,
@@ -187,10 +246,15 @@ status = {
     "json_parse_ok": bool(payload),
     "parse_error": parse_error,
     "succeeded": bool(payload.get("succeeded")) if isinstance(payload, dict) else False,
-    "unity_outcome": result_summary.get("unity_outcome", "") if isinstance(result_summary, dict) else "",
-    "transport_outcome": result_summary.get("transport_outcome", "") if isinstance(result_summary, dict) else "",
-    "effective_execution_lane": result_summary.get("effective_execution_lane", "") if isinstance(result_summary, dict) else "",
-    "matrix_status": matrix.get("status", "") if isinstance(matrix, dict) else "",
+    "requested_execution_lane": requested_execution_lane,
+    "effective_execution_lane": effective_execution_lane,
+    "batch_fallback_mode": batch_fallback_mode,
+    "lane_fallback_reason": lane_fallback_reason,
+    "license_blocker_code": license_blocker_code,
+    "operator_verdict": operator_verdict,
+    "unity_outcome": unity_outcome,
+    "transport_outcome": transport_outcome,
+    "matrix_status": matrix_status,
     "total": int(matrix.get("total", 0)) if isinstance(matrix, dict) else 0,
     "passed": int(matrix.get("passed", 0)) if isinstance(matrix, dict) else 0,
     "failed": int(matrix.get("failed", 0)) if isinstance(matrix, dict) else 0,
@@ -218,6 +282,7 @@ statuses = [json.loads(path.read_text(encoding="utf-8")) for path in status_file
 
 print("MULTI_PROJECT_BATCH_COMPILE_MATRIX_SUMMARY_BEGIN")
 overall_failed = 0
+verdict_counts = {}
 for item in statuses:
     gui_fallback_pass = (
         item.get("succeeded") is True
@@ -225,6 +290,19 @@ for item in statuses:
         and item.get("transport_outcome") == "gui_operation_completed"
         and item.get("effective_execution_lane") == "gui"
     )
+    operator_verdict = str(item.get("operator_verdict") or "")
+    if not operator_verdict:
+        if item.get("matrix_status") == "passed" and item.get("failed", 0) == 0:
+            operator_verdict = "passed_via_batch"
+        elif gui_fallback_pass:
+            operator_verdict = "passed_via_gui_fallback"
+        elif item.get("unity_outcome") in {"not_started", ""}:
+            operator_verdict = "failed_before_unity"
+        elif item.get("unity_outcome") and item.get("unity_outcome") != "passed":
+            operator_verdict = "failed_in_unity"
+        else:
+            operator_verdict = "failed_wrapper_unity_unproven"
+    verdict_counts[operator_verdict] = verdict_counts.get(operator_verdict, 0) + 1
     ok = (
         item.get("recover_rc", 0) == 0
         and item.get("batch_rc", 0) == 0
@@ -239,7 +317,12 @@ for item in statuses:
         f"recover_rc={item.get('recover_rc', 0)}",
         f"batch_rc={item.get('batch_rc', 0)}",
         f"succeeded={str(bool(item.get('succeeded'))).lower()}",
-        f"lane={item.get('effective_execution_lane', '')}",
+        f"verdict={operator_verdict}",
+        f"requested_lane={item.get('requested_execution_lane', '')}",
+        f"effective_lane={item.get('effective_execution_lane', '')}",
+        f"fallback_mode={item.get('batch_fallback_mode', '')}",
+        f"fallback_reason={item.get('lane_fallback_reason', '')}",
+        f"license_blocker={item.get('license_blocker_code', '')}",
         f"transport={item.get('transport_outcome', '')}",
         f"unity={item.get('unity_outcome', '')}",
         f"matrix_status={item.get('matrix_status', '')}",
@@ -247,6 +330,7 @@ for item in statuses:
         f"passed={item.get('passed', 0)}",
         f"failed={item.get('failed', 0)}",
         f"skipped={item.get('skipped', 0)}",
+        f"result_file={item.get('result_file', '')}",
     ]
     print("|".join(fields))
 print("MULTI_PROJECT_BATCH_COMPILE_MATRIX_SUMMARY_END")
@@ -254,6 +338,7 @@ print("MULTI_PROJECT_BATCH_COMPILE_MATRIX_SUMMARY_END")
 aggregate = {
     "projects_total": len(statuses),
     "projects_failed": overall_failed,
+    "operator_verdict_counts": verdict_counts,
     "results_dir": str(results_dir),
 }
 print(json.dumps(aggregate, indent=2))
@@ -263,7 +348,7 @@ PY
 }
 
 if [[ "${1:-}" == "__worker__" ]]; then
-  run_worker "$2" "$3" "$4"
+  run_worker "$2" "$3" "$4" "$5"
   exit 0
 fi
 
@@ -289,6 +374,10 @@ while [[ $# -gt 0 ]]; do
       CLOSE_LIVE_EDITORS="false"
       shift
       ;;
+    --batch-fallback-mode)
+      BATCH_FALLBACK_MODE="${2:-}"
+      shift 2
+      ;;
     --results-dir)
       RESULTS_DIR="$2"
       shift 2
@@ -313,6 +402,15 @@ if [[ ! "$PARALLELISM" =~ ^[0-9]+$ ]] || [[ "$PARALLELISM" -lt 1 ]]; then
   echo "parallelism must be a positive integer" >&2
   exit 1
 fi
+
+case "$BATCH_FALLBACK_MODE" in
+  auto|off|require-batch)
+    ;;
+  *)
+    echo "batch fallback mode must be one of: auto, off, require-batch" >&2
+    exit 1
+    ;;
+esac
 
 if [[ ! -x "$WRAPPER_PATH" ]]; then
   echo "Wrapper not found or not executable: $WRAPPER_PATH" >&2
@@ -350,9 +448,10 @@ fi
 printf 'discovered_projects=%s\n' "${#PROJECT_ROOTS[@]}"
 printf 'parallelism=%s\n' "$PARALLELISM"
 printf 'close_live_editors=%s\n' "$CLOSE_LIVE_EDITORS"
+printf 'batch_fallback_mode=%s\n' "$BATCH_FALLBACK_MODE"
 printf 'results_dir=%s\n' "$results_dir"
 
 printf '%s\0' "${PROJECT_ROOTS[@]}" | \
-  xargs -0 -n1 -P "$PARALLELISM" "$0" __worker__ "$results_dir" "$CLOSE_LIVE_EDITORS"
+  xargs -0 -n1 -P "$PARALLELISM" "$0" __worker__ "$results_dir" "$CLOSE_LIVE_EDITORS" "$BATCH_FALLBACK_MODE"
 
 emit_final_summary "$results_dir"

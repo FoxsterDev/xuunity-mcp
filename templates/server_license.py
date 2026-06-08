@@ -17,7 +17,7 @@ from server_editor_host import (
 from server_host_platform import current_host_platform_adapter
 
 
-LICENSE_CAPABILITIES_CACHE_SCHEMA = 1
+LICENSE_CAPABILITIES_CACHE_SCHEMA = 3
 LICENSE_PROBE_DEFAULT_TIMEOUT_MS = 30000
 BATCHMODE_SUPPORT_OVERRIDE_ENV = "XUUNITY_LIGHT_UNITY_MCP_BATCHMODE_SUPPORT_OVERRIDE"
 
@@ -58,6 +58,10 @@ def classify_license_log(text: str, exit_code: int | None = None, timed_out: boo
     for code, pattern in patterns:
         match = re.search(pattern, haystack, re.IGNORECASE)
         if match:
+            if code == "access_token_unavailable" and access_token_warning_recovered(haystack, exit_code, timed_out):
+                continue
+            if code == "licensing_client_ipc_failure" and licensing_ipc_warning_recovered(haystack, exit_code, timed_out):
+                continue
             return {
                 "batchmode_blocker_code": code,
                 "matched_pattern": pattern,
@@ -83,6 +87,29 @@ def classify_license_log(text: str, exit_code: int | None = None, timed_out: boo
         "matched_pattern": "",
         "matched_text": "",
     }
+
+
+def access_token_warning_recovered(text: str, exit_code: int | None, timed_out: bool) -> bool:
+    if timed_out or exit_code is None or int(exit_code) != 0:
+        return False
+    success_patterns = (
+        r"Successfully resolved entitlement details",
+        r"Successfully updated license",
+        r"\[Licensing::Module\] License group:",
+    )
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in success_patterns)
+
+
+def licensing_ipc_warning_recovered(text: str, exit_code: int | None, timed_out: bool) -> bool:
+    if timed_out or exit_code is None or int(exit_code) != 0:
+        return False
+    success_patterns = (
+        r"Successfully connected to LicensingClient",
+        r"Connected to LicensingClient",
+        r"Successfully connected to:\s+\"LicenseClient-",
+        r"Exiting batchmode successfully",
+    )
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in success_patterns)
 
 
 def _excerpt_around(text: str, start: int, end: int, limit: int = 360) -> str:

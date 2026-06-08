@@ -1,7 +1,7 @@
 # Build Automation Surface
 
 Date: `2026-05-26`
-Status: `current for v0.3.20-dev`
+Status: `current for v0.3.21-dev`
 
 This document defines the public-safe build automation surface for the
 standalone `xuunity-mcp` repository.
@@ -343,7 +343,8 @@ Notes:
   and then `verify-editor-closed --project-root <project> --timeout-ms 30000`
   before retrying
 - if batchmode is blocked by license/Hub/headless state, default
-  `--batch-fallback-mode auto` uses the GUI bridge equivalent when safe
+  `--batch-fallback-mode auto` uses the GUI bridge equivalent when safe; this is
+  a valid command-success path when Unity reports a passed outcome
 - use `--batch-fallback-mode require-batch` for CI lanes that must fail without
   proven batchmode support
 - host process visibility must be available; `process_visibility_restricted`

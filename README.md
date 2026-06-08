@@ -353,7 +353,7 @@ Rules:
   editing files.
 - Use the current host client that is running this request as the default MCP
   wiring target unless the user explicitly requests another client.
-- Prefer Git UPM release v0.3.20 unless the user explicitly requests local
+- Prefer Git UPM release v0.3.21 unless the user explicitly requests local
   package development.
 - Reuse an existing installed host helper if one is already present locally.
   Clone the repo only when the helper is missing or local MCP development is
@@ -436,7 +436,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.20
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.21
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -444,7 +444,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.20"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.21"
   }
 }
 ```
@@ -688,8 +688,12 @@ Troubleshooting:
 - Batchmode unavailable: run
   `license-capabilities --project-root <project> --refresh --timeout-ms 30000`.
   Batch helpers default to `--batch-fallback-mode auto`: if batchmode is blocked
-  by a known license/Hub/headless condition and GUI fallback is viable, the MCP
-  runs the equivalent GUI lane and reports `effective_execution_lane=gui`.
+  by a known license, Hub, account, Unity version, headless, or session condition
+  and GUI fallback is viable, the MCP runs the equivalent GUI lane, reports
+  `effective_execution_lane=gui`, and should be treated as successful command
+  completion when the Unity outcome passed. The `batch-*` name describes the
+  closed-project validation workflow, not a guarantee that the effective lane
+  stayed in Unity batchmode.
   Use `--batch-fallback-mode require-batch` when a CI or release lane must fail
   unless real Unity batchmode is proven.
 - Long operation timed out: recover with `request-final-status`.

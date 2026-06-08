@@ -202,7 +202,7 @@ XUUnity translation:
 - Replace some current long-form hero density with a faster decision surface:
   "What it is", "Who it is for", "Proof path", "Install", "Compare".
 - Add an "At a glance" panel near the first viewport:
-  `stdio`, `local-first`, `MIT`, `Unity Editor`, `Git UPM`, `Codex/Cursor/Claude/Windsurf/Rider`, `v0.3.20`.
+  `stdio`, `local-first`, `MIT`, `Unity Editor`, `Git UPM`, `Codex/Cursor/Claude/Windsurf/Rider`, `v0.3.21`.
 - Add a "Proof before install" strip:
   `setup-plan`, `validate-setup`, `ensure-ready`, `compile matrix`, `EditMode`, `PlayMode`.
 - Make maintenance/freshness visible:

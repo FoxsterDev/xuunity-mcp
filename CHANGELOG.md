@@ -2,8 +2,26 @@
 
 ## Unreleased
 
+## 0.3.21
+
+Release tag: `v0.3.21`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.21
+```
+
 ### Changed
 
+- Fixed license capability classification so recovered Unity licensing startup
+  warnings, such as transient access-token or IPC-channel messages followed by
+  successful entitlement resolution and a clean batchmode exit, no longer force
+  GUI fallback.
+- Added explicit portfolio batch fallback-mode forwarding and compact operator
+  verdicts so multi-project compile summaries distinguish `passed_via_batch`
+  from `passed_via_gui_fallback`.
+- Released `v0.3.21` package metadata, server metadata, package manifests, and Git UPM examples.
 - Tightened the MCP release gate so `sync_release_version.py` and
   `check_release_version_consistency.py` now treat the GitHub Pages site and
   listing metadata as release-bound surfaces that must be updated before
