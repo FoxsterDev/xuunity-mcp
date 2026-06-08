@@ -86,11 +86,15 @@
         <main class="main">
           <section id="one-prompt" class="hero home-hero hero-product" aria-labelledby="hero-title">
             <div class="hero-copy">
-              <span class="eyebrow">Editor-only bridge</span>
               <h1 id="hero-title">XUUnity Light</h1>
               <p class="lede">
                 LLM-ready Unity MCP for AI agents.
               </p>
+              <ul class="hero-facts" aria-label="XUUnity MCP highlights">
+                <li>One prompt setup</li>
+                <li>Free Unity workflows</li>
+                <li>No runtime footprint</li>
+              </ul>
             </div>
             <aside class="hero-visual" aria-label="XUUnity MCP workflow preview">
               <img src="assets/xuunity-mcp-hero-preview.png" alt="Unity Editor and MCP workflow preview for XUUnity MCP">
@@ -134,33 +138,54 @@
               <div class="benefit-row">
                 <span class="benefit-meta">02</span>
                 <div>
-                  <h3>Works with free Unity project workflows</h3>
-                  <p>XUUnity MCP does not require a paid Unity subscription from the tool itself. It works with local Unity 2021.3+ editor projects, including Unity Personal/free project workflows.</p>
-                </div>
-              </div>
-              <div class="benefit-row">
-                <span class="benefit-meta">03</span>
-                <div>
                   <h3>Better fit for validation than broad mutation</h3>
                   <p>Some Unity MCPs optimize for a huge tool surface. XUUnity MCP optimizes for compile checks, tests, scene proof, console evidence, and a smaller editor automation boundary.</p>
                 </div>
               </div>
               <div class="benefit-row">
+                <span class="benefit-meta">03</span>
+                <div>
+                  <h3>Works with free Unity project workflows</h3>
+                  <p>XUUnity MCP does not require a paid Unity subscription from the tool itself. It works with local Unity 2021.3+ editor projects, including Unity Personal/free project workflows.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
                 <span class="benefit-meta">04</span>
+                <div>
+                  <h3>Multi-project parallel routing</h3>
+                  <p>One local MCP server can route same-host work across multiple Unity projects. Per-project locks keep one project safe while other project streams can continue.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">05</span>
+                <div>
+                  <h3>Mixed repo and SDK workspace aware</h3>
+                  <p>Workspace planning can scan flat hubs, nested repos, SDK repos, and mixed Unity versions, then compute setup actions per selected project.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">06</span>
+                <div>
+                  <h3>Compile matrix without target switching</h3>
+                  <p>Validate build targets, options, defines, and build configs without switching the active Unity build target as the default check path.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">07</span>
                 <div>
                   <h3>No player-build footprint by default</h3>
                   <p>The Unity package is editor-only and disabled by default. It is meant to help the Editor workflow, not ship runtime MCP code into the game.</p>
                 </div>
               </div>
               <div class="benefit-row">
-                <span class="benefit-meta">05</span>
+                <span class="benefit-meta">08</span>
                 <div>
                   <h3>Install and remove cleanly</h3>
                   <p>Setup and uninstall both have plan/apply flows. Project-only cleanup removes the approved project state without surprise deletes elsewhere.</p>
                 </div>
               </div>
               <div class="benefit-row">
-                <span class="benefit-meta">06</span>
+                <span class="benefit-meta">09</span>
                 <div>
                   <h3>Agent support without client lock-in</h3>
                   <p>Use Codex-style agents, Cursor, Claude Code, Claude Desktop, Windsurf, Rider, or custom MCP clients through the same local stdio model.</p>

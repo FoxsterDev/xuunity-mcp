@@ -196,7 +196,7 @@ pre {
 .footer-card,
 .callout,
 .dark-section {
-  padding: 24px;
+  padding: 22px;
 }
 
 .hero {
@@ -206,15 +206,16 @@ pre {
 
 .hero.home-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.46fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.38fr);
+  gap: 16px;
   min-height: 0;
   align-items: center;
 }
 
 .home-hero h1 {
-  font-size: clamp(2.8rem, 5vw, 4.2rem);
-  line-height: 0.96;
+  margin-bottom: 10px;
+  font-size: clamp(2.75rem, 5vw, 4rem);
+  line-height: 0.94;
   overflow-wrap: break-word;
 }
 
@@ -225,12 +226,13 @@ pre {
 .hero-copy {
   display: grid;
   align-content: start;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
 }
 
 .hero-visual {
-  min-height: 270px;
+  min-height: 210px;
+  max-height: 240px;
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -243,6 +245,32 @@ pre {
   object-fit: cover;
   object-position: center;
   transform: scale(1.02);
+}
+
+.hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 750;
+  list-style: none;
+}
+
+.hero-facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.hero-facts li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--green);
 }
 
 .section,
@@ -660,17 +688,23 @@ h3 {
   gap: 10px;
 }
 
+.benefit-stack {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .flow-row,
 .benefit-row {
   display: grid;
+  gap: 12px;
+}
+
+.flow-row {
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 14px;
   padding: 14px 0;
   border-top: 1px solid var(--line);
 }
 
-.flow-row:first-child,
-.benefit-row:first-child {
+.flow-row:first-child {
   border-top: 0;
 }
 
@@ -683,6 +717,15 @@ h3 {
 .flow-row span,
 .benefit-row p {
   color: var(--muted);
+}
+
+.benefit-row {
+  align-content: start;
+  min-height: 210px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
 }
 
 .flow-num,
@@ -700,8 +743,9 @@ h3 {
 }
 
 .benefit-row p {
-  max-width: 78ch;
   margin-bottom: 0;
+  font-size: 0.9rem;
+  line-height: 1.48;
 }
 
 .foldout {
@@ -1227,6 +1271,7 @@ tr:last-child td {
   .signal-grid,
   .tool-grid,
   .listing-grid,
+  .benefit-stack,
   .prompt-outcomes,
   .card-grid,
   .three-col,
@@ -1273,6 +1318,7 @@ tr:last-child td {
   .signal-grid,
   .tool-grid,
   .listing-grid,
+  .benefit-stack,
   .prompt-outcomes,
   .card-grid,
   .three-col,
