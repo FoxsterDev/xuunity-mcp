@@ -65,6 +65,8 @@ Important:
 - [x] `docs/sitemap.xml` created
 - [x] `docs/.nojekyll` created
 - [x] GitHub Actions Pages workflow added at `.github/workflows/pages.yml`
+- [x] Public GitHub Pages site verified live with
+  `python3 scripts/testing/check_public_site.py`
 
 ### Proof assets and conversion assets
 
@@ -86,6 +88,8 @@ Important:
   `docs/reference/LISTING_KIT.md`
 - [x] listing target tracker created:
   `docs/reference/LISTING_SUBMISSION_TARGETS.md`
+- [x] MCP directory UX research reference created:
+  `docs/reference/MCP_DIRECTORY_UX_REFERENCES.md`
 - [x] manual publishing checklist created:
   `docs/operations/PUBLISHING_CHECKLIST.md`
 - [x] discovery publishing runbook created:
@@ -102,7 +106,7 @@ Important:
 ### GitHub UI / publishing setup
 
 - [x] Add repository workflow for GitHub Pages publishing from `docs/`
-- [ ] Enable or verify GitHub Pages publishing for the site in GitHub settings
+- [x] Enable or verify GitHub Pages publishing for the site in GitHub settings
 - [ ] Update GitHub repo `About` text manually in the GitHub UI
 - [ ] Update GitHub repo homepage manually in the GitHub UI
 - [ ] Add GitHub topic `xuunity` manually if it is still missing
@@ -119,10 +123,19 @@ Important:
 
 - [ ] Publish/update GitHub MCP Registry listing
 - [ ] Publish/update official MCP Registry listing
-- [ ] Publish/update MCP Scout listing
+- [ ] Publish/update MCP.Directory listing
+- [ ] Publish/update Glama listing
+- [ ] Publish/update PulseMCP listing
+- [ ] Verify/claim MCPScout.ai listing if an indexable `xuunity-mcp` permalink can be created
+- [ ] Verify/claim Vibehackers MCP Directory listing if an indexable `xuunity-mcp` permalink can be created
+- [ ] Verify/claim A2A MCP listing if an indexable `xuunity-mcp` permalink can be created
+- [ ] Verify/claim `mcpdir.dev` / MCP Hub listing if an indexable `xuunity-mcp` permalink can be created
+- [ ] Verify/claim Machina Directory listing if an indexable `xuunity-mcp` permalink can be created
 - [ ] Publish/update MCP Market listing
+- [ ] Publish/update `mcp.so` listing
 - [ ] Publish/update `mcpservers.org` listing
-- [ ] Publish/update other relevant MCP directory pages
+- [ ] Publish/update MCPlane listing only if submission is quick and indexable
+- [ ] Publish/update other relevant MCP directory pages only when they already rank for `unity mcp` or import from canonical registries
 
 ### External authority signals
 
@@ -148,14 +161,19 @@ Important:
 
 ### Highest-impact next steps
 
-1. Publish the site publicly through GitHub Pages.
-2. Run `python3 scripts/testing/check_public_site.py` after the Pages workflow deploys.
-3. Update GitHub UI metadata:
+1. Update GitHub UI metadata:
    - About
    - Homepage
    - Topics
-4. Submit sitemap to Google and Bing.
-5. Push the first wave of directory/registry listings using `LISTING_KIT.md`.
+2. Submit sitemap to Google and Bing.
+3. Prepare the official MCP Registry `server.json` flow and validate it against
+   the official schema before publishing.
+4. Push the high-leverage directory/registry listings using
+   `LISTING_KIT.md`: official MCP Registry, GitHub MCP Registry,
+   MCP.Directory, Glama, PulseMCP, and current `unity mcp` SERP surfaces that
+   can expose indexable XUUnity MCP pages.
+5. Add accepted listing URLs back into `LISTING_SUBMISSION_TARGETS.md` and
+   `SERP_TRACKING.md`.
 
 ### Best next content moves
 
@@ -169,9 +187,9 @@ Important:
 
 - [ ] push/commit current repo changes
 - [x] add GitHub Pages workflow
-- [ ] enable GitHub Pages or set Pages source to GitHub Actions
-- [ ] verify public site loads
-- [ ] verify `robots.txt` and `sitemap.xml` are reachable
+- [x] enable GitHub Pages or set Pages source to GitHub Actions
+- [x] verify public site loads
+- [x] verify `robots.txt` and `sitemap.xml` are reachable
 
 ### Phase 2: connect search/discovery
 
@@ -201,9 +219,9 @@ Important:
 - Proof assets on the homepage: `mostly done`
 - Real video proof: `not done`
 - GitHub Pages workflow: `done`
-- GitHub UI publishing actions: `not done`
+- GitHub UI publishing actions: `partially done`
 - Search engine submission: `not done`
 - External listings and backlinks: `not done`
 
-Overall execution state: `about 70% of the repo/site work is done, but the
+Overall execution state: `about 75% of the repo/site work is done, but the
 highest-impact external distribution steps are still ahead`

@@ -82,16 +82,35 @@ Use [LISTING_KIT.md](../reference/LISTING_KIT.md) as the copy source and
 [LISTING_SUBMISSION_TARGETS.md](../reference/LISTING_SUBMISSION_TARGETS.md) as
 the status tracker.
 
-First-wave priority:
+High-leverage priority:
 
 - GitHub MCP Registry
 - Official MCP Registry
 - MCP.Directory
-- MCP Scout
+- Glama
+- PulseMCP
+- MCPScout.ai, only if an indexable listing or claim flow exists
+- Vibehackers MCP Directory, only if an indexable listing or claim flow exists
+- A2A MCP, only if an indexable listing or claim flow exists
+- mcpdir.dev / MCP Hub, only if an indexable listing or claim flow exists
+- Machina Directory, only if an indexable MCP listing or claim flow exists
+
+Opportunistic follow-up:
+
 - MCP Market
+- mcp.so
 - mcpservers.org
 - MCPlane
-- Model Context Protocol catalog pages
+- SafeMCP
+- MCP Toplist
+- Model Context Protocol catalog/downstream pages, derived from official Registry metadata
+
+Start with the official MCP Registry where possible. Some directory and ranking
+surfaces appear to import from the official registry or other major registries,
+so publishing the canonical metadata first can reduce duplicate manual work.
+Do not optimize for directory count. For the `unity mcp` search goal, prioritize
+surfaces with current query visibility, public permalinks, canonical metadata
+import, or credible downstream aggregator potential.
 
 ## 5. Publish The Content Cluster
 

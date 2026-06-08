@@ -85,15 +85,34 @@ python3 scripts/testing/check_public_site.py
 
 ## Listing / Registry Submission Bundle
 
-Use `../reference/LISTING_KIT.md` as the canonical copy source when submitting
-to:
+Use `../reference/LISTING_KIT.md` as the canonical copy source. Submit in
+high-leverage order, not by directory count.
+
+Priority submissions:
 
 - GitHub MCP Registry
 - official MCP Registry
-- MCP Scout
+- MCP.Directory
+- Glama
+- PulseMCP
+- MCPScout.ai, if an indexable listing or claim flow exists
+- Vibehackers MCP Directory, if an indexable listing or claim flow exists
+- A2A MCP, if an indexable listing or claim flow exists
+- `mcpdir.dev` / MCP Hub, if an indexable listing or claim flow exists
+- Machina Directory, if an indexable MCP listing or claim flow exists
+
+Opportunistic submissions:
+
 - MCP Market
+- `mcp.so`
 - `mcpservers.org`
-- Model Context Protocol catalog pages
+- MCPlane
+- SafeMCP
+- MCP Toplist
+- Model Context Protocol catalog/downstream pages, derived from official Registry metadata
+
+Skip or defer any directory that cannot expose a public permalink, cannot be
+claimed, or does not appear to rank or aggregate credible MCP metadata.
 
 Track submission status in `../reference/LISTING_SUBMISSION_TARGETS.md`.
 

@@ -61,6 +61,22 @@ bash init_xuunity_light_unity_mcp.sh
 - `editor`
 - `safe`
 
+## Directory-Friendly At-A-Glance Fields
+
+- Transport: `stdio`
+- Runtime posture: `local-first`
+- License: `MIT`
+- Source repo: <https://github.com/FoxsterDev/xuunity-mcp>
+- Public site: <https://foxsterdev.github.io/xuunity-mcp/>
+- Primary category: `Game Development`
+- Secondary categories: `Developer Tools`, `Testing`, `Automation`
+- Safety framing:
+  `setup-plan review before mutation, editor-only base package, and validation-first Unity workflows`
+- Compatibility framing:
+  `Codex, Cursor, Claude Code, Claude Desktop, Windsurf, Rider, and other MCP-compatible clients`
+- Proof framing:
+  `compile validation, EditMode tests, PlayMode tests, scene assertions, console inspection, screenshots, and setup validation`
+
 ## Proof Assets
 
 - Banner: `docs/assets/xuunity-mcp-preview.png`
@@ -78,3 +94,9 @@ bash init_xuunity_light_unity_mcp.sh
 
 Use [LISTING_SUBMISSION_TARGETS.md](LISTING_SUBMISSION_TARGETS.md) to track
 third-party listing status and live permalink URLs.
+
+## UX Reference
+
+Use [MCP_DIRECTORY_UX_REFERENCES.md](MCP_DIRECTORY_UX_REFERENCES.md) when
+updating site UX/UI or choosing which proof fields to emphasize in external MCP
+directory listings.

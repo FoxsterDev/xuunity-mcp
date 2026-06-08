@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>XUUnity MCP: Lightweight Unity MCP for Safe Unity Editor Automation</title>
-    <meta name="description" content="XUUnity MCP is a lightweight Unity MCP server for safe Unity Editor automation, compile validation, tests, scene assertions, and validation-heavy workflows.">
+    <title>XUUnity MCP: Set Up Unity MCP From One Prompt</title>
+    <meta name="description" content="XUUnity MCP is a lightweight Unity MCP server for safe Unity Editor automation. Set it up from one prompt, keep the package editor-only, and validate Unity with compile checks and tests.">
     <link rel="canonical" href="https://foxsterdev.github.io/xuunity-mcp/">
-    <meta property="og:title" content="XUUnity MCP: Lightweight Unity MCP for Safe Unity Editor Automation">
-    <meta property="og:description" content="Validation-first Unity MCP for compile checks, tests, scene assertions, screenshots, and safe editor automation.">
+    <meta property="og:title" content="XUUnity MCP: Set Up Unity MCP From One Prompt">
+    <meta property="og:description" content="Lightweight Unity MCP for one-prompt setup, editor-only automation, compile checks, tests, and safe validation.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://foxsterdev.github.io/xuunity-mcp/">
     <meta property="og:image" content="https://foxsterdev.github.io/xuunity-mcp/assets/xuunity-mcp-preview.png">
@@ -43,10 +43,10 @@
               },
               {
                 "@type": "Question",
-                "name": "What is a lightweight Unity MCP?",
+                "name": "What is the fastest way to try XUUnity MCP?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "A lightweight Unity MCP focuses on the editor-validation loop like compile checks, tests, scene assertions, and setup safety instead of maximizing broad runtime or mutation surface."
+                  "text": "Ask an agent to set up XUUnity MCP from the repository README into a Unity project, run EditMode tests there, and print the results. The workflow still follows setup-plan, approval, setup-apply, validate-setup, and ensure-ready."
                 }
               },
               {
@@ -64,527 +64,323 @@
     </script>
   </head>
   <body>
-    <div class="shell">
-      <div class="topbar">
-        <a class="brand" href="./">XUUnity MCP</a>
-        <nav class="nav">
-          <a href="install.html">Install</a>
-          <a href="comparison.html">Comparison</a>
-          <a href="use-cases.html">Use Cases</a>
-          <a href="alternatives.html">Alternatives</a>
+    <div class="page">
+      <header class="topbar">
+        <a class="brand-lockup" href="./">
+          <span class="brand-mark">XU</span>
+          <span class="brand-name">
+            <strong>XUUnity MCP</strong>
+            <span>Safe Unity Editor automation</span>
+          </span>
+        </a>
+        <nav class="nav" aria-label="Primary">
+          <a href="#one-prompt">One prompt</a>
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#proof">Validation</a>
           <a href="articles/">Articles</a>
-          <a href="clients/">Client Guides</a>
         </nav>
-      </div>
+      </header>
 
-      <section class="hero">
-        <div class="hero-grid">
-          <div>
-            <div class="eyebrow">Validation-first Unity MCP</div>
-            <h1>XUUnity MCP for safe Unity Editor automation</h1>
-            <p class="lede">
-              <strong>XUUnity MCP</strong>, full technical package name
-              <strong>XUUnity Light Unity MCP</strong>, is a lightweight Unity
-              MCP server for compile validation, tests, scene assertions,
-              screenshots, and safe setup flows.
-            </p>
-            <div class="button-row">
-              <a class="button" href="install.html">Install XUUnity MCP</a>
-              <a class="button secondary" href="https://github.com/FoxsterDev/xuunity-mcp">View GitHub repo</a>
+      <div class="layout">
+        <main class="main">
+          <section id="one-prompt" class="hero home-hero hero-product" aria-labelledby="hero-title">
+            <div class="hero-copy">
+              <span class="eyebrow">Editor-only bridge</span>
+              <h1 id="hero-title">XUUnity Light</h1>
+              <p class="lede">
+                LLM-ready Unity MCP for AI agents.
+              </p>
             </div>
-            <div class="tags" style="margin-top: 20px;">
-              <span class="tag">xuunity mcp</span>
-              <span class="tag">unity mcp</span>
-              <span class="tag">lightweight unity mcp</span>
-              <span class="tag">safe unity mcp</span>
-              <span class="tag">unity mcp testing</span>
-            </div>
-            <div class="hero-proof signal-grid">
-              <div class="signal-card">
-                <strong>141/141</strong>
-                <span>Host Python tests passed in the validated release environment</span>
-              </div>
-              <div class="signal-card">
-                <strong>6/6</strong>
-                <span>EditMode package self-tests passed on the validated matrix</span>
-              </div>
-              <div class="signal-card">
-                <strong>5/5</strong>
-                <span>PlayMode package self-tests passed on the validated matrix</span>
-              </div>
-              <div class="signal-card">
-                <strong>38/38</strong>
-                <span>Private multi-project compile lanes passed after the package-path update</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <img src="assets/xuunity-mcp-preview.png" alt="XUUnity MCP preview banner">
-            <div class="terminal-shell" style="margin-top: 16px;">
-              <div class="terminal-bar">
-                <span>Evaluation path</span>
-                <span>safe | local-first | validation-first</span>
-              </div>
-              <div class="terminal-body">
-                <pre><code>$ bash xuunity_light_unity_mcp.sh setup-plan \
-  --project-root /Games/SafeValidationProject
+            <aside class="hero-visual" aria-label="XUUnity MCP workflow preview">
+              <img src="assets/xuunity-mcp-hero-preview.png" alt="Unity Editor and MCP workflow preview for XUUnity MCP">
+            </aside>
+          </section>
 
-preflight: python=3.11.9 unity=2022.3.62f3
-plan: manifest merge + bridge enable + client wiring review
-approve -> setup-apply -> validate-setup -> ensure-ready
-first proof: unity_status_summary
-deep proof: unity_compile_matrix + editmode + playmode</code></pre>
-                <div class="terminal-meta">
-                  <span class="terminal-pill">No hidden mutation before review</span>
-                  <span class="terminal-pill">Exact first-command path</span>
-                  <span class="terminal-pill">Engineer-readable proof loop</span>
+          <section class="panel section prompt-band" aria-labelledby="prompt-title">
+            <div class="prompt-band-head">
+              <h2 id="prompt-title">Set up Unity MCP from one prompt</h2>
+            </div>
+            <div class="prompt-copy-card">
+              <p id="one-prompt-copy" class="prompt-text">
+                Set up XUUnity MCP from
+                <a href="https://github.com/FoxsterDev/xuunity-mcp/blob/master/README.md">the repository README</a>
+                into <code>/path/to/UnityProject</code>, run EditMode tests
+                there, and print the results here.
+              </p>
+            </div>
+            <div class="prompt-action">
+              <button class="button copy-button" type="button" data-copy-target="one-prompt-copy">Copy prompt</button>
+              <p class="tiny-note">Copies with the README URL included.</p>
+            </div>
+          </section>
+
+          <section id="features" class="panel section" aria-labelledby="features-title">
+            <div class="section-head">
+              <div>
+                <span class="status green">Main features</span>
+                <h2 id="features-title">The useful parts, without the noise.</h2>
+                <p>Built for Unity developers who want an agent to help, but still want setup control, editor safety, and evidence.</p>
+              </div>
+            </div>
+            <div class="benefit-stack">
+              <div class="benefit-row">
+                <span class="benefit-meta">01</span>
+                <div>
+                  <h3>Faster first try</h3>
+                  <p>Paste the prompt once. The agent uses the repository README, picks the right client guide, makes a setup plan, applies after approval, and can run the first EditMode test pass.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">02</span>
+                <div>
+                  <h3>Works with free Unity project workflows</h3>
+                  <p>XUUnity MCP does not require a paid Unity subscription from the tool itself. It works with local Unity 2021.3+ editor projects, including Unity Personal/free project workflows.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">03</span>
+                <div>
+                  <h3>Better fit for validation than broad mutation</h3>
+                  <p>Some Unity MCPs optimize for a huge tool surface. XUUnity MCP optimizes for compile checks, tests, scene proof, console evidence, and a smaller editor automation boundary.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">04</span>
+                <div>
+                  <h3>No player-build footprint by default</h3>
+                  <p>The Unity package is editor-only and disabled by default. It is meant to help the Editor workflow, not ship runtime MCP code into the game.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">05</span>
+                <div>
+                  <h3>Install and remove cleanly</h3>
+                  <p>Setup and uninstall both have plan/apply flows. Project-only cleanup removes the approved project state without surprise deletes elsewhere.</p>
+                </div>
+              </div>
+              <div class="benefit-row">
+                <span class="benefit-meta">06</span>
+                <div>
+                  <h3>Agent support without client lock-in</h3>
+                  <p>Use Codex-style agents, Cursor, Claude Code, Claude Desktop, Windsurf, Rider, or custom MCP clients through the same local stdio model.</p>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      <section class="section">
-        <h2>What is XUUnity MCP?</h2>
-        <p>
-          The <strong>xuunity mcp</strong> project is FoxsterDev's
-          validation-first Unity MCP. It is built for teams that want AI-driven
-          Unity workflows without widening the default runtime footprint or
-          skipping setup review. The public brand is <strong>XUUnity MCP</strong>;
-          the package and repository name remain
-          <strong>XUUnity Light Unity MCP</strong>.
-        </p>
-        <div class="stats" style="margin-top: 18px;">
-          <div class="stat"><strong>Positioning</strong>Safe Unity MCP</div>
-          <div class="stat"><strong>Fit</strong>Compile, test, and scene validation</div>
-          <div class="stat"><strong>Base package</strong>Editor-only by default</div>
-          <div class="stat"><strong>Clients</strong>Cursor, Codex, Claude, Windsurf, Rider</div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Decision frame</div>
-            <h2>Choose it fast</h2>
-          </div>
-          <p>A product owner or lead engineer should be able to decide in under a minute whether this is the right Unity MCP for the team.</p>
-        </div>
-        <div class="decision-grid">
-          <div class="decision-card good">
-            <h3>Choose XUUnity MCP when</h3>
-            <ul>
-              <li>You want proof-oriented Unity automation, not just “AI can click around the editor”.</li>
-              <li>Your team cares about compile checks, tests, scene assertions, and safe rollout steps.</li>
-              <li>You need a smaller default blast radius for production-facing Unity repositories.</li>
-              <li>You want AI install flows that respect preflight review and explicit approval.</li>
-            </ul>
-          </div>
-          <div class="decision-card warn">
-            <h3>Do not choose it as the default when</h3>
-            <ul>
-              <li>You mainly want the broadest possible mutation surface or runtime-heavy automation.</li>
-              <li>You need a vendor-managed official Unity AI path as the primary decision driver.</li>
-              <li>Your evaluation rubric is “largest tool count wins” rather than validation quality.</li>
-              <li>You are optimizing for generic demo flash over repeatable engineering closeout.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Why teams pick this Unity MCP</h2>
-        <div class="card-grid">
-          <div class="feature good premium">
-            <h3>Safe setup flow</h3>
-            <p>Agent-driven install stays gated by <code>setup-plan</code>, review, and explicit approval before mutation.</p>
-          </div>
-          <div class="feature good premium">
-            <h3>Validation-heavy surface</h3>
-            <p>Compile checks, EditMode tests, PlayMode tests, console tail, scene assertions, and screenshots are first-class.</p>
-          </div>
-          <div class="feature good premium">
-            <h3>Editor-only footprint</h3>
-            <p>The base package stays focused on the Unity Editor workflow and avoids normal player-build footprint by default.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Proof assets</div>
-            <h2>Benchmark-like validation snapshot</h2>
-          </div>
-          <p>These are not vendor-neutral macro benchmarks. They are release-facing engineering signals pulled from the repository validation evidence and comparison notes.</p>
-        </div>
-        <div class="table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>Lane</th>
-                <th>Evidence</th>
-                <th>Latest public signal</th>
-                <th>Why it matters</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Host test reliability</td>
-                <td><code>scripts/testing/run_host_python_tests.sh</code></td>
-                <td><strong>141/141 passed</strong></td>
-                <td>Shows the host-side install, config, parsing, and wrapper logic is covered before user workflows touch Unity.</td>
-              </tr>
-              <tr>
-                <td>EditMode validation</td>
-                <td>Package self-tests on validated editors</td>
-                <td><strong>6/6 passed</strong></td>
-                <td>Good fit for AI agents that must prove editor-side correctness after setup or refactors.</td>
-              </tr>
-              <tr>
-                <td>PlayMode validation</td>
-                <td>Package self-tests on validated editors</td>
-                <td><strong>5/5 passed</strong></td>
-                <td>Confirms the validation-first story is not limited to static checks or compile-only flows.</td>
-              </tr>
-              <tr>
-                <td>Multi-project compile matrix</td>
-                <td>Private consumer validation</td>
-                <td><strong>9/9 projects, 38/38 lanes</strong></td>
-                <td>Important for studios that manage mixed Unity lines or multiple game repos on the same workstation.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="table-note">For detailed caveats and source framing, see the repo comparison and status documents.</p>
-        <div class="button-row">
-          <a class="button secondary" href="comparison.html">Open condensed comparison</a>
-          <a class="button ghost" href="https://github.com/FoxsterDev/xuunity-mcp/blob/master/docs/reference/STATUS.md">Open full status evidence</a>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Operator experience</div>
-            <h2>What engineers actually feel while evaluating it</h2>
-          </div>
-          <p>The product story gets stronger when the site shows not only features, but the operational texture of the workflow.</p>
-        </div>
-        <div class="ops-grid">
-          <div class="terminal-shell">
-            <div class="terminal-bar">
-              <span>Proof-first command loop</span>
-              <span>bash / stdio / Unity Editor</span>
-            </div>
-            <div class="terminal-body">
-              <pre><code>$ bash xuunity_light_unity_mcp.sh validate-setup \
-  --project-root /Games/SafeValidationProject
-
-status: healthy
-tests: optional capability
-next: ensure-ready --open-editor
-
-$ unity_status_summary
-bridge: ready
-project: connected
-
-$ unity_compile_matrix
-lanes_passed: 38/38</code></pre>
-            </div>
-          </div>
-          <div class="ops-card">
-            <h3>Why this matters to a product owner</h3>
-            <ul>
-              <li>The path from “install” to “first trustworthy proof” is explicit.</li>
-              <li>The page now reads like a product with operator discipline, not a bag of technical features.</li>
-              <li>Evidence is tied to decisions: readiness, compile truth, test truth, and visual proof.</li>
-              <li>That reduces evaluation anxiety for teams considering this against larger Unity MCP options.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2>Architecture at a glance</h2>
-        <div class="two-col">
-          <div>
-            <img src="assets/xuunity-mcp-architecture.svg" alt="Architecture diagram for XUUnity MCP">
-          </div>
-          <div>
-            <p>
-              XUUnity MCP sits between AI clients and an editor-only Unity
-              package. The workflow is deliberately staged: preflight review,
-              safe setup, readiness checks, then validation commands like
-              status, compile, tests, and scenario operations.
-            </p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Layer</th>
-                  <th>Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>AI client</td>
-                  <td>Cursor, Codex, Claude Code, Claude Desktop, Rider, Windsurf</td>
-                </tr>
-                <tr>
-                  <td>Host MCP server</td>
-                  <td>stdio server plus setup, validate, ensure-ready, and recovery helpers</td>
-                </tr>
-                <tr>
-                  <td>Unity package</td>
-                  <td>Editor-only bridge for validation-first Unity workflows</td>
-                </tr>
-              </tbody>
-            </table>
-            <div class="chip-row" style="margin-top: 16px;">
-              <span class="chip good">Safe setup-plan review</span>
-              <span class="chip good">Editor-only base package</span>
-              <span class="chip">Recovery-aware host helper</span>
-              <span class="chip">Capability-gated reflection</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Compatibility surface</div>
-            <h2>Supported clients and Unity versions</h2>
-          </div>
-          <p>The site now exposes the two tables engineers usually need first: who can connect, and which Unity lines already have release-facing evidence behind them.</p>
-        </div>
-        <div class="two-col">
-          <div class="table-shell">
-            <table>
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Primary setup surface</th>
-                  <th>Guide</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>Codex / Codex-style</td><td><code>~/.codex/config.toml</code></td><td><a href="clients/">Client guides</a></td></tr>
-                <tr><td>Cursor</td><td><code>.cursor/mcp.json</code> or <code>~/.cursor/mcp.json</code></td><td><a href="clients/">Client guides</a></td></tr>
-                <tr><td>Claude Code</td><td>Client-specific MCP config + helper install</td><td><a href="clients/">Client guides</a></td></tr>
-                <tr><td>Claude Desktop</td><td>Desktop stdio config + helper install</td><td><a href="clients/">Client guides</a></td></tr>
-                <tr><td>Windsurf</td><td>Project MCP config + helper install</td><td><a href="clients/">Client guides</a></td></tr>
-                <tr><td>Rider</td><td>IDE MCP config + helper install</td><td><a href="clients/">Client guides</a></td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="table-shell">
-            <table>
-              <thead>
-                <tr>
-                  <th>Unity line</th>
-                  <th>Status</th>
-                  <th>Evidence shape</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>Unity 2021.3 LTS</td><td>Validated release path</td><td>EditMode/PlayMode package self-tests and Git UPM smoke evidence</td></tr>
-                <tr><td>Unity 2022.3 LTS</td><td>Validated release path</td><td>Installed-editor self-tests on current source line</td></tr>
-                <tr><td>Unity 6000.x</td><td>Validated release path</td><td>Installed-editor self-tests plus current reflection-aware workflow coverage</td></tr>
-                <tr><td>Optional Test Framework</td><td>Capability-gated</td><td>Not a hard dependency; install or upgrade only after explicit review</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Feature matrix</div>
-            <h2>Where XUUnity MCP sits against other Unity MCP tools</h2>
-          </div>
-          <p>This is the short site version of the deeper comparison. It is meant to help engineers route themselves quickly by workflow, not to overclaim unknowns.</p>
-        </div>
-        <div class="table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>Capability / positioning</th>
-                <th>XUUnity MCP</th>
-                <th>Official Unity MCP</th>
-                <th>Broader community Unity MCPs</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Safe preflight before mutation</td>
-                <td><strong>Core</strong> via <code>setup-plan</code> and explicit review</td>
-                <td>Public-source unknown at this repo-level granularity</td>
-                <td>Varies by project</td>
-              </tr>
-              <tr>
-                <td>Compile validation without active platform switch</td>
-                <td><strong>Core</strong></td>
-                <td>Public-source unknown</td>
-                <td>Often undocumented in public summaries</td>
-              </tr>
-              <tr>
-                <td>EditMode and PlayMode validation</td>
-                <td><strong>Core</strong></td>
-                <td>Public-source unknown</td>
-                <td>Available in some broader tools</td>
-              </tr>
-              <tr>
-                <td>Editor-only / low-footprint default</td>
-                <td><strong>Core</strong></td>
-                <td>Public-source unknown</td>
-                <td>Usually not the headline positioning</td>
-              </tr>
-              <tr>
-                <td>Broad mutation surface</td>
-                <td>Not the base goal</td>
-                <td>Broader official/editor bridge positioning</td>
-                <td><strong>Often strongest fit</strong></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="table-note">Want the full per-solution breakdown? The long-form comparison keeps the evidence model and caveats explicit.</p>
-      </section>
-
-      <section class="dark-section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Demo walkthrough</div>
-            <h2>Short demo video transcript and indexable summary</h2>
-          </div>
-          <p>This section is structured so search engines and human evaluators can both understand the workflow. It uses a video-ready storyboard poster plus a crawlable transcript summary.</p>
-        </div>
-        <div class="transcript-grid">
-          <div class="video-stage">
-            <div class="video-topbar">
-              <span class="video-dot"></span>
-              <span class="video-dot"></span>
-              <span class="video-dot"></span>
-            </div>
-            <div class="video-body">
-              <img src="assets/xuunity-demo-storyboard.svg" alt="Storyboard poster for the XUUnity MCP demo walkthrough">
-              <div class="video-caption">
-                <span>Short demo: preflight review, safe apply, readiness, compile matrix, test proof</span>
-                <span>Video-ready module for future mp4/webm drop-in</span>
+          <section id="how-it-works" class="panel section" aria-labelledby="how-title">
+            <span class="status blue">How it works</span>
+            <div class="architecture">
+              <div>
+                <h2 id="how-title">Small local bridge, clear setup plan, Unity evidence.</h2>
+                <p class="lede">
+                  The agent follows the README instead of guessing. It creates a
+                  non-mutating setup plan, waits for approval, wires the MCP
+                  client, enables the Unity Editor bridge, then runs validation
+                  tools only against the selected Unity project.
+                </p>
+              </div>
+              <div class="architecture-visual">
+                <img src="assets/xuunity-mcp-architecture.svg" alt="XUUnity MCP architecture diagram">
               </div>
             </div>
-          </div>
-          <div class="transcript-card">
-            <h3>Transcript summary</h3>
-            <ol>
-              <li>The workflow starts with <code>setup-plan</code> so the user can inspect project and user-level config changes before any mutation.</li>
-              <li>After explicit approval, <code>setup-apply</code> wires the selected Unity project and client without broad unrelated changes.</li>
-              <li><code>validate-setup</code> and <code>ensure-ready</code> confirm the bridge is healthy before the first live MCP status check.</li>
-              <li>The demo then runs a compile matrix and test lanes to produce hard validation evidence instead of only showing UI mutation.</li>
-              <li>The closeout reports health, compile, and test outcomes in a form that fits engineering review and CI-adjacent workflows.</li>
-            </ol>
-            <div class="chip-row" style="margin-top: 16px;">
-              <span class="chip good">Search-indexable summary</span>
-              <span class="chip">Engineer-friendly flow</span>
-              <span class="chip warn">Replace poster with real video asset when available</span>
+          </section>
+
+          <section id="proof" class="panel section" aria-labelledby="proof-title">
+            <details class="foldout">
+              <summary>
+                <span>
+                  <strong id="proof-title">Validation details</strong>
+                  <span>Compile checks, tests, scene assertions, screenshots, and setup recovery.</span>
+                </span>
+              </summary>
+              <div class="foldout-body">
+                <p>
+                  Keep this below the fold: it matters after the reader already
+                  understands the one-prompt setup value.
+                </p>
+                <div class="flow-stack">
+                  <div class="flow-row">
+                    <span class="flow-num">A</span>
+                    <div><strong>Setup proof</strong><span><code>setup-plan</code>, approval, <code>setup-apply</code>, <code>validate-setup</code>, and <code>ensure-ready</code>.</span></div>
+                  </div>
+                  <div class="flow-row">
+                    <span class="flow-num">B</span>
+                    <div><strong>Unity proof</strong><span>Status summary, console tail, compile validation, EditMode tests, PlayMode tests, scene assertions, and Game View screenshots.</span></div>
+                  </div>
+                  <div class="flow-row">
+                    <span class="flow-num">C</span>
+                    <div><strong>Closeout proof</strong><span>The agent reports files changed, commands run, readiness, test result, and whether a client refresh is still needed.</span></div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </section>
+
+          <section class="panel section" aria-labelledby="agent-details-title">
+            <details class="foldout">
+              <summary>
+                <span>
+                  <strong id="agent-details-title">Exact install commands for agents</strong>
+                  <span>For agents that need the manual fallback after reading the README.</span>
+                </span>
+              </summary>
+              <div class="foldout-body">
+                <div class="install-grid">
+                  <div class="code-panel">
+                    <div class="code-top">
+                      <span>Git UPM package</span>
+                      <span>current release</span>
+                    </div>
+                    <pre><code>https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.20</code></pre>
+                  </div>
+                  <div class="code-panel">
+                    <div class="code-top">
+                      <span>First setup plan</span>
+                      <span>non-mutating</span>
+                    </div>
+                    <pre><code>bash init_xuunity_light_unity_mcp.sh
+bash xuunity_light_unity_mcp.sh setup-plan \
+  --project-root /path/to/UnityProject</code></pre>
+                  </div>
+                </div>
+                <p><a href="install.html">Open the full install guide</a> or <a href="clients/">browse client setup guides</a>.</p>
+              </div>
+            </details>
+          </section>
+
+          <section class="panel section" aria-labelledby="decision-title">
+            <details class="foldout">
+              <summary>
+                <span>
+                  <strong id="decision-title">Decision frame</strong>
+                  <span>When XUUnity MCP is the right Unity MCP choice.</span>
+                </span>
+              </summary>
+              <div class="foldout-body">
+                <div class="decision-grid">
+                  <div class="mini-card">
+                    <h3>Choose XUUnity MCP when</h3>
+                    <ul class="list-clean">
+                      <li><span class="dot"></span><span>You want validation-heavy Unity automation.</span></li>
+                      <li><span class="dot"></span><span>You need compile checks and tests as first-class proof.</span></li>
+                      <li><span class="dot"></span><span>You prefer reviewed setup mutation over hidden install churn.</span></li>
+                      <li><span class="dot"></span><span>You want a local-first stdio workflow for common AI clients.</span></li>
+                    </ul>
+                  </div>
+                  <div class="mini-card">
+                    <h3>Choose a broader tool when</h3>
+                    <ul class="list-clean">
+                      <li><span class="dot warn"></span><span>You want the largest possible mutation surface.</span></li>
+                      <li><span class="dot warn"></span><span>You need runtime/player automation as the main goal.</span></li>
+                      <li><span class="dot warn"></span><span>You only want an official vendor-managed Unity path.</span></li>
+                      <li><span class="dot warn"></span><span>You judge MCPs by raw tool count rather than validation quality.</span></li>
+                    </ul>
+                  </div>
+                </div>
+                <p><a href="comparison.html">Read the full comparison</a>.</p>
+              </div>
+            </details>
+          </section>
+
+          <section class="panel section" aria-labelledby="articles-title">
+            <div class="section-head">
+              <div>
+                <h2 id="articles-title">Articles</h2>
+                <p>Launch, comparison, and workflow pages for people researching Unity MCP options.</p>
+              </div>
             </div>
+            <div class="card-grid">
+              <div class="card">
+                <h3>Introducing XUUnity MCP</h3>
+                <p>Launch positioning for the safe, lightweight, validation-first Unity MCP story.</p>
+                <p><a href="articles/introducing-xuunity-mcp.html">Read article</a></p>
+              </div>
+              <div class="card">
+                <h3>XUUnity MCP vs Unity MCP</h3>
+                <p>Workflow comparison for broader and validation-first Unity MCP tools.</p>
+                <p><a href="articles/xuunity-mcp-vs-unity-mcp.html">Read article</a></p>
+              </div>
+              <div class="card">
+                <h3>Compile checks and tests through MCP</h3>
+                <p>A practical proof loop for setup, readiness, compile validation, and tests.</p>
+                <p><a href="articles/run-unity-compile-checks-and-tests-through-mcp.html">Read article</a></p>
+              </div>
+            </div>
+          </section>
+
+          <section class="faq">
+            <details class="foldout">
+              <summary>
+                <span>
+                  <strong>FAQ</strong>
+                  <span>Optional details for readers who need exact wording.</span>
+                </span>
+              </summary>
+              <div class="foldout-body">
+                <div class="faq-item">
+                  <h3>Is XUUnity MCP the same thing as XUUnity Light Unity MCP?</h3>
+                  <p>Yes. XUUnity MCP is the short public product name. XUUnity Light Unity MCP is the full technical package and repository name.</p>
+                </div>
+                <div class="faq-item">
+                  <h3>Does one-prompt setup skip approval?</h3>
+                  <p>No. The prompt asks the agent to use the README flow. The safe path still includes <code>setup-plan</code>, review, approval, <code>setup-apply</code>, <code>validate-setup</code>, and <code>ensure-ready</code>.</p>
+                </div>
+                <div class="faq-item">
+                  <h3>When should I choose XUUnity MCP over broader Unity MCP tools?</h3>
+                  <p>Choose it when you care most about setup safety, editor-only footprint, compile checks, tests, and validation-heavy workflows rather than the broadest possible mutation surface.</p>
+                </div>
+              </div>
+            </details>
+          </section>
+
+          <section class="footer-card">
+            <h2>Next steps</h2>
             <div class="button-row">
-              <a class="button ghost" href="install.html">Open install path</a>
-              <a class="button ghost" href="comparison.html">Open comparison path</a>
+              <a class="button" href="#one-prompt-copy">Copy the setup prompt</a>
+              <a class="button secondary" href="comparison.html">See comparison</a>
+              <a class="button secondary" href="clients/">Browse client setup guides</a>
+              <a class="button secondary" href="what-is-unity-mcp.html">Read Unity MCP overview</a>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Discovery content</div>
-            <h2>Article cluster for Unity MCP search paths</h2>
-          </div>
-          <p>These owned pages also serve as ready-to-adapt drafts for external launch, comparison, and workflow posts.</p>
-        </div>
-        <div class="card-grid">
-          <div class="card">
-            <h3>Introducing XUUnity MCP</h3>
-            <p>Launch positioning for the safe, lightweight, validation-first Unity MCP story.</p>
-            <p><a href="articles/introducing-xuunity-mcp.html">Read article</a></p>
-          </div>
-          <div class="card">
-            <h3>XUUnity MCP vs Unity MCP</h3>
-            <p>Workflow-based comparison for teams choosing between broader and validation-first Unity MCP tools.</p>
-            <p><a href="articles/xuunity-mcp-vs-unity-mcp.html">Read article</a></p>
-          </div>
-          <div class="card">
-            <h3>Compile checks and tests through MCP</h3>
-            <p>A practical proof loop for setup, readiness, compile validation, EditMode tests, and PlayMode tests.</p>
-            <p><a href="articles/run-unity-compile-checks-and-tests-through-mcp.html">Read article</a></p>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <div class="kicker">Workflow sequence</div>
-            <h2>How the validation-first loop feels in practice</h2>
-          </div>
-          <p>This is the product story engineers care about: prove what will change, make the change safely, and then produce project health evidence.</p>
-        </div>
-        <div class="timeline-grid">
-          <div class="timeline-step" data-step="1">
-            <h3>Preflight</h3>
-            <p>Confirm Python, project shape, target client, and whether user-level config changes are needed.</p>
-          </div>
-          <div class="timeline-step" data-step="2">
-            <h3>Plan</h3>
-            <p>Use <code>setup-plan</code> to produce an inspectable change plan before mutation.</p>
-          </div>
-          <div class="timeline-step" data-step="3">
-            <h3>Apply and verify</h3>
-            <p>Run <code>setup-apply</code>, <code>validate-setup</code>, and <code>ensure-ready</code> in the documented order.</p>
-          </div>
-          <div class="timeline-step" data-step="4">
-            <h3>Prove health</h3>
-            <p>Run compile checks, tests, console inspection, scene assertions, and screenshots as required.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="faq">
-        <h2>Frequently asked questions</h2>
-        <div class="faq-item">
-          <h3>Is XUUnity MCP the same thing as XUUnity Light Unity MCP?</h3>
-          <p>Yes. XUUnity MCP is the short public product name. XUUnity Light Unity MCP is the full technical package and repository name.</p>
-        </div>
-        <div class="faq-item">
-          <h3>Does this break the AI install flow from the README?</h3>
-          <p>No. The install path stays anchored on the existing README and INSTALL sequence: preflight, <code>setup-plan</code>, approval, <code>setup-apply</code>, <code>validate-setup</code>, <code>ensure-ready</code>, then the first status check.</p>
-        </div>
-        <div class="faq-item">
-          <h3>When should I choose XUUnity MCP over broader Unity MCP tools?</h3>
-          <p>Choose it when you care most about setup safety, editor-only footprint, compile checks, tests, and validation-heavy workflows rather than the broadest possible mutation surface.</p>
-        </div>
-      </section>
-
-      <section class="footer-card premium">
-        <h2>Next steps</h2>
-        <div class="button-row">
-          <a class="button" href="install.html">Read install guide</a>
-          <a class="button secondary" href="comparison.html">See comparison</a>
-          <a class="button secondary" href="clients/">Browse client setup guides</a>
-          <a class="button secondary" href="articles/">Read articles</a>
-          <a class="button secondary" href="what-is-unity-mcp.html">Read Unity MCP overview</a>
-        </div>
-        <div class="footer-meta" style="margin-top: 18px;">
-          <span>Canonical Pages path: /xuunity-mcp/</span>
-          <span>Brand query target: xuunity mcp</span>
-          <span>Head-term target: Unity MCP</span>
-        </div>
-      </section>
+          </section>
+        </main>
+      </div>
     </div>
+    <script>
+      document.querySelectorAll("[data-copy-target]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const target = document.getElementById(button.getAttribute("data-copy-target"));
+          const readText = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+            if (node.nodeType !== Node.ELEMENT_NODE) return "";
+            if (node.tagName === "A") return `${node.textContent} (${node.href})`;
+            return Array.from(node.childNodes).map(readText).join("");
+          };
+          const text = target ? readText(target).replace(/\s+/g, " ").trim() : "";
+          if (!text) return;
+
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            textarea.remove();
+          }
+
+          const original = button.textContent;
+          button.textContent = "Copied";
+          window.setTimeout(() => {
+            button.textContent = original;
+          }, 1400);
+        });
+      });
+    </script>
   </body>
 </html>
