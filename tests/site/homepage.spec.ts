@@ -40,8 +40,9 @@ test.describe("public homepage", () => {
     await page.goto("/");
 
     await expect(page).toHaveTitle(/XUUnity MCP|Unity MCP/i);
-    await expect(page.getByRole("heading", { name: "XUUnity Light" })).toBeVisible();
-    await expect(page.getByText("LLM-ready Unity MCP for AI agents.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "XUUnity Light Unity MCP" })).toBeVisible();
+    await expect(page.getByText("A lightweight Unity MCP server that lets AI agents work with")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Less Unity clicking. Fewer blind AI changes." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Set up Unity MCP from one prompt" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "The useful parts, without the noise." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Small local bridge, clear setup plan, Unity evidence." })).toBeVisible();
@@ -67,7 +68,7 @@ test.describe("public homepage", () => {
     await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
 
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardText).toContain("Set up XUUnity MCP from");
+    expect(clipboardText).toContain("Use the repository README");
     expect(clipboardText).toContain(`the repository README (${README_URL})`);
     expect(clipboardText).toContain("/path/to/UnityProject");
     expect(clipboardText).toContain("run EditMode tests");
