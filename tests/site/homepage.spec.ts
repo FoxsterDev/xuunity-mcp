@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 const README_URL = "https://github.com/FoxsterDev/xuunity-mcp/blob/master/README.md";
+const LINKEDIN_URL = "https://www.linkedin.com/in/khalandachou/";
 
 async function collectVisibleOverflow(page: Page) {
   return page.evaluate(() => {
@@ -46,6 +47,7 @@ test.describe("public homepage", () => {
     await expect(page.getByRole("heading", { name: "Set up Unity MCP from one prompt" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "The useful parts, without the noise." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Small local bridge, clear setup plan, Unity evidence." })).toBeVisible();
+    await expect(page.locator('link[rel="icon"][href="assets/favicon.svg"]')).toHaveCount(1);
 
     const sectionOrder = await page.locator("main > section").evaluateAll((sections) =>
       sections.slice(0, 4).map((section) => section.id || section.className)
@@ -58,6 +60,21 @@ test.describe("public homepage", () => {
     ]);
 
     await attachPageScreenshots(page, testInfo, `homepage-${testInfo.project.name}`);
+  });
+
+  test("keeps a professional footer with owner and project links", async ({ page }) => {
+    await page.goto("/");
+
+    const footer = page.locator(".site-footer");
+    await expect(footer).toBeVisible();
+    await expect(footer.getByText("XUUnity MCP", { exact: true })).toBeVisible();
+    await expect(footer.getByText("Product", { exact: true })).toBeVisible();
+    await expect(footer.getByText("Resources", { exact: true })).toBeVisible();
+    await expect(footer.getByText("Project", { exact: true })).toBeVisible();
+    await expect(footer.getByRole("link", { name: "LinkedIn" })).toHaveAttribute("href", LINKEDIN_URL);
+    await expect(footer.getByRole("link", { name: "GitHub" })).toHaveAttribute("href", "https://github.com/FoxsterDev/xuunity-mcp");
+    await expect(footer.getByRole("link", { name: "Discussions" })).toHaveAttribute("href", "https://github.com/FoxsterDev/xuunity-mcp/discussions");
+    await expect(footer.getByRole("link", { name: "Security" })).toHaveAttribute("href", "https://github.com/FoxsterDev/xuunity-mcp/security");
   });
 
   test("copies the one-prompt setup text with the README URL", async ({ context, page }) => {
@@ -129,6 +146,8 @@ test.describe("important docs routes", () => {
       const response = await page.goto(route);
       expect(response?.ok()).toBeTruthy();
       await expect(page.locator("h1, h2").first()).toBeVisible();
+      await expect(page.locator('link[rel="icon"]')).toHaveCount(1);
+      await expect(page.locator(".site-footer")).toBeVisible();
     });
   }
 });

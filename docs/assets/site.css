@@ -1258,6 +1258,113 @@ tr:last-child td {
   font-size: 0.88rem;
 }
 
+.site-footer {
+  margin-top: 28px;
+  padding: 28px 0 8px;
+  border-top: 1px solid var(--line);
+}
+
+.site-footer-top {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) repeat(3, minmax(130px, 1fr));
+  gap: 28px;
+  align-items: start;
+}
+
+.footer-brand-block {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.footer-brand-block p,
+.site-footer-bottom p {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.footer-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.footer-lockup > span:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.footer-lockup strong {
+  font-size: 0.98rem;
+  line-height: 1.1;
+}
+
+.footer-lockup span span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.footer-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 800;
+}
+
+.footer-column {
+  display: grid;
+  gap: 7px;
+}
+
+.footer-heading {
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.footer-column a,
+.footer-social a {
+  color: var(--muted);
+  font-size: 0.92rem;
+  text-decoration: none;
+}
+
+.footer-column a:hover,
+.footer-social a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.site-footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.footer-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 @media (max-width: 980px) {
   .layout,
   .hero.home-hero,
@@ -1287,7 +1394,8 @@ tr:last-child td {
   .card-grid,
   .three-col,
   .metric-grid,
-  .timeline-grid {
+  .timeline-grid,
+  .site-footer-top {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1334,7 +1442,8 @@ tr:last-child td {
   .card-grid,
   .three-col,
   .metric-grid,
-  .timeline-grid {
+  .timeline-grid,
+  .site-footer-top {
     grid-template-columns: 1fr;
   }
 
