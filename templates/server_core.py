@@ -24,3 +24,45 @@ def write_json(path: Path, data: Any) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2, ensure_ascii=True)
         handle.write("\n")
+
+
+class ServerFunctionProxy:
+    def __init__(self, name: str, fallback: Any):
+        self._name = name
+        self._fallback = fallback
+        try:
+            functools.update_wrapper(self, fallback)
+        except Exception:
+            pass
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        server = sys.modules.get("server")
+        if server is not None:
+            func = getattr(server, self._name, None)
+            if func is not None and func is not self:
+                return func(*args, **kwargs)
+        return self._fallback(*args, **kwargs)
+
+
+class TimeProxy:
+    def __getattr__(self, name: str) -> Any:
+        server = sys.modules.get("server")
+        if server is not None and hasattr(server, "time"):
+            t = getattr(server, "time")
+            if not isinstance(t, TimeProxy):
+                return getattr(t, name)
+        import time
+        return getattr(time, name)
+
+
+def wrap_globals_with_proxies(module_globals: dict[str, Any], names: list[str]) -> None:
+    for name in names:
+        if name in module_globals:
+            fallback = module_globals[name]
+            if not isinstance(fallback, ServerFunctionProxy):
+                module_globals[name] = ServerFunctionProxy(name, fallback)
+
+
+import functools
+import sys
+

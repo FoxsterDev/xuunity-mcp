@@ -194,3 +194,51 @@ class BridgeRegistry:
             context.last_refresh_unix = time.time()
             return
         context.apply_refresh(self._refresh_context_state(context.project_root))
+
+
+_BRIDGE_REGISTRY: BridgeRegistry | None = None
+
+def initialize_registry(
+    ensure_project_root_fn: Callable[[str], Path],
+    refresh_context_state_fn: Callable[[Path], dict[str, Any]]
+) -> None:
+    global _BRIDGE_REGISTRY
+    _BRIDGE_REGISTRY = BridgeRegistry(
+        ensure_project_root=ensure_project_root_fn,
+        refresh_context_state=refresh_context_state_fn,
+    )
+
+def get_registry() -> BridgeRegistry:
+    import sys
+    server = sys.modules.get("server")
+    if server is not None and hasattr(server, "_BRIDGE_REGISTRY"):
+        reg = getattr(server, "_BRIDGE_REGISTRY")
+        if reg is not None:
+            return reg
+    global _BRIDGE_REGISTRY
+    if _BRIDGE_REGISTRY is None:
+        raise RuntimeError("BridgeRegistry is not initialized. Call initialize_registry() first.")
+    return _BRIDGE_REGISTRY
+
+def get_project_context(project_root: str) -> ProjectContext:
+    return get_registry().get_or_discover(project_root)
+
+def refresh_project_context(project_root: str | Path) -> ProjectContext:
+    return get_registry().refresh_context(str(project_root))
+
+def list_active_project_contexts() -> list[ProjectContext]:
+    return get_registry().list_active_contexts()
+
+def forget_project_context(project_root: str) -> None:
+    get_registry().forget(project_root)
+
+def prune_stale_project_contexts(
+    *,
+    offline_context_max_idle_seconds: float | None = None,
+    general_context_max_idle_seconds: float | None = None,
+) -> list[dict[str, Any]]:
+    return get_registry().prune_stale_contexts(
+        offline_context_max_idle_seconds=offline_context_max_idle_seconds,
+        general_context_max_idle_seconds=general_context_max_idle_seconds,
+    )
+

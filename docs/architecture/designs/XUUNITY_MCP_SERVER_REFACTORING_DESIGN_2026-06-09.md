@@ -1,6 +1,6 @@
 # Refactoring Design Plan: `templates/server.py`
 
-- **Status**: Design Proposal
+- **Status**: Implemented & Verified
 - **Date**: 2026-06-09
 - **Author**: Principal Python Developer / Agent
 - **Target File**: `templates/server.py`
@@ -17,62 +17,13 @@ To maintain compatibility with light-weight client setups, we operate under two 
 
 ## Architectural Upgrades (Addressing the 3 Weak Spots)
 
-### 1. Zero-Dependency Decorator-Based CLI Registration
-Instead of a monolithic `build_parser()` function or external libraries, we will implement a lightweight, zero-dependency `CLICommandRegistry` in `server_cli_parser.py`.
+### 1. Standard Argument Parser and DAG Subcommand Mapping
+Instead of a complex decorator-based registry that would introduce cyclic dependencies (or bidirectional import loops) between parsing logic and commands, we implemented a clean top-down DAG (Directed Acyclic Graph) structure:
+- `server_cli_commands.py` contains all subcommand handlers (`cmd_*` functions).
+- `server_cli_parser.py` implements `build_parser()` and uses standard `argparse` configuration. It assigns handlers via `.set_defaults(func=cmd_...)`.
+- `server.py` acts as a facade that executes the parser and routes command handler invocations directly using `args.func(args)`.
 
-This registry allows commands to declare their arguments declaratively using decorators.
-
-```python
-# templates/server_cli_parser.py
-import argparse
-from typing import Callable, Any, NamedTuple, List
-
-class Arg(NamedTuple):
-    flags: List[str]
-    kwargs: dict
-
-class CLICommandRegistry:
-    def __init__(self):
-        self.commands = {}
-
-    def register(self, name: str, help: str, arguments: List[Arg] = None):
-        def decorator(func: Callable[[Any], None]):
-            self.commands[name] = {
-                "func": func,
-                "help": help,
-                "arguments": arguments or []
-            }
-            return func
-        return decorator
-
-    def build_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="XUUnity Light MCP Server")
-        subparsers = parser.add_subparsers(dest="command")
-        for name, cfg in self.commands.items():
-            cmd_parser = subparsers.add_parser(name, help=cfg["help"])
-            cmd_parser.set_defaults(func=cfg["func"])
-            for arg in cfg["arguments"]:
-                cmd_parser.add_argument(*arg.flags, **arg.kwargs)
-        return parser
-
-registry = CLICommandRegistry()
-```
-
-#### Example Usage in Command Modules:
-```python
-@registry.register(
-    name="recover-editor-session",
-    help="Attempt host-side editor closeout recovery",
-    arguments=[
-        Arg(["--project-root"], {"required": True}),
-        Arg(["--timeout-ms"], {"type": int, "default": 180000}),
-        Arg(["--open-editor"], {"action": "store_true"})
-    ]
-)
-def cmd_recover_editor_session(args):
-    # Execution logic...
-```
-*Benefits*: Reduces command registration code by 80%, keeps parsing logic adjacent to the command handlers, and avoids external dependencies.
+This keeps command registration simple, uses standard library features without extra layers, and ensures direct execution routing.
 
 ---
 
@@ -156,10 +107,10 @@ graph TD
 - Execute host python tests: `python3 -m unittest discover -s tests -v`.
 - Capture a reference JSON output for key commands (e.g., `--help`, `project-discovery-report`).
 
-### Phase 2: Implement Registry & CLI Parser
+### Phase 2: Decouple Argparse & Parser
 - Create `templates/server_cli_parser.py`.
-- Implement `CLICommandRegistry`.
-- Move the subcommand configuration definitions into decorators on the `cmd_*` functions in `templates/server.py`.
+- Move the subcommand configuration definitions into standard `argparse` subparsers.
+- Assign defaults via `.set_defaults(func=cmd_...)`.
 - *Verification*: Confirm `python3 templates/server.py --help` matches the baseline exactly.
 
 ### Phase 3: Introduce `ProcessLauncher`
@@ -173,11 +124,10 @@ graph TD
 - Ensure imports follow the strict DAG topology.
 - *Verification*: Run unit tests to confirm no circular dependencies are triggered.
 
-### Phase 5: Extract Command Handlers
+### Phase 5: Extract Command Handlers & Compatibility Facade
 - Create `templates/server_cli_commands.py`.
 - Relocate all `cmd_*` handler functions here.
-- Add registry decorators directly to these functions.
-- Update `templates/server.py` to only import the registry parser and execute it.
+- Configure `templates/server.py` as entrypoint and compatibility facade. Expose functions, modules, and proxy wrappers for test-suite mock compatibility.
 
 ---
 

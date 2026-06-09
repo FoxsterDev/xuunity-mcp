@@ -240,3 +240,37 @@ def scenario_failure_tool_result(result_payload: dict[str, Any]) -> dict[str, An
         "structuredContent": structured,
         "isError": True,
     }
+
+
+def _decode_bridge_payload_dict(response: dict[str, Any]) -> dict[str, Any] | None:
+    payload_json = response.get("payload_json")
+    if not isinstance(payload_json, str) or not payload_json:
+        return None
+
+    try:
+        payload = json.loads(payload_json)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    return payload
+
+
+def _bridge_error_code(response: dict[str, Any]) -> str:
+    error = response.get("error")
+    if isinstance(error, dict):
+        code = str(error.get("code") or "")
+        if code:
+            return code
+
+    payload = _decode_bridge_payload_dict(response)
+    if not isinstance(payload, dict):
+        return ""
+
+    payload_error = payload.get("error")
+    if not isinstance(payload_error, dict):
+        return ""
+    return str(payload_error.get("code") or "")
+

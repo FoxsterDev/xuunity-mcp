@@ -1549,3 +1549,50 @@ def validate_setup(project_root: Path, *, include_tests: bool = False) -> dict[s
         "validation_status": "ready" if not blockers else "blocked",
         "blockers": blockers,
     }
+
+
+def require_test_framework_capability_for_batch(project_root: Path) -> dict[str, Any]:
+    unity_version = parse_unity_version(project_root)
+    state = classify_test_framework_state(project_root, unity_version)
+    if bool(state.get("supported")):
+        return state
+
+    recommended_version = str(state.get("recommended_dependency_version") or "")
+    install_command = (
+        "xuunity_light_unity_mcp.sh install-test-framework "
+        f"--project-root {project_root} --yes"
+        + (f" --version {recommended_version}" if recommended_version else "")
+    )
+    status = str(state.get("status") or "error")
+    if status == "unsupported":
+        recommended_next_action = "use_supported_unity_version"
+        next_distinct_action = "open_project_with_unity_2021_3_or_newer"
+    elif status == "disabled_dependency_too_old":
+        recommended_next_action = "upgrade_optional_test_framework"
+        next_distinct_action = "upgrade_test_framework_then_rerun_batch"
+    else:
+        recommended_next_action = "install_optional_test_framework"
+        next_distinct_action = "install_test_framework_then_rerun_batch"
+
+    raise ToolInvocationError(
+        "test_capability_unavailable",
+        "Batch EditMode tests require the optional Test Framework capability.",
+        {
+            "capability": "tests",
+            "capability_status": status,
+            "capability_define": TEST_FRAMEWORK_CAPABILITY_DEFINE,
+            "dependency": TEST_FRAMEWORK_PACKAGE_NAME,
+            "installed_dependency_version": str(state.get("installed_dependency_version") or ""),
+            "minimum_dependency_version": str(state.get("minimum_dependency_version") or ""),
+            "recommended_dependency_version": recommended_version,
+            "recommendation_basis": str(state.get("recommendation_basis") or ""),
+            "recommended_action": str(state.get("recommended_action") or ""),
+            "dependency_action": str(state.get("dependency_action") or ""),
+            "upgrade_caution": str(state.get("upgrade_caution") or ""),
+            "recommended_next_action": recommended_next_action,
+            "next_distinct_action": next_distinct_action,
+            "install_command": install_command,
+            "unity_version": unity_version,
+        },
+    )
+
