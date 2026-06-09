@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 0.3.23
+
+Release tag: `v0.3.23`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.23
+```
+
+### Changed
+
+- Added `unity.console.grep`, `unity_console_grep`, `request-console-grep`,
+  and a reusable `console_grep` scenario template for compact Unity console
+  inspection without raw log dumping.
+- Added `request-loading-timing` and `unity_loading_timing` on top of console
+  grep so agents can collect compact scene/loading timing evidence.
+- Added `project-hook-scaffold` and profile mutation summary helpers for
+  reusable project action and scenario authoring flows.
+- Added public-safe completed retro archive entries and refreshed the public
+  retro registry split between active backlog and completed history.
+- Released `v0.3.23` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ## 0.3.22
 
 Release tag: `v0.3.22`
