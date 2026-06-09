@@ -11,6 +11,11 @@ if defined PYTHON (
   exit /b %ERRORLEVEL%
 )
 
+if exist "%SCRIPT_DIR%.venv\Scripts\python.exe" (
+  "%SCRIPT_DIR%.venv\Scripts\python.exe" "%XUUNITY_LIGHT_UNITY_MCP_SERVER%" %*
+  exit /b %ERRORLEVEL%
+)
+
 where py >nul 2>nul
 if %ERRORLEVEL%==0 (
   py -3 "%XUUNITY_LIGHT_UNITY_MCP_SERVER%" %*

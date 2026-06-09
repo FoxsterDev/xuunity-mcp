@@ -11,6 +11,17 @@ if (-not [string]::IsNullOrWhiteSpace($env:PYTHON)) {
     exit $LASTEXITCODE
 }
 
+$venvPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
+if (Test-Path $venvPython) {
+    & $venvPython $serverFile @args
+    exit $LASTEXITCODE
+}
+$venvPythonBin = Join-Path $scriptDir ".venv\bin\python"
+if (Test-Path $venvPythonBin) {
+    & $venvPythonBin $serverFile @args
+    exit $LASTEXITCODE
+}
+
 $py = Get-Command py -ErrorAction SilentlyContinue
 if ($py) {
     & $py.Source -3 $serverFile @args

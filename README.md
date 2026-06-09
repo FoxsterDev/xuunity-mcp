@@ -8,7 +8,7 @@
 
 **XUUnity MCP is a lightweight Unity MCP server for safe Unity Editor automation.**
 
-Connect Cursor, Claude Code, Claude Desktop, Rider, Windsurf, Codex-style
+Connect Cursor, Claude Code, Claude Desktop, Rider, Windsurf, Antigravity IDE, Codex-style
 agents, and custom MCP clients to Unity through a local stdio MCP server and a
 small editor-only Unity package.
 
@@ -75,7 +75,7 @@ Choose one path first:
 - Unity 2021.3 LTS+; the current release has live validation on Unity 2021.3,
   2022.3, and 6000.x. See [Status](docs/reference/STATUS.md).
 - Python 3.10+
-- one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Rider](docs/clients/rider.md), [Windsurf](docs/clients/windsurf.md), or a [Codex-style agent](docs/clients/codex.md) with the [Codex visual setup guide](docs/clients/codex-unity-mcp-setup.md)
+- one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Rider](docs/clients/rider.md), [Windsurf](docs/clients/windsurf.md), [Antigravity IDE](docs/clients/antigravity.md), or a [Codex-style agent](docs/clients/codex.md) with the [Codex visual setup guide](docs/clients/codex-unity-mcp-setup.md)
 
 Before running the helper, verify which Python it will use:
 
@@ -436,7 +436,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.21
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.22
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -444,7 +444,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.21"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.22"
   }
 }
 ```
@@ -507,9 +507,9 @@ Native Windows templates are included next to the Unix templates as
 `.windows.json` files.
 
 When running the wrapper directly, the host helper install target can be pinned
-with `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto`. `auto`
-prefers `~/.codex-tools` inside Codex-style environments and preserves the
-Claude-side `~/.claude-tools` helper for Claude clients.
+with `XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|neutral|auto`.
+`auto` prefers the current client context, then an existing neutral helper,
+then existing Claude/Codex helpers.
 
 ### 4. Verify Connection
 
@@ -607,6 +607,7 @@ templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 - [Cursor](docs/clients/cursor.md)
 - [Rider](docs/clients/rider.md)
 - [Windsurf](docs/clients/windsurf.md)
+- [Antigravity IDE](docs/clients/antigravity.md)
 - [Codex-style agents](docs/clients/codex.md) ([visual setup](docs/clients/codex-unity-mcp-setup.md))
 - custom stdio MCP clients
 

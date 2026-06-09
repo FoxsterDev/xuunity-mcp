@@ -32,6 +32,38 @@ SOURCE_ROOT="$(resolve_source_root)"
 
 CODEX_INSTALL_DIR="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp"
 CLAUDE_INSTALL_DIR="${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp"
+resolve_neutral_install_dir() {
+  if [[ -n "${XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR:-}" ]]; then
+    printf '%s\n' "$XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"
+    return 0
+  fi
+
+  if [[ "${OS:-}" == "Windows_NT" ]] || [[ -n "${APPDATA:-}" ]]; then
+    local appdata_val="${APPDATA:-}"
+    if [[ -z "$appdata_val" ]]; then
+      appdata_val="$HOME/AppData/Roaming"
+    fi
+    printf '%s/xuunity-mcp\n' "${appdata_val//\\//}"
+    return 0
+  fi
+
+  local xdg_val="${XDG_DATA_HOME:-}"
+  if [[ -n "$xdg_val" ]]; then
+    printf '%s/xuunity-mcp\n' "$xdg_val"
+    return 0
+  fi
+
+  local uname_sys
+  uname_sys="$(uname -s 2>/dev/null || echo "unknown")"
+  if [[ "$uname_sys" == "Darwin" ]]; then
+    printf '%s/Library/Application Support/xuunity-mcp\n' "$HOME"
+  else
+    printf '%s/.local/share/xuunity-mcp\n' "$HOME"
+  fi
+}
+
+NEUTRAL_INSTALL_DIR="$(resolve_neutral_install_dir)"
+
 
 codex_context_detected() {
   [[ -n "${CODEX_SHELL:-}" ]] ||
@@ -51,6 +83,10 @@ claude_context_detected() {
 resolve_install_dir() {
   local install_target="${XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET:-auto}"
   case "$install_target" in
+    neutral)
+      printf '%s\n' "$NEUTRAL_INSTALL_DIR"
+      return 0
+      ;;
     codex)
       printf '%s\n' "$CODEX_INSTALL_DIR"
       return 0
@@ -68,6 +104,10 @@ resolve_install_dir() {
         printf '%s\n' "$CLAUDE_INSTALL_DIR"
         return 0
       fi
+      if [[ -f "$NEUTRAL_INSTALL_DIR/server.py" ]]; then
+        printf '%s\n' "$NEUTRAL_INSTALL_DIR"
+        return 0
+      fi
       if [[ -f "$CLAUDE_INSTALL_DIR/server.py" ]]; then
         printf '%s\n' "$CLAUDE_INSTALL_DIR"
         return 0
@@ -76,11 +116,11 @@ resolve_install_dir() {
         printf '%s\n' "$CODEX_INSTALL_DIR"
         return 0
       fi
-      printf '%s\n' "$CODEX_INSTALL_DIR"
+      printf '%s\n' "$NEUTRAL_INSTALL_DIR"
       return 0
       ;;
     *)
-      echo "invalid XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=$install_target (expected codex, claude, or auto)" >&2
+      echo "invalid XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=$install_target (expected codex, claude, neutral, or auto)" >&2
       exit 1
       ;;
   esac
@@ -89,11 +129,11 @@ resolve_install_dir() {
 # Resolve the host install location agent-agnostically.
 # Priority order:
 #   1. XUUNITY_LIGHT_UNITY_MCP_SERVER explicit override
-#   2. XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude explicit target
+#   2. XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|neutral explicit target
 #   3. auto target: Codex context -> CODEX_TOOLS_HOME / ~/.codex-tools
 #   4. auto target: Claude context -> CLAUDE_TOOLS_HOME / ~/.claude-tools
-#   5. auto target: preserve existing helper when no client context is known
-#   6. CODEX_TOOLS_HOME default location (used as install hint when nothing is installed)
+#   5. auto target: preserve existing helper when no client context is known (neutral, then Claude, then Codex)
+#   6. NEUTRAL_INSTALL_DIR standard location (used as default fallback when nothing is installed)
 if [[ -n "${XUUNITY_LIGHT_UNITY_MCP_SERVER:-}" ]]; then
   SERVER_PATH="$XUUNITY_LIGHT_UNITY_MCP_SERVER"
   INSTALL_DIR="$(cd "$(dirname "$SERVER_PATH")" && pwd)"

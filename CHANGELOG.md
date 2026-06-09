@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 0.3.22
+
+Release tag: `v0.3.22`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.22
+```
+
+### Changed
+
+- Added centralized neutral helper installation with Codex/Claude delegate
+  launchers, isolated `.venv` discovery, and Antigravity IDE setup guidance.
+- Hardened full-reset uninstall planning so client-specific cleanup preserves
+  the shared neutral helper unless explicitly requested.
+- Updated wrapper auto-resolution, setup wizard tests, and release-facing
+  validation coverage for neutral helper workflows.
+- Released `v0.3.22` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ## 0.3.21
 
 Release tag: `v0.3.21`

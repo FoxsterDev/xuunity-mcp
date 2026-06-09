@@ -43,9 +43,9 @@ Clients that should use the Claude-side install can change `CODEX_TOOLS_HOME`
 to `CLAUDE_TOOLS_HOME` and `.codex-tools` to `.claude-tools`.
 
 Direct wrapper invocations also honor
-`XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|auto`. In `auto`, Codex
-contexts prefer `.codex-tools`; non-Codex sessions with an existing Claude
-helper keep using `.claude-tools`.
+`XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex|claude|neutral|auto`. In `auto`,
+client context wins first, then an existing neutral helper, then existing
+Claude/Codex helpers.
 
 After wiring, treat `unity_status_summary` as the canonical first live
 smoke-check. If it is healthy but a later compile or test run fails, treat that

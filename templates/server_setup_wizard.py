@@ -18,7 +18,7 @@ DEFAULT_GIT_REPO_URL = "https://github.com/FoxsterDev/xuunity-mcp.git"
 UNINSTALL_MODE_PROJECT_ONLY = "project-only-cleanup"
 UNINSTALL_MODE_FULL_RESET = "full-reset-current-user"
 UNINSTALL_MODES = {UNINSTALL_MODE_PROJECT_ONLY, UNINSTALL_MODE_FULL_RESET}
-SUPPORTED_USER_CLIENTS = {"codex", "claude_code", "cursor", "windsurf", "claude_desktop"}
+SUPPORTED_USER_CLIENTS = {"codex", "claude_code", "cursor", "windsurf", "claude_desktop", "neutral"}
 
 
 def parse_unity_version(project_root: Path) -> str:
@@ -322,10 +322,35 @@ def intended_wiring_target_for_detected_client(detected_client: str) -> str:
     return "manual_selection_required"
 
 
+def get_neutral_install_dir() -> Path:
+
+    override = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR")
+    if override:
+        return Path(override)
+
+    home = Path.home()
+    system = platform.system().lower()
+    if system == "windows":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "xuunity-mcp"
+        return home / "AppData" / "Roaming" / "xuunity-mcp"
+
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    if xdg_data_home:
+        return Path(xdg_data_home) / "xuunity-mcp"
+
+    if system == "darwin":
+        return home / "Library" / "Application Support" / "xuunity-mcp"
+
+    return home / ".local" / "share" / "xuunity-mcp"
+
+
 def helper_install_targets() -> list[dict[str, Any]]:
     home = Path.home()
     codex_tools_home = Path(os.environ.get("CODEX_TOOLS_HOME") or home / ".codex-tools")
     claude_tools_home = Path(os.environ.get("CLAUDE_TOOLS_HOME") or home / ".claude-tools")
+    neutral_tools_home = get_neutral_install_dir()
     detected_client = detect_current_host_client()
     targets: list[dict[str, Any]] = []
     for client_id, tools_home in (
@@ -348,8 +373,23 @@ def helper_install_targets() -> list[dict[str, Any]]:
                 "selected_by_default": client_id == intended_wiring_target_for_detected_client(detected_client),
             }
         )
-    return targets
 
+    neutral_run = neutral_tools_home / "run.sh"
+    neutral_server = neutral_tools_home / "server.py"
+    neutral_installed = neutral_run.is_file() and neutral_server.is_file()
+    targets.append(
+        {
+            "client_id": "neutral",
+            "tools_home": str(neutral_tools_home.parent),
+            "install_dir": str(neutral_tools_home),
+            "run_path": str(neutral_run),
+            "server_path": str(neutral_server),
+            "installed": neutral_installed,
+            "helper_action": "neutral_install" if not neutral_installed else "reuse_existing_helper",
+            "selected_by_default": True,
+        }
+    )
+    return targets
 
 def toml_contains_server_block(path: Path) -> bool:
     try:
@@ -607,16 +647,29 @@ def uninstall_helper_targets(
         client_id = str(target.get("client_id") or "")
         remove = False
         if mode == UNINSTALL_MODE_FULL_RESET:
-            remove = client_id == selected_client or (
+            is_selected = client_id == selected_client
+            is_neutral_reset = (
+                client_id == "neutral"
+                and (
+                    selected_client in ("neutral", "manual_selection_required")
+                    or include_other_client_helpers
+                )
+            )
+            remove = is_selected or is_neutral_reset or (
                 include_other_client_helpers
-                and selected_client != "manual_selection_required"
                 and bool(target.get("installed"))
             )
         target["uninstall_action"] = (
             "remove_helper_install" if remove and target.get("installed") else "keep_helper_install"
         )
         target["remove_helper_install"] = bool(remove and target.get("installed"))
-        target["selected_by_default"] = client_id == selected_client
+        target["selected_by_default"] = client_id == selected_client or (
+            client_id == "neutral"
+            and (
+                selected_client in ("neutral", "manual_selection_required")
+                or include_other_client_helpers
+            )
+        )
     return targets
 
 

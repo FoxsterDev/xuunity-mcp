@@ -18,6 +18,7 @@ specific MCP client guide.
 - Cursor: `cursor.md` and `../../templates/clients/cursor/`
 - Rider: `rider.md`
 - Windsurf: `windsurf.md` and `../../templates/clients/windsurf/`
+- Antigravity IDE: `antigravity.md`
 
 ## Routing Rules
 - Keep client docs consistent with the root `README.md`, `INSTALL.md`, and `docs/agents/AI_INTEGRATION.md`.

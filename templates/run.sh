@@ -20,7 +20,15 @@ raise SystemExit(0 if current >= minimum else 1)
 PY
 }
 
-if [[ -n "${PYTHON:-}" ]]; then
+if [[ -x "$script_dir/.venv/bin/python" ]]; then
+  python_cmd=("$script_dir/.venv/bin/python")
+elif [[ -x "$script_dir/.venv/bin/python3" ]]; then
+  python_cmd=("$script_dir/.venv/bin/python3")
+elif [[ -x "$script_dir/.venv/Scripts/python" ]]; then
+  python_cmd=("$script_dir/.venv/Scripts/python")
+elif [[ -x "$script_dir/.venv/Scripts/python.exe" ]]; then
+  python_cmd=("$script_dir/.venv/Scripts/python.exe")
+elif [[ -n "${PYTHON:-}" ]]; then
   python_cmd=("$PYTHON")
 elif command -v python3 >/dev/null 2>&1; then
   python_cmd=(python3)

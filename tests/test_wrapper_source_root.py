@@ -11,6 +11,8 @@ class WrapperSourceRootTests(unittest.TestCase):
     def make_env(self) -> dict[str, str]:
         env = dict(os.environ)
         env["PYTHON"] = sys.executable
+        # Isolate neutral install dir from host environment
+        env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = "/tmp/nonexistent-xuunity-neutral-dir"
         return env
 
     def create_fake_project(self, root: Path, unity_version: str = "2021.3.58f1") -> Path:

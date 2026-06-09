@@ -28,9 +28,9 @@ while [[ $# -gt 0 ]]; do
     --target)
       target="$2"
       case "$target" in
-        codex|claude|both) ;;
+        codex|claude|both|neutral) ;;
         *)
-          echo "Unknown --target value: $target (allowed: codex, claude, both)" >&2
+          echo "Unknown --target value: $target (allowed: codex, claude, both, neutral)" >&2
           exit 1
           ;;
       esac
@@ -63,10 +63,11 @@ Usage:
 
 Options:
     --project-root <path>     Optional Unity project root for enabling or disabling the editor-only bridge under Library/.
-  --target codex|claude|both  Choose which install location(s) receive the server files.
-                              codex  -> \$CODEX_TOOLS_HOME/xuunity-mcp  (default \$HOME/.codex-tools)
-                              claude -> \$CLAUDE_TOOLS_HOME/xuunity-mcp (default \$HOME/.claude-tools)
-                              both   -> install into both. Default: both.
+  --target codex|claude|both|neutral  Choose which install location(s) receive the server files.
+                              codex   -> \$CODEX_TOOLS_HOME/xuunity-mcp  (default \$HOME/.codex-tools)
+                              claude  -> \$CLAUDE_TOOLS_HOME/xuunity-mcp (default \$HOME/.claude-tools)
+                              neutral -> \$HOME/.xuunity-mcp
+                              both    -> install into both. Default: both.
   --install-codex-config      Also append the Codex MCP config block.
   --install-claude-config     Also register the MCP server in ~/.claude.json (Claude Code user scope).
   --enable-project          Write local bridge config under Library/ so the editor-only bridge is active on next editor load.
@@ -97,6 +98,39 @@ config_path="$codex_home/config.toml"
 claude_config_path="${CLAUDE_CONFIG_PATH:-$HOME/.claude.json}"
 codex_run_path="$codex_install_dir/run.sh"
 claude_run_path="$claude_install_dir/run.sh"
+resolve_neutral_install_dir() {
+  if [[ -n "${XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR:-}" ]]; then
+    printf '%s\n' "$XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"
+    return 0
+  fi
+
+  if [[ "${OS:-}" == "Windows_NT" ]] || [[ -n "${APPDATA:-}" ]]; then
+    local appdata_val="${APPDATA:-}"
+    if [[ -z "$appdata_val" ]]; then
+      appdata_val="$HOME/AppData/Roaming"
+    fi
+    printf '%s/xuunity-mcp\n' "${appdata_val//\\//}"
+    return 0
+  fi
+
+  local xdg_val="${XDG_DATA_HOME:-}"
+  if [[ -n "$xdg_val" ]]; then
+    printf '%s/xuunity-mcp\n' "$xdg_val"
+    return 0
+  fi
+
+  local uname_sys
+  uname_sys="$(uname -s 2>/dev/null || echo "unknown")"
+  if [[ "$uname_sys" == "Darwin" ]]; then
+    printf '%s/Library/Application Support/xuunity-mcp\n' "$HOME"
+  else
+    printf '%s/.local/share/xuunity-mcp\n' "$HOME"
+  fi
+}
+
+neutral_install_dir="$(resolve_neutral_install_dir)"
+neutral_run_path="$neutral_install_dir/run.sh"
+
 
 resolve_python_bin() {
   if [[ -n "${PYTHON:-}" ]]; then
@@ -190,9 +224,13 @@ file_contains_regex() {
 
 append_codex_block_if_missing() {
   local block
+  local codex_run_path_val="$codex_run_path"
+  if [[ "$target" == "neutral" ]]; then
+    codex_run_path_val="$neutral_run_path"
+  fi
   block=$'[mcp_servers.xuunity_light_unity]\n'
   block+=$'command = "bash"\n'
-  block+="args = [\"-lc\", \"exec \\\"$codex_run_path\\\"\"]"$'\n'
+  block+="args = [\"-lc\", \"exec \\\"$codex_run_path_val\\\"\"]"$'\n'
   block+=$'required = false\n'
 
   if [[ -f "$config_path" ]] && file_contains_regex '^\[mcp_servers\.xuunity_light_unity\]' "$config_path"; then
@@ -216,6 +254,11 @@ append_codex_block_if_missing() {
 }
 
 append_claude_block_if_missing() {
+  local claude_run_path_val="$claude_run_path"
+  if [[ "$target" == "neutral" ]]; then
+    claude_run_path_val="$neutral_run_path"
+  fi
+
   if [[ $dry_run -eq 1 ]]; then
     printf '[dry-run] register xuunity_light_unity MCP server in %s\n' "$claude_config_path"
     return
@@ -223,7 +266,7 @@ append_claude_block_if_missing() {
 
   mkdir -p "$(dirname "$claude_config_path")"
 
-  python3 - "$claude_config_path" "$claude_run_path" <<'PY'
+  python3 - "$claude_config_path" "$claude_run_path_val" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -365,9 +408,47 @@ remove_bridge_state() {
   printf 'removed %s\n' "$bridge_root"
 }
 
+setup_venv_if_needed() {
+  local target_dir="$1"
+  local venv_dir="$target_dir/.venv"
+
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] set up Python virtual environment in %s/.venv\n' "$target_dir"
+    return 0
+  fi
+
+  if [[ -d "$venv_dir" ]]; then
+    if [[ -x "$venv_dir/bin/python" ]] || [[ -x "$venv_dir/bin/python3" ]] || [[ -x "$venv_dir/Scripts/python.exe" ]]; then
+      return 0
+    fi
+  fi
+
+  printf 'Setting up Python virtual environment in %s/.venv...\n' "$target_dir"
+  run mkdir -p "$target_dir"
+
+  if ! "$PYTHON_BIN" -m venv "$venv_dir" >/dev/null 2>&1; then
+    printf 'Warning: "python -m venv" failed. Falling back to direct script execution without isolated venv.\n' >&2
+    return 0
+  fi
+
+  local venv_python=""
+  if [[ -x "$venv_dir/bin/python" ]]; then
+    venv_python="$venv_dir/bin/python"
+  elif [[ -x "$venv_dir/bin/python3" ]]; then
+    venv_python="$venv_dir/bin/python3"
+  elif [[ -x "$venv_dir/Scripts/python.exe" ]]; then
+    venv_python="$venv_dir/Scripts/python.exe"
+  fi
+
+  if [[ -n "$venv_python" ]]; then
+    "$venv_python" -m pip install --upgrade pip >/dev/null 2>&1 || true
+  fi
+}
+
 install_server_into() {
   local target_dir="$1"
   run mkdir -p "$target_dir"
+  setup_venv_if_needed "$target_dir"
   copy_if_needed "$templates_dir/server.py" "$target_dir/server.py" 644
   for helper_module in "$templates_dir"/server_*.py; do
     [[ -f "$helper_module" ]] || continue
@@ -380,17 +461,89 @@ install_server_into() {
   copy_if_needed "$package_metadata_source" "$target_dir/packages/com.xuunity.light-mcp/package.json" 644
 }
 
+install_delegates_into() {
+  local target_dir="$1"
+  local neutral_dir="$2"
+  run mkdir -p "$target_dir"
+
+  # Write delegate run.sh
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write delegate run.sh to %s/run.sh\n' "$target_dir"
+  else
+    cat > "$target_dir/run.sh" <<EOF
+#!/usr/bin/env bash
+exec "$neutral_dir/run.sh" "\$@"
+EOF
+    chmod 755 "$target_dir/run.sh"
+  fi
+
+  # Write delegate run.cmd
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write delegate run.cmd to %s/run.cmd\n' "$target_dir"
+  else
+    cat > "$target_dir/run.cmd" <<EOF
+@echo off
+call "$neutral_dir\run.cmd" %*
+EOF
+    chmod 644 "$target_dir/run.cmd"
+  fi
+
+  # Write delegate run.ps1
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write delegate run.ps1 to %s/run.ps1\n' "$target_dir"
+  else
+    cat > "$target_dir/run.ps1" <<EOF
+& "$neutral_dir\run.ps1" @args
+EOF
+    chmod 644 "$target_dir/run.ps1"
+  fi
+
+  # Write delegate server.py
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write delegate server.py to %s/server.py\n' "$target_dir"
+  else
+    cat > "$target_dir/server.py" <<EOF
+import os
+import sys
+import platform
+
+neutral_dir = os.path.expanduser("$neutral_dir")
+central_server = os.path.join(neutral_dir, "server.py")
+
+system = platform.system().lower()
+if system == "windows":
+    venv_python = os.path.join(neutral_dir, ".venv", "Scripts", "python.exe")
+else:
+    venv_python = os.path.join(neutral_dir, ".venv", "bin", "python")
+
+if os.path.isfile(venv_python) and os.access(venv_python, os.X_OK):
+    python_bin = venv_python
+else:
+    python_bin = sys.executable
+
+os.execv(python_bin, [python_bin, central_server] + sys.argv[1:])
+EOF
+    chmod 644 "$target_dir/server.py"
+  fi
+}
+
 run mkdir -p "$codex_home"
+# Always install full server files to the neutral directory
+install_server_into "$neutral_install_dir"
+
 case "$target" in
   codex)
-    install_server_into "$codex_install_dir"
+    install_delegates_into "$codex_install_dir" "$neutral_install_dir"
     ;;
   claude)
-    install_server_into "$claude_install_dir"
+    install_delegates_into "$claude_install_dir" "$neutral_install_dir"
     ;;
   both)
-    install_server_into "$codex_install_dir"
-    install_server_into "$claude_install_dir"
+    install_delegates_into "$codex_install_dir" "$neutral_install_dir"
+    install_delegates_into "$claude_install_dir" "$neutral_install_dir"
+    ;;
+  neutral)
+    # Core server is already installed in neutral_install_dir
     ;;
 esac
 
@@ -428,12 +581,7 @@ else
   printf 'skipped Claude Code user-scope config install by default; use --install-claude-config to register the server in ~/.claude.json, or copy templates/clients/claude-code/.mcp.json into a repo for project scope.\n'
 fi
 
-smoke_install_dir=""
-case "$target" in
-  codex) smoke_install_dir="$codex_install_dir" ;;
-  claude) smoke_install_dir="$claude_install_dir" ;;
-  both) smoke_install_dir="$codex_install_dir" ;;
-esac
+smoke_install_dir="$neutral_install_dir"
 
 cat <<EOF
 

@@ -399,6 +399,81 @@ class SetupWizardTests(unittest.TestCase):
             self.assertEqual(1, len(result["client_config_changes"]))
             self.assertEqual(1, len(result["helper_install_changes"]))
 
+    def test_uninstall_full_reset_neutral_preservation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_tools = root / "codex-tools"
+            claude_tools = root / "claude-tools"
+            neutral_tools = root / "neutral-tools" / "xuunity-mcp"
+
+            codex_helper = codex_tools / "xuunity-mcp"
+            codex_helper.mkdir(parents=True)
+            (codex_helper / "server.py").write_text("# helper\n", encoding="utf-8")
+            (codex_helper / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+            neutral_tools.mkdir(parents=True)
+            (neutral_tools / "server.py").write_text("# helper\n", encoding="utf-8")
+            (neutral_tools / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "CODEX_TOOLS_HOME": str(codex_tools),
+                    "CLAUDE_TOOLS_HOME": str(claude_tools),
+                    "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR": str(neutral_tools),
+                },
+                clear=False,
+            ):
+                # 1. Codex full reset without other helpers should KEEP neutral
+                plan = wizard.build_uninstall_plan(
+                    mode="full-reset-current-user",
+                    project_roots=[],
+                    client="codex",
+                    include_other_client_helpers=False,
+                )
+                helper_removals = plan["preflight_review"]["helper_installs_to_remove"]
+                self.assertIn(str(codex_helper), helper_removals)
+                self.assertNotIn(str(neutral_tools), helper_removals)
+
+                # 2. Codex full reset WITH other helpers should REMOVE neutral
+                plan_all = wizard.build_uninstall_plan(
+                    mode="full-reset-current-user",
+                    project_roots=[],
+                    client="codex",
+                    include_other_client_helpers=True,
+                )
+                helper_removals_all = plan_all["preflight_review"]["helper_installs_to_remove"]
+                self.assertIn(str(codex_helper), helper_removals_all)
+                self.assertIn(str(neutral_tools), helper_removals_all)
+
+                # 3. Explicit neutral full reset should REMOVE neutral and KEEP others
+                plan_neutral = wizard.build_uninstall_plan(
+                    mode="full-reset-current-user",
+                    project_roots=[],
+                    client="neutral",
+                )
+                helper_removals_neutral = plan_neutral["preflight_review"]["helper_installs_to_remove"]
+                self.assertIn(str(neutral_tools), helper_removals_neutral)
+                self.assertNotIn(str(codex_helper), helper_removals_neutral)
+
+                # 4. Manual selection required full reset (client=None, unknown client context) should REMOVE neutral
+                with mock.patch.object(
+                    wizard,
+                    "detect_client_context",
+                    return_value={
+                        "detected_client": "unknown",
+                        "detection_basis": [],
+                        "client_context_confidence": "low",
+                    },
+                ):
+                    plan_manual = wizard.build_uninstall_plan(
+                        mode="full-reset-current-user",
+                        project_roots=[],
+                        client=None,
+                    )
+                    helper_removals_manual = plan_manual["preflight_review"]["helper_installs_to_remove"]
+                    self.assertIn(str(neutral_tools), helper_removals_manual)
+
     def test_uninstall_apply_requires_approval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = create_unity_project(

@@ -208,7 +208,7 @@ Release validation status for the current XUUnity Light package:
 
 | Area | Status | Caveat |
 | --- | --- | --- |
-| Current package source | `Release tag prepared` | Source package is `v0.3.21` at `packages/com.xuunity.light-mcp`; push the local release tag to `origin` before using it from Git UPM consumers. OpenUPM publication is still pending. |
+| Current package source | `Release tag prepared` | Source package is `v0.3.22` at `packages/com.xuunity.light-mcp`; push the local release tag to `origin` before using it from Git UPM consumers. OpenUPM publication is still pending. |
 | macOS host tools | `Repo-verified` | Shell syntax checks, JSON/TOML config parsing, and 141 host Python tests passed in the local release environment. |
 | Package self-tests | `Source and previous Git UPM verified` | Clean installed-editor matrix passed package EditMode `6/6` and PlayMode `5/5`; the previous published `v0.3.14` Git UPM tag passed the same package self-tests on Unity `2021.3.58f1`. |
 | Multi-project compile matrix | `Repo-verified` | Private multi-project consumer validation passed `9/9` projects and `38/38` compile lanes after the `v0.3.12` package path update. |

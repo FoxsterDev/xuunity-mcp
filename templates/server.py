@@ -210,7 +210,7 @@ from server_workspace_effects import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.21",
+    "version": "0.3.22",
 }
 LIGHTWEIGHT_PACKAGE_NAME = "com.xuunity.light-mcp"
 
@@ -5377,7 +5377,7 @@ def build_parser():
     uninstall_plan_cmd.add_argument("--recursive", action="store_true")
     uninstall_plan_cmd.add_argument(
         "--client",
-        choices=["auto", "codex", "claude_code", "cursor", "windsurf", "claude_desktop"],
+        choices=["auto", "codex", "claude_code", "cursor", "windsurf", "claude_desktop", "neutral"],
         default="auto",
     )
     uninstall_plan_cmd.add_argument("--include-other-client-helpers", action="store_true")
