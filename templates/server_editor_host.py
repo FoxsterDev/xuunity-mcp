@@ -24,7 +24,7 @@ from server_bridge_runtime import (
     try_read_live_editor_state,
 )
 from server_core import ToolInvocationError, read_json, write_json
-from server_host_platform import current_host_platform_adapter
+from server_host_platform import current_host_platform_adapter, host_path_to_local_path, is_wsl, wsl_to_windows_path
 from server_specs import STARTUP_POLICIES
 
 ACTIVATION_DELAY_SECONDS = 0.35
@@ -79,8 +79,9 @@ def version_sort_key(version: str) -> tuple[Any, ...]:
 
 
 def normalize_unity_installation_path(path: Path) -> Path | None:
-    candidate = path.expanduser().resolve()
+    candidate = Path(host_path_to_local_path(path)).expanduser().resolve()
     platform_kind = host_platform_kind()
+    in_wsl = is_wsl()
 
     if platform_kind == "macos":
         if candidate.is_file() and candidate.name == "Unity" and candidate.parent.name == "MacOS":
@@ -91,16 +92,17 @@ def normalize_unity_installation_path(path: Path) -> Path | None:
             return candidate
         return None
 
-    if platform_kind == "windows":
-        if candidate.is_file() and candidate.name.lower() == "unity.exe":
+    if platform_kind == "windows" or in_wsl:
+        if candidate.is_file() and candidate.name.lower() in ("unity.exe", "unity"):
             return candidate
         if candidate.is_dir():
-            direct = candidate / "Unity.exe"
-            nested = candidate / "Editor" / "Unity.exe"
-            if direct.is_file():
-                return direct
-            if nested.is_file():
-                return nested
+            for name in ("Unity.exe", "Unity", "unity.exe", "unity"):
+                direct = candidate / name
+                nested = candidate / "Editor" / name
+                if direct.is_file():
+                    return direct
+                if nested.is_file():
+                    return nested
         return None
 
     if candidate.is_file() and candidate.name == "Unity":
@@ -154,12 +156,19 @@ def configured_unity_editor_roots() -> list[Path]:
     if not raw:
         return []
 
+    if is_wsl() and ";" in raw:
+        entries = raw.split(";")
+    elif is_wsl() and re.match(r"^[A-Za-z]:[\\/]", raw):
+        entries = [raw]
+    else:
+        entries = raw.split(os.pathsep)
+
     roots: list[Path] = []
-    for entry in raw.split(os.pathsep):
+    for entry in entries:
         entry = entry.strip()
         if not entry:
             continue
-        roots.append(Path(entry).expanduser())
+        roots.append(Path(host_path_to_local_path(entry)).expanduser())
     return roots
 
 
@@ -170,22 +179,36 @@ def candidate_unity_editor_roots() -> list[Path]:
 
     platform_kind = host_platform_kind()
     roots: list[Path] = []
+    in_wsl = is_wsl()
 
     if platform_kind == "macos":
         roots.append(Path("/Applications/Unity/Hub/Editor"))
         return roots
 
-    if platform_kind == "windows":
+    if platform_kind == "windows" or in_wsl:
         seen: set[str] = set()
-        for env_name in ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"):
-            value = (os.environ.get(env_name) or "").strip()
-            if not value:
-                continue
-            expanded = str(Path(value).expanduser())
-            if expanded.lower() in seen:
-                continue
-            seen.add(expanded.lower())
-            roots.append(Path(expanded))
+        if platform_kind == "windows":
+            for env_name in ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"):
+                value = (os.environ.get(env_name) or "").strip()
+                if not value:
+                    continue
+                expanded = str(Path(value).expanduser())
+                if expanded.lower() in seen:
+                    continue
+                seen.add(expanded.lower())
+                roots.append(Path(expanded))
+        else:
+            for drive in ("c", "d", "e"):
+                drive_root = Path(f"/mnt/{drive}")
+                if drive_root.is_dir():
+                    roots.append(drive_root)
+                for pf in ("Program Files", "Program Files (x86)", "ProgramFiles", "ProgramFiles (x86)", "ProgramW6432"):
+                    path = Path(f"/mnt/{drive}/{pf}")
+                    if path.is_dir():
+                        roots.append(path)
+            roots.append(Path.home() / "Unity" / "Hub" / "Editor")
+            roots.append(Path("/opt/Unity/Hub/Editor"))
+            roots.append(Path("/opt/unity/Hub/Editor"))
         return roots
 
     roots.append(Path.home() / "Unity" / "Hub" / "Editor")
@@ -196,6 +219,7 @@ def candidate_unity_editor_roots() -> list[Path]:
 
 def iter_candidate_installation_paths_from_root(root: Path) -> list[Path]:
     platform_kind = host_platform_kind()
+    in_wsl = is_wsl()
     candidates: list[Path] = []
 
     normalized_root = normalize_unity_installation_path(root)
@@ -210,10 +234,19 @@ def iter_candidate_installation_paths_from_root(root: Path) -> list[Path]:
         candidates.extend(sorted(root.glob("*/Unity.app")))
         return candidates
 
-    if platform_kind == "windows":
+    if platform_kind == "windows" or in_wsl:
         candidates.extend(sorted(root.glob("Unity/Hub/Editor/*/Editor/Unity.exe")))
+        candidates.extend(sorted(root.glob("UnityHub/Editor/*/Editor/Unity.exe")))
+        candidates.extend(sorted(root.glob("Unity*/Editor/*/Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("Unity*/Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("Unity/Editor/Unity.exe")))
+        candidates.extend(sorted(root.glob("Program*/Unity*/Editor/*/Editor/Unity.exe")))
+        candidates.extend(sorted(root.glob("Unity/Hub/Editor/*/Editor/Unity")))
+        candidates.extend(sorted(root.glob("UnityHub/Editor/*/Editor/Unity")))
+        candidates.extend(sorted(root.glob("Unity*/Editor/*/Editor/Unity")))
+        candidates.extend(sorted(root.glob("Unity*/Editor/Unity")))
+        candidates.extend(sorted(root.glob("Unity/Editor/Unity")))
+        candidates.extend(sorted(root.glob("Program*/Unity*/Editor/*/Editor/Unity")))
         return candidates
 
     candidates.extend(sorted(root.glob("*/Editor/Unity")))
@@ -346,13 +379,16 @@ def _normalized_project_match_key(path_value: str | Path) -> str:
     text = str(path_value or "").strip()
     if not text:
         return ""
+    text = text.replace("\\", "/")
+    if is_wsl() and len(text) >= 2 and text[1] == ":" and text[0].isalpha():
+        drive = text[0].lower()
+        text = f"/mnt/{drive}{text[2:]}"
     try:
         resolved = str(Path(text).expanduser().resolve())
     except OSError:
         resolved = str(Path(text).expanduser())
     normalized = resolved.replace("\\", "/").rstrip("/")
-    if os.name == "nt":
-        normalized = normalized.lower()
+    normalized = normalized.lower()
     return normalized
 
 
@@ -993,12 +1029,14 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
             launched_pid = int(launched_editor["pid"])
         else:
             unity_executable = resolve_unity_executable(unity_app)
+            project_path_str = wsl_to_windows_path(project_root) if is_wsl() else str(project_root)
+            log_path_str = wsl_to_windows_path(log_path) if is_wsl() else str(log_path)
             launch_command = [
                 str(unity_executable),
                 "-projectPath",
-                str(project_root),
+                project_path_str,
                 "-logFile",
-                str(log_path),
+                log_path_str,
             ]
             popen_kwargs: dict[str, Any] = {
                 "stdout": subprocess.DEVNULL,
@@ -1049,24 +1087,27 @@ def build_plain_batch_build_command(
     build_options: list[str],
 ) -> list[str]:
     unity_binary = resolve_unity_executable(unity_app)
+    project_path_str = wsl_to_windows_path(project_root) if is_wsl() else str(project_root)
+    log_path_str = wsl_to_windows_path(log_path) if is_wsl() else str(log_path)
+    result_path_str = wsl_to_windows_path(result_path) if is_wsl() else str(result_path)
 
     command = [
         str(unity_binary),
         "-batchmode",
         "-quit",
         "-projectPath",
-        str(project_root),
+        project_path_str,
         "-buildTarget",
         build_target,
         "-logFile",
-        str(log_path),
+        log_path_str,
         "-executeMethod",
         "XUUnity.LightMcp.Editor.Batch.XUUnityLightMcpBatchBuildCli.ExecuteFromCommandLine",
         "--",
         "--xuunity-build-target",
         build_target,
         "--xuunity-result-file",
-        str(result_path),
+        result_path_str,
     ]
 
     if output_path:
@@ -1093,20 +1134,23 @@ def build_batch_validation_command(
         if action == "editmode-tests"
         else "XUUnity.LightMcp.Editor.Batch.XUUnityLightMcpBatchValidationCli.ExecuteFromCommandLine"
     )
+    project_path_str = wsl_to_windows_path(project_root) if is_wsl() else str(project_root)
+    log_path_str = wsl_to_windows_path(log_path) if is_wsl() else str(log_path)
+    result_path_str = wsl_to_windows_path(result_path) if is_wsl() else str(result_path)
     command = [
         str(unity_binary),
         "-batchmode",
         "-projectPath",
-        str(project_root),
+        project_path_str,
         "-logFile",
-        str(log_path),
+        log_path_str,
         "-executeMethod",
         execute_method,
         "--",
         "--xuunity-batch-action",
         action,
         "--xuunity-result-file",
-        str(result_path),
+        result_path_str,
     ]
 
     if extra_args:
@@ -1118,10 +1162,27 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
     if pid <= 0 or not pid_is_alive(pid):
         return True
 
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except OSError:
-        return not pid_is_alive(pid)
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, check=False)
+        except Exception:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+    elif is_wsl():
+        try:
+            subprocess.run(["taskkill.exe", "/F", "/PID", str(pid)], capture_output=True, check=False)
+        except Exception:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+    else:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            return not pid_is_alive(pid)
 
     deadline = time.time() + (max(1000, timeout_ms) / 1000.0)
     while time.time() < deadline:

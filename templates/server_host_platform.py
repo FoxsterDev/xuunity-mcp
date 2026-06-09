@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -16,15 +17,63 @@ class HostPlatformAdapter:
         if pid <= 0:
             return False
 
+        if os.name == "nt":
+            try:
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                handle = kernel32.OpenProcess(0x1000, False, pid)
+                if not handle:
+                    return kernel32.GetLastError() == 5
+
+                exit_code = ctypes.c_ulong()
+                success = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+                kernel32.CloseHandle(handle)
+
+                if success:
+                    return exit_code.value == 259
+                return False
+            except Exception:
+                try:
+                    completed = subprocess.run(
+                        ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    return windows_tasklist_contains_pid(completed.stdout, pid)
+                except Exception:
+                    return False
+
         try:
             os.kill(pid, 0)
-        except OSError:
-            return False
-        return True
+            return True
+        except (OSError, SystemError):
+            pass
+
+        if is_wsl():
+            try:
+                completed = subprocess.run(
+                    ["tasklist.exe", "/FI", f"PID eq {pid}", "/NH"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                return windows_tasklist_contains_pid(completed.stdout, pid)
+            except Exception:
+                pass
+
+        return False
 
     def list_process_commands_report(self) -> dict[str, object]:
-        if os.name == "nt":
-            shell_path = shutil.which("powershell") or shutil.which("powershell.exe") or shutil.which("pwsh")
+        if os.name == "nt" or is_wsl():
+            shell_name = "powershell.exe" if is_wsl() else "powershell"
+            shell_path = (
+                shutil.which(shell_name) or
+                shutil.which("powershell") or
+                shutil.which("powershell.exe") or
+                shutil.which("pwsh") or
+                shutil.which("pwsh.exe")
+            )
             if not shell_path:
                 return {
                     "available": False,
@@ -172,6 +221,76 @@ class HostPlatformAdapter:
         report = self.list_process_commands_report()
         commands = report.get("commands") if isinstance(report, dict) else []
         return list(commands or [])
+
+
+def is_wsl() -> bool:
+    if sys.platform == "linux":
+        try:
+            with open("/proc/version", "r") as f:
+                if "microsoft" in f.read().lower():
+                    return True
+        except Exception:
+            pass
+    return False
+
+
+def windows_tasklist_contains_pid(output: str, pid: int) -> bool:
+    target = str(pid)
+    for line in str(output or "").splitlines():
+        if re.search(rf"(^|\s){re.escape(target)}(\s|$)", line):
+            return True
+    return False
+
+
+def windows_to_wsl_path(path: str | Path) -> str:
+    path_str = str(path).strip()
+    if not path_str or not is_wsl():
+        return path_str
+
+    try:
+        completed = subprocess.run(
+            ["wslpath", "-u", path_str],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        converted = completed.stdout.strip()
+        if converted:
+            return converted
+    except Exception:
+        pass
+
+    match = re.match(r"^([A-Za-z]):[\\/]*(.*)$", path_str)
+    if match:
+        drive, rest = match.groups()
+        normalized_rest = rest.replace("\\", "/").strip("/")
+        return f"/mnt/{drive.lower()}/{normalized_rest}" if normalized_rest else f"/mnt/{drive.lower()}"
+    return path_str
+
+
+def host_path_to_local_path(path: str | Path) -> str:
+    return windows_to_wsl_path(path) if is_wsl() else str(path)
+
+
+def wsl_to_windows_path(path: str | Path) -> str:
+    path_str = str(path)
+    if is_wsl():
+        try:
+            completed = subprocess.run(
+                ["wslpath", "-w", path_str],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return completed.stdout.strip()
+        except Exception:
+            if path_str.startswith("/mnt/"):
+                parts = path_str.split("/", 3)
+                if len(parts) >= 3:
+                    drive = parts[2].upper()
+                    rest = parts[3].replace("/", "\\") if len(parts) > 3 else ""
+                    return f"{drive}:\\{rest}"
+    return path_str
 
 
 def host_platform_kind() -> str:

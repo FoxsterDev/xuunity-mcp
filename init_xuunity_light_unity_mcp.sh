@@ -134,6 +134,14 @@ neutral_run_path="$neutral_install_dir/run.sh"
 
 resolve_python_bin() {
   if [[ -n "${PYTHON:-}" ]]; then
+    if [[ "$PYTHON" == "py -3" ]] && command -v py >/dev/null 2>&1; then
+      command -v py
+      return 0
+    fi
+    if [[ "$PYTHON" != */* && "$PYTHON" != *" "* ]] && command -v "$PYTHON" >/dev/null 2>&1; then
+      command -v "$PYTHON"
+      return 0
+    fi
     printf '%s\n' "$PYTHON"
     return 0
   fi
@@ -146,15 +154,33 @@ resolve_python_bin() {
     return 0
   fi
   if command -v py >/dev/null 2>&1; then
-    printf '%s\n' "py -3"
+    command -v py
     return 0
   fi
   echo "Python 3 was not found. Install Python 3 or set PYTHON to its executable path." >&2
   exit 1
 }
 
+PYTHON_BIN="$(resolve_python_bin)"
+PYTHON_ARGS=()
+PYTHON_ARGS_SET=0
+case "$(basename "$PYTHON_BIN" | tr '[:upper:]' '[:lower:]')" in
+  py|py.exe)
+    PYTHON_ARGS=(-3)
+    PYTHON_ARGS_SET=1
+    ;;
+esac
+
+python3() {
+  if [[ "$PYTHON_ARGS_SET" == "1" ]]; then
+    "$PYTHON_BIN" "${PYTHON_ARGS[@]}" "$@"
+  else
+    "$PYTHON_BIN" "$@"
+  fi
+}
+
 python_version_supported() {
-  "$1" - "$minimum_python_version" <<'PY'
+  python3 - "$minimum_python_version" <<'PY'
 import re
 import sys
 
@@ -164,16 +190,11 @@ raise SystemExit(0 if current >= minimum else 1)
 PY
 }
 
-PYTHON_BIN="$(resolve_python_bin)"
-if ! python_version_supported "$PYTHON_BIN"; then
-  current_python_version="$("$PYTHON_BIN" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || printf 'unknown')"
+if ! python_version_supported; then
+  current_python_version="$(python3 -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || printf 'unknown')"
   printf 'Python %s or newer is required. Selected interpreter reports %s. Set PYTHON to a Python 3.10+ executable.\n' "$minimum_python_version" "$current_python_version" >&2
   exit 1
 fi
-
-python3() {
-  "$PYTHON_BIN" "$@"
-}
 
 run() {
   if [[ $dry_run -eq 1 ]]; then
@@ -426,7 +447,7 @@ setup_venv_if_needed() {
   printf 'Setting up Python virtual environment in %s/.venv...\n' "$target_dir"
   run mkdir -p "$target_dir"
 
-  if ! "$PYTHON_BIN" -m venv "$venv_dir" >/dev/null 2>&1; then
+  if ! python3 -m venv "$venv_dir" >/dev/null 2>&1; then
     printf 'Warning: "python -m venv" failed. Falling back to direct script execution without isolated venv.\n' >&2
     return 0
   fi

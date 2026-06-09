@@ -15,8 +15,22 @@ class ToolInvocationError(Exception):
 
 
 def read_json(path: Path) -> Any:
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    raw_bytes = path.read_bytes()
+    encodings = ["utf-8-sig", "utf-16"]
+    if raw_bytes.startswith(b"\xff\xfe"):
+        encodings = ["utf-16", "utf-8-sig"]
+    elif raw_bytes.startswith(b"\xfe\xff"):
+        encodings = ["utf-16", "utf-8-sig"]
+
+    last_error: Exception | None = None
+    for encoding in encodings:
+        try:
+            return json.loads(raw_bytes.decode(encoding))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    return json.loads(raw_bytes.decode("utf-8-sig"))
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -65,4 +79,3 @@ def wrap_globals_with_proxies(module_globals: dict[str, Any], names: list[str]) 
 
 import functools
 import sys
-

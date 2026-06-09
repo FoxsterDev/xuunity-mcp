@@ -183,6 +183,14 @@ MINIMUM_PYTHON_VERSION="3.10"
 
 resolve_python_bin() {
   if [[ -n "${PYTHON:-}" ]]; then
+    if [[ "$PYTHON" == "py -3" ]] && command -v py >/dev/null 2>&1; then
+      command -v py
+      return 0
+    fi
+    if [[ "$PYTHON" != */* && "$PYTHON" != *" "* ]] && command -v "$PYTHON" >/dev/null 2>&1; then
+      command -v "$PYTHON"
+      return 0
+    fi
     printf '%s\n' "$PYTHON"
     return 0
   fi
@@ -195,15 +203,41 @@ resolve_python_bin() {
     return 0
   fi
   if command -v py >/dev/null 2>&1; then
-    printf '%s\n' "py -3"
+    command -v py
     return 0
   fi
   echo "Python 3 was not found. Install Python 3 or set PYTHON to its executable path." >&2
   exit 1
 }
 
+PYTHON_BIN="$(resolve_python_bin)"
+PYTHON_ARGS=()
+PYTHON_ARGS_SET=0
+case "$(basename "$PYTHON_BIN" | tr '[:upper:]' '[:lower:]')" in
+  py|py.exe)
+    PYTHON_ARGS=(-3)
+    PYTHON_ARGS_SET=1
+    ;;
+esac
+
+python3() {
+  if [[ "$PYTHON_ARGS_SET" == "1" ]]; then
+    "$PYTHON_BIN" "${PYTHON_ARGS[@]}" "$@"
+  else
+    "$PYTHON_BIN" "$@"
+  fi
+}
+
+exec_python() {
+  if [[ "$PYTHON_ARGS_SET" == "1" ]]; then
+    exec "$PYTHON_BIN" "${PYTHON_ARGS[@]}" "$@"
+  else
+    exec "$PYTHON_BIN" "$@"
+  fi
+}
+
 python_version_supported() {
-  "$1" - "$MINIMUM_PYTHON_VERSION" <<'PY'
+  python3 - "$MINIMUM_PYTHON_VERSION" <<'PY'
 import re
 import sys
 
@@ -213,16 +247,11 @@ raise SystemExit(0 if current >= minimum else 1)
 PY
 }
 
-PYTHON_BIN="$(resolve_python_bin)"
-if ! python_version_supported "$PYTHON_BIN"; then
-  current_python_version="$("$PYTHON_BIN" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || printf 'unknown')"
+if ! python_version_supported; then
+  current_python_version="$(python3 -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || printf 'unknown')"
   printf 'Python %s or newer is required. Selected interpreter reports %s. Set PYTHON to a Python 3.10+ executable.\n' "$MINIMUM_PYTHON_VERSION" "$current_python_version" >&2
   exit 1
 fi
-
-python3() {
-  "$PYTHON_BIN" "$@"
-}
 
 require_command() {
   local command_name="$1"
@@ -429,7 +458,7 @@ run_server_with_optional_compact_summary() {
   shift
 
   if [[ "$COMPACT_SUMMARY" != "true" ]]; then
-    exec python3 "$server_path" "$@"
+    exec_python "$server_path" "$@"
   fi
 
   local stdout_file
@@ -630,7 +659,6 @@ PY
 }
 
 switch_project_to_devmode() {
-  require_command python3
 
   local project_root
   project_root="$(require_project_root_argument "$@")"
@@ -661,7 +689,6 @@ PY
 
 switch_project_to_prodmode() {
   require_command git
-  require_command python3
 
   local project_root
   project_root="$(require_project_root_argument "$@")"
@@ -748,7 +775,7 @@ dispatch_arrange_unity_windows() {
     exit 1
   fi
 
-  exec python3 "$arrange_script_path" "$@"
+  exec_python "$arrange_script_path" "$@"
 }
 
 print_wrapper_help() {

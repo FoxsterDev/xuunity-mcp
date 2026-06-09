@@ -14,7 +14,7 @@ from server_editor_host import (
     resolve_unity_app_version,
     resolve_unity_executable,
 )
-from server_host_platform import current_host_platform_adapter
+from server_host_platform import current_host_platform_adapter, is_wsl, wsl_to_windows_path
 
 
 LICENSE_CAPABILITIES_CACHE_SCHEMA = 3
@@ -184,14 +184,16 @@ def build_license_capabilities(
     timeout_ms = max(1000, int(timeout_ms or LICENSE_PROBE_DEFAULT_TIMEOUT_MS))
     probe_log_path = default_license_probe_log_path(project_root)
     probe_log_path.parent.mkdir(parents=True, exist_ok=True)
+    project_path_str = wsl_to_windows_path(project_root) if is_wsl() else str(project_root)
+    probe_log_path_str = wsl_to_windows_path(probe_log_path) if is_wsl() else str(probe_log_path)
     command = [
         str(unity_executable),
         "-batchmode",
         "-quit",
         "-projectPath",
-        str(project_root),
+        project_path_str,
         "-logFile",
-        str(probe_log_path),
+        probe_log_path_str,
     ]
 
     stdout = ""
