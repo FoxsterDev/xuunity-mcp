@@ -11,6 +11,16 @@ produces reusable lessons without project-specific details. Project-specific
 evidence, product names, local paths, private request ids, and consumer-project
 business context should stay in project-local or host-local outputs.
 
+Storage rule:
+
+- Public-safe reusable MCP retros live here.
+- Host-private, project-specific, or raw-evidence MCP retros belong in the
+  host's single `Operations/XUUnityLightUnityMcp/Retros/` folder.
+- Do not create per-project MCP retro folders.
+- Do not place MCP retros in a broad host report bucket.
+- Whenever a public retro is added, moved, renamed, or deleted, update
+  `RETRO_REGISTRY.md` in the same change.
+
 When a retro produces an implementation plan, link the plan from
 `../../architecture/designs/DESIGN_PLAN_HISTORY.md`. After implementation,
 write or update a post-retro note that states:
@@ -37,3 +47,4 @@ operator or lifecycle behavior.
 - `2026-05-21_project_hook_batch_build_operator_retro.md`
 - `2026-05-23_devmode_batch_lifecycle_retro.md`
 - `2026-05-23_optional_capability_setup_wizard_retro.md`
+- `2026-06-07_xuunity_mcp_batch_compile_reliability_retro.md`

@@ -104,6 +104,12 @@ Scoring categories:
 Promotion rule:
 - project-specific evidence stays local
 - reusable lifecycle, transport, retry, status-summary, smoke-order, and operator-guidance improvements should be promoted into public AIRoot docs or wrapper surfaces
+- choose the retro storage destination before writing:
+  - public-safe reusable MCP retros and lessons go under `AIRoot/Operations/XUUnityLightUnityMcp/docs/archive/retros/`
+  - host-private, project-specific, or raw-evidence MCP retros go under the host's single `Operations/XUUnityLightUnityMcp/Retros/`
+  - do not create per-project MCP retro folders
+  - do not use a broad host report bucket for MCP retros
+  - whenever a durable retro is added, moved, renamed, or deleted, update the registry in the same destination
 
 Do not stop at describing the failure.
 End with concrete reusable changes to:
@@ -118,7 +124,7 @@ End with concrete reusable changes to:
 
 A good run should usually yield some combination of:
 
-- a local audit report
+- a retro saved to the narrowest correct MCP retro destination
 - a short executive summary
 - an apply package for concrete fixes
 - public promotion candidates for:
@@ -136,7 +142,11 @@ When the retrospective finds reusable value, prefer promoting into:
 - docs and operator contracts under `AIRoot/Operations/XUUnityLightUnityMcp/`
 - public-safe feature retros and lessons under `AIRoot/Operations/XUUnityLightUnityMcp/docs/archive/retros/`
 - wrapper/runtime templates under `AIRoot/Operations/XUUnityLightUnityMcp/templates/`
-- project-local audit/output folders only for one-off evidence and historical trace
+- host-local `Operations/XUUnityLightUnityMcp/Retros/` only for private,
+  project-specific, or raw evidence that is not public-safe as-is
+
+Registry rule:
+- update `RETRO_REGISTRY.md` beside the saved retro in the same change
 
 ## Notes
 

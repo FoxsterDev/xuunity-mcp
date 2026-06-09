@@ -298,12 +298,23 @@ When a chat provides a concrete MCP design or implementation plan:
 1. save a public-safe plan under `../architecture/designs/` when it is a feature,
    tool-surface, lifecycle, operator, or runtime design
 2. save retro-derived action plans or lesson records under `../archive/retros/`
-   when the source is an incident or weak operator session
+   when the source is an incident or weak operator session and the result is
+   public-safe
 3. update `../architecture/designs/DESIGN_PLAN_HISTORY.md` with status,
    implementation evidence, and remaining gaps
 4. after implementation, self-review the code/docs diff before final closeout
 5. record post-retro notes: what went well, where risks remain, what validation
    proved, and what follow-up should remain visible
+
+When the retro contains host-private or consumer-project evidence, keep the raw
+retro in the host's single MCP-specific retro area instead of a broad report
+bucket or a per-project retro folder:
+
+- private, project-specific, or raw evidence: `Operations/XUUnityLightUnityMcp/Retros/`
+
+Only sanitized reusable lessons should be copied into `../archive/retros/`.
+Whenever a durable retro is added, moved, renamed, or deleted, update the
+`RETRO_REGISTRY.md` in the same destination.
 
 Self-review should check:
 
