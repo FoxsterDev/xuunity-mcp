@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 0.3.24
+
+Release tag: `v0.3.24`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.24
+```
+
+### Changed
+
+- Fixed Windows Git Bash wrapper delegation so setup and server commands use
+  the resolved Python interpreter, including `python`, `python3`, and `py -3`
+  launcher paths.
+- Hardened setup plan/apply JSON loading for UTF-8, UTF-8 BOM, and UTF-16 plan
+  files produced by common PowerShell capture flows.
+- Improved Windows and WSL editor discovery, PID liveness checks, and path
+  conversion for Windows-installed Unity editors used from WSL helpers.
+- Added cross-platform compatibility regression tests for Windows, WSL, macOS,
+  Linux, and shell wrapper Python launcher handling.
+- Released `v0.3.24` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ## 0.3.23
 
 Release tag: `v0.3.23`
