@@ -7,7 +7,11 @@ if not defined XUUNITY_LIGHT_UNITY_MCP_SERVER (
 )
 
 if defined PYTHON (
-  "%PYTHON%" "%XUUNITY_LIGHT_UNITY_MCP_SERVER%" %*
+  if "%PYTHON%"=="py -3" (
+    py -3 "%XUUNITY_LIGHT_UNITY_MCP_SERVER%" %*
+  ) else (
+    "%PYTHON%" "%XUUNITY_LIGHT_UNITY_MCP_SERVER%" %*
+  )
   exit /b %ERRORLEVEL%
 )
 

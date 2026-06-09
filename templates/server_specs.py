@@ -333,8 +333,8 @@ TOOLS: dict[str, dict[str, Any]] = {
             "properties": {
                 "mode": {
                     "type": "string",
-                    "enum": ["project-only-cleanup", "full-reset-current-user"],
-                    "description": "project-only-cleanup removes only project-level setup; full-reset-current-user also plans current-user client/helper cleanup."
+                    "enum": ["project-only-cleanup", "full-reset-current-user", "current-user-reset"],
+                    "description": "project-only-cleanup removes only project-level setup; full-reset-current-user also plans current-user client/helper cleanup. current-user-reset is accepted as an alias for full-reset-current-user."
                 },
                 "workspaceRoot": {
                     "type": "string",

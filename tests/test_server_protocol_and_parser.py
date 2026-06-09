@@ -151,6 +151,17 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertEqual("uninstall-apply", apply_args.command)
         self.assertTrue(apply_args.yes)
 
+        alias_args = parser.parse_args(
+            [
+                "uninstall-plan",
+                "--mode",
+                "current-user-reset",
+                "--client",
+                "codex",
+            ]
+        )
+        self.assertEqual("current-user-reset", alias_args.mode)
+
     def test_project_action_catalog_parser_resolves_aliases_and_hook_names(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             catalog_path = Path(temp_dir) / "project_actions.yaml"

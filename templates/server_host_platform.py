@@ -252,9 +252,28 @@ def is_wsl() -> bool:
 def windows_tasklist_contains_pid(output: str, pid: int) -> bool:
     target = int(pid)
     for line in str(output or "").splitlines():
-        parsed_pid = windows_tasklist_process_pid(line)
-        if parsed_pid == target:
-            return True
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith('"'):
+            try:
+                fields = next(csv.reader([stripped]))
+            except Exception:
+                fields = []
+            if len(fields) >= 2:
+                try:
+                    if int(fields[1]) == target and "unity" in fields[0].lower():
+                        return True
+                except ValueError:
+                    pass
+        else:
+            parts = stripped.split()
+            if len(parts) >= 2:
+                try:
+                    if int(parts[1]) == target and "unity" in parts[0].lower():
+                        return True
+                except ValueError:
+                    pass
     return False
 
 
@@ -296,8 +315,16 @@ def wsl_linux_unity_interop_pid_status(pid: int) -> bool | None:
     if pid <= 0 or not is_wsl():
         return None
 
-    cmdline_path = WSL_PROC_ROOT / str(pid) / "cmdline"
+    proc_pid_dir = WSL_PROC_ROOT / str(pid)
+    cmdline_path = proc_pid_dir / "cmdline"
     if not cmdline_path.is_file():
+        return None
+
+    try:
+        exe_link = os.readlink(str(proc_pid_dir / "exe"))
+        if "init" not in os.path.basename(exe_link):
+            return None
+    except OSError:
         return None
 
     try:

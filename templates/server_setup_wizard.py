@@ -17,8 +17,15 @@ TEST_FRAMEWORK_CAPABILITY_DEFINE = "XUUNITY_LIGHT_MCP_TESTS_CAPABILITY"
 DEFAULT_GIT_REPO_URL = "https://github.com/FoxsterDev/xuunity-mcp.git"
 UNINSTALL_MODE_PROJECT_ONLY = "project-only-cleanup"
 UNINSTALL_MODE_FULL_RESET = "full-reset-current-user"
+UNINSTALL_MODE_FULL_RESET_ALIAS = "current-user-reset"
 UNINSTALL_MODES = {UNINSTALL_MODE_PROJECT_ONLY, UNINSTALL_MODE_FULL_RESET}
+UNINSTALL_MODE_ALIASES = {UNINSTALL_MODE_FULL_RESET_ALIAS: UNINSTALL_MODE_FULL_RESET}
+UNINSTALL_MODE_INPUTS = UNINSTALL_MODES | set(UNINSTALL_MODE_ALIASES)
 SUPPORTED_USER_CLIENTS = {"codex", "claude_code", "cursor", "windsurf", "claude_desktop", "neutral"}
+
+
+def normalize_uninstall_mode(mode: str) -> str:
+    return UNINSTALL_MODE_ALIASES.get(mode, mode)
 
 
 def parse_unity_version(project_root: Path) -> str:
@@ -736,12 +743,14 @@ def build_uninstall_plan(
     client: str | None = None,
     include_other_client_helpers: bool = False,
 ) -> dict[str, Any]:
-    if mode not in UNINSTALL_MODES:
+    requested_mode = str(mode or "")
+    if requested_mode not in UNINSTALL_MODE_INPUTS:
         raise ToolInvocationError(
             "invalid_uninstall_mode",
-            f"Unsupported uninstall mode: {mode}",
-            {"supported_modes": sorted(UNINSTALL_MODES)},
+            f"Unsupported uninstall mode: {requested_mode}",
+            {"supported_modes": sorted(UNINSTALL_MODE_INPUTS)},
         )
+    mode = normalize_uninstall_mode(requested_mode)
     if mode == UNINSTALL_MODE_PROJECT_ONLY and not project_roots:
         raise ToolInvocationError(
             "project_root_required",
@@ -1393,13 +1402,14 @@ def apply_uninstall_plan(plan: dict[str, Any], *, approve: bool) -> dict[str, An
         raise ToolInvocationError("approval_required", "uninstall-apply requires --yes or approve=true.")
     if not isinstance(plan, dict) or plan.get("action") != "uninstall_plan":
         raise ToolInvocationError("invalid_uninstall_plan", "Uninstall plan must be a JSON object from uninstall-plan.")
-    mode = str(plan.get("mode") or "")
-    if mode not in UNINSTALL_MODES:
+    requested_mode = str(plan.get("mode") or "")
+    if requested_mode not in UNINSTALL_MODE_INPUTS:
         raise ToolInvocationError(
             "invalid_uninstall_mode",
-            f"Unsupported uninstall mode in plan: {mode}",
-            {"supported_modes": sorted(UNINSTALL_MODES)},
+            f"Unsupported uninstall mode in plan: {requested_mode}",
+            {"supported_modes": sorted(UNINSTALL_MODE_INPUTS)},
         )
+    mode = normalize_uninstall_mode(requested_mode)
 
     applied_projects: list[dict[str, Any]] = []
     for project in list(plan.get("projects") or []):
@@ -1595,4 +1605,3 @@ def require_test_framework_capability_for_batch(project_root: Path) -> dict[str,
             "unity_version": unity_version,
         },
     )
-

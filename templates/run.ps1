@@ -7,7 +7,11 @@ if ([string]::IsNullOrWhiteSpace($serverFile)) {
 }
 
 if (-not [string]::IsNullOrWhiteSpace($env:PYTHON)) {
-    & $env:PYTHON $serverFile @args
+    if ($env:PYTHON -eq "py -3") {
+        & py -3 $serverFile @args
+    } else {
+        & $env:PYTHON $serverFile @args
+    }
     exit $LASTEXITCODE
 }
 

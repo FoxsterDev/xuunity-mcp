@@ -1603,13 +1603,15 @@ def cmd_batch_compile_matrix(args):
         else default_batch_operation_result_path(project_root, "compile_matrix")
     )
 
+    from server_host_platform import is_wsl, wsl_to_windows_path
+    config_file_host = wsl_to_windows_path(config_file) if is_wsl() else str(config_file)
     command = build_batch_validation_command(
         project_root=project_root,
         unity_app=unity_app,
         log_path=log_path,
         result_path=result_path,
         action="compile-matrix",
-        extra_args=["--xuunity-config-file", str(config_file)],
+        extra_args=["--xuunity-config-file", config_file_host],
     )
     payload = {
         "action": "batch_compile_matrix",
@@ -1664,22 +1666,27 @@ def cmd_batch_build_config_compile_matrix(args):
         else default_batch_operation_result_path(project_root, "build_config_compile_matrix")
     )
 
+    temp_dir = project_root / "Library" / "XUUnityLightMcp" / "temp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w",
         encoding="utf-8",
+        dir=str(temp_dir),
         suffix="_xuunity_compile_matrix.json",
         delete=False,
     ) as temp_file:
         temp_config_path = Path(temp_file.name)
     try:
         temp_config_path.write_text(json.dumps(compile_plan["matrixArgs"], indent=2) + "\n", encoding="utf-8")
+        from server_host_platform import is_wsl, wsl_to_windows_path
+        temp_config_path_host = wsl_to_windows_path(temp_config_path) if is_wsl() else str(temp_config_path)
         command = build_batch_validation_command(
             project_root=project_root,
             unity_app=unity_app,
             log_path=log_path,
             result_path=result_path,
             action="compile-matrix",
-            extra_args=["--xuunity-config-file", str(temp_config_path)],
+            extra_args=["--xuunity-config-file", temp_config_path_host],
         )
         payload = {
             "action": "batch_build_config_compile_matrix",

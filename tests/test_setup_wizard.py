@@ -340,6 +340,27 @@ class SetupWizardTests(unittest.TestCase):
             self.assertIn("com.xuunity.light-mcp", sibling_manifest["dependencies"])
             self.assertTrue((sibling_root / "Library" / "XUUnityLightMcp").exists())
 
+    def test_uninstall_full_reset_accepts_current_user_reset_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "CODEX_HOME": str(root / "codex-home"),
+                    "CODEX_TOOLS_HOME": str(root / "codex-tools"),
+                    "CODEX_SHELL": "1",
+                },
+                clear=False,
+            ):
+                plan = wizard.build_uninstall_plan(
+                    mode="current-user-reset",
+                    project_roots=[],
+                    client="codex",
+                )
+
+        self.assertEqual("uninstall_plan", plan["action"])
+        self.assertEqual("full-reset-current-user", plan["mode"])
+
     def test_uninstall_full_reset_removes_only_codex_block_and_selected_helper(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

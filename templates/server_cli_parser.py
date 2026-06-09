@@ -67,7 +67,11 @@ def build_parser() -> argparse.ArgumentParser:
         "uninstall-plan",
         help="Print a safe XUUnity Light MCP uninstall plan before removing project, client, or helper state.",
     )
-    uninstall_plan_cmd.add_argument("--mode", required=True, choices=["project-only-cleanup", "full-reset-current-user"])
+    uninstall_plan_cmd.add_argument(
+        "--mode",
+        required=True,
+        choices=["project-only-cleanup", "full-reset-current-user", "current-user-reset"],
+    )
     uninstall_plan_cmd.add_argument("--workspace-root")
     uninstall_plan_cmd.add_argument("--project-root", action="append", default=[])
     uninstall_plan_cmd.add_argument("--recursive", action="store_true")

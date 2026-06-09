@@ -10,7 +10,7 @@ server_file="${XUUNITY_LIGHT_UNITY_MCP_SERVER:-$script_dir/server.py}"
 minimum_python_version="3.10"
 
 python_version_is_supported() {
-  "$1" - "$minimum_python_version" <<'PY'
+  "$@" - "$minimum_python_version" <<'PY'
 import re
 import sys
 
@@ -29,7 +29,11 @@ elif [[ -x "$script_dir/.venv/Scripts/python" ]]; then
 elif [[ -x "$script_dir/.venv/Scripts/python.exe" ]]; then
   python_cmd=("$script_dir/.venv/Scripts/python.exe")
 elif [[ -n "${PYTHON:-}" ]]; then
-  python_cmd=("$PYTHON")
+  if [[ "$PYTHON" == "py -3" ]] && command -v py >/dev/null 2>&1; then
+    python_cmd=(py -3)
+  else
+    python_cmd=("$PYTHON")
+  fi
 elif command -v python3 >/dev/null 2>&1; then
   python_cmd=(python3)
 elif command -v python >/dev/null 2>&1; then
@@ -41,7 +45,7 @@ else
   exit 1
 fi
 
-if ! python_version_is_supported "${python_cmd[0]}"; then
+if ! python_version_is_supported "${python_cmd[@]}"; then
   current_version="$("${python_cmd[@]}" -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>/dev/null || printf 'unknown')"
   printf 'Python %s or newer is required. Selected interpreter reports %s. Set PYTHON to a Python 3.10+ executable.\n' "$minimum_python_version" "$current_version" >&2
   exit 1

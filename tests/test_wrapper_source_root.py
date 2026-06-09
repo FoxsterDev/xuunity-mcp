@@ -84,6 +84,35 @@ class WrapperSourceRootTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn("Usage:", completed.stdout)
 
+    def test_run_sh_template_supports_windows_py_launcher_style_python_env(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        run_sh = repo_root / "templates" / "run.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fake_py = Path(tmp_dir) / "py"
+            fake_py.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"${1:-}\" == \"-3\" ]]; then shift; fi\n"
+                f"exec {sys.executable!r} \"$@\"\n",
+                encoding="utf-8",
+            )
+            fake_py.chmod(0o755)
+
+            env = self.make_env()
+            env["PYTHON"] = "py -3"
+            env["PATH"] = f"{tmp_dir}{os.pathsep}{env.get('PATH', '')}"
+
+            completed = subprocess.run(
+                ["bash", str(run_sh), "--help"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("usage:", completed.stdout.lower())
+
     def test_devmode_prefers_operations_package_source_under_airroot(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         wrapper = repo_root / "xuunity_light_unity_mcp.sh"

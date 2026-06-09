@@ -877,7 +877,7 @@ for arg in "$@"; do
   fi
   filtered_args+=("$arg")
 done
-set -- "${filtered_args[@]}"
+set -- ${filtered_args[@]+"${filtered_args[@]}"}
 
 case "${1:-}" in
   -h|--help|help)

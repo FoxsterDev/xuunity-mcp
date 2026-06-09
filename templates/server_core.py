@@ -17,22 +17,37 @@ class ToolInvocationError(Exception):
 def read_json(path: Path) -> Any:
     raw_bytes = path.read_bytes()
     is_utf16 = raw_bytes.startswith(b"\xff\xfe") or raw_bytes.startswith(b"\xfe\xff")
-    if is_utf16:
-        try:
-            return json.loads(raw_bytes.decode("utf-16"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            try:
-                return json.loads(raw_bytes.decode("utf-8-sig"))
-            except Exception:
-                raise exc
-    else:
-        try:
-            return json.loads(raw_bytes.decode("utf-8-sig"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    try:
+        if is_utf16:
             try:
                 return json.loads(raw_bytes.decode("utf-16"))
-            except Exception:
-                raise exc
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                try:
+                    return json.loads(raw_bytes.decode("utf-8-sig"))
+                except Exception:
+                    raise exc
+        else:
+            try:
+                return json.loads(raw_bytes.decode("utf-8-sig"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                try:
+                    return json.loads(raw_bytes.decode("utf-16"))
+                except Exception:
+                    raise exc
+    except json.JSONDecodeError as exc:
+        raise json.JSONDecodeError(
+            f"Failed to parse JSON in {path}: {exc.msg}",
+            exc.doc,
+            exc.pos
+        ) from exc
+    except UnicodeDecodeError as exc:
+        raise UnicodeDecodeError(
+            exc.encoding,
+            exc.object,
+            exc.start,
+            exc.end,
+            f"Failed to decode text in {path}: {exc.reason}"
+        ) from exc
 
 
 def write_json(path: Path, data: Any) -> None:

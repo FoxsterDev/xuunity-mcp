@@ -297,6 +297,7 @@ class WindowsHostHelperTests(unittest.TestCase):
             with (
                 mock.patch.object(server_host_platform, "is_wsl", return_value=True),
                 mock.patch.object(server_host_platform, "WSL_PROC_ROOT", proc_root),
+                mock.patch.object(server_host_platform.os, "readlink", return_value="/init"),
                 mock.patch.object(server_host_platform.subprocess, "run") as mock_run,
             ):
                 self.assertTrue(adapter.pid_is_alive(4321))
@@ -309,11 +310,12 @@ class WindowsHostHelperTests(unittest.TestCase):
             proc_root = Path(tmp_dir)
             cmdline_path = proc_root / "4321" / "cmdline"
             cmdline_path.parent.mkdir(parents=True)
-            cmdline_path.write_bytes(b"/usr/bin/python3\x00server.py")
+            cmdline_path.write_bytes(b"/mnt/c/Windows/notepad.exe")
 
             with (
                 mock.patch.object(server_host_platform, "is_wsl", return_value=True),
                 mock.patch.object(server_host_platform, "WSL_PROC_ROOT", proc_root),
+                mock.patch.object(server_host_platform.os, "readlink", return_value="/init"),
                 mock.patch.object(server_host_platform.subprocess, "run") as mock_run,
             ):
                 self.assertFalse(adapter.pid_is_alive(4321))
@@ -524,6 +526,127 @@ class WindowsHostHelperTests(unittest.TestCase):
 
         self.assertFalse(summary["process_visibility_wslpath_available"])
         self.assertIn("wslpath_missing", " ".join(summary["process_visibility_warnings"]))
+
+    def test_read_json_raises_wrapped_json_decode_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            bad_json = Path(tmp_dir) / "bad.json"
+            bad_json.write_text("{ missing_quotes: 123 }", encoding="utf-8")
+            with self.assertRaises(json.JSONDecodeError) as context:
+                server_core.read_json(bad_json)
+            self.assertIn("Failed to parse JSON in", str(context.exception))
+            self.assertIn("bad.json", str(context.exception))
+
+    def test_read_json_raises_wrapped_unicode_decode_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            bad_json = Path(tmp_dir) / "bad.json"
+            bad_json.write_bytes(b"\xff\xff\xff\xff\x00\x00\xff")
+            with self.assertRaises(UnicodeDecodeError) as context:
+                server_core.read_json(bad_json)
+            self.assertIn("Failed to decode text in", str(context.exception))
+            self.assertIn("bad.json", str(context.exception))
+
+    def test_pid_is_alive_falls_back_on_local_linux_process_collision(self) -> None:
+        completed = mock.Mock(stdout="Unity.exe                  4321 Console\n", returncode=0)
+        adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
+
+        with (
+            mock.patch.object(server_host_platform, "is_wsl", return_value=True),
+            mock.patch.object(server_host_platform.os, "readlink", return_value="/usr/bin/python3"),
+            mock.patch.object(server_host_platform.subprocess, "run", return_value=completed) as mock_run,
+        ):
+            self.assertTrue(adapter.pid_is_alive(4321))
+            mock_run.assert_called_once()
+            self.assertEqual("tasklist.exe", mock_run.call_args[0][0][0])
+
+    def test_cmd_batch_compile_matrix_converts_config_file_under_wsl(self) -> None:
+        import server_cli_commands
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            project_root = tmp_path / "Project"
+            project_root.mkdir()
+            config_file = project_root / "matrix.json"
+            config_file.write_text("{}", encoding="utf-8")
+
+            args = mock.Mock(
+                project_root=str(project_root),
+                unity_app="/mnt/d/Unity.exe",
+                config_file=str(config_file),
+                batch_log_path=None,
+                result_file=None,
+                dry_run=False,
+                timeout_ms=1000,
+                workspace_root=None,
+                side_effect_mode="off",
+                side_effect_allow_file=None,
+                progress_interval_seconds=5,
+                no_progress_stdout=True,
+                batch_fallback_mode="auto",
+                refresh_license=False,
+            )
+
+            with (
+                mock.patch.object(server_cli_commands, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server_cli_commands, "detect_unity_app_path_for_project", return_value=Path("/mnt/d/Unity.exe")),
+                mock.patch.object(server_cli_commands, "load_json_file", return_value={}),
+                mock.patch("server_host_platform.is_wsl", return_value=True),
+                mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: f"WIN:{value}"),
+                mock.patch.object(server_cli_commands, "build_batch_validation_command", return_value=["Unity.exe"]) as mock_build_cmd,
+                mock.patch.object(server_cli_commands, "run_batch_operation") as mock_run_batch,
+            ):
+                server_cli_commands.cmd_batch_compile_matrix(args)
+
+                mock_build_cmd.assert_called_once()
+                extra_args = mock_build_cmd.call_args[1].get("extra_args")
+                self.assertIn(f"WIN:{config_file.resolve()}", extra_args)
+
+    def test_cmd_batch_build_config_compile_matrix_uses_project_temp_dir_and_converts_path_under_wsl(self) -> None:
+        import server_cli_commands
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            project_root = tmp_path / "Project"
+            project_root.mkdir()
+
+            args = mock.Mock(
+                project_root=str(project_root),
+                unity_app="/mnt/d/Unity.exe",
+                build_config_asset="Assets/Config.asset",
+                profile=[],
+                target=[],
+                stop_on_first_failure=False,
+                batch_log_path=None,
+                result_file=None,
+                dry_run=False,
+                timeout_ms=1000,
+                workspace_root=None,
+                side_effect_mode="off",
+                side_effect_allow_file=None,
+                progress_interval_seconds=5,
+                no_progress_stdout=True,
+                batch_fallback_mode="auto",
+                refresh_license=False,
+            )
+
+            fake_plan = {"assetPath": "Assets/Config.asset", "profiles": [], "matrixArgs": {}}
+
+            with (
+                mock.patch.object(server_cli_commands, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server_cli_commands, "detect_unity_app_path_for_project", return_value=Path("/mnt/d/Unity.exe")),
+                mock.patch.object(server_cli_commands, "build_compile_matrix_args_from_build_config", return_value=fake_plan),
+                mock.patch("server_host_platform.is_wsl", return_value=True),
+                mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: f"WIN:{value}"),
+                mock.patch.object(server_cli_commands, "build_batch_validation_command", return_value=["Unity.exe"]) as mock_build_cmd,
+                mock.patch.object(server_cli_commands, "run_batch_operation") as mock_run_batch,
+            ):
+                server_cli_commands.cmd_batch_build_config_compile_matrix(args)
+
+                mock_build_cmd.assert_called_once()
+                extra_args = mock_build_cmd.call_args[1].get("extra_args")
+                self.assertTrue(any(
+                    str(arg).startswith("WIN:") and
+                    "Library/XUUnityLightMcp/temp" in str(arg) and
+                    str(arg).endswith("_xuunity_compile_matrix.json")
+                    for arg in extra_args
+                ))
 
 
 if __name__ == "__main__":
