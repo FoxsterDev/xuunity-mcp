@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import os
 import re
@@ -7,6 +8,10 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
+
+
+WSL_PROC_ROOT = Path("/proc")
 
 
 @dataclass(frozen=True)
@@ -44,13 +49,17 @@ class HostPlatformAdapter:
                 except Exception:
                     return False
 
-        try:
-            os.kill(pid, 0)
-            return True
-        except (OSError, SystemError):
-            pass
+        if not is_wsl():
+            try:
+                os.kill(pid, 0)
+                return True
+            except (OSError, SystemError):
+                pass
+        else:
+            interop_status = wsl_linux_unity_interop_pid_status(pid)
+            if interop_status is not None:
+                return interop_status
 
-        if is_wsl():
             try:
                 completed = subprocess.run(
                     ["tasklist.exe", "/FI", f"PID eq {pid}", "/NH"],
@@ -75,11 +84,17 @@ class HostPlatformAdapter:
                 shutil.which("pwsh.exe")
             )
             if not shell_path:
+                stderr = "PowerShell was not found on PATH."
+                if is_wsl():
+                    stderr = (
+                        "PowerShell was not found on PATH. In WSL, ensure Windows interop is enabled and "
+                        "appendWindowsPath = true is set in /etc/wsl.conf, or expose powershell.exe/pwsh.exe on PATH."
+                    )
                 return {
                     "available": False,
                     "commands": [],
                     "error_code": "process_listing_tool_missing",
-                    "stderr": "PowerShell was not found on PATH.",
+                    "stderr": stderr,
                     "platform_kind": self.platform_kind,
                 }
 
@@ -235,11 +250,85 @@ def is_wsl() -> bool:
 
 
 def windows_tasklist_contains_pid(output: str, pid: int) -> bool:
-    target = str(pid)
+    target = int(pid)
     for line in str(output or "").splitlines():
-        if re.search(rf"(^|\s){re.escape(target)}(\s|$)", line):
+        parsed_pid = windows_tasklist_process_pid(line)
+        if parsed_pid == target:
             return True
     return False
+
+
+def windows_tasklist_process_pid(line: str) -> int | None:
+    stripped = str(line or "").strip()
+    if not stripped:
+        return None
+
+    lowered = stripped.lower()
+    if (
+        lowered.startswith(("info:", "error:", "warning:", "success:"))
+        or lowered.startswith("image name")
+        or set(stripped) <= {"=", "-"}
+    ):
+        return None
+
+    if stripped.startswith('"'):
+        try:
+            fields = next(csv.reader([stripped]))
+        except (csv.Error, StopIteration):
+            fields = []
+        if len(fields) >= 2:
+            try:
+                return int(str(fields[1]).strip())
+            except (TypeError, ValueError):
+                return None
+
+    parts = stripped.split()
+    if len(parts) >= 2:
+        try:
+            return int(parts[1])
+        except (TypeError, ValueError):
+            return None
+
+    return None
+
+
+def wsl_linux_unity_interop_pid_status(pid: int) -> bool | None:
+    if pid <= 0 or not is_wsl():
+        return None
+
+    cmdline_path = WSL_PROC_ROOT / str(pid) / "cmdline"
+    if not cmdline_path.is_file():
+        return None
+
+    try:
+        raw = cmdline_path.read_bytes()
+    except OSError:
+        return False
+
+    text = raw.replace(b"\x00", b" ").decode("utf-8", errors="ignore").lower()
+    return "unity" in text
+
+
+def wsl_host_diagnostics() -> dict[str, object]:
+    if not is_wsl():
+        return {
+            "wsl": False,
+            "wslpath_available": True,
+            "warnings": [],
+        }
+
+    warnings: list[str] = []
+    wslpath_available = shutil.which("wslpath") is not None
+    if not wslpath_available:
+        warnings.append(
+            "wslpath_missing: WSL path conversion is limited to fallback drive mappings; install/restore wslpath for custom mount roots."
+        )
+
+    return {
+        "wsl": True,
+        "wslpath_available": wslpath_available,
+        "warnings": warnings,
+    }
 
 
 def windows_to_wsl_path(path: str | Path) -> str:

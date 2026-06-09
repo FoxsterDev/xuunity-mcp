@@ -16,21 +16,23 @@ class ToolInvocationError(Exception):
 
 def read_json(path: Path) -> Any:
     raw_bytes = path.read_bytes()
-    encodings = ["utf-8-sig", "utf-16"]
-    if raw_bytes.startswith(b"\xff\xfe"):
-        encodings = ["utf-16", "utf-8-sig"]
-    elif raw_bytes.startswith(b"\xfe\xff"):
-        encodings = ["utf-16", "utf-8-sig"]
-
-    last_error: Exception | None = None
-    for encoding in encodings:
+    is_utf16 = raw_bytes.startswith(b"\xff\xfe") or raw_bytes.startswith(b"\xfe\xff")
+    if is_utf16:
         try:
-            return json.loads(raw_bytes.decode(encoding))
+            return json.loads(raw_bytes.decode("utf-16"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            last_error = exc
-    if last_error is not None:
-        raise last_error
-    return json.loads(raw_bytes.decode("utf-8-sig"))
+            try:
+                return json.loads(raw_bytes.decode("utf-8-sig"))
+            except Exception:
+                raise exc
+    else:
+        try:
+            return json.loads(raw_bytes.decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            try:
+                return json.loads(raw_bytes.decode("utf-16"))
+            except Exception:
+                raise exc
 
 
 def write_json(path: Path, data: Any) -> None:

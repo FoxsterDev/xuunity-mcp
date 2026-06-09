@@ -42,6 +42,18 @@ class WindowsHostHelperTests(unittest.TestCase):
         self.assertTrue(server_host_platform.windows_tasklist_contains_pid(output, 4321))
         self.assertFalse(server_host_platform.windows_tasklist_contains_pid(output, 321))
 
+    def test_windows_tasklist_ignores_error_lines(self) -> None:
+        output = "\n".join(
+            [
+                "ERROR: PID 4321 not found.",
+                "INFO: No tasks are running which match the specified criteria.",
+                "Image Name                     PID Session Name        Session#    Mem Usage",
+                "========================= ======== ================ =========== ============",
+            ]
+        )
+
+        self.assertFalse(server_host_platform.windows_tasklist_contains_pid(output, 4321))
+
     def test_windows_to_wsl_path_falls_back_without_wslpath(self) -> None:
         with (
             mock.patch.object(server_host_platform, "is_wsl", return_value=True),
@@ -273,6 +285,40 @@ class WindowsHostHelperTests(unittest.TestCase):
             self.assertTrue(adapter.pid_is_alive(4321))
             self.assertFalse(adapter.pid_is_alive(432))
 
+    def test_pid_is_alive_detects_wsl_linux_interop_process(self) -> None:
+        adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            proc_root = Path(tmp_dir)
+            cmdline_path = proc_root / "4321" / "cmdline"
+            cmdline_path.parent.mkdir(parents=True)
+            cmdline_path.write_bytes(b"/mnt/c/Unity/Editor/Unity.exe\x00-projectPath\x00/mnt/d/Project")
+
+            with (
+                mock.patch.object(server_host_platform, "is_wsl", return_value=True),
+                mock.patch.object(server_host_platform, "WSL_PROC_ROOT", proc_root),
+                mock.patch.object(server_host_platform.subprocess, "run") as mock_run,
+            ):
+                self.assertTrue(adapter.pid_is_alive(4321))
+                mock_run.assert_not_called()
+
+    def test_pid_is_alive_rejects_non_unity_wsl_linux_process_without_tasklist_fallback(self) -> None:
+        adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            proc_root = Path(tmp_dir)
+            cmdline_path = proc_root / "4321" / "cmdline"
+            cmdline_path.parent.mkdir(parents=True)
+            cmdline_path.write_bytes(b"/usr/bin/python3\x00server.py")
+
+            with (
+                mock.patch.object(server_host_platform, "is_wsl", return_value=True),
+                mock.patch.object(server_host_platform, "WSL_PROC_ROOT", proc_root),
+                mock.patch.object(server_host_platform.subprocess, "run") as mock_run,
+            ):
+                self.assertFalse(adapter.pid_is_alive(4321))
+                mock_run.assert_not_called()
+
     def test_linux_process_listing_parses_ps_output(self) -> None:
         completed = mock.Mock(
             returncode=0,
@@ -321,6 +367,20 @@ class WindowsHostHelperTests(unittest.TestCase):
                 self.assertTrue(report["available"])
                 self.assertEqual(expected, report["commands"])
 
+    def test_wsl_process_listing_missing_powershell_mentions_append_windows_path(self) -> None:
+        adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
+
+        with (
+            mock.patch.object(server_host_platform.os, "name", "posix"),
+            mock.patch.object(server_host_platform, "is_wsl", return_value=True),
+            mock.patch.object(server_host_platform.shutil, "which", return_value=None),
+        ):
+            report = adapter.list_process_commands_report()
+
+        self.assertFalse(report["available"])
+        self.assertEqual("process_listing_tool_missing", report["error_code"])
+        self.assertIn("appendWindowsPath = true", report["stderr"])
+
     def test_batch_validation_command_converts_project_and_result_paths_under_wsl(self) -> None:
         with (
             mock.patch.object(server_editor_host, "resolve_unity_executable", return_value=Path("/mnt/d/Unity.exe")),
@@ -338,6 +398,132 @@ class WindowsHostHelperTests(unittest.TestCase):
         self.assertIn("WIN:/mnt/d/Project", command)
         self.assertIn("WIN:/mnt/d/Project/Library/XUUnityLightMcp/logs/batch.log", command)
         self.assertIn("WIN:/mnt/d/Project/Library/XUUnityLightMcp/results/editmode.json", command)
+
+    def test_read_json_on_invalid_utf8_raises_json_decode_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            bad_json = Path(tmp_dir) / "bad.json"
+            bad_json.write_text("{ \"missing_comma\": 123 ", encoding="utf-8")
+
+            with self.assertRaises(json.JSONDecodeError):
+                server_core.read_json(bad_json)
+
+    def test_discover_unity_installations_uses_case_insensitive_deduplication_under_wsl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            path_a = root / "UnityHub" / "Editor" / "6000.3.2f1" / "Editor" / "Unity"
+            path_b = root / "UnityHub" / "Editor" / "6000.3.2F1" / "Editor" / "Unity"
+
+            for path in (path_a, path_b):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("", encoding="utf-8")
+
+            with (
+                mock.patch.object(server_editor_host, "configured_unity_editor_roots", return_value=[]),
+                mock.patch.object(server_editor_host, "candidate_unity_editor_roots", return_value=[root]),
+                mock.patch.object(server_editor_host, "host_platform_kind", return_value="linux"),
+                mock.patch.object(server_editor_host, "is_wsl", return_value=True),
+            ):
+                discovered = server_editor_host.discover_unity_installations()
+
+            self.assertEqual(1, len(discovered))
+
+    def test_cmd_batch_build_player_converts_output_path_under_wsl(self) -> None:
+        import server_cli_commands
+        args = mock.Mock(
+            project_root="/mnt/d/Project",
+            unity_app="/mnt/d/Unity.exe",
+            build_target="Android",
+            output_path="/mnt/d/Project/Builds/Android.apk",
+            scene_path=[],
+            build_option=[],
+            batch_log_path=None,
+            result_file=None,
+            dry_run=False,
+            timeout_ms=1000,
+            artifact_probe_file=None,
+            artifact_probe_json=None,
+            artifact_probe_warn_only=False,
+            workspace_root=None,
+            side_effect_mode="off",
+            side_effect_allow_file=None,
+            progress_interval_seconds=5,
+            no_progress_stdout=True,
+            batch_fallback_mode="auto",
+            refresh_license=False,
+        )
+
+        with (
+            mock.patch.object(server_cli_commands, "ensure_project_root", return_value=Path("/mnt/d/Project")),
+            mock.patch.object(server_cli_commands, "detect_unity_app_path_for_project", return_value=Path("/mnt/d/Unity.exe")),
+            mock.patch.object(
+                server_cli_commands,
+                "default_batch_build_result_path",
+                return_value=Path("/mnt/d/Project/Library/XUUnityLightMcp/results/build_Android.json"),
+            ),
+            mock.patch.object(server_cli_commands, "resolve_batch_build_output_path", return_value="/mnt/d/Project/Builds/Android.apk"),
+            mock.patch("server_host_platform.is_wsl", return_value=True),
+            mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: f"WIN:{value}"),
+            mock.patch.object(server_cli_commands, "build_plain_batch_build_command", return_value=["Unity.exe"]) as mock_build_cmd,
+            mock.patch.object(server_cli_commands, "run_batch_operation") as mock_run_batch,
+        ):
+            server_cli_commands.cmd_batch_build_player(args)
+
+            mock_build_cmd.assert_called_once()
+            self.assertEqual("WIN:/mnt/d/Project/Builds/Android.apk", mock_build_cmd.call_args[1].get("output_path"))
+
+            mock_run_batch.assert_called_once()
+            gui_args = mock_run_batch.call_args[1].get("gui_operation_args")
+            self.assertEqual("WIN:/mnt/d/Project/Builds/Android.apk", gui_args.get("outputPath"))
+            self.assertEqual("WIN:/mnt/d/Project/Library/XUUnityLightMcp/results/build_Android.json", gui_args.get("resultFile"))
+
+    def test_pid_is_alive_bypasses_os_kill_under_wsl(self) -> None:
+        completed = mock.Mock(stdout="Unity.exe                  4321 Console\n", returncode=0)
+        adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
+
+        mock_kill = mock.Mock()
+        with (
+            mock.patch.object(server_host_platform, "is_wsl", return_value=True),
+            mock.patch.object(server_host_platform.os, "kill", mock_kill),
+            mock.patch.object(server_host_platform.subprocess, "run", return_value=completed),
+        ):
+            self.assertTrue(adapter.pid_is_alive(4321))
+            mock_kill.assert_not_called()
+
+    def test_terminate_editor_pid_kills_wsl_linux_interop_process(self) -> None:
+        with (
+            mock.patch.object(server_editor_host, "is_wsl", return_value=True),
+            mock.patch.object(server_editor_host, "pid_is_alive", side_effect=[True, False]) as mock_alive,
+            mock.patch.object(server_editor_host, "wsl_linux_unity_interop_pid_status", return_value=True),
+            mock.patch.object(server_editor_host.os, "kill") as mock_kill,
+            mock.patch.object(server_editor_host.subprocess, "run") as mock_run,
+        ):
+            self.assertTrue(server_editor_host.terminate_editor_pid(4321, 1000))
+
+        mock_alive.assert_called()
+        mock_kill.assert_called_once_with(4321, server_editor_host.signal.SIGTERM)
+        mock_run.assert_not_called()
+
+    def test_process_visibility_warns_on_missing_wslpath_under_wsl(self) -> None:
+        with (
+            mock.patch.object(
+                server_editor_host,
+                "list_process_commands_report",
+                return_value={
+                    "available": True,
+                    "commands": [],
+                    "error_code": "",
+                    "stderr": "",
+                    "platform_kind": "linux",
+                },
+            ),
+            mock.patch.object(server_editor_host, "is_wsl", return_value=True),
+            mock.patch.object(server_host_platform, "is_wsl", return_value=True),
+            mock.patch.object(server_host_platform.shutil, "which", return_value=None),
+        ):
+            summary = server_editor_host.process_visibility_summary()
+
+        self.assertFalse(summary["process_visibility_wslpath_available"])
+        self.assertIn("wslpath_missing", " ".join(summary["process_visibility_warnings"]))
 
 
 if __name__ == "__main__":

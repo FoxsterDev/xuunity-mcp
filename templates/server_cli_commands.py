@@ -1831,6 +1831,9 @@ def cmd_batch_build_player(args):
         else default_batch_build_result_path(project_root, build_target)
     )
     output_path = resolve_batch_build_output_path(project_root, args.output_path)
+    from server_host_platform import is_wsl, wsl_to_windows_path
+    output_path_windows = wsl_to_windows_path(output_path) if is_wsl() else output_path
+    result_path_host = wsl_to_windows_path(result_path) if is_wsl() else str(result_path)
     scene_paths = list(args.scene_path or [])
     build_options = list(args.build_option or [])
     artifact_probe_config = load_artifact_probe_config(
@@ -1846,7 +1849,7 @@ def cmd_batch_build_player(args):
         log_path=log_path,
         result_path=result_path,
         build_target=build_target,
-        output_path=output_path,
+        output_path=output_path_windows,
         scene_paths=scene_paths,
         build_options=build_options,
     )
@@ -1885,8 +1888,8 @@ def cmd_batch_build_player(args):
         gui_operation="unity.build_player",
         gui_operation_args={
             "buildTarget": build_target,
-            "outputPath": output_path,
-            "resultFile": str(result_path),
+            "outputPath": output_path_windows,
+            "resultFile": result_path_host,
             "scenePaths": scene_paths,
             "buildOptions": build_options,
         },
@@ -1957,6 +1960,5 @@ wrap_globals_with_proxies(globals(), [
     "call_unity_artifact_register_tool",
     "call_unity_artifact_write_report_tool",
 ])
-
 
 

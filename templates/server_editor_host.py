@@ -24,7 +24,14 @@ from server_bridge_runtime import (
     try_read_live_editor_state,
 )
 from server_core import ToolInvocationError, read_json, write_json
-from server_host_platform import current_host_platform_adapter, host_path_to_local_path, is_wsl, wsl_to_windows_path
+from server_host_platform import (
+    current_host_platform_adapter,
+    host_path_to_local_path,
+    is_wsl,
+    wsl_host_diagnostics,
+    wsl_linux_unity_interop_pid_status,
+    wsl_to_windows_path,
+)
 from server_specs import STARTUP_POLICIES
 
 ACTIVATION_DELAY_SECONDS = 0.35
@@ -263,7 +270,7 @@ def discover_unity_installations() -> list[tuple[str, Path]]:
             normalized = normalize_unity_installation_path(candidate)
             if normalized is None:
                 continue
-            key = str(normalized).lower() if os.name == "nt" else str(normalized)
+            key = str(normalized).lower() if (os.name == "nt" or is_wsl()) else str(normalized)
             if key in seen:
                 continue
             seen.add(key)
@@ -301,12 +308,17 @@ def list_process_commands_report() -> dict[str, Any]:
 
 def process_visibility_summary() -> dict[str, Any]:
     report = list_process_commands_report()
-    return {
+    summary = {
         "process_visibility_available": bool(report.get("available")),
         "process_visibility_error_code": str(report.get("error_code") or ""),
         "process_visibility_stderr": _truncate_host_process_text(report.get("stderr") or ""),
         "process_visibility_platform_kind": str(report.get("platform_kind") or host_platform_kind()),
     }
+    if is_wsl():
+        diagnostics = wsl_host_diagnostics()
+        summary["process_visibility_wslpath_available"] = bool(diagnostics.get("wslpath_available"))
+        summary["process_visibility_warnings"] = list(diagnostics.get("warnings") or [])
+    return summary
 
 
 def try_read_host_editor_session_state(project_root: Path) -> dict[str, Any] | None:
@@ -1171,12 +1183,15 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
             except OSError:
                 pass
     elif is_wsl():
-        try:
-            subprocess.run(["taskkill.exe", "/F", "/PID", str(pid)], capture_output=True, check=False)
-        except Exception:
+        if wsl_linux_unity_interop_pid_status(pid) is True:
             try:
                 os.kill(pid, signal.SIGTERM)
             except OSError:
+                pass
+        else:
+            try:
+                subprocess.run(["taskkill.exe", "/F", "/PID", str(pid)], capture_output=True, check=False)
+            except Exception:
                 pass
     else:
         try:
