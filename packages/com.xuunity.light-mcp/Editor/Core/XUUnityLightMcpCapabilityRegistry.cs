@@ -39,6 +39,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.editor.quit", CoreCapability },
             { "unity.package.install_test_framework", CoreCapability },
             { "unity.console.tail", CoreCapability },
+            { "unity.console.grep", CoreCapability },
             { "unity.scene.snapshot", CoreCapability },
             { "unity.scene.assert", CoreCapability },
             { "unity.scenario.validate", CoreCapability },

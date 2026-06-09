@@ -10,6 +10,7 @@ from server_core import ToolInvocationError
 
 
 PROJECT_ACTION_SCHEMA_VERSION = "xuunity.project-actions.v1"
+PROJECT_HOOK_SCAFFOLD_VERSION = "xuunity.project-hook-scaffold.v1"
 
 
 def parse_project_actions_yaml(text: str) -> dict[str, Any]:
@@ -592,6 +593,245 @@ def sanitize_action_name(value: str) -> str:
     sanitized = re.sub(r"[^A-Za-z0-9_]+", "_", value.strip())
     sanitized = sanitized.strip("_").lower()
     return sanitized or "project_action"
+
+
+def scaffold_project_hook(
+    *,
+    hook_name: str,
+    action_id: str,
+    class_name: str,
+    namespace: str,
+    output_dir: Path,
+    mutating: bool = False,
+    write_files: bool = False,
+) -> dict[str, Any]:
+    hook_name = hook_name.strip()
+    action_id = action_id.strip()
+    class_name = class_name.strip()
+    namespace = namespace.strip() or "Example.Project.Editor"
+    if not hook_name:
+        raise ToolInvocationError("project_hook_scaffold_invalid", "hook_name is required.")
+    if not action_id:
+        raise ToolInvocationError("project_hook_scaffold_invalid", "action_id is required.")
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", class_name):
+        raise ToolInvocationError(
+            "project_hook_scaffold_invalid",
+            "class_name must be a valid C# identifier.",
+            {"class_name": class_name},
+        )
+    if not output_dir:
+        raise ToolInvocationError("project_hook_scaffold_invalid", "output_dir is required.")
+
+    slug = sanitize_action_name(hook_name.replace(".", "_"))
+    scenario_name = f"{slug}_activation_smoke"
+    files = {
+        f"{class_name}.cs": render_project_hook_class(
+            hook_name=hook_name,
+            action_id=action_id,
+            class_name=class_name,
+            namespace=namespace,
+        ),
+        "project_actions.fragment.yaml": render_project_actions_fragment(
+            hook_name=hook_name,
+            action_id=action_id,
+            mutating=mutating,
+        ),
+        f"{scenario_name}.json": render_project_hook_activation_scenario(
+            scenario_name=scenario_name,
+            action_id=action_id,
+            mutating=mutating,
+        ),
+        "ACTIVATION_CHECKLIST.md": render_project_hook_activation_checklist(
+            hook_name=hook_name,
+            action_id=action_id,
+            class_name=class_name,
+            scenario_name=scenario_name,
+            mutating=mutating,
+        ),
+    }
+
+    written_paths: list[str] = []
+    if write_files:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for relative_path, content in files.items():
+            target = output_dir / relative_path
+            target.write_text(content, encoding="utf-8")
+            written_paths.append(str(target))
+
+    return {
+        "action": "project_hook_scaffold",
+        "schema_version": PROJECT_HOOK_SCAFFOLD_VERSION,
+        "hook_name": hook_name,
+        "action_id": action_id,
+        "class_name": class_name,
+        "namespace": namespace,
+        "mutating": mutating,
+        "output_dir": str(output_dir),
+        "write_files": write_files,
+        "written_paths": written_paths,
+        "files": [
+            {
+                "path": relative_path,
+                "content": content,
+            }
+            for relative_path, content in files.items()
+        ],
+        "activation_order": [
+            "add_hook_class_under_project_editor_assembly",
+            "merge_project_actions_fragment",
+            "refresh_project_and_wait_for_compile",
+            "run_project_action_list",
+            "validate_activation_scenario",
+            "run_non_mutating_activation_scenario",
+            "only_then_run_mutating_action_with_explicit_approval" if mutating else "ready_for_non_mutating_action",
+        ],
+    }
+
+
+def render_project_hook_class(*, hook_name: str, action_id: str, class_name: str, namespace: str) -> str:
+    return f"""using System;
+using UnityEngine;
+using XUUnity.LightMcp.Editor.ScenarioHooks;
+
+namespace {namespace}
+{{
+    public sealed class {class_name} : IXUUnityLightMcpScenarioHook
+    {{
+        [Serializable]
+        private sealed class HookPayload
+        {{
+            public string action = "";
+        }}
+
+        [Serializable]
+        private sealed class HookResponse
+        {{
+            public string action = "";
+            public string outcome = "";
+            public string executed_at_utc = "";
+            public string[] available_actions = Array.Empty<string>();
+        }}
+
+        public string HookName => "{hook_name}";
+
+        public XUUnityLightMcpScenarioHookResult Execute(string payloadJson)
+        {{
+            var payload = string.IsNullOrWhiteSpace(payloadJson)
+                ? new HookPayload()
+                : JsonUtility.FromJson<HookPayload>(payloadJson) ?? new HookPayload();
+
+            var action = string.IsNullOrWhiteSpace(payload.action)
+                ? "{action_id}"
+                : payload.action.Trim();
+
+            if (!string.Equals(action, "{action_id}", StringComparison.Ordinal))
+            {{
+                return Failure(action, "unsupported_action", $"Unsupported action '{{action}}'.");
+            }}
+
+            return Success(action, "activation_checked");
+        }}
+
+        private static XUUnityLightMcpScenarioHookResult Success(string action, string outcome)
+        {{
+            return new XUUnityLightMcpScenarioHookResult
+            {{
+                success = true,
+                outcome = outcome,
+                payload_json = JsonUtility.ToJson(CreateResponse(action, outcome)),
+            }};
+        }}
+
+        private static XUUnityLightMcpScenarioHookResult Failure(string action, string errorCode, string errorMessage)
+        {{
+            return new XUUnityLightMcpScenarioHookResult
+            {{
+                success = false,
+                outcome = errorCode,
+                error_code = errorCode,
+                error_message = errorMessage,
+                payload_json = JsonUtility.ToJson(CreateResponse(action, errorCode)),
+            }};
+        }}
+
+        private static HookResponse CreateResponse(string action, string outcome)
+        {{
+            return new HookResponse
+            {{
+                action = action ?? "",
+                outcome = outcome ?? "",
+                executed_at_utc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                available_actions = new[] {{ "{action_id}" }},
+            }};
+        }}
+    }}
+}}
+"""
+
+
+def render_project_actions_fragment(*, hook_name: str, action_id: str, mutating: bool) -> str:
+    mutates = "[project_specific_state]" if mutating else "[]"
+    return f"""# Merge this action into <HostOutput>/Projects/<Project>/Operations/XUUnityLightUnityMcp/project_actions.yaml.
+{action_id}:
+  hookName: {hook_name}
+  payload: {{}}
+  mutates: {mutates}
+  evidence:
+    - outcome
+    - available_actions
+  validationModes:
+    - project_action_contract
+"""
+
+
+def render_project_hook_activation_scenario(*, scenario_name: str, action_id: str, mutating: bool) -> str:
+    step: dict[str, Any] = {
+        "stepId": "invoke_project_action",
+        "kind": "project_action",
+        "actionId": action_id,
+    }
+    if mutating:
+        step["allowMutating"] = True
+    scenario = {
+        "name": scenario_name,
+        "description": "Activation smoke for a catalog-backed project hook.",
+        "stopOnFirstFailure": True,
+        "steps": [step],
+    }
+    return json.dumps(scenario, indent=2, ensure_ascii=True) + "\n"
+
+
+def render_project_hook_activation_checklist(
+    *,
+    hook_name: str,
+    action_id: str,
+    class_name: str,
+    scenario_name: str,
+    mutating: bool,
+) -> str:
+    mutating_note = (
+        "- This action declares mutations. Keep a non-mutating list/preflight action nearby and require explicit approval before real mutation.\n"
+        if mutating
+        else "- This activation action is non-mutating; keep it as the first validation path for the hook.\n"
+    )
+    return f"""# Project Hook Activation Checklist
+
+Hook: `{hook_name}`
+Class: `{class_name}`
+Action: `{action_id}`
+Scenario: `{scenario_name}`
+
+## Checklist
+
+- Place `{class_name}.cs` under a project Editor assembly that references `XUUnity.LightMcp.Editor.ScenarioHooks`.
+- Merge `project_actions.fragment.yaml` into the project's `project_actions.yaml`.
+- Refresh Unity and wait for compile/domain reload to settle.
+- Run `project-action-list --project-root <ProjectRoot>` and confirm `{action_id}` resolves to `{hook_name}`.
+- Validate `{scenario_name}.json` with `request-scenario-validate`.
+- Run the activation scenario and inspect `request-scenario-result-summary`.
+{mutating_note}- If the hook fans out across projects, preflight all targets before mutating the first one.
+- Keep project-specific paths, product names, and private evidence out of public MCP docs.
+"""
 
 
 def _as_dict(value: Any) -> dict[str, Any]:

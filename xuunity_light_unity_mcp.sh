@@ -311,6 +311,80 @@ if payload.get("action") == "unity_status_summary" or "health_status" in payload
     )
     raise SystemExit(0)
 
+if payload.get("action") == "unity_scenario_result_summary":
+    parts = [
+        "outcome=scenario",
+        f"scenario={payload.get('scenario_name', '')}",
+        f"status={payload.get('status', '')}",
+        f"terminal={str(bool(payload.get('terminal'))).lower()}",
+        f"passed_steps={int(payload.get('passed_steps') or 0)}",
+        f"failed_steps={int(payload.get('failed_steps') or 0)}",
+        f"skipped_steps={int(payload.get('skipped_steps') or 0)}",
+    ]
+    failed = payload.get("first_failed_step") if isinstance(payload.get("first_failed_step"), dict) else {}
+    if failed:
+        parts.append(f"first_failed={failed.get('step_id', '')}:{failed.get('error_code', '')}")
+    profile = payload.get("profile_mutation_summary") if isinstance(payload.get("profile_mutation_summary"), dict) else {}
+    if profile:
+        parts.append(f"profile_restore_required={str(bool(profile.get('profile_restore_required'))).lower()}")
+    line(*parts)
+    raise SystemExit(0)
+
+if payload.get("action") == "unity_project_action_invoke":
+    parts = [
+        "outcome=project_action",
+        f"action_id={payload.get('action_id', '')}",
+        f"hook={payload.get('hook_name', '')}",
+        f"status={payload.get('status', '')}",
+        f"succeeded={str(bool(payload.get('succeeded'))).lower()}",
+        f"mutating={str(bool(payload.get('mutation'))).lower()}",
+    ]
+    if payload.get("result_path"):
+        parts.append(f"result_path={payload.get('result_path')}")
+    line(*parts)
+    raise SystemExit(0)
+
+if payload.get("action") == "unity_loading_timing_summary":
+    parts = [
+        "outcome=loading_timing",
+        f"succeeded={str(bool(payload.get('succeeded'))).lower()}",
+        f"matches={int(payload.get('match_count') or 0)}",
+        f"returned={int(payload.get('returned_count') or 0)}",
+        f"timing_values={int(payload.get('timing_value_count') or 0)}",
+        f"truncated={str(bool(payload.get('truncated'))).lower()}",
+    ]
+    if payload.get("marker_count"):
+        parts.append(f"markers={int(payload.get('marker_count') or 0)}")
+    if payload.get("first_timestamp"):
+        parts.append(f"first={payload.get('first_timestamp')}")
+    if payload.get("last_timestamp"):
+        parts.append(f"last={payload.get('last_timestamp')}")
+    line(*parts)
+    raise SystemExit(0)
+
+if isinstance(payload.get("result_summary"), dict):
+    summary = payload.get("result_summary") or {}
+    matrix = summary.get("matrix") if isinstance(summary.get("matrix"), dict) else {}
+    parts = [
+        "outcome=batch",
+        f"action={payload.get('action', '')}",
+        f"succeeded={str(bool(payload.get('succeeded'))).lower()}",
+        f"requested_lane={summary.get('requested_execution_lane', '')}",
+        f"effective_lane={summary.get('effective_execution_lane', '')}",
+        f"unity={summary.get('unity_outcome', '')}",
+        f"transport={summary.get('transport_outcome', '')}",
+    ]
+    if matrix:
+        parts.extend([
+            f"matrix_status={matrix.get('status', '')}",
+            f"total={int(matrix.get('total') or 0)}",
+            f"failed={int(matrix.get('failed') or 0)}",
+        ])
+    if payload.get("summary_file"):
+        parts.append(f"summary_file={payload.get('summary_file')}")
+    line(*parts)
+    raise SystemExit(0)
+
 if payload.get("request_id") and payload.get("payload_type"):
     parts = [
         "outcome=ok",
@@ -339,6 +413,12 @@ if payload.get("request_id") and payload.get("payload_type"):
             f"total={int(decoded.get('total') or 0)}",
             f"passed={int(decoded.get('passed') or 0)}",
             f"failed={int(decoded.get('failed') or 0)}",
+        ])
+    elif payload_type == "unity.console.grep":
+        parts.extend([
+            f"matches={int(decoded.get('match_count') or 0)}",
+            f"returned={len(decoded.get('items') or []) if isinstance(decoded.get('items'), list) else 0}",
+            f"truncated={str(bool(decoded.get('truncated'))).lower()}",
         ])
     line(*parts)
 PY
@@ -706,6 +786,8 @@ Server commands:
     request-capabilities
     request-health-probe
     request-project-refresh
+    request-console-grep
+    request-loading-timing
     request-install-test-framework
     request-compile
     request-editmode-tests

@@ -42,13 +42,13 @@ Updated: `2026-05-15`
 | MCP tool schema for scene assertion | Implemented | `templates/server_specs.py` exposes `unity_scene_assert` |
 | CLI scene assertion helper | Implemented | `templates/server.py` exposes `request-scene-assert` |
 | Capability/status accounting for scene assertion | Implemented | `XUUnityLightMcpCapabilityRegistry.cs` and `XUUnityLightMcpHealthProbe.cs` include `unity.scene.assert` |
-| Generic profile mutation scenario template | Not implemented in public core | Still needs a public template with placeholder hook payloads |
+| Generic profile mutation scenario template | Implemented | `templates/scenarios/profile_mutation_probe_template.json` uses placeholder project actions and cleanup steps |
 | Consumer profile restore scenario/shortcut | Implemented in one consumer overlay | Verified through a host-local scenario and wrapper shortcut outside public `AIRoot` |
 | Hardened consumer profile timing probe | Implemented in one consumer overlay | Uses target switch, settle, compile gate, `assert_scene`, Play Mode probe, restore, settle, and compile closeout |
 | `project_refresh_timeout` guidance | Not implemented | Timeout message and payload still need richer recovery guidance |
-| Profile mutation closeout reminder in summaries | Not implemented | Scenario summaries do not yet infer mutation/restore obligations |
-| Compact console query | Not implemented | `unity.console.grep` / `console_grep` remains future work |
-| Compact loading timing helper | Not implemented | Depends on compact console query |
+| Profile mutation closeout reminder in summaries | Implemented | `server_summaries.py` adds `profile_mutation_summary` and restore recommendations |
+| Compact console query | Implemented | `unity.console.grep`, `request-console-grep`, `unity_console_grep`, and `console_grep` scenario steps are available |
+| Compact loading timing helper | Implemented | `unity_loading_timing` and `request-loading-timing` summarize loading/startup timing evidence through `unity.console.grep` |
 | Scenario summary evidence hints | Not implemented | Summary still needs next-best evidence recommendations |
 
 Validation already performed for the implemented scene assertion and consumer
@@ -192,12 +192,13 @@ escalate it to failure in stricter local lanes.
 
 ### Compact Loading Timing Helper
 
-Add a convenience helper built on `console_grep` for loading and startup timing:
+Implemented a convenience helper built on `console_grep` for loading and startup timing:
 
 - accept a pattern list such as loading step names, markers, or timing suffixes
 - return only matching timing messages by default
 - suppress stack traces unless explicitly requested
 - preserve enough timestamp/order data to reconstruct startup sequence
+- expose both `unity_loading_timing` and `request-loading-timing`
 
 ### Scenario Summary Evidence Hints
 
@@ -217,7 +218,8 @@ This keeps raw JSON as a fallback rather than the default operator path.
 Minimum proof for these additions:
 
 - host Python tests for CLI argument parsing and summary payload shape
-- Unity editor tests or scenario smoke for `console_grep` and `assert_scene`
+- Unity editor smoke for `console_grep`, invalid regex handling, scenario
+  validation/run, and `request-loading-timing`
 - scenario validation tests for new step kinds
 - one generic scenario template smoke with a fake project-defined mutation hook
 - regression coverage that raw `unity.console.tail` and `unity.scene.snapshot`

@@ -15,6 +15,9 @@ if str(TEMPLATES_DIR) not in sys.path:
 import server
 import server_artifact_probe
 import server_batch_reporting
+import server_loading_timing
+import server_project_actions
+import server_specs
 import server_summaries
 import server_workspace_effects
 
@@ -191,8 +194,140 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
         self.assertEqual(2, hook["payload_scalars"]["changed_file_count"])
         self.assertNotIn("api_token", hook.get("payload_scalars", {}))
 
+    def test_profile_mutation_summary_warns_when_restore_is_missing(self) -> None:
+        summary = server_summaries.build_scenario_result_summary(
+            {
+                "project_root": "/tmp/FakeProject",
+                "run_id": "run-profile",
+                "scenario_name": "ProfileProbe",
+                "status": "failed",
+                "steps": [
+                    {
+                        "stepId": "apply_dev",
+                        "kind": "project_defined_hook",
+                        "status": "passed",
+                        "hook_name": "example.environment",
+                        "payload_json": json.dumps({"action": "project.set_environment", "environment": "dev"}),
+                    }
+                ],
+            },
+            {"passed", "failed"},
+        )
+
+        profile = summary["profile_mutation_summary"]
+        self.assertTrue(profile["profile_mutation_detected"])
+        self.assertTrue(profile["profile_restore_required"])
+        self.assertEqual("restore_or_assert_final_profile_then_run_compile_gate", summary["recommended_next_action"])
+
+    def test_project_hook_scaffold_emits_activation_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "scaffold"
+            result = server_project_actions.scaffold_project_hook(
+                hook_name="example.hook",
+                action_id="example.list_targets",
+                class_name="ExampleHook",
+                namespace="Example.Project.Editor",
+                output_dir=output_dir,
+                mutating=False,
+                write_files=True,
+            )
+
+            self.assertEqual("project_hook_scaffold", result["action"])
+            self.assertTrue((output_dir / "ExampleHook.cs").is_file())
+            self.assertTrue((output_dir / "project_actions.fragment.yaml").is_file())
+            self.assertTrue((output_dir / "ACTIVATION_CHECKLIST.md").is_file())
+            scenario_files = list(output_dir.glob("*_activation_smoke.json"))
+            self.assertEqual(1, len(scenario_files))
+            scenario = json.loads(scenario_files[0].read_text(encoding="utf-8"))
+            self.assertEqual("project_action", scenario["steps"][0]["kind"])
+            self.assertIn("run_project_action_list", result["activation_order"])
+
     def test_parser_contains_artifact_probe_command(self) -> None:
         self.assertIn("artifact-probe", get_subparser_choices(server.build_parser()))
+
+    def test_parser_contains_hook_scaffold_and_console_grep_commands(self) -> None:
+        choices = get_subparser_choices(server.build_parser())
+        self.assertIn("project-hook-scaffold", choices)
+        self.assertIn("request-console-grep", choices)
+        self.assertIn("request-loading-timing", choices)
+
+    def test_loading_timing_helper_builds_marker_and_timing_regex(self) -> None:
+        args = server_loading_timing.build_loading_timing_grep_args(
+            markers=["Boot", "Init"],
+            timing_only=True,
+            include_stack_traces=False,
+            include_types=[],
+            limit=10,
+        )
+
+        self.assertTrue(args["regex"])
+        self.assertEqual(10, args["limit"])
+        self.assertIn("Boot", args["pattern"])
+        self.assertIn("Init", args["pattern"])
+        self.assertIn("duration", args["pattern"])
+        self.assertFalse(args["includeStackTraces"])
+
+    def test_loading_timing_summary_extracts_compact_timing_values(self) -> None:
+        response = {
+            "request_id": "request-1",
+            "status": "ok",
+            "payload_json": json.dumps(
+                {
+                    "match_count": 2,
+                    "truncated": False,
+                    "items": [
+                        {
+                            "type": "log",
+                            "timestamp": "2026-06-09T18:00:00Z",
+                            "message": "Boot finished in 123ms",
+                        },
+                        {
+                            "type": "log",
+                            "timestamp": "2026-06-09T18:00:01Z",
+                            "message": "Init duration 1.5s",
+                        },
+                    ],
+                }
+            ),
+        }
+
+        summary = server_loading_timing.summarize_loading_timing_response(
+            project_root="/tmp/FakeProject",
+            response=response,
+            markers=["Boot", "Init"],
+            timing_only=True,
+            include_stack_traces=False,
+            include_types=[],
+            limit=20,
+        )
+
+        self.assertTrue(summary["succeeded"])
+        self.assertEqual("unity_loading_timing_summary", summary["action"])
+        self.assertEqual(2, summary["returned_count"])
+        self.assertEqual(2, summary["timing_value_count"])
+        self.assertEqual(123.0, summary["timing_values"][0]["milliseconds"])
+        self.assertEqual(1500.0, summary["timing_values"][1]["milliseconds"])
+
+    def test_scenario_step_limit_zero_means_default(self) -> None:
+        limit_schema = server_specs.SCENARIO_STEP_SCHEMA["properties"]["limit"]
+
+        self.assertEqual(0, limit_schema["minimum"])
+        self.assertIn("step default", limit_schema["description"])
+
+    def test_console_grep_operation_reports_invalid_regex(self) -> None:
+        operation_path = (
+            Path(__file__).resolve().parents[1]
+            / "packages"
+            / "com.xuunity.light-mcp"
+            / "Editor"
+            / "Operations"
+            / "XUUnityLightMcpConsoleGrepOperation.cs"
+        )
+        operation_source = operation_path.read_text(encoding="utf-8")
+
+        self.assertIn('"invalid_regex"', operation_source)
+        self.assertIn("new Regex(pattern, options)", operation_source)
+        self.assertNotIn("return false;", operation_source)
 
     def test_batch_commands_accept_fallback_mode(self) -> None:
         parser = server.build_parser()

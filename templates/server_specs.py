@@ -88,6 +88,11 @@ OPERATION_LIFECYCLE_POLICIES: dict[str, dict[str, Any]] = {
         "retry_on_transport_response_missing": True,
         "retry_on_transport_connect_failed": True,
     },
+    "unity.console.grep": {
+        "retry_on_lifecycle_reset": True,
+        "retry_on_transport_response_missing": True,
+        "retry_on_transport_connect_failed": True,
+    },
     "unity.scenario.validate": {
         "retry_on_lifecycle_reset": True,
         "retry_on_transport_response_missing": True,
@@ -169,6 +174,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
                 "assert_scene",
                 "project_refresh",
                 "console_tail",
+                "console_grep",
                 "playmode_set",
                 "wait",
                 "wait_for_playmode_state",
@@ -215,8 +221,13 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
         "allowDirty": {"type": "boolean", "default": True},
         "limit": {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 0,
+            "description": "Per-step item limit. Omit or use 0 to apply the step default.",
         },
+        "pattern": {"type": "string"},
+        "regex": {"type": "boolean"},
+        "ignoreCase": {"type": "boolean"},
+        "includeStackTraces": {"type": "boolean"},
         "includeTypes": {
             "type": "array",
             "items": {"type": "string"},
@@ -696,6 +707,56 @@ TOOLS: dict[str, dict[str, Any]] = {
             "properties": {
                 "projectRoot": {"type": "string"},
                 "limit": {"type": "integer", "default": 50, "minimum": 1},
+                "includeTypes": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Subset of log, warning, error, exception."
+                },
+                "timeoutMs": {"type": "integer", "default": 5000, "minimum": 1000}
+            },
+            "required": ["projectRoot"]
+        }
+    },
+    "unity_console_grep": {
+        "bridgeOperation": "unity.console.grep",
+        "description": "Return compact Unity console items whose message, and optionally stack trace, matches a string or regex pattern.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "pattern": {"type": "string"},
+                "regex": {"type": "boolean", "default": False},
+                "ignoreCase": {"type": "boolean", "default": True},
+                "includeStackTraces": {"type": "boolean", "default": False},
+                "limit": {"type": "integer", "default": 20, "minimum": 1},
+                "includeTypes": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Subset of log, warning, error, exception."
+                },
+                "timeoutMs": {"type": "integer", "default": 5000, "minimum": 1000}
+            },
+            "required": ["projectRoot", "pattern"]
+        }
+    },
+    "unity_loading_timing": {
+        "description": "Return compact loading/startup timing evidence by querying Unity console messages through unity.console.grep.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "markers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Loading markers, step names, timing labels, or startup phases to match."
+                },
+                "timingOnly": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "When true, require timing words or duration units in addition to markers."
+                },
+                "includeStackTraces": {"type": "boolean", "default": False},
+                "limit": {"type": "integer", "default": 20, "minimum": 1},
                 "includeTypes": {
                     "type": "array",
                     "items": {"type": "string"},

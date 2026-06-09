@@ -1,0 +1,57 @@
+{
+  "name": "profile_mutation_probe_template",
+  "description": "Template for profile/environment-sensitive validation: apply a project action, prove compile/runtime evidence, then restore or assert the final profile in cleanup.",
+  "stopOnFirstFailure": true,
+  "steps": [
+    {
+      "stepId": "apply_profile",
+      "kind": "project_action",
+      "actionId": "project.set_environment",
+      "payload": {
+        "environment": "example",
+        "build_target": "Android"
+      },
+      "allowMutating": true
+    },
+    {
+      "stepId": "compile_after_profile_apply",
+      "kind": "compile_player_scripts",
+      "target": "Android",
+      "name": "profile_probe_after_apply"
+    },
+    {
+      "stepId": "assert_start_scene",
+      "kind": "assert_scene",
+      "expectedName": "ExampleScene"
+    },
+    {
+      "stepId": "grep_probe_logs",
+      "kind": "console_grep",
+      "pattern": "Example startup marker",
+      "limit": 10,
+      "includeTypes": [
+        "log",
+        "warning",
+        "error",
+        "exception"
+      ]
+    }
+  ],
+  "cleanupSteps": [
+    {
+      "stepId": "restore_profile",
+      "kind": "project_action",
+      "actionId": "project.restore_environment",
+      "payload": {
+        "build_target": "Android"
+      },
+      "allowMutating": true
+    },
+    {
+      "stepId": "compile_after_profile_restore",
+      "kind": "compile_player_scripts",
+      "target": "Android",
+      "name": "profile_probe_after_restore"
+    }
+  ]
+}

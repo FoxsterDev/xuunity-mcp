@@ -109,6 +109,7 @@ from server_license import (
     build_license_capabilities,
     classify_license_log,
 )
+from server_loading_timing import request_loading_timing_summary
 from server_host_platform import current_host_platform_adapter
 from server_mcp_protocol import (
     JsonRpcError,
@@ -138,6 +139,7 @@ from server_project_actions import (
     normalize_project_action_scenario,
     project_action_catalog_payload,
     resolve_project_action,
+    scaffold_project_hook,
 )
 from server_project_context import (
     ensure_project_root as ensure_project_root_base,
@@ -1602,6 +1604,63 @@ def call_unity_scenario_validate_tool(arguments: dict[str, Any]) -> dict[str, An
     return bridge_response_to_tool_result(response)
 
 
+def _optional_string_list_argument(arguments: dict[str, Any], key: str) -> list[str]:
+    value = arguments.get(key)
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise JsonRpcError(-32602, f"{key} must be an array of strings when provided.")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise JsonRpcError(-32602, f"{key} must be an array of strings when provided.")
+        text = item.strip()
+        if text:
+            normalized.append(text)
+    return normalized
+
+
+def call_unity_loading_timing_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    timeout_ms = arguments.get("timeoutMs", 5000)
+    if not isinstance(timeout_ms, int):
+        raise JsonRpcError(-32602, "timeoutMs must be an integer.")
+
+    limit = arguments.get("limit", 20)
+    if not isinstance(limit, int):
+        raise JsonRpcError(-32602, "limit must be an integer.")
+
+    timing_only = arguments.get("timingOnly", True)
+    if not isinstance(timing_only, bool):
+        raise JsonRpcError(-32602, "timingOnly must be a boolean.")
+
+    include_stack_traces = arguments.get("includeStackTraces", False)
+    if not isinstance(include_stack_traces, bool):
+        raise JsonRpcError(-32602, "includeStackTraces must be a boolean.")
+
+    markers = _optional_string_list_argument(arguments, "markers")
+    include_types = _optional_string_list_argument(arguments, "includeTypes")
+
+    try:
+        project_root = ensure_project_root(project_root_value)
+        summary = request_loading_timing_summary(
+            project_root=project_root,
+            markers=markers,
+            timing_only=timing_only,
+            include_stack_traces=include_stack_traces,
+            include_types=include_types,
+            limit=limit,
+            timeout_ms=timeout_ms,
+            invoke_bridge=invoke_bridge,
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(summary, is_error=not bool(summary.get("succeeded")))
+
+
 def call_unity_scenario_run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     try:
         arguments = normalize_scenario_tool_arguments(arguments)
@@ -2155,6 +2214,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_scenario_validate": call_unity_scenario_validate_tool,
             "unity_scenario_run": call_unity_scenario_run_tool,
             "unity_scenario_run_and_wait": call_unity_scenario_run_and_wait_tool,
+            "unity_loading_timing": call_unity_loading_timing_tool,
             "unity_project_action_list": call_unity_project_action_list_tool,
             "unity_project_action_invoke": call_unity_project_action_invoke_tool,
             "unity_artifact_register": call_unity_artifact_register_tool,
@@ -2513,6 +2573,40 @@ def cmd_request_scene_assert(args):
     print_json(response)
 
 
+def cmd_request_console_grep(args):
+    response = invoke_bridge(
+        args.project_root,
+        "unity.console.grep",
+        {
+            "pattern": args.pattern,
+            "regex": bool(args.regex),
+            "ignoreCase": bool(args.ignore_case),
+            "includeStackTraces": bool(args.include_stack_traces),
+            "limit": max(1, int(args.limit or 20)),
+            "includeTypes": args.include_type or None,
+        },
+        args.timeout_ms,
+    )
+    print_json(response)
+
+
+def cmd_request_loading_timing(args):
+    project_root = ensure_project_root(args.project_root)
+    summary = request_loading_timing_summary(
+        project_root=project_root,
+        markers=args.marker or [],
+        timing_only=not bool(args.include_non_timing),
+        include_stack_traces=bool(args.include_stack_traces),
+        include_types=args.include_type or [],
+        limit=int(args.limit or 20),
+        timeout_ms=int(args.timeout_ms or 5000),
+        invoke_bridge=invoke_bridge,
+    )
+    print_json(summary)
+    if not bool(summary.get("succeeded")):
+        raise SystemExit(1)
+
+
 def cmd_request_editor_quit(args):
     project_root = ensure_project_root(args.project_root)
     response = request_editor_quit(str(project_root), args.timeout_ms)
@@ -2843,6 +2937,19 @@ def cmd_project_action_invoke(args):
     print_json(result)
     if is_error:
         raise SystemExit(1)
+
+
+def cmd_project_hook_scaffold(args):
+    result = scaffold_project_hook(
+        hook_name=args.hook_name,
+        action_id=args.action_id,
+        class_name=args.class_name,
+        namespace=args.namespace,
+        output_dir=Path(args.output_dir).expanduser().resolve(),
+        mutating=bool(args.mutating),
+        write_files=bool(args.write),
+    )
+    print_json(result)
 
 
 def load_optional_json_object(value: str, error_code: str) -> dict[str, Any]:
@@ -5513,6 +5620,27 @@ def build_parser():
     scene_assert_cmd.add_argument("--timeout-ms", type=int, default=5000)
     scene_assert_cmd.set_defaults(func=cmd_request_scene_assert)
 
+    console_grep_cmd = sub.add_parser("request-console-grep", help="Search recent Unity console messages through the active bridge transport.")
+    console_grep_cmd.add_argument("--project-root", required=True)
+    console_grep_cmd.add_argument("--pattern", required=True)
+    console_grep_cmd.add_argument("--regex", action="store_true")
+    console_grep_cmd.add_argument("--ignore-case", dest="ignore_case", action=argparse.BooleanOptionalAction, default=True)
+    console_grep_cmd.add_argument("--include-stack-traces", action="store_true")
+    console_grep_cmd.add_argument("--include-type", action="append", default=[])
+    console_grep_cmd.add_argument("--limit", type=int, default=20)
+    console_grep_cmd.add_argument("--timeout-ms", type=int, default=5000)
+    console_grep_cmd.set_defaults(func=cmd_request_console_grep)
+
+    loading_timing_cmd = sub.add_parser("request-loading-timing", help="Return compact loading/startup timing console evidence using unity.console.grep.")
+    loading_timing_cmd.add_argument("--project-root", required=True)
+    loading_timing_cmd.add_argument("--marker", action="append", default=[], help="Loading marker, step name, or timing label to match. Repeat for multiple markers.")
+    loading_timing_cmd.add_argument("--include-non-timing", action="store_true", help="Match markers without requiring timing words or duration units.")
+    loading_timing_cmd.add_argument("--include-stack-traces", action="store_true")
+    loading_timing_cmd.add_argument("--include-type", action="append", default=[])
+    loading_timing_cmd.add_argument("--limit", type=int, default=20)
+    loading_timing_cmd.add_argument("--timeout-ms", type=int, default=5000)
+    loading_timing_cmd.set_defaults(func=cmd_request_loading_timing)
+
     editor_quit_cmd = sub.add_parser("request-editor-quit", help="Send a direct unity.editor.quit request through the active bridge transport.")
     editor_quit_cmd.add_argument("--project-root", required=True)
     editor_quit_cmd.add_argument("--timeout-ms", type=int, default=15000)
@@ -5559,6 +5687,19 @@ def build_parser():
     project_action_invoke_cmd.add_argument("--timeout-ms", type=int, default=None)
     project_action_invoke_cmd.add_argument("--poll-interval-ms", type=int, default=1000)
     project_action_invoke_cmd.set_defaults(func=cmd_project_action_invoke)
+
+    project_hook_scaffold_cmd = sub.add_parser(
+        "project-hook-scaffold",
+        help="Generate a project hook class, project_actions fragment, activation scenario, and checklist.",
+    )
+    project_hook_scaffold_cmd.add_argument("--hook-name", required=True)
+    project_hook_scaffold_cmd.add_argument("--action-id", required=True)
+    project_hook_scaffold_cmd.add_argument("--class-name", required=True)
+    project_hook_scaffold_cmd.add_argument("--namespace", default="Example.Project.Editor")
+    project_hook_scaffold_cmd.add_argument("--output-dir", required=True)
+    project_hook_scaffold_cmd.add_argument("--mutating", action="store_true")
+    project_hook_scaffold_cmd.add_argument("--write", action="store_true")
+    project_hook_scaffold_cmd.set_defaults(func=cmd_project_hook_scaffold)
 
     artifact_register_cmd = sub.add_parser(
         "artifact-register",

@@ -25,6 +25,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.edm4u.resolve", new XUUnityLightMcpEdm4uResolveOperation() },
             { "unity.sdk.dependency.verify", new XUUnityLightMcpSdkDependencyVerifyOperation() },
             { "unity.console.tail", new XUUnityLightMcpConsoleTailOperation() },
+            { "unity.console.grep", new XUUnityLightMcpConsoleGrepOperation() },
             { "unity.scene.snapshot", new XUUnityLightMcpSceneSnapshotOperation() },
             { "unity.scene.assert", new XUUnityLightMcpSceneAssertOperation() },
             { "unity.playmode.state", new XUUnityLightMcpPlayModeStateOperation() },

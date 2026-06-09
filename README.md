@@ -627,7 +627,8 @@ Popular MCP tools:
 `xuunity_uninstall_plan` | `xuunity_uninstall_apply` |
 `unity_license_capabilities` |
 `unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
-`unity_console_tail` | `unity_scene_snapshot` | `unity_scene_assert` |
+`unity_console_tail` | `unity_console_grep` | `unity_loading_timing` |
+`unity_scene_snapshot` | `unity_scene_assert` |
 `unity_compile_player_scripts` | `unity_compile_matrix` |
 `unity_compile_build_config_matrix` | `unity_tests_run_editmode` |
 `unity_tests_run_playmode` | `unity_playmode_state` | `unity_playmode_set` |
@@ -647,8 +648,9 @@ Host helper commands include `setup-plan`, `setup-apply`, `uninstall-plan`,
 `recover-editor-session`, `batch-compile`, `batch-compile-matrix`,
 `batch-editmode-tests`, `batch-build-config-compile-matrix`,
 `batch-build-player`, `project-action-list`, `project-action-invoke`,
-`artifact-register`, `artifact-write-report`, `artifact-probe`, `devmode`,
-and `prodmode`.
+`project-hook-scaffold`, `request-console-grep`, `request-loading-timing`,
+`artifact-register`,
+`artifact-write-report`, `artifact-probe`, `devmode`, and `prodmode`.
 
 Scenario JSON may use Unity-native `project_action` steps for catalog-backed
 project actions. Unity resolves `project_actions.yaml`, enforces mutation

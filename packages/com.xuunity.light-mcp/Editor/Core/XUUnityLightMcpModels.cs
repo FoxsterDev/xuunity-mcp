@@ -416,6 +416,17 @@ namespace XUUnity.LightMcp.Editor.Core
     }
 
     [Serializable]
+    internal sealed class XUUnityLightMcpConsoleGrepArgs
+    {
+        public string pattern = "";
+        public bool regex;
+        public bool ignoreCase = true;
+        public bool includeStackTraces;
+        public int limit = 20;
+        public string[] includeTypes = null;
+    }
+
+    [Serializable]
     internal sealed class XUUnityLightMcpConsoleItem
     {
         public string type = "unknown";
@@ -429,6 +440,10 @@ namespace XUUnity.LightMcp.Editor.Core
     {
         public string backend_id = "xuunity.light_unity_mcp";
         public string project_root = "";
+        public string pattern = "";
+        public bool regex;
+        public bool ignore_case;
+        public int match_count;
         public List<XUUnityLightMcpConsoleItem> items = new();
         public bool truncated;
         public string validation_evidence = "unity_mcp";
@@ -853,7 +868,11 @@ namespace XUUnity.LightMcp.Editor.Core
         public string expectedPath = "";
         public string[] requiredRootNames = null;
         public bool allowDirty = true;
-        public int limit = 50;
+        public int limit;
+        public string pattern = "";
+        public bool regex;
+        public bool ignoreCase = true;
+        public bool includeStackTraces;
         public string[] includeTypes = null;
         public string fileName = "";
         public bool includeImage;

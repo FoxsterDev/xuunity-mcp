@@ -91,6 +91,8 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_build_player", tool_names)
         self.assertIn("unity_edm4u_resolve", tool_names)
         self.assertIn("unity_sdk_dependency_verify", tool_names)
+        self.assertIn("unity_console_grep", tool_names)
+        self.assertIn("unity_loading_timing", tool_names)
         self.assertIn("unity_scenario_run_and_wait", tool_names)
         self.assertIn("unity_scenario_results_list", tool_names)
         self.assertIn("unity_scenario_result_latest", tool_names)

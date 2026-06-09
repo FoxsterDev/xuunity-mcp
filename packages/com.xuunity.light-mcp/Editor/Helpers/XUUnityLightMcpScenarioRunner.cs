@@ -355,6 +355,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     return ProcessProjectRefreshStep(state, step, stepResult);
                 case "console_tail":
                     return ProcessConsoleTailStep(step, stepResult);
+                case "console_grep":
+                    return ProcessConsoleGrepStep(step, stepResult);
                 case "playmode_set":
                     return ProcessPlayModeSetStep(step, stepResult);
                 case "game_view_screenshot":
@@ -478,6 +480,21 @@ namespace XUUnity.LightMcp.Editor.Helpers
             };
 
             return ProcessNestedOperationStep("unity.console.tail", JsonUtility.ToJson(args), stepResult);
+        }
+
+        static bool ProcessConsoleGrepStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
+        {
+            var args = new XUUnityLightMcpConsoleGrepArgs
+            {
+                pattern = step.pattern,
+                regex = step.regex,
+                ignoreCase = step.ignoreCase,
+                includeStackTraces = step.includeStackTraces,
+                limit = step.limit > 0 ? step.limit : 20,
+                includeTypes = step.includeTypes,
+            };
+
+            return ProcessNestedOperationStep("unity.console.grep", JsonUtility.ToJson(args), stepResult);
         }
 
         static bool ProcessAssertSceneStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
@@ -1603,9 +1620,19 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     }
                     break;
                 case "console_tail":
-                    if (step.limit <= 0)
+                    if (step.limit < 0)
                     {
-                        AddIssue(payload, "error", "invalid_limit", "console_tail step requires limit > 0.", stepId, index);
+                        AddIssue(payload, "error", "invalid_limit", "console_tail step requires limit >= 0; omit it or use 0 for the default.", stepId, index);
+                    }
+                    break;
+                case "console_grep":
+                    if (string.IsNullOrWhiteSpace(step.pattern))
+                    {
+                        AddIssue(payload, "error", "missing_pattern", "console_grep step requires pattern.", stepId, index);
+                    }
+                    if (step.limit < 0)
+                    {
+                        AddIssue(payload, "error", "invalid_limit", "console_grep step requires limit >= 0; omit it or use 0 for the default.", stepId, index);
                     }
                     break;
                 case "playmode_set":

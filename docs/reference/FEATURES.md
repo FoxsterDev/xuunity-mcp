@@ -67,6 +67,8 @@ Unity MCP implementations when the user wants safe production validation.
 | EDM4U | `unity_edm4u_resolve` | `Project-dependent` | Requires External Dependency Manager for Unity and whitelisted resolver menu availability. |
 | SDK validation | `unity_sdk_dependency_verify` | `Project-dependent` | Requires explicit generated-artifact expectations. |
 | Console | `unity_console_tail` | `Core` | Returns recent Unity console items in normalized form. |
+| Console | `unity_console_grep` | `Core` | Returns compact console matches by string or regex without stack traces by default. |
+| Console | `unity_loading_timing` | `Core` | Returns compact loading/startup timing evidence through `unity.console.grep`. |
 | Scene | `unity_scene_snapshot` | `Core` | Lightweight active-scene snapshot. |
 | Scene | `unity_scene_assert` | `Core` | Asserts scene name, path, root objects, or dirty state. |
 | Tests | `unity_tests_run_editmode` | `Core` | Runs EditMode tests with normalized result accounting. |

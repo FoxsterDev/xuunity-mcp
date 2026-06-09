@@ -210,6 +210,94 @@ def build_project_defined_hook_summary(steps: list[Any]) -> dict[str, Any]:
     }
 
 
+def build_profile_mutation_summary(steps: list[Any]) -> dict[str, Any]:
+    mutation_steps: list[dict[str, Any]] = []
+    restore_steps: list[dict[str, Any]] = []
+    final_assertion_steps: list[dict[str, Any]] = []
+
+    for raw_step in steps:
+        if not isinstance(raw_step, dict):
+            continue
+        action = _step_action_hint(raw_step)
+        if not action:
+            continue
+        step_summary = {
+            "step_id": str(raw_step.get("stepId") or raw_step.get("step_id") or ""),
+            "kind": str(raw_step.get("kind") or ""),
+            "status": str(raw_step.get("status") or ""),
+            "action": truncate_text(action, 160),
+        }
+        if _looks_like_profile_mutation(action):
+            mutation_steps.append(step_summary)
+        if _looks_like_profile_restore(action):
+            restore_steps.append(step_summary)
+        if _looks_like_profile_assertion(action):
+            final_assertion_steps.append(step_summary)
+
+    profile_restore_required = bool(mutation_steps) and not bool(restore_steps or final_assertion_steps)
+    if not mutation_steps and not restore_steps and not final_assertion_steps:
+        return {
+            "profile_mutation_detected": False,
+            "profile_restore_required": False,
+            "recommended_next_action": "",
+            "mutation_steps": [],
+            "restore_steps": [],
+            "final_assertion_steps": [],
+        }
+
+    recommended = ""
+    if profile_restore_required:
+        recommended = "restore_or_assert_final_profile_then_run_compile_gate"
+
+    return {
+        "profile_mutation_detected": bool(mutation_steps),
+        "profile_restore_required": profile_restore_required,
+        "recommended_next_action": recommended,
+        "mutation_steps": mutation_steps,
+        "restore_steps": restore_steps,
+        "final_assertion_steps": final_assertion_steps,
+    }
+
+
+def _step_action_hint(step: dict[str, Any]) -> str:
+    payload = _parse_step_payload_json(step)
+    for key in ("action", "projectAction", "actionId", "profileName", "config_name", "environment"):
+        value = payload.get(key)
+        if value:
+            return str(value)
+    for key in ("action", "projectAction", "actionId", "profileName", "config_name", "environment"):
+        value = step.get(key)
+        if value:
+            return str(value)
+    raw_payload = str(step.get("hookPayloadJson") or step.get("payloadJson") or "")
+    if raw_payload:
+        try:
+            payload = json.loads(raw_payload)
+            if isinstance(payload, dict):
+                for key in ("action", "projectAction", "actionId", "profileName", "config_name", "environment"):
+                    value = payload.get(key)
+                    if value:
+                        return str(value)
+        except json.JSONDecodeError:
+            return raw_payload
+    return ""
+
+
+def _looks_like_profile_mutation(action: str) -> bool:
+    normalized = action.lower()
+    return any(marker in normalized for marker in ("set_environment", "apply_profile", "set_profile", "profile.apply", "environment.apply"))
+
+
+def _looks_like_profile_restore(action: str) -> bool:
+    normalized = action.lower()
+    return any(marker in normalized for marker in ("restore", "release", "store", "production", "final_profile"))
+
+
+def _looks_like_profile_assertion(action: str) -> bool:
+    normalized = action.lower()
+    return any(marker in normalized for marker in ("assert_profile", "assert_environment", "verify_profile", "verify_environment"))
+
+
 def _parse_step_payload_json(step: dict[str, Any]) -> dict[str, Any]:
     payload_json = str(step.get("payload_json") or "")
     if not payload_json:
@@ -329,6 +417,12 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
     project_defined_hook_summary = build_project_defined_hook_summary(step_items)
     if project_defined_hook_summary["hook_count"] > 0:
         summary["project_defined_hook_summary"] = project_defined_hook_summary
+
+    profile_mutation_summary = build_profile_mutation_summary(step_items)
+    if bool(profile_mutation_summary.get("profile_mutation_detected")) or bool(profile_mutation_summary.get("restore_steps")):
+        summary["profile_mutation_summary"] = profile_mutation_summary
+        if bool(profile_mutation_summary.get("profile_restore_required")) and "recommended_next_action" not in summary:
+            summary["recommended_next_action"] = str(profile_mutation_summary.get("recommended_next_action") or "")
 
     for key in (
         "host_health_classification",
