@@ -108,6 +108,24 @@ Current design intent:
 
 This keeps the lightweight lane closer to Rider-style behavior without depending on Rider runtime internals.
 
+## Portfolio Reporting Contract
+
+Per-project request artifacts remain the source of truth. For test runs, the
+persisted `state/test_results/<request_id>.json` file owns the final counts,
+failure list, lifecycle churn flag, and request id for that Unity request.
+
+Portfolio aggregate artifacts are operator-facing verdicts. They should make a
+multi-project run cheap to read and quote, but they must point back to the
+per-project request/result artifacts rather than replacing them. Aggregate
+summaries are responsible for:
+
+- separating MCP operation success from Unity test-suite pass/fail status
+- grouping repeated first-failure classes across projects
+- reporting editor restore or closeout status
+- summarizing package manifest/package-lock alignment when package source is
+  part of the validation claim
+- summarizing workspace side effects without mutating or cleaning files
+
 Current public bridge-state baseline includes:
 
 - `bridge_session_id`

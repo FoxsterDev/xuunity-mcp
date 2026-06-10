@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.3.25
+
+Release tag: `v0.3.25`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.25
+```
+
+### Changed
+
+- Added `test-results-table` for reusable markdown, JSON, and TSV summaries
+  from persisted Unity test-result JSON files.
+- Improved multi-project GUI test subset reporting with per-project request
+  ids, result paths, count summaries, lifecycle churn flags, failure grouping,
+  package-source closeout, and workspace side-effect accounting.
+- Documented completed test-result JSON as the immutable source of truth for
+  portfolio closeout and aggregate operator verdicts.
+- Released `v0.3.25` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ## 0.3.24
 
 Release tag: `v0.3.24`

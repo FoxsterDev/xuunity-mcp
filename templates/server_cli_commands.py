@@ -127,6 +127,10 @@ from server_project_context import (
     find_latest_request_event,
     inspect_package_dependency_alignment,
 )
+from server_test_reporting import (
+    format_test_results,
+    select_test_result_rows,
+)
 from server_setup_wizard import (
     LIGHT_MCP_PACKAGE_NAME,
     TEST_FRAMEWORK_CAPABILITY_DEFINE,
@@ -1798,6 +1802,54 @@ def cmd_batch_editmode_tests(args):
     )
 
 
+def cmd_test_results_table(args):
+    project_roots = [_resolve_cli_project_root(value) for value in list(getattr(args, "project_root", []) or [])]
+    if not project_roots and getattr(args, "workspace_root", None):
+        project_roots = _discover_test_result_project_roots(Path(args.workspace_root).expanduser().resolve())
+
+    result_files = [
+        Path(value).expanduser().resolve()
+        for value in list(getattr(args, "result_file", []) or [])
+    ]
+    if not project_roots and not result_files:
+        raise ToolInvocationError(
+            "test_results_project_required",
+            "Provide --project-root, --workspace-root, or --result-file for test-results-table.",
+        )
+
+    rows = select_test_result_rows(
+        project_roots=project_roots,
+        modes=list(getattr(args, "mode", []) or []),
+        request_ids=list(getattr(args, "request_id", []) or []),
+        result_files=result_files,
+    )
+    print(
+        format_test_results(
+            rows,
+            output_format=str(getattr(args, "format", "markdown") or "markdown"),
+        ),
+        end="",
+    )
+
+
+def _resolve_cli_project_root(value: str) -> Path:
+    return ensure_project_root(value)
+
+
+def _discover_test_result_project_roots(workspace_root: Path) -> list[Path]:
+    if not workspace_root.is_dir():
+        raise ToolInvocationError("workspace_root_not_found", f"Workspace root not found: {workspace_root}")
+    roots: list[Path] = []
+    for candidate in sorted(workspace_root.iterdir()):
+        if (
+            candidate.is_dir()
+            and (candidate / "ProjectSettings" / "ProjectVersion.txt").is_file()
+            and (candidate / "Packages" / "manifest.json").is_file()
+        ):
+            roots.append(candidate.resolve())
+    return roots
+
+
 def cmd_artifact_probe(args):
     artifact_probe_config = load_artifact_probe_config(
         artifact_probe_file=getattr(args, "artifact_probe_file", "") or "",
@@ -1967,5 +2019,3 @@ wrap_globals_with_proxies(globals(), [
     "call_unity_artifact_register_tool",
     "call_unity_artifact_write_report_tool",
 ])
-
-

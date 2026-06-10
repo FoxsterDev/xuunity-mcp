@@ -592,6 +592,18 @@ def build_parser() -> argparse.ArgumentParser:
     add_batch_operator_arguments(batch_editmode_cmd)
     batch_editmode_cmd.set_defaults(func_name="cmd_batch_editmode_tests")
 
+    test_results_table_cmd = sub.add_parser(
+        "test-results-table",
+        help="Read persisted Unity Test Framework result JSON files and print a compact table.",
+    )
+    test_results_table_cmd.add_argument("--project-root", action="append", default=[])
+    test_results_table_cmd.add_argument("--workspace-root")
+    test_results_table_cmd.add_argument("--mode", action="append", choices=["editmode", "playmode"], default=[])
+    test_results_table_cmd.add_argument("--request-id", action="append", default=[])
+    test_results_table_cmd.add_argument("--result-file", action="append", default=[])
+    test_results_table_cmd.add_argument("--format", choices=["markdown", "json", "tsv"], default="markdown")
+    test_results_table_cmd.set_defaults(func_name="cmd_test_results_table")
+
     regression_cmd = sub.add_parser(
         "batch-test-framework-version-regression",
         help="Run the Phase 0 com.unity.test-framework version sweep against the live MCP and batch EditMode validation lanes.",

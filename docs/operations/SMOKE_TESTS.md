@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-05-23`
-Status: `current for v0.3.24`
+Status: `current for v0.3.25`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.24`: `141/141`
+- host Python tests for `v0.3.25`: `141/141`
 - source package self-tests for the current release line: EditMode `6/6`, PlayMode `5/5` on runnable installed Unity `2021.3`, `2022.3`, and `6000.x` editors after offline optional Test Framework setup
 - multi-project batch compile matrix in a consumer repo: `9/9` projects, `38/38` lanes, `0` failures
 
@@ -131,6 +131,29 @@ Pass criteria:
 - both payloads report the same final value
 - for the common single-test happy path, the final value should normally be
   `edit`
+
+### 5a. Portfolio Test Closeout Smoke
+
+For multi-project EditMode/PlayMode validation, the closeout artifact must
+distinguish:
+
+- MCP transport or wrapper operation success
+- Unity test request completion
+- test-suite pass/fail status
+- editor restoration or closeout status
+
+Pass criteria:
+
+- the aggregate summary contains one row per project/mode that ran
+- each row includes request id, result artifact path, top-level test counts,
+  lifecycle churn flag, and restore/closeout status
+- repeated test failures are grouped by a stable first-failure class/key
+- package-source and package-lock alignment are summarized when package
+  validation is part of the run
+- workspace side effects separate preexisting dirty files, allowed new dirty
+  files, and unexpected new dirty files
+- a completed MCP request with failing tests is reported as a test-suite
+  failure, not as an infrastructure failure
 
 ### 6. PlayMode Lifecycle Retry Smoke
 

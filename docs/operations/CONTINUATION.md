@@ -27,6 +27,8 @@ It now has:
 - batch progress heartbeat JSONL sidecars for long-running batch helpers
 - generic artifact probe summaries for ZIP/APK and file/text checks
 - tracked workspace side-effect accounting around batch helpers
+- persisted test-result table reporting for portfolio-scale EditMode/PlayMode
+  closeout
 - project-defined hook summary promotion in compact scenario summaries
 - operator verdicts for confirmed lifecycle reclassification recovery
 - design-plan history for retro-derived implementation plans
@@ -62,6 +64,8 @@ External server:
   - `batch-editmode-tests`
   - `batch-build-player`
   - `artifact-probe`
+- `test-results-table`, which reads completed Unity Test Framework result
+  artifacts without contacting the editor
 
 Unity bridge:
 - heartbeat state
@@ -137,7 +141,16 @@ Inside the target Unity project:
 - `Library/XUUnityLightMcp/inbox/`
 - `Library/XUUnityLightMcp/outbox/`
 - `Library/XUUnityLightMcp/compile/`
+- `Library/XUUnityLightMcp/state/test_results/`
 - `Library/XUUnityLightMcp/captures/`
+
+Completed Unity Test Framework requests persist one JSON file per `request_id`
+under `state/test_results/`. Treat these files as the immutable source of truth
+for completed test outcomes. The result counts are top-level fields:
+`total`, `passed`, `failed`, and `skipped`; do not assume a nested `counts`
+object. The result also carries `test_mode`, `request_id`, `failures`, and
+`lifecycle_churn_observed`, which are what `test-results-table` and portfolio
+summaries read.
 - `Library/XUUnityLightMcp/scenarios/active_run.json`
 - `Library/XUUnityLightMcp/scenarios/results/`
 - `Library/XUUnityLightMcp/logs/`
