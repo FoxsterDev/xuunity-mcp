@@ -35,6 +35,7 @@ If this repo is used outside `AIFoxsterDevHub`, skip missing host paths and use
 this router plus the local docs as the source of truth.
 
 ## Routing Rules
+- For any task involving process management (process listing, checking liveness, or terminating processes/editors), load the safe process management skill: [SKILL.md](skills/safe_process_management/SKILL.md).
 - For client setup tasks, load `docs/clients/Agents.md` when it exists, then the requested client guide.
 - For AI integration or workflow tasks, load `docs/agents/AI_INTEGRATION.md` or `docs/agents/AGENT_WORKFLOWS.md` as appropriate.
 - For Unity package implementation, edit `packages/com.xuunity.light-mcp/` and validate through the repo's test or smoke guidance.

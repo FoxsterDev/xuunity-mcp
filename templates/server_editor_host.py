@@ -1174,10 +1174,20 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
     if pid <= 0 or not pid_is_alive(pid):
         return True
 
-    if os.name == "nt":
-        try:
-            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, check=False)
-        except Exception:
+    is_windows_like = (os.name == "nt" or sys.platform in ("win32", "cygwin", "msys"))
+
+    if is_windows_like:
+        taskkill_success = False
+        for cmd in ["taskkill", "taskkill.exe"]:
+            try:
+                completed = subprocess.run([cmd, "/F", "/PID", str(pid)], capture_output=True, check=False)
+                if completed.returncode == 0:
+                    taskkill_success = True
+                    break
+            except Exception:
+                pass
+        
+        if not taskkill_success and os.name == "nt":
             try:
                 os.kill(pid, signal.SIGTERM)
             except OSError:
@@ -1189,10 +1199,12 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
             except OSError:
                 pass
         else:
-            try:
-                subprocess.run(["taskkill.exe", "/F", "/PID", str(pid)], capture_output=True, check=False)
-            except Exception:
-                pass
+            for cmd in ["taskkill.exe", "taskkill"]:
+                try:
+                    subprocess.run([cmd, "/F", "/PID", str(pid)], capture_output=True, check=False)
+                    break
+                except Exception:
+                    pass
     else:
         try:
             os.kill(pid, signal.SIGTERM)

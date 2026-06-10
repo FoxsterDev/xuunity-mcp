@@ -14,6 +14,15 @@ from pathlib import Path
 WSL_PROC_ROOT = Path("/proc")
 
 
+def _clear_thread_exception() -> None:
+    try:
+        import ctypes
+        if hasattr(ctypes, "pythonapi") and hasattr(ctypes.pythonapi, "PyErr_Clear"):
+            ctypes.pythonapi.PyErr_Clear()
+    except Exception:
+        pass
+
+
 @dataclass(frozen=True)
 class HostPlatformAdapter:
     platform_kind: str
@@ -22,54 +31,85 @@ class HostPlatformAdapter:
         if pid <= 0:
             return False
 
-        if os.name == "nt":
-            try:
-                import ctypes
-                kernel32 = ctypes.windll.kernel32
-                handle = kernel32.OpenProcess(0x1000, False, pid)
-                if not handle:
-                    return kernel32.GetLastError() == 5
+        _clear_thread_exception()
 
-                exit_code = ctypes.c_ulong()
-                success = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
-                kernel32.CloseHandle(handle)
+        is_windows_like = (os.name == "nt" or sys.platform in ("win32", "cygwin", "msys"))
 
-                if success:
-                    return exit_code.value == 259
-                return False
-            except Exception:
+        if is_windows_like:
+            if os.name == "nt":
+                try:
+                    import ctypes
+                    from ctypes import wintypes
+                    kernel32 = ctypes.windll.kernel32
+
+                    # Explicitly declare argument and return types to prevent 64-bit handle truncation
+                    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+                    kernel32.OpenProcess.restype = wintypes.HANDLE
+
+                    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+                    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+
+                    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+                    kernel32.CloseHandle.restype = wintypes.BOOL
+
+                    kernel32.GetLastError.argtypes = []
+                    kernel32.GetLastError.restype = wintypes.DWORD
+
+                    handle = kernel32.OpenProcess(0x1000, False, pid)
+                    if not handle:
+                        is_alive = (kernel32.GetLastError() == 5)
+                        _clear_thread_exception()
+                        return is_alive
+
+                    exit_code = wintypes.DWORD()
+                    success = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+                    kernel32.CloseHandle(handle)
+
+                    _clear_thread_exception()
+                    if success:
+                        return exit_code.value == 259
+                    return False
+                except Exception:
+                    _clear_thread_exception()
+
+            # Fallback for native Windows, or primary route for Cygwin/MSYS
+            for cmd in ["tasklist", "tasklist.exe"]:
                 try:
                     completed = subprocess.run(
-                        ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                        [cmd, "/FI", f"PID eq {pid}", "/NH"],
                         capture_output=True,
                         text=True,
                         check=False,
                     )
                     return windows_tasklist_contains_pid(completed.stdout, pid)
                 except Exception:
-                    return False
+                    pass
+            return False
 
         if not is_wsl():
             try:
                 os.kill(pid, 0)
+                _clear_thread_exception()
                 return True
             except (OSError, SystemError):
+                _clear_thread_exception()
                 pass
         else:
             interop_status = wsl_linux_unity_interop_pid_status(pid)
             if interop_status is not None:
                 return interop_status
 
-            try:
-                completed = subprocess.run(
-                    ["tasklist.exe", "/FI", f"PID eq {pid}", "/NH"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                return windows_tasklist_contains_pid(completed.stdout, pid)
-            except Exception:
-                pass
+            for cmd in ["tasklist.exe", "tasklist"]:
+                try:
+                    completed = subprocess.run(
+                        [cmd, "/FI", f"PID eq {pid}", "/NH"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    return windows_tasklist_contains_pid(completed.stdout, pid)
+                except Exception:
+                    pass
 
         return False
 

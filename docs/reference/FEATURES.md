@@ -1,7 +1,7 @@
 # Features
 
 Date: `2026-05-26`
-Status: `current for v0.3.25`
+Status: `current for v0.3.26`
 
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
 automation: status, compile, tests, scene checks, Game View evidence, scenario
@@ -128,7 +128,7 @@ Unity MCP implementations when the user wants safe production validation.
 
 | Target | Status | Validation notes |
 | --- | --- | --- |
-| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.25`; old `templates/unity-package#v0.3.11` is migration-only. |
+| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.26`; old `templates/unity-package#v0.3.11` is migration-only. |
 | macOS host tools | `Validated in this release environment` | Shell syntax checks, JSON/TOML config parsing, and 141 host Python tests passed locally. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |

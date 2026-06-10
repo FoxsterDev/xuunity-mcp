@@ -28,6 +28,7 @@ host-local registry.
 
 | Date | File | Scope | Registry Status | Why It Is Not Completed History |
 | --- | --- | --- | --- | --- |
+| 2026-06-10 | `2026-06-10_windows_process_kill_catastrophe_retro.md` | Windows process kill catastrophe & dry-run proposal | active triage | Post-mortem of process termination bug and recommendation of dry-run mode for MCP client safety. |
 | 2026-05-11 | `2026-05-11_chat_retro_playmode_lifecycle_reset.md` | PlayMode lifecycle reset chat retro | needs triage | File status is `active public retro` and includes P0/P1/P2 priority improvements. |
 | 2026-05-14 | `2026-05-14_sdk_rollout_mcp_portfolio_retro.md` | SDK rollout MCP portfolio retro | needs triage | Contains P0/P1 rollout, resolver, generated diff, process pool, and closeout-contract improvements. |
 | 2026-05-21 | `2026-05-21_project_hook_batch_build_operator_retro.md` | project hook batch build operator retro | needs triage / partially superseded | Contains priority improvements; some may now be covered by current project-action and batch-summary work but the file has not been fully re-triaged. |

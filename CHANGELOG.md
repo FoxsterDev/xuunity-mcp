@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.3.26
+
+Release tag: `v0.3.26`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.26
+```
+
+### Changed
+
+- Released `v0.3.26` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ## 0.3.25
 
 Release tag: `v0.3.25`

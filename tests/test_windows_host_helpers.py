@@ -648,6 +648,31 @@ class WindowsHostHelperTests(unittest.TestCase):
                     for arg in extra_args
                 ))
 
+    def test_pid_is_alive_handles_cygwin_msys_platform_routing(self) -> None:
+        completed = mock.Mock(stdout="Unity.exe                  1234 Console\n", returncode=0)
+        adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
+        
+        with (
+            mock.patch.object(sys, "platform", "msys"),
+            mock.patch.object(server_host_platform, "is_wsl", return_value=False),
+            mock.patch.object(server_host_platform.subprocess, "run", return_value=completed) as mock_run,
+        ):
+            self.assertTrue(adapter.pid_is_alive(1234))
+            mock_run.assert_called_once()
+            self.assertIn("tasklist", mock_run.call_args[0][0])
+
+    def test_terminate_editor_pid_handles_cygwin_msys_platform_routing(self) -> None:
+        completed = mock.Mock(returncode=0)
+        with (
+            mock.patch.object(sys, "platform", "cygwin"),
+            mock.patch.object(server_editor_host, "is_wsl", return_value=False),
+            mock.patch.object(server_editor_host, "pid_is_alive", side_effect=[True, False]),
+            mock.patch.object(server_editor_host.subprocess, "run", return_value=completed) as mock_run,
+        ):
+            self.assertTrue(server_editor_host.terminate_editor_pid(1234, 1000))
+            mock_run.assert_called_once()
+            self.assertIn("taskkill", mock_run.call_args[0][0])
+
 
 if __name__ == "__main__":
     unittest.main()
