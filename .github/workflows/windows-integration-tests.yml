@@ -2,10 +2,10 @@ name: Integration Tests
 
 on:
   push:
+    # Release tags point at the already-tested master commit. Keeping this
+    # workflow branch-only avoids duplicate master+tag runs for the same SHA.
     branches:
       - master
-    tags:
-      - 'v*'
   pull_request:
   workflow_dispatch:
 
