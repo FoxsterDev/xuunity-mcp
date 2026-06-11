@@ -1,0 +1,24 @@
+name: Acquire Unity Activation File
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  activation-request:
+    name: Generate .alf file
+    runs-on: windows-latest
+    steps:
+      - name: Request activation file
+        uses: game-ci/unity-request-activation-file@v4
+        id: get_alf
+        with:
+          unityVersion: 6000.3.2f1
+          
+      - name: Upload activation file as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity_v6000.3.2f1.alf
+          path: ${{ steps.get_alf.outputs.filePath }}
