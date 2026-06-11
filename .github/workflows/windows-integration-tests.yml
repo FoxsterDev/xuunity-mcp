@@ -1,0 +1,95 @@
+name: Windows Integration Tests
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-ci:
+    name: Windows Setup and Test Integration
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Python Unit Tests
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH="templates"
+          python -m unittest discover -s tests -v
+
+      - name: Scaffold Test Unity Project
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "TestProject/Assets"
+          New-Item -ItemType Directory -Force -Path "TestProject/ProjectSettings"
+          New-Item -ItemType Directory -Force -Path "TestProject/Packages"
+          Set-Content -Path "TestProject/ProjectSettings/ProjectVersion.txt" -Value "m_EditorVersion: 2022.3.20f1"
+          Set-Content -Path "TestProject/Packages/manifest.json" -Value '{"dependencies": {}}'
+
+      - name: Run MCP setup-plan
+        shell: pwsh
+        run: |
+          python templates/server.py setup-plan --project-root TestProject --plan-file plan.json
+          Get-Content plan.json
+
+      - name: Run MCP setup-apply
+        shell: pwsh
+        run: |
+          python templates/server.py setup-apply --plan-file plan.json --project-root TestProject --yes
+
+      - name: Run MCP validate-setup
+        shell: pwsh
+        run: |
+          python templates/server.py validate-setup --project-root TestProject
+
+      - name: Verify package is registered in manifest
+        shell: pwsh
+        run: |
+          $manifest = Get-Content -Raw -Path "TestProject/Packages/manifest.json" | ConvertFrom-Json
+          if (-not $manifest.dependencies."com.xuunity.light-mcp") {
+            Write-Error "com.xuunity.light-mcp is missing from package manifest!"
+            exit 1
+          }
+          Write-Host "Verification successful: com.xuunity.light-mcp is present."
+
+      - name: Check if Unity License is configured
+        id: check_license
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.UNITY_SERIAL }}" ] && [ -n "${{ secrets.UNITY_EMAIL }}" ] && [ -n "${{ secrets.UNITY_PASSWORD }}" ]; then
+            echo "license_configured=true" >> $GITHUB_OUTPUT
+            echo "Unity license secrets found. Will run batchmode verification."
+          else
+            echo "license_configured=false" >> $GITHUB_OUTPUT
+            echo "Unity license secrets missing. Skipping batchmode Unity verification."
+          fi
+
+      - name: Set up Unity (Game.CI)
+        if: steps.check_license.outputs.license_configured == 'true'
+        uses: game-ci/unity-setup@v4
+        with:
+          unityVersion: 2022.3.20f1
+
+      - name: Run Unity EditMode Tests (Game.CI)
+        if: steps.check_license.outputs.license_configured == 'true'
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: TestProject
+          unityVersion: 2022.3.20f1
+          testMode: EditMode
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
