@@ -52,11 +52,18 @@ source-root discovery, install refresh, process management, JSON editing,
 project traversal, retries, and recovery policy belong in Python modules with
 tests. This rule is especially strict for Windows Git Bash compatibility.
 
-## 7. Never Compare Full Path Strings in Tests
+## 7. Persist Host-Native Paths For Native Readers
+
+If a Git Bash/MSYS installer writes a durable path marker or config value that
+native Windows Python, cmd, or PowerShell will read later, write a host-native
+path with `cygpath -w` or make the reader explicitly convert MSYS paths.
+Persisted text is not converted by the MSYS process-launch layer.
+
+## 8. Never Compare Full Path Strings in Tests
 
 MSYS `/tmp/...`, `C:\Users\RUNNER~1\...` (8.3 short name), and `C:/Users/runneradmin/...` can all be the same directory. Compare separator-normalized suffixes or resolved `Path` equality.
 
-## 8. Bound Every Spawned Process in Tests
+## 9. Bound Every Spawned Process in Tests
 
 Use `tests/bash_support.py:run_with_timeout()` instead of bare `subprocess.run` for anything that spawns bash: timeout + process-tree kill (`taskkill /T /F` / `killpg`) + partial stdout/stderr dumped to stderr **at the moment the timeout fires**, plus `skip_if_prior_subprocess_timeout` in `setUp` so one hang does not cascade. `tests/test_bash_spawn_canary.py` runs first in the suite as the end-to-end regression guard.
 

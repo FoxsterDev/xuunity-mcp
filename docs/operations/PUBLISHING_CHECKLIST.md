@@ -25,7 +25,9 @@ Release is blocked until all of the following are true:
   for default startup, not plain `run.sh` or `run.cmd`
 - a stale neutral helper smoke proves the chain:
   source checkout -> installer -> client config -> refresh launcher -> neutral
-  server version
+  server version; on Windows this must also prove the installed `.source_root`
+  marker resolves back to source package metadata from the native refresh
+  launcher path
 - `docs/index.html` shows the current `softwareVersion`
 - `docs/install.html` shows the current Git UPM tag
 - `docs/reference/LISTING_KIT.md` shows the current Git UPM tag
