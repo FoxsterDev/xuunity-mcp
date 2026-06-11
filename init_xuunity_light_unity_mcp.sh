@@ -86,6 +86,22 @@ EOF
 done
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
+source_root_marker_path() {
+  local source_path="$1"
+  local uname_sys
+  uname_sys="$(uname -s 2>/dev/null || echo "unknown")"
+  case "$uname_sys" in
+    MINGW*|MSYS*|CYGWIN*)
+      if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$source_path"
+        return 0
+      fi
+      ;;
+  esac
+  printf '%s\n' "$source_path"
+}
+
+source_root_marker="$(source_root_marker_path "$script_dir")"
 templates_dir="$script_dir/templates"
 package_metadata_source="$script_dir/packages/com.xuunity.light-mcp/package.json"
 refresh_launcher_source="$script_dir/run_installed_or_refresh_xuunity_mcp.sh"
@@ -490,7 +506,7 @@ install_server_into() {
   if [[ $dry_run -eq 1 ]]; then
     printf '[dry-run] write source root marker to %s/.source_root\n' "$target_dir"
   else
-    printf '%s\n' "$script_dir" > "$target_dir/.source_root"
+    printf '%s\n' "$source_root_marker" > "$target_dir/.source_root"
     chmod 644 "$target_dir/.source_root"
   fi
   run mkdir -p "$target_dir/packages/com.xuunity.light-mcp"
