@@ -34,7 +34,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "TestProject/Assets"
           New-Item -ItemType Directory -Force -Path "TestProject/ProjectSettings"
           New-Item -ItemType Directory -Force -Path "TestProject/Packages"
-          Set-Content -Path "TestProject/ProjectSettings/ProjectVersion.txt" -Value "m_EditorVersion: 2022.3.20f1"
+          Set-Content -Path "TestProject/ProjectSettings/ProjectVersion.txt" -Value "m_EditorVersion: 6000.3.2f1"
           Set-Content -Path "TestProject/Packages/manifest.json" -Value '{"dependencies": {}}'
 
       - name: Run MCP setup-plan
@@ -79,7 +79,7 @@ jobs:
         if: steps.check_license.outputs.license_configured == 'true'
         uses: game-ci/unity-setup@v4
         with:
-          unityVersion: 2022.3.20f1
+          unityVersion: 6000.3.2f1
 
       - name: Run Unity EditMode Tests (Game.CI)
         if: steps.check_license.outputs.license_configured == 'true'
@@ -90,6 +90,6 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: TestProject
-          unityVersion: 2022.3.20f1
+          unityVersion: 6000.3.2f1
           testMode: EditMode
           githubToken: ${{ secrets.GITHUB_TOKEN }}
