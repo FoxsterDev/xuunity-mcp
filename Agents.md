@@ -36,6 +36,7 @@ this router plus the local docs as the source of truth.
 
 ## Routing Rules
 - For any task involving process management (process listing, checking liveness, or terminating processes/editors), load the safe process management skill: [SKILL.md](skills/safe_process_management/SKILL.md).
+- For any task that writes or edits bash scripts, the shell wrapper, `templates/run.sh`, `scripts/testing/*.sh`, CI workflows, or tests that spawn shell processes — and for any failure that reproduces only on the Windows CI leg or only in CI — load the cross-platform shell skill: [SKILL.md](skills/cross_platform_shell/SKILL.md). Windows Git Bash support is a hard compatibility requirement for every shell change.
 - For client setup tasks, load `docs/clients/Agents.md` when it exists, then the requested client guide.
 - For AI integration or workflow tasks, load `docs/agents/AI_INTEGRATION.md` or `docs/agents/AGENT_WORKFLOWS.md` as appropriate.
 - For Unity package implementation, edit `packages/com.xuunity.light-mcp/` and validate through the repo's test or smoke guidance.

@@ -695,7 +695,7 @@ actions:
             structured = result["structuredContent"]
             self.assertEqual("repo_report", structured["destination"])
             self.assertFalse(structured["unity_imported"])
-            self.assertEqual("AIOutput/Projects/FakeProject/Reports/Localization/smoke/report.md", structured["repo_relative_path"])
+            self.assertEqual("AIOutput/Projects/FakeProject/Reports/Localization/smoke/report.md", structured["repo_relative_path"].replace('\\', '/'))
             self.assertEqual("localization_report", structured["kind"])
             self.assertEqual("demo.v1", structured["artifact_schema_version"])
             self.assertEqual("pt-BR", structured["language"])
@@ -999,7 +999,7 @@ actions:
         self.assertEqual("close_same_project_editor_or_use_interactive_lane", payload["recovery_recommended_next_action"])
         self.assertEqual(
             "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
-            payload["recommended_recovery_command"],
+            payload["recommended_recovery_command"].replace('\\', '/'),
         )
         self.assertNotIn("reopen_block_reason", payload)
         self.assertFalse(bool(payload.get("reopen_blocked")))
@@ -1080,7 +1080,7 @@ actions:
         self.assertEqual("open_editor_or_ensure_ready", ctx.exception.details["recommended_next_action"])
         self.assertEqual(
             "xuunity_light_unity_mcp.sh ensure-ready --project-root /tmp/FakeProject --open-editor",
-            ctx.exception.details["recommended_recovery_command"],
+            ctx.exception.details["recommended_recovery_command"].replace('\\', '/'),
         )
         wait_mock.assert_not_called()
 
@@ -1106,7 +1106,7 @@ actions:
         )
         self.assertEqual(
             "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
-            exc.details["recommended_recovery_command"],
+            exc.details["recommended_recovery_command"].replace('\\', '/'),
         )
         self.assertFalse(exc.details["same_project_editor_closed"])
         self.assertFalse(exc.details["process_exit_verified"])

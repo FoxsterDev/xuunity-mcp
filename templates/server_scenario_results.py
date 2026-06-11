@@ -80,13 +80,13 @@ def _result_sort_key(
     *,
     parse_utc_timestamp: Callable[[Any], float | None],
 ) -> tuple[float, str]:
+    payload_timestamp = max(
+        _parse_sort_timestamp(payload.get("completed_at_utc"), parse_utc_timestamp=parse_utc_timestamp),
+        _parse_sort_timestamp(payload.get("updated_at_utc"), parse_utc_timestamp=parse_utc_timestamp),
+        _parse_sort_timestamp(payload.get("started_at_utc"), parse_utc_timestamp=parse_utc_timestamp),
+    )
     return (
-        max(
-            _parse_sort_timestamp(payload.get("completed_at_utc"), parse_utc_timestamp=parse_utc_timestamp),
-            _parse_sort_timestamp(payload.get("updated_at_utc"), parse_utc_timestamp=parse_utc_timestamp),
-            _parse_sort_timestamp(payload.get("started_at_utc"), parse_utc_timestamp=parse_utc_timestamp),
-            path.stat().st_mtime,
-        ),
+        payload_timestamp if payload_timestamp > 0.0 else path.stat().st_mtime,
         path.name,
     )
 

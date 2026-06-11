@@ -6,8 +6,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+from bash_support import resolve_bash_executable, run_with_timeout, skip_if_prior_subprocess_timeout
+
 
 class WrapperSourceRootTests(unittest.TestCase):
+    def setUp(self) -> None:
+        skip_if_prior_subprocess_timeout(self)
+
     def make_env(self) -> dict[str, str]:
         env = dict(os.environ)
         env["PYTHON"] = sys.executable
@@ -38,18 +47,21 @@ class WrapperSourceRootTests(unittest.TestCase):
             text=True,
         )
 
+    def get_wrapper_cmd(self, wrapper_path: Path) -> list[str]:
+        if os.name == "nt" or sys.platform == "win32":
+            return [resolve_bash_executable(), wrapper_path.as_posix()]
+        return [str(wrapper_path)]
+
     def test_wrapper_honors_python_command_name_without_recursive_function_crash(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         wrapper = repo_root / "xuunity_light_unity_mcp.sh"
         env = self.make_env()
         env["PYTHON"] = "python3"
 
-        completed = subprocess.run(
-            [str(wrapper), "--help"],
-            check=False,
-            capture_output=True,
-            text=True,
+        completed = run_with_timeout(
+            self.get_wrapper_cmd(wrapper) + ["--help"],
             env=env,
+            timeout_seconds=120,
         )
 
         self.assertEqual(0, completed.returncode, completed.stderr)
@@ -73,12 +85,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["PYTHON"] = "py -3"
             env["PATH"] = f"{tmp_dir}{os.pathsep}{env.get('PATH', '')}"
 
-            completed = subprocess.run(
-                [str(wrapper), "--help"],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + ["--help"],
                 env=env,
+                timeout_seconds=120,
             )
 
         self.assertEqual(0, completed.returncode, completed.stderr)
@@ -102,12 +112,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["PYTHON"] = "py -3"
             env["PATH"] = f"{tmp_dir}{os.pathsep}{env.get('PATH', '')}"
 
-            completed = subprocess.run(
-                ["bash", str(run_sh), "--help"],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                [resolve_bash_executable(), run_sh.as_posix(), "--help"],
                 env=env,
+                timeout_seconds=120,
             )
 
         self.assertEqual(0, completed.returncode, completed.stderr)
@@ -151,12 +159,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env.pop("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT", None)
             env["XUUNITY_LIGHT_UNITY_MCP_AIRROOT"] = str(airroot)
 
-            completed = subprocess.run(
-                [str(wrapper), "devmode", "--project-root", str(project_root)],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + ["devmode", "--project-root", str(project_root)],
                 env=env,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
@@ -164,7 +170,17 @@ class WrapperSourceRootTests(unittest.TestCase):
             dependency = manifest["dependencies"]["com.xuunity.light-mcp"]
             resolved_dependency = (project_root / "Packages" / dependency.removeprefix("file:")).resolve()
             self.assertEqual(operation_package.resolve(), resolved_dependency)
-            self.assertIn(f"package_source={operation_package}", completed.stdout)
+            package_source_lines = [
+                line for line in completed.stdout.splitlines() if line.startswith("package_source=")
+            ]
+            self.assertEqual(1, len(package_source_lines), completed.stdout)
+            package_source_value = package_source_lines[0].removeprefix("package_source=").replace("\\", "/")
+            self.assertTrue(
+                package_source_value.endswith(
+                    "AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp"
+                ),
+                completed.stdout,
+            )
 
     def test_setup_plan_default_version_uses_source_without_installed_helper_sync(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -184,12 +200,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CODEX_TOOLS_HOME"] = str(codex_tools)
             env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
 
-            completed = subprocess.run(
-                [str(wrapper), "setup-plan", "--project-root", str(project_root)],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + ["setup-plan", "--project-root", str(project_root)],
                 env=env,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
@@ -224,19 +238,16 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CODEX_TOOLS_HOME"] = str(codex_tools)
             env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
 
-            completed = subprocess.run(
-                [
-                    str(wrapper),
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + [
                     "uninstall-plan",
                     "--mode",
                     "project-only-cleanup",
                     "--project-root",
                     str(project_root),
                 ],
-                check=False,
-                capture_output=True,
-                text=True,
                 env=env,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
@@ -268,12 +279,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
             env["CODEX_SHELL"] = "1"
 
-            completed = subprocess.run(
-                [str(wrapper), "server-help"],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + ["server-help"],
                 env=env,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
@@ -298,12 +307,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
             env["CODEX_SHELL"] = "1"
 
-            completed = subprocess.run(
-                [str(wrapper), "server-help"],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + ["server-help"],
                 env=env,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
@@ -337,12 +344,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CODEX_TOOLS_HOME"] = str(codex_tools)
             env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
 
-            completed = subprocess.run(
-                [str(wrapper), "server-help"],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + ["server-help"],
                 env=env,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
@@ -402,12 +407,10 @@ class WrapperSourceRootTests(unittest.TestCase):
             env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
             env["CLAUDE_TOOLS_HOME"] = str(temp_root / "claude-tools")
 
-            completed = subprocess.run(
-                [str(wrapper), "prodmode", "--project-root", str(project_root)],
-                check=False,
-                capture_output=True,
-                text=True,
+            completed = run_with_timeout(
+                self.get_wrapper_cmd(wrapper) + ["prodmode", "--project-root", str(project_root)],
                 env=env,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)

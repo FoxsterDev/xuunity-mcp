@@ -764,8 +764,8 @@ class ServerProjectHelperTests(unittest.TestCase):
             self.assertIn("structured_timing", structured["results"][0])
             self.assertIn("artifact_manifest", structured["results"][0])
             self.assertEqual(
-                str(capture_path.resolve()),
-                structured["results"][0]["artifact_manifest"]["groups"]["captures"][0]["path"],
+                str(capture_path.resolve()).replace('\\', '/'),
+                structured["results"][0]["artifact_manifest"]["groups"]["captures"][0]["path"].replace('\\', '/'),
             )
 
     def test_call_unity_scenario_result_latest_tool_returns_latest_filtered_summary(self) -> None:

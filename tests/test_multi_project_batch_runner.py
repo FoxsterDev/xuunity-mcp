@@ -1,17 +1,27 @@
 import json
 import os
-import subprocess
+import sys
 import textwrap
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+from bash_support import resolve_bash_executable, run_with_timeout, skip_if_prior_subprocess_timeout
+
 
 OPS_ROOT = Path(__file__).resolve().parents[1]
 RUNNER = OPS_ROOT / "scripts" / "testing" / "run_multi_project_batch_compile_matrix.sh"
+BASH = resolve_bash_executable()
 
 
 class MultiProjectBatchRunnerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        skip_if_prior_subprocess_timeout(self)
+
     def test_jsonl_progress_plus_final_json_stdout_counts_as_success(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -91,27 +101,25 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
 
             results_dir = temp_root / "results"
             env = os.environ.copy()
-            env["XUUNITY_LIGHT_UNITY_MCP_WRAPPER"] = str(wrapper_path)
-            completed = subprocess.run(
+            env["XUUNITY_LIGHT_UNITY_MCP_WRAPPER"] = wrapper_path.as_posix()
+            env["XUUNITY_LIGHT_UNITY_MCP_PYTHON"] = Path(sys.executable).as_posix()
+            completed = run_with_timeout(
                 [
-                    "bash",
-                    str(RUNNER),
+                    BASH,
+                    RUNNER.as_posix(),
                     "--repo-root",
-                    str(temp_root),
+                    temp_root.as_posix(),
                     "--project-root",
-                    str(project_root),
+                    project_root.as_posix(),
                     "--parallelism",
                     "1",
                     "--no-close-live-editors",
                     "--results-dir",
-                    str(results_dir),
+                    results_dir.as_posix(),
                 ],
-                cwd=OPS_ROOT,
+                cwd=OPS_ROOT.as_posix(),
                 env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr + completed.stdout)
@@ -206,27 +214,25 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
 
             results_dir = temp_root / "results"
             env = os.environ.copy()
-            env["XUUNITY_LIGHT_UNITY_MCP_WRAPPER"] = str(wrapper_path)
-            completed = subprocess.run(
+            env["XUUNITY_LIGHT_UNITY_MCP_WRAPPER"] = wrapper_path.as_posix()
+            env["XUUNITY_LIGHT_UNITY_MCP_PYTHON"] = Path(sys.executable).as_posix()
+            completed = run_with_timeout(
                 [
-                    "bash",
-                    str(RUNNER),
+                    BASH,
+                    RUNNER.as_posix(),
                     "--repo-root",
-                    str(temp_root),
+                    temp_root.as_posix(),
                     "--project-root",
-                    str(project_root),
+                    project_root.as_posix(),
                     "--parallelism",
                     "1",
                     "--no-close-live-editors",
                     "--results-dir",
-                    str(results_dir),
+                    results_dir.as_posix(),
                 ],
-                cwd=OPS_ROOT,
+                cwd=OPS_ROOT.as_posix(),
                 env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
+                timeout_seconds=120,
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr + completed.stdout)
@@ -321,29 +327,27 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
 
             results_dir = temp_root / "results"
             env = os.environ.copy()
-            env["XUUNITY_LIGHT_UNITY_MCP_WRAPPER"] = str(wrapper_path)
-            completed = subprocess.run(
+            env["XUUNITY_LIGHT_UNITY_MCP_WRAPPER"] = wrapper_path.as_posix()
+            env["XUUNITY_LIGHT_UNITY_MCP_PYTHON"] = Path(sys.executable).as_posix()
+            completed = run_with_timeout(
                 [
-                    "bash",
-                    str(RUNNER),
+                    BASH,
+                    RUNNER.as_posix(),
                     "--repo-root",
-                    str(temp_root),
+                    temp_root.as_posix(),
                     "--project-root",
-                    str(project_root),
+                    project_root.as_posix(),
                     "--parallelism",
                     "1",
                     "--no-close-live-editors",
                     "--batch-fallback-mode",
                     "require-batch",
                     "--results-dir",
-                    str(results_dir),
+                    results_dir.as_posix(),
                 ],
-                cwd=OPS_ROOT,
+                cwd=OPS_ROOT.as_posix(),
                 env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
+                timeout_seconds=120,
             )
 
             self.assertNotEqual(0, completed.returncode)

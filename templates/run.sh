@@ -32,7 +32,7 @@ elif [[ -n "${PYTHON:-}" ]]; then
   if [[ "$PYTHON" == "py -3" ]] && command -v py >/dev/null 2>&1; then
     python_cmd=(py -3)
   else
-    python_cmd=("$PYTHON")
+    python_cmd=("${PYTHON//\\//}")
   fi
 elif command -v python3 >/dev/null 2>&1; then
   python_cmd=(python3)

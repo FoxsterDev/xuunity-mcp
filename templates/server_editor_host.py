@@ -142,6 +142,10 @@ def resolve_unity_executable(unity_app: Path) -> Path:
 def resolve_unity_app_version(unity_app: Path) -> str:
     normalized = normalize_unity_installation_path(unity_app)
     if normalized is None:
+        for part in unity_app.parts:
+            match = re.search(r"(\d{4}\.\d+\.\d+[A-Za-z]\d+)", part)
+            if match:
+                return match.group(1)
         return ""
 
     platform_kind = host_platform_kind()

@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -117,6 +118,7 @@ class WindowsHostHelperTests(unittest.TestCase):
     def test_configured_unity_editor_roots_split_posix_list_outside_wsl(self) -> None:
         with (
             mock.patch.object(server_editor_host, "is_wsl", return_value=False),
+            mock.patch.object(server_editor_host.os, "pathsep", ":"),
             mock.patch.dict(
                 server_editor_host.os.environ,
                 {"XUUNITY_UNITY_EDITOR_ROOTS": "/opt/unity-a:/opt/unity-b"},
@@ -273,6 +275,7 @@ class WindowsHostHelperTests(unittest.TestCase):
         self.assertEqual([3333], [editor["pid"] for editor in editors])
         self.assertEqual("/home/dev/Project", editors[0]["project_path"])
 
+    @unittest.skipIf(os.name == "nt", "simulates a POSIX host; native Windows takes the nt branch first")
     def test_pid_is_alive_uses_windows_tasklist_after_wsl_os_kill_systemerror(self) -> None:
         completed = mock.Mock(stdout="Unity.exe                  4321 Console\n", returncode=0)
         adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
@@ -285,6 +288,7 @@ class WindowsHostHelperTests(unittest.TestCase):
             self.assertTrue(adapter.pid_is_alive(4321))
             self.assertFalse(adapter.pid_is_alive(432))
 
+    @unittest.skipIf(os.name == "nt", "simulates a POSIX host; native Windows takes the nt branch first")
     def test_pid_is_alive_detects_wsl_linux_interop_process(self) -> None:
         adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
 
@@ -387,7 +391,7 @@ class WindowsHostHelperTests(unittest.TestCase):
         with (
             mock.patch.object(server_editor_host, "resolve_unity_executable", return_value=Path("/mnt/d/Unity.exe")),
             mock.patch.object(server_editor_host, "is_wsl", return_value=True),
-            mock.patch.object(server_editor_host, "wsl_to_windows_path", side_effect=lambda value: f"WIN:{value}"),
+            mock.patch.object(server_editor_host, "wsl_to_windows_path", side_effect=lambda value: "WIN:" + str(value).replace('\\', '/')),
         ):
             command = server_editor_host.build_batch_validation_command(
                 project_root=Path("/mnt/d/Project"),
@@ -464,7 +468,7 @@ class WindowsHostHelperTests(unittest.TestCase):
             ),
             mock.patch.object(server_cli_commands, "resolve_batch_build_output_path", return_value="/mnt/d/Project/Builds/Android.apk"),
             mock.patch("server_host_platform.is_wsl", return_value=True),
-            mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: f"WIN:{value}"),
+            mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: "WIN:" + str(value).replace('\\', '/')),
             mock.patch.object(server_cli_commands, "build_plain_batch_build_command", return_value=["Unity.exe"]) as mock_build_cmd,
             mock.patch.object(server_cli_commands, "run_batch_operation") as mock_run_batch,
         ):
@@ -478,6 +482,7 @@ class WindowsHostHelperTests(unittest.TestCase):
             self.assertEqual("WIN:/mnt/d/Project/Builds/Android.apk", gui_args.get("outputPath"))
             self.assertEqual("WIN:/mnt/d/Project/Library/XUUnityLightMcp/results/build_Android.json", gui_args.get("resultFile"))
 
+    @unittest.skipIf(os.name == "nt", "simulates a POSIX host; native Windows takes the nt branch first")
     def test_pid_is_alive_bypasses_os_kill_under_wsl(self) -> None:
         completed = mock.Mock(stdout="Unity.exe                  4321 Console\n", returncode=0)
         adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
@@ -491,6 +496,7 @@ class WindowsHostHelperTests(unittest.TestCase):
             self.assertTrue(adapter.pid_is_alive(4321))
             mock_kill.assert_not_called()
 
+    @unittest.skipIf(os.name == "nt", "simulates a POSIX host; native Windows takes the nt branch first")
     def test_terminate_editor_pid_kills_wsl_linux_interop_process(self) -> None:
         with (
             mock.patch.object(server_editor_host, "is_wsl", return_value=True),
@@ -545,6 +551,7 @@ class WindowsHostHelperTests(unittest.TestCase):
             self.assertIn("Failed to decode text in", str(context.exception))
             self.assertIn("bad.json", str(context.exception))
 
+    @unittest.skipIf(os.name == "nt", "simulates a POSIX host; native Windows takes the nt branch first")
     def test_pid_is_alive_falls_back_on_local_linux_process_collision(self) -> None:
         completed = mock.Mock(stdout="Unity.exe                  4321 Console\n", returncode=0)
         adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")
@@ -589,7 +596,7 @@ class WindowsHostHelperTests(unittest.TestCase):
                 mock.patch.object(server_cli_commands, "detect_unity_app_path_for_project", return_value=Path("/mnt/d/Unity.exe")),
                 mock.patch.object(server_cli_commands, "load_json_file", return_value={}),
                 mock.patch("server_host_platform.is_wsl", return_value=True),
-                mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: f"WIN:{value}"),
+                mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: "WIN:" + str(value).replace('\\', '/')),
                 mock.patch.object(server_cli_commands, "build_batch_validation_command", return_value=["Unity.exe"]) as mock_build_cmd,
                 mock.patch.object(server_cli_commands, "run_batch_operation") as mock_run_batch,
             ):
@@ -597,7 +604,7 @@ class WindowsHostHelperTests(unittest.TestCase):
 
                 mock_build_cmd.assert_called_once()
                 extra_args = mock_build_cmd.call_args[1].get("extra_args")
-                self.assertIn(f"WIN:{config_file.resolve()}", extra_args)
+                self.assertIn("WIN:" + str(config_file.resolve()).replace('\\', '/'), extra_args)
 
     def test_cmd_batch_build_config_compile_matrix_uses_project_temp_dir_and_converts_path_under_wsl(self) -> None:
         import server_cli_commands
@@ -633,7 +640,7 @@ class WindowsHostHelperTests(unittest.TestCase):
                 mock.patch.object(server_cli_commands, "detect_unity_app_path_for_project", return_value=Path("/mnt/d/Unity.exe")),
                 mock.patch.object(server_cli_commands, "build_compile_matrix_args_from_build_config", return_value=fake_plan),
                 mock.patch("server_host_platform.is_wsl", return_value=True),
-                mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: f"WIN:{value}"),
+                mock.patch("server_host_platform.wsl_to_windows_path", side_effect=lambda value: "WIN:" + str(value).replace('\\', '/')),
                 mock.patch.object(server_cli_commands, "build_batch_validation_command", return_value=["Unity.exe"]) as mock_build_cmd,
                 mock.patch.object(server_cli_commands, "run_batch_operation") as mock_run_batch,
             ):
@@ -643,11 +650,12 @@ class WindowsHostHelperTests(unittest.TestCase):
                 extra_args = mock_build_cmd.call_args[1].get("extra_args")
                 self.assertTrue(any(
                     str(arg).startswith("WIN:") and
-                    "Library/XUUnityLightMcp/temp" in str(arg) and
+                    "Library/XUUnityLightMcp/temp" in str(arg).replace('\\', '/') and
                     str(arg).endswith("_xuunity_compile_matrix.json")
                     for arg in extra_args
                 ))
 
+    @unittest.skipIf(os.name == "nt", "simulates a POSIX host; native Windows takes the nt branch first")
     def test_pid_is_alive_handles_cygwin_msys_platform_routing(self) -> None:
         completed = mock.Mock(stdout="Unity.exe                  1234 Console\n", returncode=0)
         adapter = server_host_platform.HostPlatformAdapter(platform_kind="linux")

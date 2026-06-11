@@ -202,7 +202,7 @@ class ReleaseVersioningTests(unittest.TestCase):
 
             errors = release_consistency.check_release_version_consistency(root)
 
-            self.assertTrue(any("docs/index.html:1" in error for error in errors), errors)
+            self.assertTrue(any("docs/index.html:1" in error.replace("\\", "/") for error in errors), errors)
 
 
 if __name__ == "__main__":
