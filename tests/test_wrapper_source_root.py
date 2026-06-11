@@ -471,7 +471,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
-            self.assertEqual(server_path.as_posix(), completed.stdout.strip())
+            self.assertEqual(server_path.resolve(), Path(completed.stdout.strip()).resolve())
             tree = ast.parse(server_path.read_text(encoding="utf-8"))
             refreshed_version = ""
             for node in tree.body:
