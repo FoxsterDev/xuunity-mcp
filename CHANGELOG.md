@@ -2,33 +2,38 @@
 
 ## Unreleased
 
+## 0.3.27
+
+Release tag: `v0.3.27`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.27
+```
 
 ### Changed
 
-- Ported the operator wrapper body from bash to `templates/server_launcher.py`;
-  `xuunity_light_unity_mcp.sh` is now a 28-line launcher (find Python 3.10+,
-  exec the Python core) with the same commands, env contract, output lines,
-  and exit codes. The previous bash body remains callable via
-  `XUUNITY_LIGHT_UNITY_MCP_LEGACY_WRAPPER=1` until the port is proven on the
-  Windows CI leg, then it will be removed.
-- Added `xuunity_light_unity_mcp.cmd` and `xuunity_light_unity_mcp.ps1`
-  wrapper siblings with the identical launcher contract, so Windows operators
-  no longer need bash for wrapper commands.
-- Ported both multi-project runners into
-  `scripts/testing/run_multi_project.py` (subcommands `batch-compile-matrix`
-  and `gui-test-subset`) with `ThreadPoolExecutor` workers; `xargs -P` is gone
-  and `--parallelism N` now overlaps workers identically on macOS, Linux, and
-  Windows. The two runner `.sh` entrypoints remain as thin shims for one
-  release.
-- Promoted shared subprocess helpers (Git Bash resolution, process-tree kill,
-  run-to-files) into `scripts/testing/process_support.py`, consumed by both
-  the orchestrator and the test suite. An optional
-  `XUUNITY_LIGHT_UNITY_MCP_WORKER_TIMEOUT_SECONDS` watchdog kills a stuck
-  worker process tree with exit code 124; unset keeps unbounded waits.
-- Offline CI checks now run on `master` pushes and pull requests (previously
-  tags only), and the Windows leg smoke-executes `templates/run.cmd` and
-  `templates/run.ps1` plus cross-flavor wrapper parity and worker-overlap
-  parallelism tests.
+- Released `v0.3.27` package metadata, server metadata, package manifests, and Git UPM examples.
+
+
+### Added
+
+- Added `xuunity_light_unity_mcp.cmd` and `xuunity_light_unity_mcp.ps1` wrapper siblings using the proven `run.cmd`/`run.ps1` Python discovery chain and executing `templates/server_launcher.py`, so Windows operators get the full wrapper surface without bash.
+- Promoted shared subprocess helpers (Git Bash resolution, process-tree kill, run-to-files) into `scripts/testing/process_support.py`, consumed by both the orchestrator and the test suite.
+- Added an optional `XUUNITY_LIGHT_UNITY_MCP_WORKER_TIMEOUT_SECONDS` watchdog that kills stuck worker process trees with exit code 124.
+- Added cross-flavor launcher parity tests (`test_launcher_flavor_parity`) and thread-pool parallelism tests (`test_multi_project_parallelism`).
+
+### Changed
+
+- Ported the operator wrapper body from bash to `templates/server_launcher.py`, which owns source/repo/install-dir resolution, helper sync, compact summary emission, devmode/prodmode, and server dispatch. Client-context and install-dir resolution delegate to `server_setup_wizard` to remove duplicate bash/python logic.
+- Shrank `xuunity_light_unity_mcp.sh` to a thin 28-line launcher with legacy flag checking and Python discovery (`PYTHON` env, `py -3`, `python3`, `python`, `py`). Preserved the previous bash body as `xuunity_light_unity_mcp_legacy.sh` (callable via `XUUNITY_LIGHT_UNITY_MCP_LEGACY_WRAPPER=1`).
+- Ported both multi-project runners into `scripts/testing/run_multi_project.py` (subcommands `batch-compile-matrix` and `gui-test-subset`) using `ThreadPoolExecutor` workers, removing `xargs -P` and enabling identical parallelism overlap across macOS, Linux, and Windows.
+- Expanded offline CI checks to run on `master` pushes and pull requests (previously tags only), smoke-executing `templates/run.cmd` and `templates/run.ps1` on the Windows leg.
+
+### Fixed
+
+- Fixed parity test path normalization for Windows path representations, resolving WSL/POSIX temp differences, 8.3 short names (`RUNNER~1`), and JSON-escaped backslashes.
 
 ## 0.3.26
 
