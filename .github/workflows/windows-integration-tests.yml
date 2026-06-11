@@ -20,6 +20,18 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify Tag is on Master Branch
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          if ! git merge-base --is-ancestor ${{ github.sha }} origin/master; then
+            echo "ERROR: Tag ${{ github.ref }} is not reachable from the master branch!"
+            exit 1
+          fi
+          echo "Success: Tag is verified on the master branch."
 
       - name: Set up Python
         uses: actions/setup-python@v5
