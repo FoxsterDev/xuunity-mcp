@@ -67,12 +67,12 @@ jobs:
         id: check_license
         shell: bash
         run: |
-          if [ -n "${{ secrets.UNITY_SERIAL }}" ] && [ -n "${{ secrets.UNITY_EMAIL }}" ] && [ -n "${{ secrets.UNITY_PASSWORD }}" ]; then
+          if [ -n "${{ secrets.UNITY_LICENSE }}" ] || ( [ -n "${{ secrets.UNITY_SERIAL }}" ] && [ -n "${{ secrets.UNITY_EMAIL }}" ] && [ -n "${{ secrets.UNITY_PASSWORD }}" ] ); then
             echo "license_configured=true" >> $GITHUB_OUTPUT
-            echo "Unity license secrets found. Will run batchmode verification."
+            echo "Unity license configured. Will run batchmode verification."
           else
             echo "license_configured=false" >> $GITHUB_OUTPUT
-            echo "Unity license secrets missing. Skipping batchmode Unity verification."
+            echo "Unity license missing. Skipping batchmode Unity verification."
           fi
 
       - name: Set up Unity (Game.CI)
@@ -85,6 +85,7 @@ jobs:
         if: steps.check_license.outputs.license_configured == 'true'
         uses: game-ci/unity-test-runner@v4
         env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
