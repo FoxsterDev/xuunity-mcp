@@ -5,7 +5,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""
+        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""
       ]
     }
   }

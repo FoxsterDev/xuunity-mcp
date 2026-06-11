@@ -42,6 +42,20 @@ jobs:
           if errorlevel 1 exit /b 1
           findstr /C:"usage:" run_cmd_help.txt
 
+      - name: Smoke refresh run.cmd Launcher
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          set "CODEX_HOME=%RUNNER_TEMP%\codex-home"
+          set "CODEX_TOOLS_HOME=%RUNNER_TEMP%\codex-tools"
+          set "CLAUDE_TOOLS_HOME=%RUNNER_TEMP%\claude-tools"
+          set "CLAUDE_CONFIG_PATH=%RUNNER_TEMP%\claude.json"
+          set "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR=%RUNNER_TEMP%\neutral-xuunity-mcp"
+          call run_installed_or_refresh_xuunity_mcp.cmd --print-run 1> refresh_cmd_run.txt 2>&1
+          if errorlevel 1 exit /b 1
+          type refresh_cmd_run.txt
+          findstr /C:"run.cmd" refresh_cmd_run.txt
+
       - name: Smoke run.ps1 Launcher
         if: runner.os == 'Windows'
         shell: pwsh

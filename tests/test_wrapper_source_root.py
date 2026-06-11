@@ -1,3 +1,5 @@
+import ast
+import importlib.util
 import json
 import os
 import subprocess
@@ -5,12 +7,15 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 TESTS_DIR = Path(__file__).resolve().parent
 if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
 from bash_support import resolve_bash_executable, run_with_timeout, skip_if_prior_subprocess_timeout
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class WrapperSourceRootTests(unittest.TestCase):
@@ -52,9 +57,96 @@ class WrapperSourceRootTests(unittest.TestCase):
             return [resolve_bash_executable(), wrapper_path.as_posix()]
         return [str(wrapper_path)]
 
+    def load_refresh_launcher_module(self):
+        spec = importlib.util.spec_from_file_location(
+            "run_installed_or_refresh_xuunity_mcp",
+            REPO_ROOT / "run_installed_or_refresh_xuunity_mcp.py",
+        )
+        module = importlib.util.module_from_spec(spec)
+        self.assertIsNotNone(spec.loader)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_refresh_python_prefers_git_bash_over_system32_bash_on_windows(self) -> None:
+        module = self.load_refresh_launcher_module()
+
+        class HostPath:
+            def __init__(self, *parts: str) -> None:
+                self.value = os.path.join(*(str(part) for part in parts))
+
+            def joinpath(self, *parts: str):
+                return HostPath(self.value, *parts)
+
+            def is_file(self) -> bool:
+                return os.path.isfile(self.value)
+
+            def __str__(self) -> str:
+                return self.value
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fake_program_files = Path(tmp_dir) / "Program Files"
+            git_bash = fake_program_files / "Git" / "usr" / "bin" / "bash.exe"
+            git_bash.parent.mkdir(parents=True)
+            git_bash.write_text("", encoding="utf-8")
+
+            with (
+                mock.patch.object(module.os, "name", "nt"),
+                mock.patch.dict(
+                    module.os.environ,
+                    {
+                        "PROGRAMFILES": str(fake_program_files),
+                        "ProgramW6432": "",
+                        "PROGRAMFILES(X86)": "",
+                    },
+                    clear=False,
+                ),
+                mock.patch.object(module, "Path", HostPath),
+                mock.patch.object(module.shutil, "which", return_value=r"C:\Windows\System32\bash.exe"),
+            ):
+                self.assertEqual(str(git_bash), module.find_bash())
+
+    def test_refresh_python_uses_run_cmd_for_windows_exec(self) -> None:
+        module = self.load_refresh_launcher_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            run_cmd = Path(tmp_dir) / "run.cmd"
+            run_cmd.write_text("@echo off\n", encoding="utf-8")
+
+            with (
+                mock.patch.object(module.os, "name", "nt"),
+                mock.patch.object(module.subprocess, "run") as run_mock,
+            ):
+                run_mock.return_value = subprocess.CompletedProcess([str(run_cmd), "--help"], 7)
+                with self.assertRaises(SystemExit) as raised:
+                    module.exec_run(run_cmd, ["--help"])
+
+        self.assertEqual(7, raised.exception.code)
+        run_mock.assert_called_once_with([str(run_cmd), "--help"], check=False)
+
+    @unittest.skipUnless(os.name == "nt", "native Windows .cmd smoke")
+    def test_refresh_cmd_print_run_uses_windows_low_level_launcher(self) -> None:
+        refresh_cmd = REPO_ROOT / "run_installed_or_refresh_xuunity_mcp.cmd"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            env = self.make_env()
+            env["CODEX_HOME"] = str(temp_root / "codex-home")
+            env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
+            env["CLAUDE_TOOLS_HOME"] = str(temp_root / "claude-tools")
+            env["CLAUDE_CONFIG_PATH"] = str(temp_root / "claude.json")
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(temp_root / "neutral")
+
+            completed = run_with_timeout(
+                ["cmd.exe", "/c", str(refresh_cmd), "--print-run"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertTrue(completed.stdout.strip().endswith("run.cmd"), completed.stdout)
+
     def test_wrapper_honors_python_command_name_without_recursive_function_crash(self) -> None:
-        repo_root = Path(__file__).resolve().parents[1]
-        wrapper = repo_root / "xuunity_light_unity_mcp.sh"
+        wrapper = REPO_ROOT / "xuunity_light_unity_mcp.sh"
         env = self.make_env()
         env["PYTHON"] = "python3"
 
@@ -288,6 +380,106 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertEqual(0, completed.returncode, completed.stderr)
             self.assertTrue((codex_tools / "xuunity-mcp" / "server.py").is_file())
             self.assertEqual("# stale claude helper\n", stale_server.read_text(encoding="utf-8"))
+
+    def test_init_installs_refresh_launcher_and_registers_it_in_codex_config(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            codex_home = temp_root / "codex-home"
+            codex_tools = temp_root / "codex-tools"
+            claude_tools = temp_root / "claude-tools"
+            neutral_dir = temp_root / "neutral"
+
+            env = self.make_env()
+            env["CODEX_HOME"] = str(codex_home)
+            env["CODEX_TOOLS_HOME"] = str(codex_tools)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "codex", "--install-codex-config"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            codex_install = codex_tools / "xuunity-mcp"
+            neutral_refresh = neutral_dir / "run_installed_or_refresh_xuunity_mcp.sh"
+            neutral_refresh_py = neutral_dir / "run_installed_or_refresh_xuunity_mcp.py"
+            neutral_refresh_cmd = neutral_dir / "run_installed_or_refresh_xuunity_mcp.cmd"
+            codex_refresh = codex_install / "run_installed_or_refresh_xuunity_mcp.sh"
+            codex_refresh_py = codex_install / "run_installed_or_refresh_xuunity_mcp.py"
+            codex_refresh_cmd = codex_install / "run_installed_or_refresh_xuunity_mcp.cmd"
+            self.assertTrue(neutral_refresh.is_file())
+            self.assertTrue(os.access(neutral_refresh, os.X_OK))
+            self.assertTrue(neutral_refresh_py.is_file())
+            self.assertTrue(neutral_refresh_cmd.is_file())
+            self.assertTrue(codex_refresh.is_file())
+            self.assertTrue(os.access(codex_refresh, os.X_OK))
+            self.assertTrue(codex_refresh_py.is_file())
+            self.assertTrue(codex_refresh_cmd.is_file())
+            self.assertEqual(repo_root.resolve(), Path((neutral_dir / ".source_root").read_text(encoding="utf-8").strip()).resolve())
+
+            config_text = (codex_home / "config.toml").read_text(encoding="utf-8")
+            self.assertIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
+            self.assertNotIn("/xuunity-mcp/run.sh", config_text)
+
+    def test_refresh_shell_launcher_stays_thin(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        launcher = repo_root / "run_installed_or_refresh_xuunity_mcp.sh"
+        text = launcher.read_text(encoding="utf-8")
+
+        self.assertLessEqual(len(text.splitlines()), 30)
+        self.assertIn("run_installed_or_refresh_xuunity_mcp.py", text)
+        self.assertNotIn("SERVER_INFO", text)
+        self.assertNotIn("package.json", text)
+        self.assertNotIn("init_xuunity_light_unity_mcp.sh --target", text)
+
+    def test_installed_refresh_launcher_uses_source_root_marker_to_update_neutral_server(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+        package_json = repo_root / "packages" / "com.xuunity.light-mcp" / "package.json"
+        package_version = json.loads(package_json.read_text(encoding="utf-8"))["version"]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            codex_tools = temp_root / "codex-tools"
+            claude_tools = temp_root / "claude-tools"
+            neutral_dir = temp_root / "neutral"
+
+            env = self.make_env()
+            env["CODEX_TOOLS_HOME"] = str(codex_tools)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "neutral"],
+                env=env,
+                timeout_seconds=120,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr)
+
+            server_path = neutral_dir / "server.py"
+            server_path.write_text("SERVER_INFO = {'name': 'xuunity-mcp', 'version': '0.0.1'}\n", encoding="utf-8")
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), (neutral_dir / "run_installed_or_refresh_xuunity_mcp.sh").as_posix(), "--print-server"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertEqual(server_path.as_posix(), completed.stdout.strip())
+            tree = ast.parse(server_path.read_text(encoding="utf-8"))
+            refreshed_version = ""
+            for node in tree.body:
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name) and target.id == "SERVER_INFO":
+                            refreshed_version = str(ast.literal_eval(node.value).get("version") or "")
+            self.assertEqual(package_version, refreshed_version)
 
     def test_explicit_install_target_can_force_claude_from_codex_context(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

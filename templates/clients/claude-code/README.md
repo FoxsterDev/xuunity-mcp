@@ -3,7 +3,7 @@
 Status: `active`.
 
 Claude Code talks to MCP servers over stdio. The lightweight Unity MCP service
-ships an installable stdio launcher (`run.sh`) that Claude Code consumes
+ships an installable stdio launcher (`run_installed_or_refresh_xuunity_mcp.sh`) that Claude Code consumes
 directly. The Claude-side install lives in its own directory and is fully
 independent from any other agent.
 
@@ -12,7 +12,8 @@ independent from any other agent.
 ```
 ~/.claude-tools/
 └── xuunity-mcp/
-    ├── run.sh          # self-resolving stdio launcher
+    ├── run_installed_or_refresh_xuunity_mcp.sh  # refresh-before-run stdio launcher
+    ├── run.sh          # low-level stdio launcher
     ├── server.py       # MCP server
     └── server_*.py     # helper modules
 ```
@@ -103,7 +104,7 @@ Adds the `xuunity_light_unity` server block to `~/.claude.json`
 
 ```bash
 claude mcp add --scope local --transport stdio xuunity_light_unity \
-  -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run.sh"'
+  -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"'
 ```
 
 ## How To Verify
@@ -117,11 +118,11 @@ claude mcp list
 Expected line:
 
 ```
-xuunity_light_unity: bash -lc exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run.sh"  - Connected
+xuunity_light_unity: bash -lc exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"  - Connected
 ```
 
 A failed connect typically means the Claude-side server was never installed
-(run `init --target claude`) or `run.sh` is not executable.
+(run `init --target claude`) or `run_installed_or_refresh_xuunity_mcp.sh` is not executable.
 
 ## Available MCP Tools
 

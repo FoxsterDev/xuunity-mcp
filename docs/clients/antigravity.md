@@ -29,9 +29,9 @@ You can register and grant permissions to the MCP server directly within the Ant
 3. Click the **Add** button.
 4. Set the permission policy dropdown to **Allow** (or **Ask** if you prefer to review every invocation).
 5. In the input field, enter the path to the launcher script:
-    - **macOS**: `bash "/Users/<username>/Library/Application Support/xuunity-mcp/run.sh"` *(replace `<username>` with your macOS username)*
-    - **Linux**: `bash "/home/<username>/.local/share/xuunity-mcp/run.sh"` *(replace `<username>` with your Linux username)*
-    - **Windows**: `cmd.exe /c %APPDATA%\xuunity-mcp\run.cmd`
+    - **macOS**: `bash "/Users/<username>/Library/Application Support/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"` *(replace `<username>` with your macOS username)*
+    - **Linux**: `bash "/home/<username>/.local/share/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"` *(replace `<username>` with your Linux username)*
+    - **Windows**: `cmd.exe /c %APPDATA%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd`
 6. Save the settings.
 
 ---

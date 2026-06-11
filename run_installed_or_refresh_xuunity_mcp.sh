@@ -21,4 +21,4 @@ else
 fi
 
 XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME="$(basename "$0")" \
-  exec "${python_cmd[@]}" "$SCRIPT_DIR/templates/server_launcher.py" "$@"
+  exec "${python_cmd[@]}" "$SCRIPT_DIR/run_installed_or_refresh_xuunity_mcp.py" "$@"

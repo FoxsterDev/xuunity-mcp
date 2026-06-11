@@ -85,13 +85,14 @@ python3 --version
 ```
 
 If your default `python3` is older than `3.10`, set `PYTHON` explicitly before
-running `run.sh` or `xuunity_light_unity_mcp.sh`.
+running `run_installed_or_refresh_xuunity_mcp.sh`, `run.sh`, or
+`xuunity_light_unity_mcp.sh`.
 
 Important:
 
 - UI auto-review, sandbox auto-approval, or tool-level approval is not the same
   thing as user approval of setup mutations.
-- If `~/.codex-tools/xuunity-mcp/run.sh` or the equivalent
+- If `~/.codex-tools/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh` or the equivalent
   host-tools install already exists, reuse it. Do not clone the repo locally
   unless the helper is missing or local MCP development is the goal.
 
@@ -436,7 +437,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.27
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.28
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -444,7 +445,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.27"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.28"
   }
 }
 ```
@@ -454,6 +455,20 @@ Local package source for MCP development:
 Keep Git UPM as the default project state. Switch to the local `file:` source
 only through explicit `devmode`.
 OpenUPM is planned; use Git UPM until the package is published there.
+
+When changing the project package pin, update the installed host MCP helper from
+the same source line before validation. A package bump is not complete if Unity
+uses a newer `com.xuunity.light-mcp` package while the client still launches an
+older local `server.py`.
+
+For MCP client configs, use `run_installed_or_refresh_xuunity_mcp.sh` as the
+server command. The installer writes this launcher into the selected install
+directories and records the public source checkout in `.source_root`. On client
+startup it compares the installed neutral helper with
+`packages/com.xuunity.light-mcp/package.json` from that public source checkout,
+refreshes the host helper with
+`init_xuunity_light_unity_mcp.sh --target both --force` when stale, and then
+delegates to the installed low-level `run.sh` or `run.cmd` launcher.
 
 ### 2. Install The Host MCP Helper
 
@@ -469,8 +484,10 @@ bash init_xuunity_light_unity_mcp.sh \
   --enable-project
 ```
 
-The installer writes Unix and Windows launchers: `run.sh`, `run.cmd`, and
-`run.ps1`.
+The installer writes the refresh-before-run launcher plus Unix and Windows
+fallback launchers: `run_installed_or_refresh_xuunity_mcp.sh`,
+`run_installed_or_refresh_xuunity_mcp.py`,
+`run_installed_or_refresh_xuunity_mcp.cmd`, `run.sh`, `run.cmd`, and `run.ps1`.
 
 If this helper is already installed under `~/.codex-tools`,
 `~/.claude-tools`, or another explicit host-tools path, reuse it instead of

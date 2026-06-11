@@ -1,7 +1,7 @@
 # Install XUUnity Light Unity MCP
 
 Date: `2026-05-23`
-Status: `current for v0.3.27`
+Status: `current for v0.3.28`
 
 XUUnity Light Unity MCP has two pieces:
 
@@ -57,7 +57,8 @@ python3 --version
 ```
 
 If the selected interpreter is older than `3.10`, set `PYTHON` explicitly
-before `run.sh` or `xuunity_light_unity_mcp.sh`.
+before `run_installed_or_refresh_xuunity_mcp.sh`, `run.sh`, or
+`xuunity_light_unity_mcp.sh`.
 
 `setup-plan` is the only setup wizard command intended for pre-approval
 inspection. It must not clone, run the installer, refresh installed helper
@@ -107,7 +108,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.27"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.28"
   }
 }
 ```
@@ -150,9 +151,12 @@ From the repository root on Linux/macOS:
 bash init_xuunity_light_unity_mcp.sh
 ```
 
-The installer writes `run.sh`, `run.cmd`, and `run.ps1` into each selected
+The installer writes `run_installed_or_refresh_xuunity_mcp.sh`,
+`run_installed_or_refresh_xuunity_mcp.py`,
+`run_installed_or_refresh_xuunity_mcp.cmd`, `run.sh`, `run.cmd`, and `run.ps1` into each selected
 host tools directory. Native Windows clients should use the Windows templates
-that call `run.cmd`.
+that call `run_installed_or_refresh_xuunity_mcp.cmd`; keep `run.cmd` as a
+low-level fallback.
 
 To enable a Unity project bridge without changing package mode:
 
@@ -336,7 +340,7 @@ Template:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "bash"
-args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""]
+args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""]
 required = false
 ```
 
@@ -345,7 +349,7 @@ Windows template:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "cmd.exe"
-args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run.cmd")']
+args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")']
 required = false
 ```
 
@@ -455,7 +459,7 @@ If those checks succeed but a later compile or test run fails, treat that as a
 Unity project or runtime failure unless the error explicitly points back to
 bridge readiness, package import, or unsupported capability.
 
-For package-level verification after upgrading to `v0.3.27`, run:
+For package-level verification after upgrading to `v0.3.28`, run:
 
 ```bash
 templates/smoke/run_package_self_tests.sh \
@@ -483,7 +487,7 @@ templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 ## Troubleshooting
 
 - If the bridge is disabled, run the init script with `--enable-project`.
-- If the AI client cannot find the server, verify the configured `run.sh` or `run.cmd` path.
+- If the AI client cannot find the server, verify the configured `run_installed_or_refresh_xuunity_mcp.sh`, `run_installed_or_refresh_xuunity_mcp.cmd`, `run.sh`, or `run.cmd` path.
 - If Unity imported the package but MCP calls fail, check `Library/XUUnityLightMcp/` for bridge state and request artifacts.
 - If a Unity project is already open, prefer reusing the healthy editor session instead of starting a competing one.
 - If `batch-editmode-tests` reports `test_capability_unavailable`, inspect the

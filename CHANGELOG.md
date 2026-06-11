@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 0.3.28
+
+Release tag: `v0.3.28`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.28
+```
+
+### Changed
+
+- Released `v0.3.28` package metadata, server metadata, package manifests, and Git UPM examples.
+
+### Changed
+
+- Removed the legacy bash wrapper body (`xuunity_light_unity_mcp_legacy.sh`)
+  and the `XUUNITY_LIGHT_UNITY_MCP_LEGACY_WRAPPER` escape hatch after the
+  Python launcher core was proven by green Windows, macOS, and Linux CI legs
+  on `v0.3.27`. The golden dual-run parity suite retired with its subject;
+  cross-flavor (.sh/.cmd/.ps1) parity, the bash-spawn canary, and the full
+  contract suite remain as regression guards.
+
 ## 0.3.27
 
 Release tag: `v0.3.27`

@@ -70,7 +70,7 @@ Claude-side helper also exists. To make that explicit in scripts, set:
 export XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex
 ```
 
-If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh`
+If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh`
 already exists, reuse that helper install instead of cloning a fresh repo just
 to run the installer again.
 
@@ -109,7 +109,7 @@ Add this to `~/.codex/config.toml` on Linux/macOS:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "bash"
-args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""]
+args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""]
 required = false
 ```
 
@@ -121,12 +121,13 @@ For native Windows, add this to `%USERPROFILE%\.codex\config.toml`:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "cmd.exe"
-args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run.cmd")']
+args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")']
 required = false
 ```
 
-The Windows config uses `run.cmd`, which resolves `server.py` beside itself and
-prefers `PYTHON`, then `py -3`, then `python`, then `python3`.
+The Windows config uses `run_installed_or_refresh_xuunity_mcp.cmd`, which
+delegates to the refresh-before-run launcher before starting the installed
+server. Keep `run.cmd` as a low-level fallback, not the default client command.
 
 Manual or automatic Codex config only wires the client to the host helper. It
 does not prove that a specific Unity project has the MCP package dependency,

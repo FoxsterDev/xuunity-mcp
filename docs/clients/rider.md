@@ -47,7 +47,7 @@ Create or update `.mcp.json` in your project root with **both** JetBrains and xu
       "command": "bash",
       "args": [
         "-lc",
-        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run.sh\""
+        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""
       ],
       "timeout": 600000
     }
@@ -78,7 +78,7 @@ This adds the MCP server to `~/.codex/mcp-config.toml`:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "bash"
-args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run.sh\""]
+args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""]
 required = false
 ```
 

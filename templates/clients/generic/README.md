@@ -28,8 +28,10 @@ tool-home overrides are resolved by the shell instead of relying on client-side
 tilde expansion.
 
 The Windows command intentionally goes through `cmd.exe /d /c` and calls
-`run.cmd` so `%USERPROFILE%`, `CODEX_TOOLS_HOME`, and Python launcher fallback
-behavior are resolved by Windows instead of the MCP client.
+`run_installed_or_refresh_xuunity_mcp.cmd` so `%USERPROFILE%`,
+`CODEX_TOOLS_HOME`, refresh-before-run behavior, and Python launcher fallback
+are resolved by Windows instead of the MCP client. Keep `run.cmd` as a
+low-level fallback.
 
 ## Install The Server
 

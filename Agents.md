@@ -15,7 +15,7 @@ Use it when a session starts from this MCP repo, or when a host repo task target
 - Agent workflow docs: `docs/agents/`
 - Templates: `templates/`
 - AI/public discovery files: `llms.txt`, `mcp-server.json`
-- Public shell entrypoints: `init_xuunity_light_unity_mcp.sh`, `xuunity_light_unity_mcp.sh`
+- Public shell entrypoints: `init_xuunity_light_unity_mcp.sh`, `xuunity_light_unity_mcp.sh`, `run_installed_or_refresh_xuunity_mcp.sh`
 
 ## Mode Detection
 - Standalone mode: `../../../Agents.md` is absent or does not describe the active workspace. Use this file and local repo docs as the full routing contract.
@@ -37,6 +37,7 @@ this router plus the local docs as the source of truth.
 ## Routing Rules
 - For any task involving process management (process listing, checking liveness, or terminating processes/editors), load the safe process management skill: [SKILL.md](skills/safe_process_management/SKILL.md).
 - For any task that writes or edits bash scripts, the shell wrapper, `templates/run.sh`, `scripts/testing/*.sh`, CI workflows, or tests that spawn shell processes — and for any failure that reproduces only on the Windows CI leg or only in CI — load the cross-platform shell skill: [SKILL.md](skills/cross_platform_shell/SKILL.md). Windows Git Bash support is a hard compatibility requirement for every shell change.
+- MCP `.sh` entrypoints must stay maximally thin. They may resolve the script directory, choose the Python interpreter, set launcher metadata, and `exec` Python. Do not put version parsing, source-root discovery, install refresh, process management, project traversal, JSON editing, or retry policy in bash; move that behavior into Python and cover it with tests.
 - For client setup tasks, load `docs/clients/Agents.md` when it exists, then the requested client guide.
 - For AI integration or workflow tasks, load `docs/agents/AI_INTEGRATION.md` or `docs/agents/AGENT_WORKFLOWS.md` as appropriate.
 - For Unity package implementation, edit `packages/com.xuunity.light-mcp/` and validate through the repo's test or smoke guidance.

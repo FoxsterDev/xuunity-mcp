@@ -1,7 +1,7 @@
 # XUUnity MCP: Thin Launchers + Python Core Orchestration
 
 **Date:** `2026-06-11`
-**Status:** `Proposed`
+**Status:** `Implemented; Phase 4 cleanup complete`
 **Driver:** Windows CI silent-hang incident (June 2026) — root cause and every secondary defect lived in the bash layer.
 
 ---
@@ -76,13 +76,24 @@ New `scripts/testing/run_multi_project.py` (single module, two subcommands: `bat
 ### 3.5 Phase 4 — Cleanup & release
 - Delete dead bash, update `CHANGELOG.md`, version bump, refresh `docs/agents/` + `docs/operations/` references, re-run release-versioning consistency tests.
 
+Phase 4 closeout note, 2026-06-11:
+
+- `v0.3.27` provided green Windows, macOS, and Linux evidence for the Python
+  launcher core.
+- `xuunity_light_unity_mcp_legacy.sh` and the
+  `XUUNITY_LIGHT_UNITY_MCP_LEGACY_WRAPPER` escape hatch were removed after that
+  evidence.
+- The golden dual-run parity suite was retired with its legacy subject.
+- Cross-flavor launcher parity, bash-spawn canary coverage, and the regular
+  contract suite remain as regression guards.
+
 ---
 
 ## 4. Porting Safety (the main risk)
 
 A 962-line behavioral port is the risk center. Mitigations, in priority order:
 1. **Golden-output baseline before the port**: record current wrapper stdout/exit codes for every command exercised by tests, on all three CI legs, into versioned fixtures. The port must reproduce them.
-2. **Command-by-command port**: each command moves in its own commit with its golden test; the bash implementation stays callable (env flag `XUUNITY_LIGHT_UNITY_MCP_LEGACY_WRAPPER=1`) until the full surface is proven, then the flag and dead code are removed in Phase 4.
+2. **Command-by-command port**: each command moves in its own commit with its golden test; the bash implementation stays callable (env flag `XUUNITY_LIGHT_UNITY_MCP_LEGACY_WRAPPER=1`) until the full surface is proven, then the flag and dead code are removed in Phase 4. This cleanup was completed after the `v0.3.27` cross-platform evidence.
 3. **No semantic improvements during the port.** Behavior changes (if any are discovered as desirable) are filed as follow-ups; the port itself is mechanical.
 
 Residual risks to state honestly: `py -3` launcher quoting on Windows, `os.execv` signal semantics on POSIX vs subprocess passthrough on Windows, and git output parsing differences — each is covered by an existing or new test, but real-Unity flows remain validated only as far as current CI exercises them.
@@ -91,12 +102,12 @@ Residual risks to state honestly: `py -3` launcher quoting on Windows, `os.execv
 
 ## 5. Success Criteria
 
-- [ ] Each shell entrypoint ≤ 30 lines; no resolves, loops, or business logic in shell.
-- [ ] `grep -r xargs` over the repo returns nothing.
-- [ ] `--parallelism 3` demonstrably overlaps workers on the Windows CI leg.
-- [ ] `.sh`, `.cmd`, `.ps1` all executed green in CI on Windows.
-- [ ] Offline checks run on push/PR, not only on tags.
-- [ ] Full suite green on macOS, Ubuntu, Windows; golden parity fixtures match.
+- [x] Each shell entrypoint ≤ 30 lines; no resolves, loops, or business logic in shell.
+- [x] `grep -r xargs` over the repo returns nothing.
+- [x] `--parallelism 3` demonstrably overlaps workers on the Windows CI leg.
+- [x] `.sh`, `.cmd`, `.ps1` all executed green in CI on Windows.
+- [x] Offline checks run on push/PR, not only on tags.
+- [x] Full suite green on macOS, Ubuntu, Windows; legacy golden parity retired after the Python core was proven.
 
 ## 6. Sequencing & Effort
 

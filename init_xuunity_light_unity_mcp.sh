@@ -88,6 +88,9 @@ done
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 templates_dir="$script_dir/templates"
 package_metadata_source="$script_dir/packages/com.xuunity.light-mcp/package.json"
+refresh_launcher_source="$script_dir/run_installed_or_refresh_xuunity_mcp.sh"
+refresh_python_source="$script_dir/run_installed_or_refresh_xuunity_mcp.py"
+refresh_cmd_source="$script_dir/run_installed_or_refresh_xuunity_mcp.cmd"
 minimum_python_version="3.10"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 codex_tools_home="${CODEX_TOOLS_HOME:-$HOME/.codex-tools}"
@@ -97,7 +100,9 @@ claude_install_dir="$claude_tools_home/xuunity-mcp"
 config_path="$codex_home/config.toml"
 claude_config_path="${CLAUDE_CONFIG_PATH:-$HOME/.claude.json}"
 codex_run_path="$codex_install_dir/run.sh"
+codex_refresh_run_path="$codex_install_dir/run_installed_or_refresh_xuunity_mcp.sh"
 claude_run_path="$claude_install_dir/run.sh"
+claude_refresh_run_path="$claude_install_dir/run_installed_or_refresh_xuunity_mcp.sh"
 resolve_neutral_install_dir() {
   if [[ -n "${XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR:-}" ]]; then
     printf '%s\n' "$XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"
@@ -130,6 +135,7 @@ resolve_neutral_install_dir() {
 
 neutral_install_dir="$(resolve_neutral_install_dir)"
 neutral_run_path="$neutral_install_dir/run.sh"
+neutral_refresh_run_path="$neutral_install_dir/run_installed_or_refresh_xuunity_mcp.sh"
 
 
 resolve_python_bin() {
@@ -245,9 +251,9 @@ file_contains_regex() {
 
 append_codex_block_if_missing() {
   local block
-  local codex_run_path_val="$codex_run_path"
+  local codex_run_path_val="$codex_refresh_run_path"
   if [[ "$target" == "neutral" ]]; then
-    codex_run_path_val="$neutral_run_path"
+    codex_run_path_val="$neutral_refresh_run_path"
   fi
   block=$'[mcp_servers.xuunity_light_unity]\n'
   block+=$'command = "bash"\n'
@@ -275,9 +281,9 @@ append_codex_block_if_missing() {
 }
 
 append_claude_block_if_missing() {
-  local claude_run_path_val="$claude_run_path"
+  local claude_run_path_val="$claude_refresh_run_path"
   if [[ "$target" == "neutral" ]]; then
-    claude_run_path_val="$neutral_run_path"
+    claude_run_path_val="$neutral_refresh_run_path"
   fi
 
   if [[ $dry_run -eq 1 ]]; then
@@ -478,6 +484,15 @@ install_server_into() {
   copy_if_needed "$templates_dir/run.sh" "$target_dir/run.sh" 755
   copy_if_needed "$templates_dir/run.cmd" "$target_dir/run.cmd" 644
   copy_if_needed "$templates_dir/run.ps1" "$target_dir/run.ps1" 644
+  copy_if_needed "$refresh_launcher_source" "$target_dir/run_installed_or_refresh_xuunity_mcp.sh" 755
+  copy_if_needed "$refresh_python_source" "$target_dir/run_installed_or_refresh_xuunity_mcp.py" 644
+  copy_if_needed "$refresh_cmd_source" "$target_dir/run_installed_or_refresh_xuunity_mcp.cmd" 644
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write source root marker to %s/.source_root\n' "$target_dir"
+  else
+    printf '%s\n' "$script_dir" > "$target_dir/.source_root"
+    chmod 644 "$target_dir/.source_root"
+  fi
   run mkdir -p "$target_dir/packages/com.xuunity.light-mcp"
   copy_if_needed "$package_metadata_source" "$target_dir/packages/com.xuunity.light-mcp/package.json" 644
 }
@@ -498,6 +513,32 @@ EOF
     chmod 755 "$target_dir/run.sh"
   fi
 
+  # Write delegate refresh launcher
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write delegate run_installed_or_refresh_xuunity_mcp.sh to %s/run_installed_or_refresh_xuunity_mcp.sh\n' "$target_dir"
+  else
+    cat > "$target_dir/run_installed_or_refresh_xuunity_mcp.sh" <<EOF
+#!/usr/bin/env bash
+exec "$neutral_dir/run_installed_or_refresh_xuunity_mcp.sh" "\$@"
+EOF
+    chmod 755 "$target_dir/run_installed_or_refresh_xuunity_mcp.sh"
+  fi
+
+  # Write delegate refresh Python module
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write delegate run_installed_or_refresh_xuunity_mcp.py to %s/run_installed_or_refresh_xuunity_mcp.py\n' "$target_dir"
+  else
+    cat > "$target_dir/run_installed_or_refresh_xuunity_mcp.py" <<EOF
+import os
+import sys
+
+neutral_dir = os.path.expanduser("$neutral_dir")
+central_launcher = os.path.join(neutral_dir, "run_installed_or_refresh_xuunity_mcp.py")
+os.execv(sys.executable, [sys.executable, central_launcher] + sys.argv[1:])
+EOF
+    chmod 644 "$target_dir/run_installed_or_refresh_xuunity_mcp.py"
+  fi
+
   # Write delegate run.cmd
   if [[ $dry_run -eq 1 ]]; then
     printf '[dry-run] write delegate run.cmd to %s/run.cmd\n' "$target_dir"
@@ -507,6 +548,17 @@ EOF
 call "$neutral_dir\run.cmd" %*
 EOF
     chmod 644 "$target_dir/run.cmd"
+  fi
+
+  # Write delegate refresh run.cmd
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write delegate run_installed_or_refresh_xuunity_mcp.cmd to %s/run_installed_or_refresh_xuunity_mcp.cmd\n' "$target_dir"
+  else
+    cat > "$target_dir/run_installed_or_refresh_xuunity_mcp.cmd" <<EOF
+@echo off
+call "$neutral_dir\run_installed_or_refresh_xuunity_mcp.cmd" %*
+EOF
+    chmod 644 "$target_dir/run_installed_or_refresh_xuunity_mcp.cmd"
   fi
 
   # Write delegate run.ps1
@@ -620,14 +672,14 @@ EOF
 
 case "$target" in
   codex)
-    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n' "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir"
+    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run_installed_or_refresh_xuunity_mcp.sh\n- %s/run_installed_or_refresh_xuunity_mcp.py\n- %s/run.cmd\n- %s/run_installed_or_refresh_xuunity_mcp.cmd\n- %s/run.ps1\n' "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir"
     ;;
   claude)
-    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n' "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir"
+    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run_installed_or_refresh_xuunity_mcp.sh\n- %s/run_installed_or_refresh_xuunity_mcp.py\n- %s/run.cmd\n- %s/run_installed_or_refresh_xuunity_mcp.cmd\n- %s/run.ps1\n' "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir"
     ;;
   both)
-    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n- %s/server.py\n- %s/run.sh\n- %s/run.cmd\n- %s/run.ps1\n' \
-      "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" \
-      "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir"
+    printf -- '- %s/server.py\n- %s/run.sh\n- %s/run_installed_or_refresh_xuunity_mcp.sh\n- %s/run_installed_or_refresh_xuunity_mcp.py\n- %s/run.cmd\n- %s/run_installed_or_refresh_xuunity_mcp.cmd\n- %s/run.ps1\n- %s/server.py\n- %s/run.sh\n- %s/run_installed_or_refresh_xuunity_mcp.sh\n- %s/run_installed_or_refresh_xuunity_mcp.py\n- %s/run.cmd\n- %s/run_installed_or_refresh_xuunity_mcp.cmd\n- %s/run.ps1\n' \
+      "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" "$codex_install_dir" \
+      "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir" "$claude_install_dir"
     ;;
 esac

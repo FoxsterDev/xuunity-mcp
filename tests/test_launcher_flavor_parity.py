@@ -56,7 +56,6 @@ class LauncherFlavorParityTests(unittest.TestCase):
             "XUUNITY_LIGHT_UNITY_MCP_SERVER",
             "XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET",
             "XUUNITY_LIGHT_UNITY_MCP_AIRROOT",
-            "XUUNITY_LIGHT_UNITY_MCP_LEGACY_WRAPPER",
             "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME",
         ):
             env.pop(key, None)

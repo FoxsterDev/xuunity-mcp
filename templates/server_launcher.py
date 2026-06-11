@@ -30,6 +30,9 @@ if sys.version_info[:2] < (3, 10):
 PACKAGE_NAME = "com.xuunity.light-mcp"
 SERVER_TEMPLATE_RELATIVE_PATH = "templates/server.py"
 RUN_TEMPLATE_RELATIVE_PATH = "templates/run.sh"
+REFRESH_LAUNCHER_RELATIVE_PATH = "run_installed_or_refresh_xuunity_mcp.sh"
+REFRESH_PYTHON_RELATIVE_PATH = "run_installed_or_refresh_xuunity_mcp.py"
+REFRESH_CMD_RELATIVE_PATH = "run_installed_or_refresh_xuunity_mcp.cmd"
 SERVER_MODULES_TEMPLATE_GLOB = "server_*.py"
 RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH = "templates/xuunity_light_unity_mcp_runtime_defaults.json"
 PACKAGE_TEMPLATE_RELATIVE_PATH = "packages/com.xuunity.light-mcp"
@@ -155,6 +158,9 @@ class LauncherPaths:
             self.install_dir = resolve_install_dir()
             self.server_path = os.path.join(self.install_dir, "server.py")
         self.run_path = os.path.join(self.install_dir, "run.sh")
+        self.refresh_run_path = os.path.join(self.install_dir, "run_installed_or_refresh_xuunity_mcp.sh")
+        self.refresh_python_path = os.path.join(self.install_dir, "run_installed_or_refresh_xuunity_mcp.py")
+        self.refresh_cmd_path = os.path.join(self.install_dir, "run_installed_or_refresh_xuunity_mcp.cmd")
         self.source_server_path = os.path.join(self.source_root, SERVER_TEMPLATE_RELATIVE_PATH)
 
 
@@ -397,8 +403,6 @@ def sync_file_from_source(paths: LauncherPaths, destination_path: str, relative_
 
 
 def sync_installed_helper_if_needed(paths: LauncherPaths) -> None:
-    if not os.path.exists(os.path.join(paths.source_root, ".git")):
-        return
     if not os.path.isfile(os.path.join(paths.source_root, SERVER_TEMPLATE_RELATIVE_PATH)):
         return
 
@@ -406,6 +410,12 @@ def sync_installed_helper_if_needed(paths: LauncherPaths) -> None:
 
     sync_file_from_source(paths, paths.server_path, SERVER_TEMPLATE_RELATIVE_PATH)
     sync_file_from_source(paths, paths.run_path, RUN_TEMPLATE_RELATIVE_PATH)
+    if os.path.isfile(os.path.join(paths.source_root, REFRESH_LAUNCHER_RELATIVE_PATH)):
+        sync_file_from_source(paths, paths.refresh_run_path, REFRESH_LAUNCHER_RELATIVE_PATH)
+    if os.path.isfile(os.path.join(paths.source_root, REFRESH_PYTHON_RELATIVE_PATH)):
+        sync_file_from_source(paths, paths.refresh_python_path, REFRESH_PYTHON_RELATIVE_PATH)
+    if os.path.isfile(os.path.join(paths.source_root, REFRESH_CMD_RELATIVE_PATH)):
+        sync_file_from_source(paths, paths.refresh_cmd_path, REFRESH_CMD_RELATIVE_PATH)
     sync_file_from_source(
         paths,
         os.path.join(paths.install_dir, os.path.basename(RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH)),
@@ -427,6 +437,9 @@ def sync_installed_helper_if_needed(paths: LauncherPaths) -> None:
             os.path.join("templates", module_source_path.name),
         )
     os.chmod(paths.run_path, 0o755)
+    if os.path.isfile(paths.refresh_run_path):
+        os.chmod(paths.refresh_run_path, 0o755)
+    Path(paths.install_dir, ".source_root").write_text(paths.source_root + "\n", encoding="utf-8")
 
 
 def require_project_root_argument(args: list) -> str:

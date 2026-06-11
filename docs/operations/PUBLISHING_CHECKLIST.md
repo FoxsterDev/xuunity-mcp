@@ -17,6 +17,15 @@ Release is blocked until all of the following are true:
 - `python3 scripts/tools/sync_release_version.py --version <next-version>` has
   been run
 - `python3 scripts/testing/check_release_version_consistency.py` passes
+- `bash init_xuunity_light_unity_mcp.sh --target both --force` from the source
+  checkout installs `run_installed_or_refresh_xuunity_mcp.sh`,
+  `run_installed_or_refresh_xuunity_mcp.py`,
+  `run_installed_or_refresh_xuunity_mcp.cmd`, and `.source_root`
+- client config templates and downstream client docs use the refresh launcher
+  for default startup, not plain `run.sh` or `run.cmd`
+- a stale neutral helper smoke proves the chain:
+  source checkout -> installer -> client config -> refresh launcher -> neutral
+  server version
 - `docs/index.html` shows the current `softwareVersion`
 - `docs/install.html` shows the current Git UPM tag
 - `docs/reference/LISTING_KIT.md` shows the current Git UPM tag
@@ -27,13 +36,15 @@ Minimum release closeout sequence:
 ```bash
 python3 scripts/tools/sync_release_version.py --version <next-version>
 python3 scripts/testing/check_release_version_consistency.py
+bash init_xuunity_light_unity_mcp.sh --target both --force
 scripts/testing/run_host_python_tests.sh
 git push origin master
 git push origin v<next-version>
 ```
 
-If the site version, install tag, or listing metadata is stale, do not tag the
-release and do not publish the package URL to consumers.
+If the site version, install tag, listing metadata, refresh launcher install
+output, or client startup docs are stale, do not tag the release and do not
+publish the package URL to consumers.
 
 ## GitHub Repository UI
 
