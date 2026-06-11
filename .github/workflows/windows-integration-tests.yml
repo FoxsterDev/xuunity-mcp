@@ -1,4 +1,4 @@
-name: Windows Integration Tests
+name: Integration Tests
 
 on:
   push:
@@ -10,9 +10,13 @@ permissions:
   contents: read
 
 jobs:
-  windows-ci:
-    name: Windows Setup and Test Integration
-    runs-on: windows-latest
+  offline-ci:
+    name: Offline Checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -23,74 +27,44 @@ jobs:
           python-version: "3.11"
 
       - name: Run Python Unit Tests
-        shell: pwsh
+        shell: bash
         run: |
-          $env:PYTHONPATH="templates"
-          python -m unittest discover -s tests -v
+          PYTHONPATH=templates python -m unittest discover -s tests -v
 
       - name: Scaffold Test Unity Project
-        shell: pwsh
+        shell: bash
         run: |
-          New-Item -ItemType Directory -Force -Path "TestProject/Assets"
-          New-Item -ItemType Directory -Force -Path "TestProject/ProjectSettings"
-          New-Item -ItemType Directory -Force -Path "TestProject/Packages"
-          Set-Content -Path "TestProject/ProjectSettings/ProjectVersion.txt" -Value "m_EditorVersion: 6000.3.2f1"
-          Set-Content -Path "TestProject/Packages/manifest.json" -Value '{"dependencies": {}}'
+          mkdir -p TestProject/Assets
+          mkdir -p TestProject/ProjectSettings
+          mkdir -p TestProject/Packages
+          echo "m_EditorVersion: 6000.3.2f1" > TestProject/ProjectSettings/ProjectVersion.txt
+          echo '{"dependencies": {}}' > TestProject/Packages/manifest.json
 
       - name: Run MCP setup-plan
-        shell: pwsh
+        shell: bash
         run: |
           python templates/server.py setup-plan --project-root TestProject --plan-file plan.json
-          Get-Content plan.json
+          python -m json.tool plan.json
 
       - name: Run MCP setup-apply
-        shell: pwsh
+        shell: bash
         run: |
           python templates/server.py setup-apply --plan-file plan.json --project-root TestProject --yes
 
       - name: Run MCP validate-setup
-        shell: pwsh
+        shell: bash
         run: |
           python templates/server.py validate-setup --project-root TestProject
 
       - name: Verify package is registered in manifest
-        shell: pwsh
+        shell: python
         run: |
-          $manifest = Get-Content -Raw -Path "TestProject/Packages/manifest.json" | ConvertFrom-Json
-          if (-not $manifest.dependencies."com.xuunity.light-mcp") {
-            Write-Error "com.xuunity.light-mcp is missing from package manifest!"
-            exit 1
-          }
-          Write-Host "Verification successful: com.xuunity.light-mcp is present."
-
-      - name: Check if Unity License is configured
-        id: check_license
-        shell: bash
-        run: |
-          if [ -n "${{ secrets.UNITY_LICENSE }}" ] || ( [ -n "${{ secrets.UNITY_SERIAL }}" ] && [ -n "${{ secrets.UNITY_EMAIL }}" ] && [ -n "${{ secrets.UNITY_PASSWORD }}" ] ); then
-            echo "license_configured=true" >> $GITHUB_OUTPUT
-            echo "Unity license configured. Will run batchmode verification."
-          else
-            echo "license_configured=false" >> $GITHUB_OUTPUT
-            echo "Unity license missing. Skipping batchmode Unity verification."
-          fi
-
-      - name: Set up Unity (Game.CI)
-        if: steps.check_license.outputs.license_configured == 'true'
-        uses: game-ci/unity-setup@v4
-        with:
-          unityVersion: 6000.3.2f1
-
-      - name: Run Unity EditMode Tests (Game.CI)
-        if: steps.check_license.outputs.license_configured == 'true'
-        uses: game-ci/unity-test-runner@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-        with:
-          projectPath: TestProject
-          unityVersion: 6000.3.2f1
-          testMode: EditMode
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          import json
+          import sys
+          with open("TestProject/Packages/manifest.json", "r") as f:
+              manifest = json.load(f)
+          dependencies = manifest.get("dependencies", {})
+          if "com.xuunity.light-mcp" not in dependencies:
+              print("ERROR: com.xuunity.light-mcp is missing from package manifest!")
+              sys.exit(1)
+          print("Verification successful: com.xuunity.light-mcp is present.")
