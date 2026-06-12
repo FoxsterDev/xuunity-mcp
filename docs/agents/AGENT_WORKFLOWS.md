@@ -20,6 +20,9 @@ Use this file after the MCP is installed and a target Unity project is known.
 Use `AI_INTEGRATION.md` for install/integration rules and this file for the
 day-to-day agent playbooks.
 
+For portfolio or single-project `com.xuunity.light-mcp` version bumps, use the
+lean package-bump playbook first: `PACKAGE_BUMP_FAST_PATH.md`.
+
 ## Workflow Contract
 
 Every agent workflow should follow this contract:

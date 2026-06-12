@@ -46,6 +46,7 @@ write or update a post-retro note that states:
 - `2026-05-23_devmode_batch_lifecycle_retro.md`
 - `2026-06-02_token_efficiency_response_envelope_retro.md`
 - `2026-06-07_xuunity_mcp_batch_compile_reliability_retro.md`
+- `2026-06-11_token_accounting_and_fast_path_retro.md`
 - `xuunity_mcp_chat_retro.md`
 - `xuunity_mcp_install_retro.md`
 

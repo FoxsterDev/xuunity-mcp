@@ -32,6 +32,8 @@ It now has:
 - project-defined hook summary promotion in compact scenario summaries
 - operator verdicts for confirmed lifecycle reclassification recovery
 - design-plan history for retro-derived implementation plans
+- public package-bump fast-path guidance for lean `com.xuunity.light-mcp`
+  version updates
 
 The public `xuunity` protocol layer also now understands validation-lane
 selection.
