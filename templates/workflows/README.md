@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Workflow Templates
 
 Date: `2026-05-23`
-Status: `current for v0.3.28`
+Status: `current for v0.3.29`
 
 This folder contains machine-readable agent workflow templates.
 
@@ -27,5 +27,5 @@ Use `../../docs/agents/AGENT_WORKFLOWS.md` for the human-readable playbooks and 
 Current production package source for workflow evidence:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.28
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.29
 ```

@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+## 0.3.29
+
+Release tag: `v0.3.29`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.29
+```
+
+### Added
+
+- Added `project_defined_hook_poll_until`, a first-class scenario operation for
+  project-defined hook smokes that starts one hook action, polls another until a
+  payload predicate reaches `passed`, `failed`, or timeout, and keeps the latest
+  terminal payload in scenario results.
+- Added scenario summary promotion for poll-until hook name, terminal status,
+  failure class, requested scalar payload fields, screenshot path, console-tail
+  evidence count, and cleanup result.
+
+### Changed
+
+- Released `v0.3.29` package metadata, server metadata, package manifests, and Git UPM examples.
+- Scenario JSON now accepts `operation` as an alias for `kind` and accepts
+  object-shaped `startPayload` / `pollPayload` inputs, which are normalized for
+  both Python MCP tool callers and direct Unity bridge callers.
+
+### Validation
+
+- Validated package EditMode self-tests on a temporary Unity `2022.3.67f2`
+  project with the local `com.xuunity.light-mcp` package: `12/12` passed.
+- Validated an end-to-end temporary project hook scenario:
+  `request-scenario-validate` returned `valid`, `request-scenario-run-and-wait`
+  returned `passed` with `poll_count=3`, and compact summary promoted
+  `selected_tab`, `user_path`, `before_value`, `after_value`, and
+  `cleanup_result=passed`.
+- Re-ran the host Python suite after live Unity validation: `237` tests passed
+  with one expected native Windows `.cmd` smoke skipped on macOS.
+
 ## 0.3.28
 
 Release tag: `v0.3.28`
