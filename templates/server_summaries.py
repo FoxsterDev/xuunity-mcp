@@ -178,13 +178,14 @@ def build_project_defined_hook_summary(steps: list[Any]) -> dict[str, Any]:
     for raw_step in steps:
         if not isinstance(raw_step, dict):
             continue
-        if str(raw_step.get("kind") or "") != "project_defined_hook":
+        if str(raw_step.get("kind") or "") not in {"project_defined_hook", "project_defined_hook_poll_until"}:
             continue
 
         payload = _parse_step_payload_json(raw_step)
         hook_summary: dict[str, Any] = {
             "step_id": str(raw_step.get("stepId") or raw_step.get("step_id") or ""),
             "hook_name": str(raw_step.get("hook_name") or raw_step.get("hookName") or ""),
+            "kind": str(raw_step.get("kind") or ""),
             "status": str(raw_step.get("status") or ""),
             "outcome": truncate_text(payload.get("outcome") or raw_step.get("outcome") or "", 120),
         }
@@ -194,6 +195,26 @@ def build_project_defined_hook_summary(steps: list[Any]) -> dict[str, Any]:
             hook_summary["payload_flags"] = payload_flags
         if payload_scalars:
             hook_summary["payload_scalars"] = payload_scalars
+        promoted_scalars = _extract_promoted_payload_scalars(payload, raw_step.get("promote_payload_fields"))
+        if promoted_scalars:
+            hook_summary["promoted_payload_scalars"] = promoted_scalars
+
+        for key in ("terminal_status", "failure_class", "poll_count"):
+            if key in raw_step and raw_step.get(key) not in ("", None):
+                hook_summary[key] = raw_step.get(key)
+
+        screenshot_payload = _parse_json_string(raw_step.get("terminal_screenshot_payload_json"))
+        screenshot_path = str(screenshot_payload.get("file_path") or screenshot_payload.get("screenshot_path") or "")
+        if screenshot_path:
+            hook_summary["screenshot_path"] = screenshot_path
+
+        console_tail_payload = _parse_json_string(raw_step.get("terminal_console_tail_payload_json"))
+        if console_tail_payload:
+            entries = console_tail_payload.get("entries")
+            if isinstance(entries, list):
+                hook_summary["terminal_console_tail_count"] = len(entries)
+            elif "lines" in console_tail_payload and isinstance(console_tail_payload.get("lines"), list):
+                hook_summary["terminal_console_tail_count"] = len(console_tail_payload.get("lines") or [])
 
         error_code = str(raw_step.get("error_code") or "")
         error_message = str(raw_step.get("error_message") or "")
@@ -208,6 +229,35 @@ def build_project_defined_hook_summary(steps: list[Any]) -> dict[str, Any]:
         "all_hooks_succeeded": bool(hooks) and all(str(item.get("status") or "") == "passed" for item in hooks),
         "hooks": hooks,
     }
+
+
+def _parse_json_string(value: Any) -> dict[str, Any]:
+    text = str(value or "")
+    if not text:
+        return {}
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _extract_promoted_payload_scalars(payload: dict[str, Any], requested_fields: Any) -> dict[str, Any]:
+    if not isinstance(requested_fields, list):
+        return {}
+    result: dict[str, Any] = {}
+    for raw_key in requested_fields:
+        key = str(raw_key or "").strip()
+        if not key or _is_sensitive_payload_key(key) or key not in payload:
+            continue
+        value = payload.get(key)
+        if isinstance(value, bool):
+            result[key] = value
+        elif isinstance(value, (int, float)):
+            result[key] = value
+        elif isinstance(value, str):
+            result[key] = truncate_text(value, 120)
+    return result
 
 
 def build_profile_mutation_summary(steps: list[Any]) -> dict[str, Any]:
@@ -418,6 +468,10 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
     if project_defined_hook_summary["hook_count"] > 0:
         summary["project_defined_hook_summary"] = project_defined_hook_summary
 
+    cleanup_summary = build_scenario_cleanup_summary(step_items, normalized.get("cleanup_start_index"))
+    if cleanup_summary["cleanup_step_count"] > 0:
+        summary["cleanup_summary"] = cleanup_summary
+
     profile_mutation_summary = build_profile_mutation_summary(step_items)
     if bool(profile_mutation_summary.get("profile_mutation_detected")) or bool(profile_mutation_summary.get("restore_steps")):
         summary["profile_mutation_summary"] = profile_mutation_summary
@@ -475,6 +529,50 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
         }
 
     return summary
+
+
+def build_scenario_cleanup_summary(steps: list[Any], cleanup_start_index: Any) -> dict[str, Any]:
+    try:
+        start_index = int(cleanup_start_index)
+    except (TypeError, ValueError):
+        start_index = -1
+
+    if start_index < 0 or start_index >= len(steps):
+        return {
+            "cleanup_step_count": 0,
+            "cleanup_passed_count": 0,
+            "cleanup_failed_count": 0,
+            "cleanup_skipped_count": 0,
+            "cleanup_result": "",
+            "cleanup_steps": [],
+        }
+
+    cleanup_steps: list[dict[str, Any]] = []
+    for raw_step in steps[start_index:]:
+        summarized = summarize_scenario_step(raw_step if isinstance(raw_step, dict) else None)
+        if summarized:
+            cleanup_steps.append(summarized)
+
+    passed = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "passed")
+    failed = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "failed")
+    skipped = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "skipped")
+    if failed > 0:
+        cleanup_result = "failed"
+    elif cleanup_steps and passed == len(cleanup_steps):
+        cleanup_result = "passed"
+    elif cleanup_steps:
+        cleanup_result = "incomplete"
+    else:
+        cleanup_result = ""
+
+    return {
+        "cleanup_step_count": len(cleanup_steps),
+        "cleanup_passed_count": passed,
+        "cleanup_failed_count": failed,
+        "cleanup_skipped_count": skipped,
+        "cleanup_result": cleanup_result,
+        "cleanup_steps": cleanup_steps,
+    }
 
 
 def scenario_wait_remaining_seconds(waiting_until_utc: Any) -> float | None:

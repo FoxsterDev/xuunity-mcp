@@ -398,7 +398,7 @@ def build_project_action_scenario(
 
 def scenario_has_project_action_steps(scenario: dict[str, Any]) -> bool:
     return any(
-        isinstance(step, dict) and str(step.get("kind") or "") == "project_action"
+        isinstance(step, dict) and _scenario_step_operation(step) == "project_action"
         for step in list(scenario.get("steps") or []) + list(scenario.get("cleanupSteps") or [])
     )
 
@@ -409,6 +409,7 @@ def normalize_project_action_scenario(
     scenario: dict[str, Any],
     catalog_path: str = "",
 ) -> dict[str, Any]:
+    scenario = normalize_poll_until_scenario(scenario)
     if not scenario_has_project_action_steps(scenario):
         return scenario
 
@@ -428,6 +429,52 @@ def normalize_project_action_scenario(
     return normalized
 
 
+def _scenario_step_operation(step: dict[str, Any]) -> str:
+    return str(step.get("kind") or step.get("operation") or "").strip()
+
+
+def normalize_poll_until_scenario(scenario: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(scenario)
+    normalized["steps"] = normalize_poll_until_steps(list(scenario.get("steps") or []))
+    if "cleanupSteps" in scenario:
+        normalized["cleanupSteps"] = normalize_poll_until_steps(list(scenario.get("cleanupSteps") or []))
+    return normalized
+
+
+def normalize_poll_until_steps(steps: list[Any]) -> list[Any]:
+    normalized_steps: list[Any] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            normalized_steps.append(step)
+            continue
+
+        normalized = dict(step)
+        operation = _scenario_step_operation(normalized)
+        if operation and not str(normalized.get("kind") or "").strip():
+            normalized["kind"] = operation
+
+        if operation == "project_defined_hook_poll_until":
+            if "startPayload" in normalized and "startPayloadJson" not in normalized:
+                start_payload = normalized.pop("startPayload")
+                if not isinstance(start_payload, dict):
+                    raise ToolInvocationError(
+                        "poll_until_start_payload_invalid",
+                        "project_defined_hook_poll_until startPayload must be a JSON object.",
+                    )
+                normalized["startPayloadJson"] = json.dumps(start_payload, ensure_ascii=True, separators=(",", ":"))
+            if "pollPayload" in normalized and "pollPayloadJson" not in normalized:
+                poll_payload = normalized.pop("pollPayload")
+                if not isinstance(poll_payload, dict):
+                    raise ToolInvocationError(
+                        "poll_until_poll_payload_invalid",
+                        "project_defined_hook_poll_until pollPayload must be a JSON object.",
+                    )
+                normalized["pollPayloadJson"] = json.dumps(poll_payload, ensure_ascii=True, separators=(",", ":"))
+
+        normalized_steps.append(normalized)
+    return normalized_steps
+
+
 def normalize_project_action_steps(
     *,
     catalog: dict[str, Any],
@@ -436,7 +483,7 @@ def normalize_project_action_steps(
 ) -> list[Any]:
     normalized_steps: list[Any] = []
     for index, step in enumerate(steps):
-        if not isinstance(step, dict) or str(step.get("kind") or "") != "project_action":
+        if not isinstance(step, dict) or _scenario_step_operation(step) != "project_action":
             normalized_steps.append(step)
             continue
         normalized_steps.append(

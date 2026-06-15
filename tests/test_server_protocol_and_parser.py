@@ -14,6 +14,7 @@ if str(TEMPLATES_DIR) not in sys.path:
 
 import server
 import server_project_actions
+import server_summaries
 
 
 def get_subparser_choices(parser: argparse.ArgumentParser) -> set[str]:
@@ -535,6 +536,132 @@ actions:
             {"action": "localization.list_actions"},
             json.loads(sent_step["hookPayloadJson"]),
         )
+
+    def test_scenario_run_normalizes_poll_until_operation_payloads_before_unity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir) / "FakeProject"
+            project_root.mkdir()
+            invoke_calls: list[tuple[str, dict[str, object], int]] = []
+
+            def fake_invoke_bridge(
+                project_root_value: str,
+                operation: str,
+                operation_args: dict[str, object],
+                timeout_ms: int,
+            ) -> dict[str, object]:
+                invoke_calls.append((operation, dict(operation_args), timeout_ms))
+                return {
+                    "status": "ok",
+                    "payload_type": "unity.scenario.run",
+                    "payload_json": json.dumps(
+                        {
+                            "project_root": str(project_root),
+                            "run_id": "run-poll",
+                            "scenario_name": "PollUntilSmoke",
+                            "status": "queued",
+                        }
+                    ),
+                }
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+            ):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 230,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_scenario_run",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "scenario": {
+                                    "name": "PollUntilSmoke",
+                                    "steps": [
+                                        {
+                                            "stepId": "flow",
+                                            "operation": "project_defined_hook_poll_until",
+                                            "hookName": "example.ui_smoke",
+                                            "startPayload": {"action": "start_flow"},
+                                            "pollPayload": {"action": "snapshot_flow"},
+                                            "passWhen": "payload.status == 'passed'",
+                                            "failWhen": "payload.status == 'failed'",
+                                            "continueWhen": "payload.status == 'running'",
+                                            "intervalSeconds": 2,
+                                            "timeoutSeconds": 180,
+                                        }
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual(1, len(invoke_calls))
+        operation, scenario_args, _ = invoke_calls[0]
+        self.assertEqual("unity.scenario.run", operation)
+        step = scenario_args["scenario"]["steps"][0]
+        self.assertEqual("project_defined_hook_poll_until", step["kind"])
+        self.assertEqual({"action": "start_flow"}, json.loads(step["startPayloadJson"]))
+        self.assertEqual({"action": "snapshot_flow"}, json.loads(step["pollPayloadJson"]))
+        self.assertNotIn("startPayload", step)
+        self.assertNotIn("pollPayload", step)
+
+    def test_scenario_summary_promotes_poll_until_terminal_fields_and_cleanup(self) -> None:
+        summary = server_summaries.build_scenario_result_summary(
+            {
+                "project_root": "/tmp/FakeProject",
+                "run_id": "run-poll",
+                "scenario_name": "PollUntilSmoke",
+                "status": "failed",
+                "cleanup_start_index": 1,
+                "steps": [
+                    {
+                        "stepId": "flow",
+                        "kind": "project_defined_hook_poll_until",
+                        "status": "failed",
+                        "outcome": "hook_poll_until_failed",
+                        "hook_name": "example.ui_smoke",
+                        "terminal_status": "failed",
+                        "failure_class": "product",
+                        "poll_count": 3,
+                        "promote_payload_fields": ["status", "failure_class", "selected_tab", "api_token"],
+                        "payload_json": json.dumps(
+                            {
+                                "status": "failed",
+                                "failure_class": "product",
+                                "selected_tab": "Store",
+                                "api_token": "do-not-surface",
+                            }
+                        ),
+                        "terminal_screenshot_payload_json": json.dumps({"file_path": "/tmp/smoke.png"}),
+                        "error_code": "ui_assertion_failed",
+                    },
+                    {
+                        "stepId": "cleanup",
+                        "kind": "project_defined_hook",
+                        "status": "passed",
+                        "outcome": "hook_succeeded",
+                        "hook_name": "example.ui_smoke",
+                        "payload_json": json.dumps({"status": "cleaned"}),
+                    },
+                ],
+            },
+            {"passed", "failed"},
+        )
+
+        hook_summary = summary["project_defined_hook_summary"]["hooks"][0]
+        self.assertEqual("project_defined_hook_poll_until", hook_summary["kind"])
+        self.assertEqual("failed", hook_summary["terminal_status"])
+        self.assertEqual("product", hook_summary["failure_class"])
+        self.assertEqual(3, hook_summary["poll_count"])
+        self.assertEqual("Store", hook_summary["promoted_payload_scalars"]["selected_tab"])
+        self.assertNotIn("api_token", hook_summary["promoted_payload_scalars"])
+        self.assertEqual("/tmp/smoke.png", hook_summary["screenshot_path"])
+        self.assertEqual("passed", summary["cleanup_summary"]["cleanup_result"])
 
     def test_scenario_project_action_steps_accept_payload_json_escape_hatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

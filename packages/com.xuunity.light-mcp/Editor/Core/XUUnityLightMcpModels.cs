@@ -858,6 +858,7 @@ namespace XUUnity.LightMcp.Editor.Core
     {
         public string stepId = "";
         public string kind = "";
+        public string operation = "";
         public string[] dependsOn = null;
         public string[] runIfStepPassed = null;
         public string action = "";
@@ -895,6 +896,16 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool rerunHealthProbe = true;
         public string hookName = "";
         public string hookPayloadJson = "";
+        public string startPayloadJson = "";
+        public string pollPayloadJson = "";
+        public string passWhen = "";
+        public string failWhen = "";
+        public string continueWhen = "";
+        public double intervalSeconds = 2.0d;
+        public string[] promotePayloadFields = null;
+        public bool terminalScreenshot;
+        public bool terminalConsoleTail;
+        public bool continueToCleanupOnFail;
         public string actionId = "";
         public string projectAction = "";
         public string payloadJson = "";
@@ -961,6 +972,12 @@ namespace XUUnity.LightMcp.Editor.Core
         public string outcome = "";
         public string hook_name = "";
         public string payload_json = "";
+        public string terminal_status = "";
+        public string failure_class = "";
+        public int poll_count;
+        public string[] promote_payload_fields = null;
+        public string terminal_screenshot_payload_json = "";
+        public string terminal_console_tail_payload_json = "";
         public string error_code = "";
         public string error_message = "";
         public double duration_seconds;
@@ -981,6 +998,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public string updated_at_utc = "";
         public string completed_at_utc = "";
         public string result_path = "";
+        public int cleanup_start_index = -1;
         public int total_steps;
         public int passed_steps;
         public int failed_steps;
@@ -1015,6 +1033,10 @@ namespace XUUnity.LightMcp.Editor.Core
         public string pendingNestedResponseErrorCode = "";
         public string pendingNestedResponseErrorMessage = "";
         public int pendingNestedStableTickCount;
+        public string pollUntilStartedAtUtc = "";
+        public string pollUntilDeadlineUtc = "";
+        public string pollUntilNextPollUtc = "";
+        public int pollUntilPollCount;
         public List<XUUnityLightMcpScenarioStepResult> steps = new();
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using UnityEditor.TestTools.TestRunner.Api;
@@ -6,6 +7,7 @@ using UnityEngine;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Helpers;
 using XUUnity.LightMcp.Editor.Operations;
+using XUUnity.LightMcp.Editor.ScenarioHooks;
 
 namespace XUUnity.LightMcp.Tests.EditMode
 {
@@ -197,6 +199,158 @@ namespace XUUnity.LightMcp.Tests.EditMode
             }
         }
 
+        [Test]
+        public void ScenarioProjectActionNormalizer_ExpandsPollUntilOperationPayloads()
+        {
+            var argsJson = "{\"scenario\":{\"name\":\"poll_until\",\"steps\":[{\"stepId\":\"flow\",\"operation\":\"project_defined_hook_poll_until\",\"hookName\":\"example.ui_smoke\",\"startPayload\":{\"action\":\"start_flow\"},\"pollPayload\":{\"action\":\"snapshot_flow\"},\"passWhen\":\"payload.status == 'passed'\",\"failWhen\":\"payload.status == 'failed'\",\"continueWhen\":\"payload.status == 'running'\",\"intervalSeconds\":2,\"timeoutSeconds\":180}]}}";
+
+            var normalized = XUUnityLightMcpScenarioProjectActionNormalizer.TryNormalizeArgsJson(
+                argsJson,
+                out var normalizedArgsJson,
+                out var errorCode,
+                out var errorMessage);
+
+            Assert.That(normalized, Is.True, $"{errorCode}: {errorMessage}");
+            var args = JsonUtility.FromJson<XUUnityLightMcpScenarioValidateArgs>(normalizedArgsJson);
+            var step = args.scenario.steps[0];
+            Assert.That(step.kind, Is.EqualTo("project_defined_hook_poll_until"));
+            Assert.That(step.startPayloadJson, Does.Contain("\"action\":\"start_flow\""));
+            Assert.That(step.pollPayloadJson, Does.Contain("\"action\":\"snapshot_flow\""));
+        }
+
+        [Test]
+        public void ScenarioRunner_PollUntilPassesAfterRepeatedRunningPolls()
+        {
+            XUUnityLightMcpSyntheticPollUntilHook.Reset("passed_after_two_running_polls");
+            var scenario = new XUUnityLightMcpScenarioDefinition
+            {
+                name = "synthetic_poll_until_pass",
+                steps = new List<XUUnityLightMcpScenarioStepDefinition>
+                {
+                    new()
+                    {
+                        stepId = "flow",
+                        kind = "project_defined_hook_poll_until",
+                        hookName = XUUnityLightMcpSyntheticPollUntilHook.Name,
+                        startPayloadJson = "{\"action\":\"start_flow\"}",
+                        pollPayloadJson = "{\"action\":\"snapshot_flow\"}",
+                        passWhen = "payload.status == 'passed'",
+                        failWhen = "payload.status == 'failed'",
+                        continueWhen = "payload.status == 'running'",
+                        intervalSeconds = 0.0d,
+                        timeoutSeconds = 5.0d,
+                        promotePayloadFields = new[] { "status", "selected_tab", "user_path" },
+                    },
+                },
+            };
+
+            var queued = XUUnityLightMcpScenarioRunner.QueueRun(scenario);
+            TickScenarioUntilIdle();
+
+            Assert.That(XUUnityLightMcpScenarioRunner.TryReadResult(queued.run_id, "", out var payload, out var errorCode, out var errorMessage), Is.True, $"{errorCode}: {errorMessage}");
+            Assert.That(payload.status, Is.EqualTo("passed"));
+            Assert.That(payload.steps[0].status, Is.EqualTo("passed"));
+            Assert.That(payload.steps[0].poll_count, Is.EqualTo(3));
+            Assert.That(payload.steps[0].payload_json, Does.Contain("\"status\":\"passed\""));
+        }
+
+        [Test]
+        public void ScenarioRunner_PollUntilFailureContinuesToCleanup()
+        {
+            XUUnityLightMcpSyntheticPollUntilHook.Reset("failed_terminal");
+            var scenario = new XUUnityLightMcpScenarioDefinition
+            {
+                name = "synthetic_poll_until_fail_cleanup",
+                stopOnFirstFailure = true,
+                steps = new List<XUUnityLightMcpScenarioStepDefinition>
+                {
+                    new()
+                    {
+                        stepId = "flow",
+                        kind = "project_defined_hook_poll_until",
+                        hookName = XUUnityLightMcpSyntheticPollUntilHook.Name,
+                        startPayloadJson = "{\"action\":\"start_flow\"}",
+                        pollPayloadJson = "{\"action\":\"snapshot_flow\"}",
+                        passWhen = "payload.status == 'passed'",
+                        failWhen = "payload.status == 'failed'",
+                        continueWhen = "payload.status == 'running'",
+                        intervalSeconds = 0.0d,
+                        timeoutSeconds = 5.0d,
+                        continueToCleanupOnFail = true,
+                    },
+                },
+                cleanupSteps = new List<XUUnityLightMcpScenarioStepDefinition>
+                {
+                    new()
+                    {
+                        stepId = "cleanup",
+                        kind = "project_defined_hook",
+                        hookName = XUUnityLightMcpSyntheticPollUntilHook.Name,
+                        hookPayloadJson = "{\"action\":\"cleanup\"}",
+                    },
+                },
+            };
+
+            var queued = XUUnityLightMcpScenarioRunner.QueueRun(scenario);
+            TickScenarioUntilIdle();
+
+            Assert.That(XUUnityLightMcpScenarioRunner.TryReadResult(queued.run_id, "", out var payload, out var errorCode, out var errorMessage), Is.True, $"{errorCode}: {errorMessage}");
+            Assert.That(payload.status, Is.EqualTo("failed"));
+            Assert.That(payload.steps[0].status, Is.EqualTo("failed"));
+            Assert.That(payload.steps[0].failure_class, Is.EqualTo("product"));
+            Assert.That(payload.steps[1].status, Is.EqualTo("passed"));
+            Assert.That(XUUnityLightMcpSyntheticPollUntilHook.CleanupCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ScenarioRunner_PollUntilTimeoutKeepsLatestPayload()
+        {
+            XUUnityLightMcpSyntheticPollUntilHook.Reset("always_running");
+            var scenario = new XUUnityLightMcpScenarioDefinition
+            {
+                name = "synthetic_poll_until_timeout",
+                steps = new List<XUUnityLightMcpScenarioStepDefinition>
+                {
+                    new()
+                    {
+                        stepId = "flow",
+                        kind = "project_defined_hook_poll_until",
+                        hookName = XUUnityLightMcpSyntheticPollUntilHook.Name,
+                        startPayloadJson = "{\"action\":\"start_flow\"}",
+                        pollPayloadJson = "{\"action\":\"snapshot_flow\"}",
+                        passWhen = "payload.status == 'passed'",
+                        failWhen = "payload.status == 'failed'",
+                        continueWhen = "payload.status == 'running'",
+                        intervalSeconds = 0.0d,
+                        timeoutSeconds = 2.0d,
+                    },
+                },
+            };
+
+            var queued = XUUnityLightMcpScenarioRunner.QueueRun(scenario);
+            XUUnityLightMcpScenarioRunner.Tick();
+            XUUnityLightMcpScenarioRunner.Tick();
+            System.Threading.Thread.Sleep(2500);
+            TickScenarioUntilIdle();
+
+            Assert.That(XUUnityLightMcpScenarioRunner.TryReadResult(queued.run_id, "", out var payload, out var errorCode, out var errorMessage), Is.True, $"{errorCode}: {errorMessage}");
+            Assert.That(payload.status, Is.EqualTo("failed"));
+            Assert.That(payload.steps[0].error_code, Is.EqualTo("project_hook_poll_until_timeout"));
+            Assert.That(payload.steps[0].terminal_status, Is.EqualTo("timeout"));
+            Assert.That(payload.steps[0].payload_json, Does.Contain("\"status\":\"running\""));
+            Assert.That(payload.steps[0].payload_json, Does.Contain("\"poll_count\":1"));
+        }
+
+        static void TickScenarioUntilIdle()
+        {
+            for (var i = 0; i < 20 && XUUnityLightMcpScenarioRunner.HasActiveRun(); i++)
+            {
+                XUUnityLightMcpScenarioRunner.Tick();
+            }
+
+            Assert.That(XUUnityLightMcpScenarioRunner.HasActiveRun(), Is.False);
+        }
+
         static string WriteTemporaryProjectActionCatalog()
         {
             var catalogPath = Path.Combine(Path.GetTempPath(), $"xuunity_project_actions_{Guid.NewGuid():N}.yaml");
@@ -214,6 +368,63 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 + "    mutates:\n"
                 + "      - repo-level localization pipeline reports\n");
             return catalogPath;
+        }
+    }
+
+    public sealed class XUUnityLightMcpSyntheticPollUntilHook : IXUUnityLightMcpScenarioHook
+    {
+        public const string Name = "xuunity.synthetic_poll_until";
+        static string s_mode = "passed_after_two_running_polls";
+        static int s_pollCount;
+        public static int CleanupCount { get; private set; }
+
+        public string HookName => Name;
+
+        public static void Reset(string mode)
+        {
+            s_mode = mode;
+            s_pollCount = 0;
+            CleanupCount = 0;
+        }
+
+        public XUUnityLightMcpScenarioHookResult Execute(string payloadJson)
+        {
+            if ((payloadJson ?? "").Contains("\"action\":\"cleanup\""))
+            {
+                CleanupCount++;
+                return new XUUnityLightMcpScenarioHookResult
+                {
+                    outcome = "cleanup_done",
+                    payload_json = "{\"status\":\"cleaned\"}",
+                };
+            }
+
+            if ((payloadJson ?? "").Contains("\"action\":\"start_flow\""))
+            {
+                s_pollCount = 0;
+                return new XUUnityLightMcpScenarioHookResult
+                {
+                    outcome = "flow_started",
+                    payload_json = "{\"status\":\"running\"}",
+                };
+            }
+
+            s_pollCount++;
+            if (s_mode == "failed_terminal")
+            {
+                return new XUUnityLightMcpScenarioHookResult
+                {
+                    outcome = "flow_failed",
+                    payload_json = "{\"status\":\"failed\",\"failure_class\":\"product\",\"selected_tab\":\"Store\",\"user_path\":\"open_store\"}",
+                };
+            }
+
+            var status = s_mode == "always_running" || s_pollCount < 3 ? "running" : "passed";
+            return new XUUnityLightMcpScenarioHookResult
+            {
+                outcome = $"flow_{status}",
+                payload_json = $"{{\"status\":\"{status}\",\"poll_count\":{s_pollCount},\"selected_tab\":\"Store\",\"user_path\":\"open_store\"}}",
+            };
         }
     }
 }
