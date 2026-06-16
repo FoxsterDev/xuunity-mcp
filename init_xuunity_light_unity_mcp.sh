@@ -614,6 +614,12 @@ os.execv(python_bin, [python_bin, central_server] + sys.argv[1:])
 EOF
     chmod 644 "$target_dir/server.py"
   fi
+
+  # Keep client-local metadata aligned for verifiers and humans inspecting the
+  # delegate directory. Runtime launches delegate to the neutral install, but
+  # stale package metadata here is misleading after a package bump.
+  run mkdir -p "$target_dir/packages/com.xuunity.light-mcp"
+  copy_if_needed "$package_metadata_source" "$target_dir/packages/com.xuunity.light-mcp/package.json" 644
 }
 
 run mkdir -p "$codex_home"

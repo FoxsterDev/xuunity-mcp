@@ -39,6 +39,8 @@ MUST:
 - verify the target release tag before mutating project manifests;
 - keep the canonical Git UPM URL as `https://github.com/FoxsterDev/xuunity-mcp.git`;
 - refresh installed host helpers in the same closeout;
+- verify helper package metadata in the neutral install and in any client
+  delegate install directories that exist, such as Codex or Claude tools;
 - validate after manifests and locks are in their final form;
 - report lane type honestly, including GUI fallback;
 - end with a compact manifest/lock/helper/validation summary.
@@ -142,7 +144,9 @@ secondary to a trustworthy validation claim.
 
 4. Update or let Unity regenerate the matching `packages-lock.json` entry.
 5. Refresh installed host helpers from the same source checkout.
-6. Verify host helper package metadata reports the target version.
+6. Verify host helper package metadata reports the target version. Include the
+   neutral install and any existing Codex or Claude delegate install directories
+   because old full installs may have left inspectable metadata there.
 7. Run the approved MCP compile validation lane:
    - use multi-project batch validation with explicit `--parallelism` when
      validating a portfolio;
@@ -170,7 +174,8 @@ The fast path is complete only when all of these are true:
 - every touched lock entry exists and matches the target version;
 - every touched lock entry has `source: git`;
 - every touched lock entry hash matches the target release commit;
-- installed helper metadata reports the same package version;
+- installed helper metadata reports the same package version in the neutral
+  install and any existing client delegate install directories;
 - package refresh or compile evidence was produced after the final lock state;
 - validation totals are available as a compact summary;
 - any GUI fallback, missing lock regeneration, or skipped validation is reported
