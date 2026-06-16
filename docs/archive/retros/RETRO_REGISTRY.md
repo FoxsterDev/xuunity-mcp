@@ -40,6 +40,8 @@ host-local registry.
 | undated | `xuunity_mcp_chat_retro.md` | general MCP chat retro | legacy needs triage | Legacy retro has priority improvements that should be checked for implemented/superseded status. |
 | undated | `xuunity_mcp_install_retro.md` | general MCP install retro | legacy hygiene/status triage | Legacy install retro should be reviewed for current public-safety and implemented/superseded status. |
 
+> Still actual (re-confirmed 2026-06-16): the response-envelope / token-efficiency backlog in `2026-06-02_token_efficiency_response_envelope_retro.md` and `2026-06-11_token_accounting_and_fast_path_retro.md` remains open. A clean validation session re-observed that the calm-path tool responses are still dominated by duplicated full `_xuunity_lifecycle` bridge snapshots, while the actionable signal per call is a few fields. Treat compact/signal-first responses as still-pending, not implemented.
+
 ## Completed Public History
 
 | Date | File | Scope | Registry Status | Notes |
