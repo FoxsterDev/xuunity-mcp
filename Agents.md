@@ -34,6 +34,13 @@ Use it when a session starts from this MCP repo, or when a host repo task target
 If this repo is used outside `AIFoxsterDevHub`, skip missing host paths and use
 this router plus the local docs as the source of truth.
 
+## Entrypoint Contract
+- A selected router, protocol entrypoint, or start-session file is atomic context: load it from first line through EOF before applying it.
+- A partial read, summary, excerpt, search hit, or fixed line window is not valid entrypoint loading.
+- Keep default-loaded entrypoints small: target 150-220 lines; split by 300 lines.
+- Put detailed rules, command catalogs, and matrices in explicitly routed owner files.
+- Longer knowledge, review, skill, and reference files are valid only when trigger-loaded; they are not default entrypoints.
+
 ## Routing Rules
 - For any task involving process management (process listing, checking liveness, or terminating processes/editors), load the safe process management skill: [SKILL.md](skills/safe_process_management/SKILL.md).
 - For any task that writes or edits bash scripts, the shell wrapper, `templates/run.sh`, `scripts/testing/*.sh`, CI workflows, or tests that spawn shell processes — and for any failure that reproduces only on the Windows CI leg or only in CI — load the cross-platform shell skill: [SKILL.md](skills/cross_platform_shell/SKILL.md). Windows Git Bash support is a hard compatibility requirement for every shell change.
