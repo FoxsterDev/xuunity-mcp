@@ -423,7 +423,13 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertEqual(repo_root.resolve(), Path((neutral_dir / ".source_root").read_text(encoding="utf-8").strip()).resolve())
 
             config_text = (codex_home / "config.toml").read_text(encoding="utf-8")
-            self.assertIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
+            if env.get("OS") == "Windows_NT" or env.get("APPDATA") or os.name == "nt":
+                self.assertIn('command = "cmd.exe"', config_text)
+                self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", config_text)
+                self.assertNotIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
+            else:
+                self.assertIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
+                self.assertNotIn('command = "cmd.exe"', config_text)
             self.assertNotIn("/xuunity-mcp/run.sh", config_text)
 
     def test_init_registers_native_windows_codex_config_on_windows_like_host(self) -> None:
