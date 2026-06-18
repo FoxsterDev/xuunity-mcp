@@ -1,7 +1,7 @@
 # Install XUUnity Light Unity MCP
 
 Date: `2026-05-23`
-Status: `current for v0.3.29`
+Status: `current for v0.3.30`
 
 XUUnity Light Unity MCP has two pieces:
 
@@ -108,7 +108,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.29"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.30"
   }
 }
 ```
@@ -188,6 +188,22 @@ bash xuunity_light_unity_mcp.sh setup-apply \
 bash xuunity_light_unity_mcp.sh validate-setup \
   --project-root /path/to/UnityProject
 ```
+
+Native Windows quickstart from `cmd.exe`:
+
+```bat
+xuunity_light_unity_mcp.cmd setup-plan --project-root "C:\path with spaces\UnityProject" > "%TEMP%\xuunity-setup-plan.json"
+
+REM Stop here. Review the plan with the user before continuing.
+xuunity_light_unity_mcp.cmd setup-apply --plan-file "%TEMP%\xuunity-setup-plan.json" --project-root "C:\path with spaces\UnityProject" --yes
+xuunity_light_unity_mcp.cmd validate-setup --project-root "C:\path with spaces\UnityProject"
+xuunity_light_unity_mcp.cmd ensure-ready --project-root "C:\path with spaces\UnityProject" --open-editor
+```
+
+Quote every `--project-root` and `--workspace-root` value on Windows. Prefer
+the `.cmd` launcher for setup; `.ps1` can be blocked by PowerShell
+ExecutionPolicy, and Git Bash is not the recommended native Windows setup route
+for project paths containing spaces.
 
 For a flat multi-project hub, mixed Unity versions, or nested repositories,
 scan first and then apply only to the approved Unity project roots:
@@ -459,7 +475,7 @@ If those checks succeed but a later compile or test run fails, treat that as a
 Unity project or runtime failure unless the error explicitly points back to
 bridge readiness, package import, or unsupported capability.
 
-For package-level verification after upgrading to `v0.3.29`, run:
+For package-level verification after upgrading to `v0.3.30`, run:
 
 ```bash
 templates/smoke/run_package_self_tests.sh \

@@ -234,6 +234,23 @@ bash xuunity_light_unity_mcp.sh validate-setup \
   --project-root /path/to/UnityProject
 ```
 
+Native Windows quickstart from `cmd.exe` uses the `.cmd` launcher and quoted
+project paths:
+
+```bat
+xuunity_light_unity_mcp.cmd setup-plan --project-root "C:\path with spaces\UnityProject" > "%TEMP%\xuunity-setup-plan.json"
+
+REM Stop here. Review the plan with the user before continuing.
+xuunity_light_unity_mcp.cmd setup-apply --plan-file "%TEMP%\xuunity-setup-plan.json" --project-root "C:\path with spaces\UnityProject" --yes
+xuunity_light_unity_mcp.cmd validate-setup --project-root "C:\path with spaces\UnityProject"
+xuunity_light_unity_mcp.cmd ensure-ready --project-root "C:\path with spaces\UnityProject" --open-editor
+```
+
+On native Windows, prefer `.cmd` for setup commands. PowerShell `.ps1` wrappers
+can be blocked by ExecutionPolicy, and Git Bash is not the recommended setup
+route because native Windows paths with spaces can cross an extra shell
+argument boundary before Python receives them.
+
 For flat hubs, mixed-version hubs, or nested repositories, scan the workspace
 first and require an explicit target selection before `setup-apply`:
 
@@ -437,7 +454,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.29
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.30
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -445,7 +462,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.29"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.30"
   }
 }
 ```

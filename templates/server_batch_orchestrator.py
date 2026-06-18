@@ -379,6 +379,8 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "request_final_status",
         "journal_event_path",
         "recommended_recovery_command",
+        "package_import_state",
+        "package_import_diagnosis",
         "live_project_editor_pids",
         "batch_summary_file",
         "batch_failure_summary",
@@ -2817,4 +2819,3 @@ wrap_globals_with_proxies(globals(), [
     "call_unity_artifact_write_report_tool",
 ])
 time = TimeProxy()
-

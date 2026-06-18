@@ -108,7 +108,7 @@ class LauncherFlavorParityTests(unittest.TestCase):
     def test_setup_plan_contract_across_flavors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
-            project_root = temp_root / "FakeProject"
+            project_root = temp_root / "Unity Projects" / "Fake Project"
             (project_root / "Assets").mkdir(parents=True)
             (project_root / "Packages").mkdir(parents=True)
             (project_root / "ProjectSettings").mkdir(parents=True)
@@ -131,6 +131,7 @@ class LauncherFlavorParityTests(unittest.TestCase):
             self.assertEqual(0, results["sh"][0], results["sh"][2])
             plan = json.loads(results["sh"][1])
             self.assertEqual("setup_plan", plan["action"])
+            self.assertEqual([str(project_root.resolve())], plan["requested_project_roots"])
 
 
 if __name__ == "__main__":

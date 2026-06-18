@@ -9,7 +9,7 @@ from typing import Any
 
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.29",
+    "version": "0.3.30",
 }
 PROTOCOL_VERSION = "2025-06-18"
 
@@ -54,6 +54,7 @@ from server_bridge_runtime import (
 from server_discovery import discover_project_context_state
 from server_project_context import (
     ensure_project_root as ensure_project_root_base,
+    inspect_light_mcp_import_state,
     inspect_package_dependency_alignment,
 )
 from server_host_platform import current_host_platform_adapter

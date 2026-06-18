@@ -125,6 +125,7 @@ from server_project_actions import (
 from server_project_context import (
     find_repo_local_package_source,
     find_latest_request_event,
+    inspect_light_mcp_import_state,
     inspect_package_dependency_alignment,
 )
 from server_test_reporting import (
@@ -1206,11 +1207,14 @@ def cmd_open_editor(args):
 def cmd_ensure_ready(args):
     project_root = ensure_project_root(args.project_root)
     log_path = resolve_editor_log_path(project_root, args.editor_log_path)
+    package_import_state_before_ready = inspect_light_mcp_import_state(project_root)
 
     payload: dict[str, Any] = {
         "project_root": str(project_root),
         "editor_log_path": str(log_path),
         "startup_policy": args.startup_policy,
+        "package_import_state": package_import_state_before_ready,
+        "package_import_state_before_ready": package_import_state_before_ready,
     }
     payload["discovery"] = build_project_discovery_report(project_root)
 
@@ -1243,7 +1247,39 @@ def cmd_ensure_ready(args):
     except ToolInvocationError as exc:
         if str(exc.details.get("fail_fast_reason") or "") == "ensure_ready_without_open_editor_offline":
             raise
-        raise enrich_tool_invocation_error_with_discovery(project_root, exc)
+        details = dict(exc.details or {})
+        package_import_state = inspect_light_mcp_import_state(project_root)
+        details["package_import_state"] = package_import_state
+        import_state = str(package_import_state.get("import_state") or "")
+        discovery = build_project_discovery_report(project_root)
+        live_editor_pids: list[int] = []
+        for pid_value in discovery.get("detected_editor_pids") or discovery.get("live_project_editor_pids") or []:
+            try:
+                pid = int(pid_value or 0)
+            except (TypeError, ValueError):
+                continue
+            if pid > 0:
+                live_editor_pids.append(pid)
+        bridge_state_present = bool(package_import_state.get("bridge_state_present")) or bool(
+            current_project_context_bridge_state(project_root)
+        )
+        if (
+            args.open_editor
+            and import_state in {"declared_not_resolved", "resolved_not_cached"}
+            and live_editor_pids
+            and not bridge_state_present
+        ):
+            details["package_import_diagnosis"] = "package_declared_not_imported"
+            details["recommended_next_action"] = "reopen_project_for_clean_resolve"
+            details["next_distinct_action"] = "close_and_reopen_unity_to_resolve_package"
+            details["recommended_recovery_command"] = (
+                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor"
+            )
+            details["live_project_editor_pids"] = live_editor_pids
+        raise enrich_tool_invocation_error_with_discovery(
+            project_root,
+            ToolInvocationError(exc.code, exc.message, details),
+        )
 
     payload["bridge_state"] = state
     if payload.get("launch") and not bool(payload["launch"].get("reused_existing_editor")):
@@ -1251,6 +1287,8 @@ def cmd_ensure_ready(args):
     refresh_project_context(project_root)
     payload["discovery_after_ready"] = build_project_discovery_report(project_root)
     payload["package_dependency"] = inspect_package_dependency_alignment(project_root)
+    payload["package_import_state"] = inspect_light_mcp_import_state(project_root)
+    payload["package_import_state_after_ready"] = payload["package_import_state"]
     print_json(payload)
 
 
@@ -1974,6 +2012,7 @@ wrap_globals_with_proxies(globals(), [
     "enrich_tool_invocation_error_with_discovery",
     "ensure_project_root",
     "heartbeat_age_seconds",
+    "inspect_light_mcp_import_state",
     "invoke_bridge",
     "list_live_project_editor_pids",
     "open_unity_editor",

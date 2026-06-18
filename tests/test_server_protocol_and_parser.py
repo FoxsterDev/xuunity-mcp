@@ -1211,6 +1211,58 @@ actions:
         )
         wait_mock.assert_not_called()
 
+    def test_ensure_ready_timeout_reports_unresolved_package_import_state(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            open_editor=True,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+        )
+        discovery = {
+            "reconciliation_case": "live_process_only",
+            "reconciliation_status": "degraded",
+            "detected_editor_count": 1,
+            "detected_editor_pids": [2468],
+        }
+        import_state = {
+            "package_name": "com.xuunity.light-mcp",
+            "manifest_declared": True,
+            "manifest_dependency": "https://example.invalid/repo.git#abc123",
+            "lock_entry_present": False,
+            "package_cache_present": False,
+            "bridge_state_present": False,
+            "import_state": "declared_not_resolved",
+        }
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "resolve_editor_log_path", return_value=Path("/tmp/editor.log")),
+            mock.patch.object(server, "build_project_discovery_report", return_value=discovery),
+            mock.patch.object(server, "current_project_context_bridge_state", return_value={}),
+            mock.patch.object(server, "inspect_light_mcp_import_state", return_value=import_state),
+            mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/Applications/Unity.app")),
+            mock.patch.object(server, "open_unity_editor", return_value={"reused_existing_editor": True, "editor_pid": 2468}),
+            mock.patch.object(server, "enrich_tool_invocation_error_with_discovery", side_effect=lambda _, exc: exc),
+            mock.patch.object(
+                server,
+                "wait_for_ready",
+                side_effect=server.ToolInvocationError("editor_ready_timeout", "Timed out"),
+            ),
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_ensure_ready(args)
+
+        self.assertEqual("editor_ready_timeout", ctx.exception.code)
+        self.assertEqual(import_state, ctx.exception.details["package_import_state"])
+        self.assertEqual("package_declared_not_imported", ctx.exception.details["package_import_diagnosis"])
+        self.assertEqual("reopen_project_for_clean_resolve", ctx.exception.details["recommended_next_action"])
+        self.assertEqual("close_and_reopen_unity_to_resolve_package", ctx.exception.details["next_distinct_action"])
+        self.assertEqual([2468], ctx.exception.details["live_project_editor_pids"])
+
     def test_batch_editor_conflict_includes_concrete_recovery_command(self) -> None:
         project_root = Path("/tmp/FakeProject")
 

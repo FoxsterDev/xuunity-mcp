@@ -27,6 +27,22 @@ Use these values:
 | Environment variable | `CODEX_TOOLS_HOME=/path/to/.codex-tools` if you do not want the default `$HOME/.codex-tools` |
 | Working directory | `/path/to/trusted/workspace` |
 
+On native Windows, use these values instead:
+
+| Field | Value |
+| --- | --- |
+| Name | `xuunity_light_unity` |
+| Command to launch | `cmd.exe` |
+| Argument 1 | `/d` |
+| Argument 2 | `/c` |
+| Argument 3 | `if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")` |
+| Environment variable | `CODEX_TOOLS_HOME=C:\path\to\.codex-tools` if you do not want the default `%USERPROFILE%\.codex-tools` |
+| Working directory | `C:\path\to\trusted\workspace` |
+
+Prefer the `.cmd` launcher for native Windows. PowerShell `.ps1` wrappers can
+be blocked by ExecutionPolicy, and Git Bash is not the recommended setup route
+for quoted Unity project paths that contain spaces.
+
 ![Codex custom MCP command configuration](../assets/codex-custom-mcp-form.svg)
 
 The same setup in `~/.codex/config.toml` looks like this on Linux/macOS:
@@ -78,6 +94,12 @@ MCP server yet, ask Codex to run the host helper checks first:
 
 ```text
 Run xuunity_light_unity_mcp.sh validate-setup for /path/to/UnityProject, then run ensure-ready, wait for it to finish, and check request-status-summary. After Codex can see the MCP server, check unity_status_summary.
+```
+
+On native Windows, ask for the `.cmd` helper explicitly:
+
+```text
+Run xuunity_light_unity_mcp.cmd validate-setup for "C:\path with spaces\UnityProject", then run ensure-ready, wait for it to finish, and check request-status-summary. After Codex can see the MCP server, check unity_status_summary.
 ```
 
 Run helper checks sequentially; do not start the status check before

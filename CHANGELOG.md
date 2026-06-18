@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+## 0.3.30
+
+Release tag: `v0.3.30`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.30
+```
+
+### Changed
+
+- Released `v0.3.30` package metadata, server metadata, package manifests, and Git UPM examples.
+- Native Windows Codex config generation now uses `cmd.exe` and
+  `run_installed_or_refresh_xuunity_mcp.cmd`; an existing Windows `bash` block
+  is reported as `windows_codex_launcher_mismatch` instead of duplicated.
+- Windows setup docs now prefer `.cmd`, quote project paths, and call out
+  PowerShell ExecutionPolicy risk for `.ps1`.
+- `validate-setup` now reports offline readiness scope and package import-state
+  evidence instead of presenting manifest/config validation as live Unity
+  readiness.
+
+### Fixed
+
+- Added raw/resolved project-root diagnostics and Windows launcher hints for
+  `project_not_found`, making path-with-spaces truncation diagnosable from one
+  error payload.
+- Added package import-state evidence to `ensure-ready` success and error
+  payloads. A declared-but-unresolved package with a live bridgeless editor now
+  recommends `reopen_project_for_clean_resolve` instead of generic editor
+  recovery.
+- Added an already-closed editor closeout fast path that clears stale host
+  session/bridge/test state without quit or terminate attempts when process
+  visibility proves no same-project editor is live.
+
+### Validation
+
+- Host Python suite: `243` tests passed on macOS, with one expected native
+  Windows `.cmd` smoke skipped on this host.
+
 ## 0.3.29
 
 Release tag: `v0.3.29`

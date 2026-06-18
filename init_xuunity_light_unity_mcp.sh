@@ -86,6 +86,21 @@ EOF
 done
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
+is_windows_like_host() {
+  if [[ "${OS:-}" == "Windows_NT" ]] || [[ -n "${APPDATA:-}" ]]; then
+    return 0
+  fi
+
+  local uname_sys
+  uname_sys="$(uname -s 2>/dev/null || echo "unknown")"
+  case "$uname_sys" in
+    MINGW*|MSYS*|CYGWIN*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 source_root_marker_path() {
   local source_path="$1"
   local uname_sys
@@ -265,18 +280,46 @@ file_contains_regex() {
   fi
 }
 
+file_mcp_block_contains_regex() {
+  local pattern="$1"
+  local file_path="$2"
+  awk -v pattern="$pattern" '
+    /^\[mcp_servers\.xuunity_light_unity\]/ { in_block = 1; next }
+    /^\[/ && in_block { exit }
+    in_block && $0 ~ pattern { found = 1; exit }
+    END { exit found ? 0 : 1 }
+  ' "$file_path"
+}
+
 append_codex_block_if_missing() {
   local block
   local codex_run_path_val="$codex_refresh_run_path"
+  local windows_cmd_args
   if [[ "$target" == "neutral" ]]; then
     codex_run_path_val="$neutral_refresh_run_path"
   fi
   block=$'[mcp_servers.xuunity_light_unity]\n'
-  block+=$'command = "bash"\n'
-  block+="args = [\"-lc\", \"exec \\\"$codex_run_path_val\\\"\"]"$'\n'
+  if is_windows_like_host; then
+    block+=$'command = "cmd.exe"\n'
+    if [[ "$target" == "neutral" ]]; then
+      windows_cmd_args='if defined XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR (call "%XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR%\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%APPDATA%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")'
+    else
+      windows_cmd_args='if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")'
+    fi
+    block+="args = ['/d', '/c', '$windows_cmd_args']"$'\n'
+  else
+    block+=$'command = "bash"\n'
+    block+="args = [\"-lc\", \"exec \\\"$codex_run_path_val\\\"\"]"$'\n'
+  fi
   block+=$'required = false\n'
 
   if [[ -f "$config_path" ]] && file_contains_regex '^\[mcp_servers\.xuunity_light_unity\]' "$config_path"; then
+    if is_windows_like_host && file_mcp_block_contains_regex '^[[:space:]]*command[[:space:]]*=[[:space:]]*"bash"' "$config_path"; then
+      {
+        printf 'windows_codex_launcher_mismatch: existing [mcp_servers.xuunity_light_unity] in %s uses bash on a Windows-like host.\n' "$config_path"
+        printf 'Recommended native Windows replacement block:\n%s' "$block"
+      } >&2
+    fi
     printf 'kept existing MCP config in %s\n' "$config_path"
     return
   fi

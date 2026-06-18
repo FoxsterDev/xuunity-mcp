@@ -102,6 +102,12 @@ If `~/.codex/config.toml` already contains
 `[mcp_servers.xuunity_light_unity]`, merge or verify the existing block instead
 of appending a duplicate entry.
 
+On native Windows, the installer writes a `cmd.exe` block that calls
+`run_installed_or_refresh_xuunity_mcp.cmd`. If an existing
+`[mcp_servers.xuunity_light_unity]` block still uses `bash`, the installer
+keeps it in place and reports `windows_codex_launcher_mismatch` with the
+merge-safe replacement block.
+
 ## Manual Config
 
 Add this to `~/.codex/config.toml` on Linux/macOS:
@@ -198,6 +204,18 @@ bash xuunity_light_unity_mcp.sh request-status-summary \
   --project-root /path/to/UnityProject \
   --timeout-ms 5000
 ```
+
+On native Windows, use `.cmd` and quote the project path:
+
+```bat
+xuunity_light_unity_mcp.cmd validate-setup --project-root "C:\path with spaces\UnityProject"
+xuunity_light_unity_mcp.cmd ensure-ready --project-root "C:\path with spaces\UnityProject" --open-editor
+xuunity_light_unity_mcp.cmd request-status-summary --project-root "C:\path with spaces\UnityProject" --timeout-ms 5000
+```
+
+Prefer `.cmd` for Windows setup and verification commands. PowerShell `.ps1`
+can be blocked by ExecutionPolicy, and Git Bash is not the recommended native
+Windows route for project paths containing spaces.
 
 Run these commands sequentially; do not run the status check before
 `ensure-ready` finishes. If the current Codex session does not hot-reload newly

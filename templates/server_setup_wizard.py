@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from server_core import ToolInvocationError, read_json, write_json
+from server_project_context import inspect_light_mcp_import_state, project_not_found_error
 
 LIGHT_MCP_PACKAGE_NAME = "com.xuunity.light-mcp"
 TEST_FRAMEWORK_PACKAGE_NAME = "com.unity.test-framework"
@@ -78,9 +79,10 @@ def is_unity_project_root(path: Path) -> bool:
 
 
 def normalize_project_root(path: str | Path) -> Path:
-    root = Path(path).expanduser().resolve()
+    raw_path = str(path)
+    root = Path(raw_path).expanduser().resolve()
     if not is_unity_project_root(root):
-        raise ToolInvocationError("project_not_found", f"Not a Unity project root: {root}")
+        raise project_not_found_error(raw_path, root)
     return root
 
 
@@ -1539,6 +1541,7 @@ def validate_setup(project_root: Path, *, include_tests: bool = False) -> dict[s
     unity_version = parse_unity_version(project_root)
     package_dependency = manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME)
     bridge_state = bridge_config_state(project_root)
+    import_state = inspect_light_mcp_import_state(project_root)
     tf_state = classify_test_framework_state(project_root, unity_version)
     blockers: list[str] = []
     if not package_dependency:
@@ -1547,16 +1550,24 @@ def validate_setup(project_root: Path, *, include_tests: bool = False) -> dict[s
         blockers.append("bridge_config_missing")
     if include_tests and not tf_state["supported"]:
         blockers.append("test_framework_unavailable")
+    offline_status = "ready" if not blockers else "blocked"
     return {
         "action": "validate_setup",
         "project_root": str(project_root),
         "unity_version": unity_version,
         "package_dependency_state": "declared" if package_dependency else "missing",
         "package_dependency": package_dependency,
+        "package_import_state": import_state,
         "bridge_config_state": bridge_state,
         "test_framework_state": tf_state,
         "test_capabilities_state": test_capabilities_state(tf_state),
-        "validation_status": "ready" if not blockers else "blocked",
+        "validation_status": offline_status,
+        "offline_validation_status": offline_status,
+        "readiness_scope": "offline_manifest_and_bridge_config_only",
+        "readiness_scope_note": (
+            "validate-setup does not prove Unity package resolution, package import, "
+            "or live bridge heartbeat; run ensure-ready --open-editor for live readiness."
+        ),
         "blockers": blockers,
     }
 

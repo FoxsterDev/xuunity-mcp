@@ -1367,6 +1367,34 @@ def restore_host_opened_editor_state(
         "close_path": "",
     }
 
+    already_closed_probe = verify_project_editor_closed(project_root, 0)
+    if bool(already_closed_probe.get("process_visibility_available")) and bool(
+        already_closed_probe.get("same_project_editor_closed")
+    ):
+        clear_host_editor_session_state(project_root)
+        restoration["stale_bridge_state_cleared"] = clear_stale_bridge_state(project_root)
+        restoration["stale_active_test_run_cleared"] = clear_stale_active_test_run_state(project_root)
+        restoration["stale_project_lock_state"] = clear_stale_project_lock(project_root)
+        restoration["restored"] = False
+        restoration["closeout_verified"] = True
+        restoration["process_exit_verified"] = True
+        restoration["same_project_editor_closed"] = True
+        restoration["closeout_classification"] = "tracked_editor_already_closed"
+        restoration["recommended_next_action"] = "none"
+        restoration["next_distinct_action"] = "rerun_closed_editor_batch_lane"
+        restoration["reason"] = "tracked_editor_already_closed"
+        restoration["close_path"] = "zero_time_process_probe"
+        restoration["editor_closed_verification"] = already_closed_probe
+        for key in (
+            "live_project_editor_pids",
+            "process_visibility_available",
+            "process_visibility_error_code",
+            "process_visibility_stderr",
+            "process_visibility_platform_kind",
+        ):
+            restoration[key] = already_closed_probe.get(key)
+        return restoration
+
     if current_pid > 0 and (tracked_pid <= 0 or current_pid == tracked_pid):
         restoration["quit_request_attempted"] = True
         try:

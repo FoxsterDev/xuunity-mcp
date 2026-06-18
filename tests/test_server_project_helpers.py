@@ -14,6 +14,7 @@ if str(TEMPLATES_DIR) not in sys.path:
 
 import server
 import server_editor_host
+import server_project_context
 from server_host_platform import HostPlatformAdapter
 from server_project_context import ensure_project_root as ensure_project_root_base
 from server_registry import BridgeRegistry
@@ -64,6 +65,66 @@ class ServerProjectHelperTests(unittest.TestCase):
 
             self.assertEqual("project_not_found", ctx.exception.code)
 
+    def test_ensure_project_root_windows_hint_includes_raw_and_resolved_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            invalid_root = Path(tmp_dir) / "Unity Projects" / "Not A Project"
+            invalid_root.mkdir(parents=True, exist_ok=True)
+
+            with (
+                mock.patch.dict("os.environ", {"OS": "Windows_NT", "APPDATA": str(Path(tmp_dir) / "Roaming")}),
+                self.assertRaises(ToolInvocationError) as ctx,
+            ):
+                ensure_project_root_base(str(invalid_root))
+
+        self.assertEqual("project_not_found", ctx.exception.code)
+        self.assertEqual(str(invalid_root), ctx.exception.details["raw_project_root"])
+        self.assertEqual(str(invalid_root.resolve()), ctx.exception.details["resolved_project_root"])
+        self.assertEqual("cmd", ctx.exception.details["recommended_launcher_flavor"])
+        self.assertIn("quote --project-root", ctx.exception.details["windows_launcher_hint"])
+
+    def test_inspect_light_mcp_import_state_tracks_lock_cache_and_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = make_unity_project(Path(tmp_dir) / "Project")
+            write_json(
+                project_root / "Packages" / "manifest.json",
+                {"dependencies": {"com.xuunity.light-mcp": "https://example.invalid/repo.git#abc123"}},
+            )
+
+            declared = server_project_context.inspect_light_mcp_import_state(project_root)
+            self.assertEqual("declared_not_resolved", declared["import_state"])
+            self.assertTrue(declared["manifest_declared"])
+            self.assertFalse(declared["lock_entry_present"])
+
+            write_json(
+                project_root / "Packages" / "packages-lock.json",
+                {
+                    "dependencies": {
+                        "com.xuunity.light-mcp": {
+                            "version": "https://example.invalid/repo.git#abc123",
+                            "hash": "abc123",
+                            "source": "git",
+                        }
+                    }
+                },
+            )
+            resolved = server_project_context.inspect_light_mcp_import_state(project_root)
+            self.assertEqual("resolved_not_cached", resolved["import_state"])
+            self.assertTrue(resolved["lock_entry_present"])
+            self.assertEqual("abc123", resolved["lock_hash"])
+
+            (project_root / "Library" / "PackageCache" / "com.xuunity.light-mcp@abc123").mkdir(parents=True)
+            cached = server_project_context.inspect_light_mcp_import_state(project_root)
+            self.assertEqual("cached_without_bridge_state", cached["import_state"])
+            self.assertTrue(cached["package_cache_present"])
+
+            write_json(
+                project_root / "Library" / "XUUnityLightMcp" / "state" / "bridge_state.json",
+                {"editor_pid": 1234, "health_status": "ready"},
+            )
+            imported = server_project_context.inspect_light_mcp_import_state(project_root)
+            self.assertEqual("imported_or_bridge_state_present", imported["import_state"])
+            self.assertTrue(imported["bridge_state_present"])
+
     def test_open_unity_editor_reuses_recent_host_launch_in_progress(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             project_root = make_unity_project(Path(tmp_dir) / "MyProject")
@@ -92,6 +153,40 @@ class ServerProjectHelperTests(unittest.TestCase):
             self.assertTrue(result["launch_in_progress"])
             run_mock.assert_not_called()
             popen_mock.assert_not_called()
+
+    def test_restore_host_opened_editor_state_fast_paths_already_closed_editor(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = make_unity_project(Path(tmp_dir) / "MyProject")
+            server_editor_host.write_host_editor_session_state(
+                project_root,
+                {"opened_by_host": True, "editor_pid": 9876},
+            )
+            session_path = server_editor_host.host_editor_session_state_path(project_root)
+
+            with (
+                mock.patch.object(server_editor_host, "try_read_live_editor_state", return_value=None),
+                mock.patch.object(server_editor_host, "list_live_project_editor_pids", return_value=[]),
+                mock.patch.object(
+                    server_editor_host,
+                    "process_visibility_summary",
+                    return_value={
+                        "process_visibility_available": True,
+                        "process_visibility_error_code": "",
+                        "process_visibility_platform_kind": "windows",
+                    },
+                ),
+                mock.patch.object(server_editor_host, "terminate_editor_pid") as terminate_mock,
+            ):
+                request_quit = mock.Mock()
+                result = server_editor_host.restore_host_opened_editor_state(project_root, 30000, request_quit)
+
+        self.assertEqual("tracked_editor_already_closed", result["closeout_classification"])
+        self.assertTrue(result["closeout_verified"])
+        self.assertTrue(result["same_project_editor_closed"])
+        self.assertEqual("zero_time_process_probe", result["close_path"])
+        self.assertFalse(session_path.exists())
+        request_quit.assert_not_called()
+        terminate_mock.assert_not_called()
 
     def test_find_latest_request_event_is_sorted_and_project_local(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

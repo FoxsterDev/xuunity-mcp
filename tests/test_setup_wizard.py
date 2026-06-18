@@ -664,6 +664,9 @@ class SetupWizardTests(unittest.TestCase):
             result = wizard.validate_setup(project_root, include_tests=True)
 
         self.assertEqual("blocked", result["validation_status"])
+        self.assertEqual("blocked", result["offline_validation_status"])
+        self.assertEqual("offline_manifest_and_bridge_config_only", result["readiness_scope"])
+        self.assertEqual("declared_not_resolved", result["package_import_state"]["import_state"])
         self.assertIn("test_framework_unavailable", result["blockers"])
         self.assertEqual("disabled_missing_dependency", result["test_capabilities_state"])
         self.assertEqual("1.1.33", result["test_framework_state"]["recommended_dependency_version"])

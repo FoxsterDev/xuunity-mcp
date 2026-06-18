@@ -426,6 +426,77 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
             self.assertNotIn("/xuunity-mcp/run.sh", config_text)
 
+    def test_init_registers_native_windows_codex_config_on_windows_like_host(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            codex_home = temp_root / "codex-home"
+            codex_tools = temp_root / "codex-tools"
+            claude_tools = temp_root / "claude-tools"
+            neutral_dir = temp_root / "neutral"
+
+            env = self.make_env()
+            env["CODEX_HOME"] = str(codex_home)
+            env["CODEX_TOOLS_HOME"] = str(codex_tools)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+            env["OS"] = "Windows_NT"
+            env["APPDATA"] = str(temp_root / "AppData" / "Roaming")
+            env["USERPROFILE"] = str(temp_root)
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "codex", "--install-codex-config"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            config_text = (codex_home / "config.toml").read_text(encoding="utf-8")
+            self.assertIn('command = "cmd.exe"', config_text)
+            self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", config_text)
+            self.assertNotIn('command = "bash"', config_text)
+            self.assertNotIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
+
+    def test_init_warns_on_existing_windows_bash_codex_config_without_duplicate(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            codex_home = temp_root / "codex-home"
+            codex_home.mkdir(parents=True)
+            config_path = codex_home / "config.toml"
+            existing_config = (
+                "[mcp_servers.xuunity_light_unity]\n"
+                'command = "bash"\n'
+                'args = ["-lc", "exec \\"/tmp/xuunity/run_installed_or_refresh_xuunity_mcp.sh\\""]\n'
+                "required = false\n"
+            )
+            config_path.write_text(existing_config, encoding="utf-8")
+
+            env = self.make_env()
+            env["CODEX_HOME"] = str(codex_home)
+            env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
+            env["CLAUDE_TOOLS_HOME"] = str(temp_root / "claude-tools")
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(temp_root / "neutral")
+            env["OS"] = "Windows_NT"
+            env["APPDATA"] = str(temp_root / "AppData" / "Roaming")
+            env["USERPROFILE"] = str(temp_root)
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "codex", "--install-codex-config"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertEqual(existing_config, config_path.read_text(encoding="utf-8"))
+            self.assertIn("windows_codex_launcher_mismatch", completed.stderr)
+            self.assertIn('command = "cmd.exe"', completed.stderr)
+            self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", completed.stderr)
+
     def test_refresh_shell_launcher_stays_thin(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         launcher = repo_root / "run_installed_or_refresh_xuunity_mcp.sh"
