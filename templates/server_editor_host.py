@@ -435,25 +435,56 @@ def unity_command_targets_project(command: str, project_root: Path) -> bool:
     return _normalized_project_match_key(project_path_argument) == _normalized_project_match_key(project_root)
 
 
-def find_running_unity_editors_for_project(project_root: Path) -> list[dict[str, Any]]:
+def classify_unity_process_role(command: str) -> str:
+    normalized_command = str(command or "").replace("\\ ", " ").strip()
+    if not normalized_command:
+        return ""
+
+    lower_command = normalized_command.lower()
+    command_for_match = normalized_command.replace("\\", "/")
+    lower_command_for_match = command_for_match.lower()
+
+    if "/unity hub.app/" in lower_command_for_match or "unity hub helper" in lower_command:
+        return "launcher"
+
+    worker_markers = (
+        "assetimportworker",
+        "asset import worker",
+        "-assetimportworker",
+        "unityshadercompiler",
+        "unity shader compiler",
+        "unitypackagemanager",
+        "unity package manager",
+        "/unity helper.app/",
+    )
+    if any(marker in lower_command_for_match for marker in worker_markers):
+        return "worker"
+
+    if (
+        "Unity.app/Contents/MacOS/Unity" in normalized_command
+        or "unity.exe" in lower_command
+        or re.search(r'(^|\s)"?(?:/[^"\s]+)+/Unity"?(?:\s|$)', command_for_match)
+        or command_for_match.endswith("/Unity")
+    ):
+        return "main_editor"
+
+    return ""
+
+
+def find_running_unity_editors_for_project(
+    project_root: Path,
+    process_commands: list[tuple[int, str]] | None = None,
+) -> list[dict[str, Any]]:
     matches: list[dict[str, Any]] = []
     seen_pids: set[int] = set()
-    for pid, command in list_process_commands():
+    for pid, command in (process_commands if process_commands is not None else list_process_commands()):
         normalized_command = command.replace("\\ ", " ").strip()
         command_for_match = normalized_command.replace("\\", "/")
 
         if pid <= 0 or pid in seen_pids or not pid_is_alive(pid):
             continue
 
-        if "Unity Hub.app/Contents/MacOS/Unity Hub" in normalized_command:
-            continue
-
-        if not (
-            "Unity.app/Contents/MacOS/Unity" in normalized_command
-            or "Unity.exe" in normalized_command
-            or "/Unity " in f"{command_for_match} "
-            or command_for_match.endswith("/Unity")
-        ):
+        if classify_unity_process_role(normalized_command) != "main_editor":
             continue
 
         project_path_argument = extract_unity_project_path_from_command(normalized_command)
@@ -483,6 +514,39 @@ def find_running_unity_editors_for_project(project_root: Path) -> list[dict[str,
                 "project_path": project_path_argument,
                 "unity_app": unity_app,
                 "unity_version": unity_version,
+                "process_role": "main_editor",
+            }
+        )
+        seen_pids.add(pid)
+
+    return matches
+
+
+def find_running_unity_worker_processes_for_project(
+    project_root: Path,
+    process_commands: list[tuple[int, str]] | None = None,
+) -> list[dict[str, Any]]:
+    matches: list[dict[str, Any]] = []
+    seen_pids: set[int] = set()
+    for pid, command in (process_commands if process_commands is not None else list_process_commands()):
+        normalized_command = command.replace("\\ ", " ").strip()
+
+        if pid <= 0 or pid in seen_pids or not pid_is_alive(pid):
+            continue
+
+        if classify_unity_process_role(normalized_command) != "worker":
+            continue
+
+        project_path_argument = extract_unity_project_path_from_command(normalized_command)
+        if not project_path_argument or not unity_command_targets_project(normalized_command, project_root):
+            continue
+
+        matches.append(
+            {
+                "pid": pid,
+                "command": normalized_command,
+                "project_path": project_path_argument,
+                "process_role": "worker",
             }
         )
         seen_pids.add(pid)
@@ -901,7 +965,47 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
             "unity_version": running_version,
         }
 
-    detected_editors = find_running_unity_editors_for_project(project_root)
+    process_report = list_process_commands_report()
+    visibility = {
+        "process_visibility_available": bool(process_report.get("available")),
+        "process_visibility_error_code": str(process_report.get("error_code") or ""),
+        "process_visibility_stderr": _truncate_host_process_text(process_report.get("stderr") or ""),
+        "process_visibility_platform_kind": str(process_report.get("platform_kind") or host_platform_kind()),
+    }
+    if is_wsl():
+        diagnostics = wsl_host_diagnostics()
+        visibility["process_visibility_wslpath_available"] = bool(diagnostics.get("wslpath_available"))
+        visibility["process_visibility_warnings"] = list(diagnostics.get("warnings") or [])
+
+    process_visibility_available = bool(visibility.get("process_visibility_available"))
+    if not process_visibility_available:
+        error_code = str(visibility.get("process_visibility_error_code") or "process_visibility_restricted")
+        details = {
+            "project_root": str(project_root),
+            "unity_app": str(unity_app),
+            "editor_log_path": str(log_path),
+            "background_open": background_open,
+            "process_visibility_available": False,
+            "process_visibility_error_code": error_code,
+            "process_visibility_stderr": str(visibility.get("process_visibility_stderr") or ""),
+            "process_visibility_platform_kind": str(visibility.get("process_visibility_platform_kind") or host_platform_kind()),
+            "selected_action": "fail_closed",
+            "reason": "process_visibility_restricted_before_open",
+            "recommended_next_action": "restore_host_process_visibility",
+        }
+        raise ToolInvocationError(
+            "process_visibility_restricted_before_open",
+            (
+                "Unity process visibility is unavailable, so the wrapper cannot prove this project is closed. "
+                "Refusing to open a second Unity editor instance."
+            ),
+            details,
+        )
+
+    process_commands = list(process_report.get("commands") or [])
+    detected_editors = find_running_unity_editors_for_project(project_root, process_commands)
+    detected_workers = find_running_unity_worker_processes_for_project(project_root, process_commands)
+    detected_worker_pids = [int(worker["pid"]) for worker in detected_workers]
     if detected_editors:
         requested_version = resolve_unity_app_version(unity_app)
         detected_versions = sorted(
@@ -938,6 +1042,14 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
             "editor_pid": detected_editors[0]["pid"],
             "unity_version": str(detected_editors[0].get("unity_version") or requested_version or ""),
             "matching_editor_pids": [int(editor["pid"]) for editor in detected_editors],
+            "launch_decision": {
+                "bridge_ready": False,
+                "process_visibility_available": True,
+                "main_same_project_editor_pids": [int(editor["pid"]) for editor in detected_editors],
+                "worker_pids": detected_worker_pids,
+                "selected_action": "reuse",
+                "reason": "same_project_editor_process_detected",
+            },
         }
 
     launch_in_progress = try_read_recent_host_editor_launch_in_progress(project_root)
@@ -952,6 +1064,14 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
             "launch_in_progress": True,
             "launch_in_progress_age_seconds": launch_in_progress.get("launch_in_progress_age_seconds"),
             "editor_pid": int(launch_in_progress.get("editor_pid") or 0),
+            "launch_decision": {
+                "bridge_ready": False,
+                "process_visibility_available": True,
+                "main_same_project_editor_pids": [],
+                "worker_pids": detected_worker_pids,
+                "selected_action": "wait",
+                "reason": "host_launch_in_progress",
+            },
         }
 
     lock_state = inspect_project_lock(project_root)
@@ -1089,6 +1209,14 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
         "opened_by_host": True,
         "editor_pid": launched_pid,
         "launch_command": [str(part) for part in launch_command],
+        "launch_decision": {
+            "bridge_ready": False,
+            "process_visibility_available": True,
+            "main_same_project_editor_pids": [],
+            "worker_pids": detected_worker_pids,
+            "selected_action": "open",
+            "reason": "same_project_editor_absence_proven",
+        },
     }
 
 

@@ -142,7 +142,19 @@ class ServerProjectHelperTests(unittest.TestCase):
 
             with (
                 mock.patch.object(server_editor_host, "try_read_live_editor_state", return_value=None),
+                mock.patch.object(
+                    server_editor_host,
+                    "list_process_commands_report",
+                    return_value={
+                        "available": True,
+                        "commands": [],
+                        "error_code": "",
+                        "stderr": "",
+                        "platform_kind": "macos",
+                    },
+                ),
                 mock.patch.object(server_editor_host, "find_running_unity_editors_for_project", return_value=[]),
+                mock.patch.object(server_editor_host, "find_running_unity_worker_processes_for_project", return_value=[]),
                 mock.patch.object(server_editor_host.subprocess, "run") as run_mock,
                 mock.patch.object(server_editor_host.subprocess, "Popen") as popen_mock,
             ):
@@ -153,6 +165,38 @@ class ServerProjectHelperTests(unittest.TestCase):
             self.assertTrue(result["launch_in_progress"])
             run_mock.assert_not_called()
             popen_mock.assert_not_called()
+
+    def test_open_unity_editor_fails_closed_when_process_visibility_is_restricted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = make_unity_project(Path(tmp_dir) / "MyProject")
+            unity_app = Path("/Applications/Unity.app")
+            log_path = project_root / "Library" / "XUUnityLightMcp" / "logs" / "unity_editor.log"
+
+            with (
+                mock.patch.object(server_editor_host, "try_read_live_editor_state", return_value=None),
+                mock.patch.object(
+                    server_editor_host,
+                    "list_process_commands_report",
+                    return_value={
+                        "available": False,
+                        "commands": [],
+                        "error_code": "process_listing_failed",
+                        "stderr": "operation not permitted",
+                        "platform_kind": "macos",
+                    },
+                ),
+                mock.patch.object(server_editor_host, "find_running_unity_editors_for_project") as find_mock,
+                mock.patch.object(server_editor_host.subprocess, "run") as run_mock,
+                mock.patch.object(server_editor_host.subprocess, "Popen") as popen_mock,
+            ):
+                with self.assertRaises(ToolInvocationError) as ctx:
+                    server_editor_host.open_unity_editor(project_root, log_path, unity_app, True)
+
+        self.assertEqual("process_visibility_restricted_before_open", ctx.exception.code)
+        self.assertEqual("restore_host_process_visibility", ctx.exception.details["recommended_next_action"])
+        find_mock.assert_not_called()
+        run_mock.assert_not_called()
+        popen_mock.assert_not_called()
 
     def test_restore_host_opened_editor_state_fast_paths_already_closed_editor(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -670,10 +714,10 @@ class ServerProjectHelperTests(unittest.TestCase):
                 "discovery_classification": "editor_process_only",
                 "discovery_reason": "project_matched_in_process_table",
                 "authoritative_state_source": "process_table",
-                "reconciliation_case": "live_process_only",
+                "reconciliation_case": "same_project_editor_running_bridge_not_ready",
                 "reconciliation_status": "degraded",
-                "reconciliation_reason": "process_table_match_without_live_state_authority",
-                "reconciliation_recommended_next_action": "recover_editor_session",
+                "reconciliation_reason": "same_project_editor_process_without_live_bridge_state",
+                "reconciliation_recommended_next_action": "wait_for_bridge_or_recover_editor",
                 "detected_editor_count": 1,
                 "detected_editor_pids": [777],
             },
@@ -696,8 +740,8 @@ class ServerProjectHelperTests(unittest.TestCase):
             summary = server.build_request_final_status_from_context(Path("/tmp/FakeProject"), "req-1", "unity.status", 0)
 
         self.assertEqual("editor_process_only", summary["discovery_classification"])
-        self.assertEqual("live_process_only", summary["reconciliation_case"])
-        self.assertEqual("recover_editor_session", summary["recommended_next_action"])
+        self.assertEqual("same_project_editor_running_bridge_not_ready", summary["reconciliation_case"])
+        self.assertEqual("wait_for_bridge_or_recover_editor", summary["recommended_next_action"])
 
     def test_build_request_final_status_prefers_host_health_next_action_for_anr(self) -> None:
         context = types.SimpleNamespace(
@@ -982,9 +1026,9 @@ class ServerProjectHelperTests(unittest.TestCase):
     def test_recover_project_bridge_for_reconciliation_activates_live_process_only_editor(self) -> None:
         context = types.SimpleNamespace(
             discovery_details={
-                "reconciliation_case": "live_process_only",
+                "reconciliation_case": "same_project_editor_running_bridge_not_ready",
                 "reconciliation_status": "degraded",
-                "reconciliation_recommended_next_action": "ensure_ready_or_recover_bridge",
+                "reconciliation_recommended_next_action": "wait_for_bridge_or_recover_editor",
                 "detected_editor_count": 1,
                 "detected_editor_pids": [777],
             },
@@ -1119,10 +1163,10 @@ class ServerProjectHelperTests(unittest.TestCase):
                 "discovery_classification": "editor_process_only",
                 "discovery_reason": "project_matched_in_process_table",
                 "authoritative_state_source": "process_table",
-                "reconciliation_case": "live_process_only",
+                "reconciliation_case": "same_project_editor_running_bridge_not_ready",
                 "reconciliation_status": "degraded",
-                "reconciliation_reason": "process_table_match_without_live_state_authority",
-                "reconciliation_recommended_next_action": "ensure_ready_or_recover_bridge",
+                "reconciliation_reason": "same_project_editor_process_without_live_bridge_state",
+                "reconciliation_recommended_next_action": "wait_for_bridge_or_recover_editor",
                 "detected_editor_count": 1,
                 "detected_editor_pids": [777],
             },
@@ -1156,7 +1200,7 @@ class ServerProjectHelperTests(unittest.TestCase):
 
         self.assertEqual("passed", payload["status"])
         self.assertEqual(1, payload["recovery_attempt_count"])
-        self.assertEqual("live_process_only", payload["reconciliation_case"])
+        self.assertEqual("same_project_editor_running_bridge_not_ready", payload["reconciliation_case"])
         self.assertEqual(2, invoke_mock.call_count)
         recovery_mock.assert_called_once()
 
@@ -1406,6 +1450,11 @@ class ServerProjectHelperTests(unittest.TestCase):
                 f"{project_root} -logFile /tmp/editor.log",
             ),
             (
+                102,
+                "/Applications/Unity Hub.app/Contents/Frameworks/Unity Hub Helper.app/Contents/MacOS/Unity Hub Helper "
+                f"--type=utility -projectPath {project_root}",
+            ),
+            (
                 202,
                 "/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity "
                 f"-projectPath {project_root} -logFile /tmp/editor.log",
@@ -1421,6 +1470,24 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertEqual(1, len(matches))
         self.assertEqual(202, matches[0]["pid"])
         self.assertEqual("6000.0.58f2", matches[0]["unity_version"])
+
+    def test_find_running_unity_editors_for_project_reports_asset_import_worker_separately(self) -> None:
+        project_root = Path("/tmp/xuunity/ProjectA")
+        worker_command = (
+            "/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity "
+            f"-projectPath {project_root} -assetImportWorker"
+        )
+
+        with (
+            mock.patch.object(server_editor_host, "list_process_commands", return_value=[(303, worker_command)]),
+            mock.patch.object(server_editor_host, "pid_is_alive", return_value=True),
+        ):
+            editors = server_editor_host.find_running_unity_editors_for_project(project_root)
+            workers = server_editor_host.find_running_unity_worker_processes_for_project(project_root)
+
+        self.assertEqual([], editors)
+        self.assertEqual([303], [worker["pid"] for worker in workers])
+        self.assertEqual("worker", workers[0]["process_role"])
 
     def test_find_running_unity_editors_for_project_requires_exact_project_path_argument(self) -> None:
         project_root = Path("/tmp/xuunity/ProjectA")

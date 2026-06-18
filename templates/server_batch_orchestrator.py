@@ -522,6 +522,7 @@ def build_project_discovery_report(project_root: Path) -> dict[str, Any]:
 RECOVERY_RECONCILIATION_ACTIONS = frozenset(
     {
         "ensure_ready_or_recover_bridge",
+        "wait_for_bridge_or_recover_editor",
         "recover_editor_session",
         "open_editor_or_ensure_ready",
         "start_or_recover_editor",
@@ -551,6 +552,7 @@ DISCOVERY_STATUS_FALLBACK_ERROR_CODES = frozenset(
     {
         "editor_not_running",
         "process_visibility_restricted",
+        "process_visibility_restricted_before_open",
         "transport_not_ready",
         "bridge_disabled",
     }
@@ -572,6 +574,7 @@ DISCOVERY_NEXT_ACTION_COMMANDS = {
     "enable_bridge_and_retry": "init_xuunity_light_unity_mcp.sh --project-root {project_root} --enable-project",
     "open_editor_or_ensure_ready": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
     "ensure_ready_or_recover_bridge": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
+    "wait_for_bridge_or_recover_editor": "xuunity_light_unity_mcp.sh recover-editor-session --project-root {project_root} --timeout-ms 180000",
     "recover_editor_session": "xuunity_light_unity_mcp.sh recover-editor-session --project-root {project_root} --timeout-ms 180000",
     "close_same_project_editor_or_use_interactive_lane": "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
     "start_or_recover_editor": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",

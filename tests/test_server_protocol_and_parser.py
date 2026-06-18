@@ -1223,7 +1223,7 @@ actions:
             startup_policy="fail_fast_on_interactive_compile_block",
         )
         discovery = {
-            "reconciliation_case": "live_process_only",
+            "reconciliation_case": "same_project_editor_running_bridge_not_ready",
             "reconciliation_status": "degraded",
             "detected_editor_count": 1,
             "detected_editor_pids": [2468],

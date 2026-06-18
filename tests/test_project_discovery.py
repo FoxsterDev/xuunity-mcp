@@ -65,7 +65,27 @@ class ProjectDiscoveryTests(unittest.TestCase):
         self.assertEqual("editor_process_only", result["discovery_classification"])
         self.assertEqual("process_table", result["authoritative_state_source"])
         self.assertEqual([303], result["detected_editor_pids"])
-        self.assertEqual("live_process_only", result["reconciliation_case"])
+        self.assertEqual("same_project_editor_running_bridge_not_ready", result["reconciliation_case"])
+        self.assertEqual("wait_for_bridge_or_recover_editor", result["reconciliation_recommended_next_action"])
+
+    def test_discovery_reports_worker_only_processes_without_marking_editor_live(self) -> None:
+        project_root = Path("/tmp/ProjectA")
+        result = discover_project_context_state(
+            project_root,
+            try_read_bridge_state=lambda _: None,
+            try_read_host_editor_session_state=lambda _: None,
+            find_running_unity_editors_for_project=lambda _: [],
+            find_running_unity_worker_processes_for_project=lambda _: [{"pid": 909}],
+            pid_is_alive=lambda pid: pid == 909,
+            bridge_enabled=lambda _: True,
+        )
+
+        self.assertEqual("host_launchable_not_active", result["discovery_classification"])
+        self.assertEqual("host_launchable_not_active", result["reconciliation_case"])
+        self.assertEqual([909], result["detected_worker_pids"])
+        live_editor = result["host_prerequisites"]["checks"]["live_editor"]
+        self.assertEqual(1, live_editor["detected_worker_count"])
+        self.assertEqual("missing", live_editor["status"])
 
     def test_discovery_classifies_stale_state_without_live_process(self) -> None:
         project_root = Path("/tmp/ProjectA")

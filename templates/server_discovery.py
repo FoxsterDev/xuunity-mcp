@@ -115,6 +115,8 @@ def _state_groups(
             "host_session_pid_matches_project": bool(discovery.get("host_session_pid_matches_project")),
             "detected_editor_count": int(discovery.get("detected_editor_count") or 0),
             "detected_editor_pids": list(discovery.get("detected_editor_pids") or []),
+            "detected_worker_count": int(discovery.get("detected_worker_count") or 0),
+            "detected_worker_pids": list(discovery.get("detected_worker_pids") or []),
             "opened_by_host": bool(host_editor_session_state.get("opened_by_host")),
             "process_visibility_available": bool(discovery.get("process_visibility_available", True)),
             "process_visibility_error_code": str(discovery.get("process_visibility_error_code") or ""),
@@ -179,6 +181,7 @@ def _build_host_prerequisites(
     )
     process_visibility_available = bool(discovery.get("process_visibility_available", True))
     live_editor_status = "ready" if live_editor_present else "unknown" if not process_visibility_available else "missing"
+    detected_worker_count = int(discovery.get("detected_worker_count") or 0)
     live_editor_code = (
         "none"
         if live_editor_present
@@ -238,9 +241,13 @@ def _build_host_prerequisites(
                 if live_editor_present
                 else "Host process listing is unavailable; live editor state cannot be proven."
                 if not process_visibility_available
+                else "Only Unity worker/helper processes were detected for this project; no main editor process is live."
+                if detected_worker_count > 0
                 else "No matching Unity editor process is currently live for this project."
             ),
             "detected_editor_count": int(discovery.get("detected_editor_count") or 0),
+            "detected_worker_count": detected_worker_count,
+            "detected_worker_pids": list(discovery.get("detected_worker_pids") or []),
             "process_visibility_available": process_visibility_available,
             "process_visibility_error_code": str(discovery.get("process_visibility_error_code") or ""),
         },
@@ -344,10 +351,10 @@ def _reconciliation_summary(
 
     if detected_editor_pids:
         return {
-            "case": "live_process_only",
+            "case": "same_project_editor_running_bridge_not_ready",
             "status": "degraded",
-            "reason": "process_table_match_without_live_state_authority",
-            "recommended_next_action": "recover_editor_session",
+            "reason": "same_project_editor_process_without_live_bridge_state",
+            "recommended_next_action": "wait_for_bridge_or_recover_editor",
         }
 
     if not bridge_currently_enabled:
@@ -409,11 +416,21 @@ def discover_project_context_state(
     build_project_health: Callable[..., dict[str, Any]] | None = None,
     inspect_package_dependency_alignment: Callable[[Path], dict[str, Any]] | None = None,
     inspect_stale_request_artifacts: Callable[[Path], dict[str, Any]] | None = None,
+    find_running_unity_worker_processes_for_project: Callable[[Path], list[dict[str, Any]]] | None = None,
     process_visibility_report: dict[str, Any] | Callable[[], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     bridge_state = _copy_dict(try_read_bridge_state(project_root))
     host_editor_session_state = _copy_dict(try_read_host_editor_session_state(project_root))
     detected_editors = [dict(editor) for editor in (find_running_unity_editors_for_project(project_root) or []) if isinstance(editor, dict)]
+    detected_workers = (
+        [
+            dict(worker)
+            for worker in (find_running_unity_worker_processes_for_project(project_root) or [])
+            if isinstance(worker, dict)
+        ]
+        if find_running_unity_worker_processes_for_project is not None
+        else []
+    )
     raw_process_visibility = (
         process_visibility_report()
         if callable(process_visibility_report)
@@ -430,6 +447,13 @@ def discover_project_context_state(
         }
     )
     detected_editor_pid_set = set(detected_editor_pids)
+    detected_worker_pids = sorted(
+        {
+            int(worker.get("pid") or 0)
+            for worker in detected_workers
+            if int(worker.get("pid") or 0) > 0
+        }
+    )
 
     bridge_pid = int(bridge_state.get("editor_pid") or 0)
     host_session_pid = int(host_editor_session_state.get("editor_pid") or 0)
@@ -526,6 +550,9 @@ def discover_project_context_state(
         "detected_editor_count": len(detected_editor_pids),
         "detected_editor_pids": detected_editor_pids,
         "detected_editors": detected_editors,
+        "detected_worker_count": len(detected_worker_pids),
+        "detected_worker_pids": detected_worker_pids,
+        "detected_workers": detected_workers,
         **process_visibility,
     }
 

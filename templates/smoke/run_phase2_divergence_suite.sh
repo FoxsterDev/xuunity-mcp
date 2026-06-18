@@ -311,7 +311,7 @@ restore_file "$HOST_SESSION_PATH" "host_editor_session.json"
 LPO_REPORT="$TMP_DIR/live_process_only_report.json"
 mutate_state_files "live_process_only" "$LIVE_PID" "$DEAD_PID"
 discovery_report "$LPO_REPORT"
-assert_discovery_case "live-process-only" "$LPO_REPORT" "editor_process_only" "live_process_only"
+assert_discovery_case "live-process-only" "$LPO_REPORT" "editor_process_only" "same_project_editor_running_bridge_not_ready"
 restore_file "$HOST_SESSION_PATH" "host_editor_session.json"
 restore_file "$BRIDGE_STATE_PATH" "bridge_state.json"
 
