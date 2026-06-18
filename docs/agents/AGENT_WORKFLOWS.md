@@ -30,14 +30,17 @@ Every agent workflow should follow this contract:
 1. Resolve exactly one Unity project root.
 2. Confirm the bridge is enabled only for that project.
 3. Prefer `ensure-ready` over blind sleeps.
-4. Run capability and health probes before version-sensitive operations.
-5. Prefer compile validation before tests when scripts changed.
-6. Prefer read and validation tools before mutation.
-7. Record structured evidence, not only a pass/fail sentence.
-8. Resolve interrupted requests through `request-final-status`.
-9. Restore host-opened editor state at closeout.
-10. Report unsupported capabilities as explicit validation gaps.
-11. For substantial MCP implementation plans, update the design-plan history and
+4. Do not start multiple activation-heavy commands in parallel for one Unity
+   project until the bridge is healthy; serialize `ensure-ready`, compile,
+   tests, PlayMode, and scenario start.
+5. Run capability and health probes before version-sensitive operations.
+6. Prefer compile validation before tests when scripts changed.
+7. Prefer read and validation tools before mutation.
+8. Record structured evidence, not only a pass/fail sentence.
+9. Resolve interrupted requests through `request-final-status`.
+10. Restore host-opened editor state at closeout.
+11. Report unsupported capabilities as explicit validation gaps.
+12. For substantial MCP implementation plans, update the design-plan history and
     perform a code/docs self-review before final closeout.
 
 Stop immediately when:

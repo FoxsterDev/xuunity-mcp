@@ -246,7 +246,7 @@ evidence disagree.
 
 Minimum cases:
 
-- `live_process_only`
+- `same_project_editor_running_bridge_not_ready`
 - `stale_bridge_state`
 - `stale_host_session`
 - `bridge_disabled`

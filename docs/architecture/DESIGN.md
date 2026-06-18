@@ -201,8 +201,13 @@ Current multi-project lifecycle baseline:
 - same-project mutating operations are serialized through `ProjectContext.request_lock`
 - different project roots can proceed independently
 - process-table project ownership is matched by exact parsed `-projectPath`
+- process-table matches are split between main editor processes and
+  worker/helper processes; worker-only visibility does not count as a live
+  editor
+- host editor opening fails closed when process visibility is unavailable, so
+  the wrapper does not call `open -na` without proving same-project absence
 - the host can classify and recover:
-  - `live_process_only`
+  - `same_project_editor_running_bridge_not_ready`
   - `stale_bridge_state`
   - `stale_host_session`
   - `bridge_disabled`
