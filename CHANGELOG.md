@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.3.31
+
+Release tag: `v0.3.31`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.31
+```
+
+### Changed
+
+- Released `v0.3.31` package metadata, server metadata, package manifests, and Git UPM examples.
+
+### Fixed
+
+- Cleared Unity's editor progress bar after MCP-triggered compile, refresh, and build so the "Importing assets"/"Compiling" dialog no longer stays stuck on Unity 2022.3. Added `EditorUtility.ClearProgressBar()` to the compile-utility `finally` (covers every `PlayerBuildInterface.CompilePlayerScripts` caller, including matrix and scenario steps) and to the request-pump completion path (covers `AssetDatabase.Refresh` / `BuildPipeline.BuildPlayer`). Unity 6 already auto-cleared the bar; this restores parity on 2022.3.
+
 ## 0.3.30
 
 Release tag: `v0.3.30`

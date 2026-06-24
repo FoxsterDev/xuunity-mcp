@@ -110,6 +110,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             {
                 CompilationPipeline.assemblyCompilationFinished -= HandleAssemblyCompilationFinished;
                 stopwatch.Stop();
+                EditorUtility.ClearProgressBar();
             }
 
             payload.duration_seconds = Math.Round(stopwatch.Elapsed.TotalSeconds, 6);

@@ -138,6 +138,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 }
                 else
                 {
+                    UnityEditor.EditorUtility.ClearProgressBar();
                     XUUnityLightMcpBridgeRuntimeState.MarkRequestProcessed(
                         requestId,
                         operationName,

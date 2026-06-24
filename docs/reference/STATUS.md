@@ -4,7 +4,7 @@ Date: `2026-05-23`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
-for MCP-capable AI agents. The current source line is `v0.3.30`.
+for MCP-capable AI agents. The current source line is `v0.3.31`.
 
 ## Current Package
 
@@ -17,7 +17,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.30
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.31
 ```
 
 Current package path:
@@ -117,17 +117,17 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest source validation for `v0.3.30`:
+Latest source validation for `v0.3.31`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.30`, `unity=2021.3`, no hard Test Framework dependency |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.31`, `unity=2021.3`, no hard Test Framework dependency |
 | Host Python tests | `scripts/testing/run_host_python_tests.sh` | `141/141` passed during the `v0.3.17` release pass |
 | Package self-tests | Clean devmode projects on installed Unity editors | EditMode `6/6`, PlayMode `5/5` on `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`, `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1` after offline optional Test Framework setup. `2021.3.45f2` is classified as `skipped/create_project_license_unavailable` on this host because Unity reports no valid editor license before package import. |
 | Previous Git UPM release smoke | Clean Unity `2021.3.58f1` project pinned to `#v0.3.14` | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package EditMode `6/6` and PlayMode `5/5` passed, and closeout verified `process_exit_verified=true`. |
-| Release prodmode check | Temporary Unity project pinned to `#v0.3.30` | Run after pushing the release tag so `prodmode` can verify the tag on `origin` and write the matching Git UPM dependency before consumer closeout. |
+| Release prodmode check | Temporary Unity project pinned to `#v0.3.31` | Run after pushing the release tag so `prodmode` can verify the tag on `origin` and write the matching Git UPM dependency before consumer closeout. |
 | Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
-| Git tag visibility | Git refs | Release tag `v0.3.30` is prepared locally and must be pushed to `origin` for Git UPM consumers. |
+| Git tag visibility | Git refs | Release tag `v0.3.31` is prepared locally and must be pushed to `origin` for Git UPM consumers. |
 
 Cross-platform status:
 
@@ -147,7 +147,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.30"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.31"
   }
 }
 ```
@@ -173,7 +173,7 @@ Rules:
 
 - `devmode` points a Unity project at the local package working tree.
 - `prodmode` pins the Unity project to the published release tag that matches
-  the package version, for example `#v0.3.30`.
+  the package version, for example `#v0.3.31`.
 - `prodmode` refuses to pin when that release tag is not visible on `origin`.
 - both modes remove the package lock entry so Unity re-resolves honestly.
 
