@@ -1055,6 +1055,47 @@ class ServerProjectHelperTests(unittest.TestCase):
         activate_mock.assert_called_once()
         wait_mock.assert_called_once()
 
+    def test_recover_project_bridge_for_reconciliation_attributes_opened_editor_cold_start(self) -> None:
+        context = types.SimpleNamespace(
+            discovery_details={
+                "reconciliation_case": "host_launchable_not_active",
+                "reconciliation_status": "offline",
+                "reconciliation_recommended_next_action": "open_editor_or_ensure_ready",
+                "detected_editor_count": 0,
+                "detected_editor_pids": [],
+            },
+            last_bridge_state={"editor_pid": 0, "bridge_generation": 2},
+        )
+        registry = types.SimpleNamespace(refresh_context=lambda _: context)
+
+        with (
+            mock.patch.object(server, "_BRIDGE_REGISTRY", registry),
+            mock.patch.object(server, "read_best_effort_bridge_state", return_value=None),
+            mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/Applications/Unity.app")),
+            mock.patch.object(server, "open_unity_editor", return_value={"editor_pid": 444, "reused_existing_editor": False}) as open_mock,
+            mock.patch.object(server, "wait_for_ready", return_value={"editor_pid": 444, "health_status": "healthy", "bridge_generation": 3}) as wait_mock,
+            mock.patch.object(server, "update_host_editor_session_pid") as update_mock,
+            mock.patch.object(server, "refresh_project_context", return_value=context),
+        ):
+            recovery = server.recover_project_bridge_for_reconciliation(
+                Path("/tmp/FakeProject"),
+                timeout_ms=5000,
+                heartbeat_max_age_seconds=5,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                allow_open_editor=True,
+            )
+
+        self.assertEqual("opened_editor", recovery["action"])
+        open_mock.assert_called_once()
+        wait_mock.assert_called_once()
+        update_mock.assert_called_once_with(Path("/tmp/FakeProject"), 444)
+        self.assertTrue(recovery["editor_relaunched"])
+        self.assertEqual(0, recovery["previous_editor_pid"])
+        self.assertEqual(444, recovery["current_editor_pid"])
+        self.assertEqual(2, recovery["bridge_generation_before"])
+        self.assertEqual(3, recovery["bridge_generation_after"])
+        self.assertEqual("host_launchable_not_active", recovery["cold_start_reason"])
+
     def test_execute_host_health_recovery_policy_observe_only_does_not_terminate(self) -> None:
         context = types.SimpleNamespace(
             discovery_details={
@@ -1091,7 +1132,7 @@ class ServerProjectHelperTests(unittest.TestCase):
                 "bridge_pid": 777,
                 "detected_editor_pids": [777],
             },
-            last_bridge_state={},
+            last_bridge_state={"editor_pid": 777, "bridge_generation": 4},
         )
         registry = types.SimpleNamespace(refresh_context=lambda _: context)
 
@@ -1124,10 +1165,11 @@ class ServerProjectHelperTests(unittest.TestCase):
 
         with (
             mock.patch.object(server, "_BRIDGE_REGISTRY", registry),
+            mock.patch.object(server, "read_best_effort_bridge_state", return_value={"editor_pid": 777, "bridge_generation": 4}),
             mock.patch.object(server, "terminate_editor_pid", return_value=True) as terminate_mock,
             mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/Applications/Unity.app")),
             mock.patch.object(server, "open_unity_editor", return_value={"editor_pid": 888, "reused_existing_editor": False}) as open_mock,
-            mock.patch.object(server, "wait_for_ready", return_value={"editor_pid": 888, "health_status": "healthy"}) as wait_mock,
+            mock.patch.object(server, "wait_for_ready", return_value={"editor_pid": 888, "health_status": "healthy", "bridge_generation": 5}) as wait_mock,
             mock.patch.object(server, "update_host_editor_session_pid") as update_mock,
             mock.patch.object(server, "refresh_project_context", return_value=context),
         ):
@@ -1143,6 +1185,12 @@ class ServerProjectHelperTests(unittest.TestCase):
         open_mock.assert_called_once()
         wait_mock.assert_called_once()
         update_mock.assert_called_once_with(Path("/tmp/FakeProject"), 888)
+        self.assertTrue(recovery["editor_relaunched"])
+        self.assertEqual(777, recovery["previous_editor_pid"])
+        self.assertEqual(888, recovery["current_editor_pid"])
+        self.assertEqual(4, recovery["bridge_generation_before"])
+        self.assertEqual(5, recovery["bridge_generation_after"])
+        self.assertEqual("host_health_anr", recovery["cold_start_reason"])
 
     def test_wait_for_scenario_result_attempts_recovery_on_editor_not_running(self) -> None:
         success_response = {

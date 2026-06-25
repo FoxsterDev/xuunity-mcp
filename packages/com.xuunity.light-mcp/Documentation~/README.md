@@ -1,7 +1,7 @@
 # XUUnity Light MCP Unity Package
 
 Date: `2026-05-23`
-Status: `current for package v0.3.31`
+Status: `current for package v0.3.32`
 
 This Unity package provides the editor-side bridge for the lightweight
 XUUnity Light Unity MCP service.
@@ -24,7 +24,7 @@ Add this to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.31"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.32"
   }
 }
 ```
@@ -43,6 +43,8 @@ This package exposes the Unity-side bridge for:
 - Game View control and screenshots
 - scenario validation, execution, and persisted results
 - project-defined scenario hooks through `IXUUnityLightMcpScenarioHook`
+- compact scenario verdicts for agent acceptance checks, with verbose payloads
+  reserved for deep diagnostics
 
 Before EditMode and PlayMode test execution, the package runs a best-effort
 test preflight that closes Unity Android Logcat editor windows when they are

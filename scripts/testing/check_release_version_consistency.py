@@ -15,7 +15,10 @@ PACKAGE_MANIFESTS = (
     Path("templates") / "package-manifests" / "unity-package-2021_2022.json",
     Path("templates") / "package-manifests" / "unity-package-6000.json",
 )
-SERVER_TEMPLATE = Path("templates") / "server.py"
+SERVER_INFO_TEMPLATES = (
+    Path("templates") / "server.py",
+    Path("templates") / "server_batch_orchestrator.py",
+)
 CHANGELOG = Path("CHANGELOG.md")
 
 CLAIM_PATTERNS = (
@@ -55,8 +58,8 @@ def package_version(source_root: Path) -> str:
     return str(read_json(source_root / PACKAGE_JSON).get("version") or "").strip()
 
 
-def server_info_version(source_root: Path) -> str:
-    text = (source_root / SERVER_TEMPLATE).read_text(encoding="utf-8")
+def server_info_version(source_root: Path, relative_path: Path) -> str:
+    text = (source_root / relative_path).read_text(encoding="utf-8")
     match = re.search(
         r'SERVER_INFO\s*=\s*\{\s*"name":\s*"xuunity-mcp",\s*"version":\s*"([^"]+)"',
         text,
@@ -67,9 +70,12 @@ def server_info_version(source_root: Path) -> str:
 
 def check_metadata_versions(source_root: Path, version: str) -> list[str]:
     errors: list[str] = []
-    server_version = server_info_version(source_root)
-    if server_version != version:
-        errors.append(f"{SERVER_TEMPLATE}: SERVER_INFO version is {server_version!r}, expected {version!r}")
+    for relative_path in SERVER_INFO_TEMPLATES:
+        if not (source_root / relative_path).is_file():
+            continue
+        server_version = server_info_version(source_root, relative_path)
+        if server_version != version:
+            errors.append(f"{relative_path}: SERVER_INFO version is {server_version!r}, expected {version!r}")
     for relative_path in PACKAGE_MANIFESTS:
         manifest_version = str(read_json(source_root / relative_path).get("version") or "").strip()
         if manifest_version != version:

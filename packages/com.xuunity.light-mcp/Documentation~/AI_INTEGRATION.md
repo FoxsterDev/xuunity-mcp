@@ -1,7 +1,7 @@
 # AI Integration Instructions
 
 Date: `2026-05-23`
-Status: `current for package v0.3.31`
+Status: `current for package v0.3.32`
 
 Use this document when an AI agent is integrating this Unity package into a new
 project.
@@ -32,7 +32,7 @@ The full system requires:
 Current Git UPM package URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.31
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.32
 ```
 
 ## Safety Rules
@@ -64,8 +64,8 @@ An AI agent should not:
 6. play mode
 7. screenshot
 8. scenario validate
-9. scenario run
-10. scenario result
+9. scenario run-and-wait compact verdict
+10. raw scenario result only when verbose diagnostics are needed
 11. implement `IXUUnityLightMcpScenarioHook` in `Assets/Editor/` when the project needs local scenario automation not worth promoting upstream yet
 
 ## Upstream Docs

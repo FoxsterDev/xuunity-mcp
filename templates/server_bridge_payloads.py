@@ -4,6 +4,86 @@ import json
 from typing import Any, Callable
 
 
+def _int_or_zero(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _attach_post_settle_compile_truth(
+    normalized: dict[str, Any],
+    idle_wait_after: dict[str, Any],
+    *,
+    settle_phase: str,
+    completion_basis: str,
+) -> None:
+    diagnostics = idle_wait_after.get("recent_compiler_diagnostics")
+    if not isinstance(diagnostics, list):
+        diagnostics = []
+    post_settle_error_count = _int_or_zero(idle_wait_after.get("compiler_error_count"))
+    script_compilation_failed = bool(idle_wait_after.get("script_compilation_failed"))
+    post_settle_failed = script_compilation_failed or post_settle_error_count > 0
+    compiling_or_updating = bool(idle_wait_after.get("is_compiling")) or bool(idle_wait_after.get("is_updating"))
+    if compiling_or_updating:
+        post_settle_compile = "inconclusive"
+    elif post_settle_failed:
+        post_settle_compile = "failed"
+    else:
+        post_settle_compile = "passed"
+
+    normalized["authoritative_state_source"] = "idle_wait_after"
+    normalized["post_settle_compile"] = post_settle_compile
+    normalized["post_settle_error_count"] = post_settle_error_count
+    normalized["post_settle_diagnostics"] = diagnostics[:5]
+    normalized["post_settle_compiler_diagnostics_source"] = str(idle_wait_after.get("compiler_diagnostics_source") or "")
+    normalized["post_settle_script_compilation_failed"] = script_compilation_failed
+    normalized["script_compilation_failed"] = script_compilation_failed
+    normalized["compiler_error_count"] = post_settle_error_count
+    normalized["recent_compiler_diagnostics"] = diagnostics[:5]
+    normalized["compiler_diagnostics_source"] = str(idle_wait_after.get("compiler_diagnostics_source") or "")
+    normalized["settle_phase"] = settle_phase or str(normalized.get("settle_phase") or "")
+    normalized["completion_basis"] = completion_basis or str(normalized.get("completion_basis") or "")
+
+
+def _editor_relaunch_attribution_from_recovery(recovery: Any) -> dict[str, Any]:
+    if not isinstance(recovery, dict):
+        return {}
+    if bool(recovery.get("editor_relaunched")):
+        return {
+            "editor_relaunched": True,
+            "previous_editor_pid": _int_or_zero(recovery.get("previous_editor_pid")),
+            "current_editor_pid": _int_or_zero(recovery.get("current_editor_pid")),
+            "bridge_generation_before": _int_or_zero(recovery.get("bridge_generation_before")),
+            "bridge_generation_after": _int_or_zero(recovery.get("bridge_generation_after")),
+            "cold_start_reason": str(recovery.get("cold_start_reason") or ""),
+        }
+
+    nested = recovery.get("host_health_recovery")
+    if isinstance(nested, dict):
+        return _editor_relaunch_attribution_from_recovery(nested)
+    return {}
+
+
+def _editor_relaunch_attribution_from_lifecycle(lifecycle: dict[str, Any]) -> dict[str, Any]:
+    for key in (
+        "activation",
+        "lifecycle_reset_recovery",
+        "transport_response_missing_recovery",
+        "transport_connect_failed_recovery",
+    ):
+        attribution = _editor_relaunch_attribution_from_recovery(lifecycle.get(key))
+        if attribution:
+            return attribution
+    return {}
+
+
+def _attach_editor_relaunch_attribution(normalized: dict[str, Any], lifecycle: dict[str, Any]) -> None:
+    attribution = _editor_relaunch_attribution_from_lifecycle(lifecycle)
+    if attribution:
+        normalized.update(attribution)
+
+
 def normalize_refresh_payload_from_lifecycle(payload: dict[str, Any], lifecycle: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
     requested_outcome = str(normalized.get("outcome") or "")
@@ -29,9 +109,16 @@ def normalize_refresh_payload_from_lifecycle(payload: dict[str, Any], lifecycle:
         normalized["settle_request_id"] = str(idle_wait_after.get("refresh_settle_request_id") or normalized.get("settle_request_id") or "")
     else:
         normalized["completion_basis"] = "host_waited_for_editor_idle"
+        normalized["settle_phase"] = str(idle_wait_after.get("refresh_settle_phase") or "editor_idle_observed")
     normalized["editor_is_compiling_after_settle"] = bool(idle_wait_after.get("is_compiling"))
     normalized["editor_is_updating_after_settle"] = bool(idle_wait_after.get("is_updating"))
     normalized["playmode_state_after_settle"] = str(idle_wait_after.get("playmode_state") or "")
+    _attach_post_settle_compile_truth(
+        normalized,
+        idle_wait_after,
+        settle_phase=str(normalized.get("settle_phase") or ""),
+        completion_basis=str(normalized.get("completion_basis") or ""),
+    )
     return normalized
 
 
@@ -54,10 +141,17 @@ def normalize_compile_payload_from_lifecycle(payload: dict[str, Any], lifecycle:
     else:
         normalized["completion_basis"] = "host_waited_for_editor_idle"
         normalized["settled_at_utc"] = settled_at_utc
+        normalized["settle_phase"] = str(idle_wait_after.get("compile_settle_phase") or "editor_idle_observed")
 
     normalized["editor_is_compiling_after_settle"] = bool(idle_wait_after.get("is_compiling"))
     normalized["editor_is_updating_after_settle"] = bool(idle_wait_after.get("is_updating"))
     normalized["playmode_state_after_settle"] = str(idle_wait_after.get("playmode_state") or "")
+    _attach_post_settle_compile_truth(
+        normalized,
+        idle_wait_after,
+        settle_phase=str(normalized.get("settle_phase") or ""),
+        completion_basis=str(normalized.get("completion_basis") or ""),
+    )
     return normalized
 
 
@@ -122,6 +216,12 @@ def normalize_tests_payload_from_lifecycle(payload: dict[str, Any], lifecycle: d
         or normalized.get("playmode_state_after_settle")
         or ""
     )
+    _attach_post_settle_compile_truth(
+        normalized,
+        idle_wait_after,
+        settle_phase=str(idle_wait_after.get("compile_settle_phase") or "editor_idle_observed"),
+        completion_basis=str(normalized.get("completion_basis") or "host_waited_for_editor_idle"),
+    )
     return normalized
 
 
@@ -156,11 +256,13 @@ def normalize_response_payload_from_lifecycle(
         payload = normalize_compile_payload_from_lifecycle(payload, lifecycle)
     elif operation == "unity.build_target.switch":
         payload = normalize_build_target_payload_from_lifecycle(payload, lifecycle)
-    elif operation == "unity.tests.run_playmode":
+    elif operation in {"unity.tests.run_playmode", "unity.tests.run_editmode"}:
         payload = normalize_tests_payload_from_lifecycle(payload, lifecycle)
 
     if payload_type in {"unity.scenario.run", "unity.scenario.result"}:
         payload = normalize_scenario_payload(payload, scenario_terminal_statuses)
+
+    _attach_editor_relaunch_attribution(payload, lifecycle)
 
     normalized = dict(response)
     normalized["payload_json"] = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
@@ -273,4 +375,3 @@ def _bridge_error_code(response: dict[str, Any]) -> str:
     if not isinstance(payload_error, dict):
         return ""
     return str(payload_error.get("code") or "")
-

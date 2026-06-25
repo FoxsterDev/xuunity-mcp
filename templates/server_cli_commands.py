@@ -1070,6 +1070,8 @@ def cmd_request_scenario_run_and_wait(args):
             "scenario": scenario,
             "timeoutMs": args.timeout_ms,
             "pollIntervalMs": args.poll_interval_ms,
+            "verbose": bool(args.verbose),
+            "includeFullPayload": bool(args.include_full_payload),
         }
     )
     print_json(result.get("structuredContent") or {})

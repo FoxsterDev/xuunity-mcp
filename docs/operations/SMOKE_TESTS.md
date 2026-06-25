@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-05-23`
-Status: `current for v0.3.31`
+Status: `current for v0.3.32`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,8 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.31`: `141/141`
+- host Python tests for `v0.3.32`: `255/255`, with one expected native
+  Windows `.cmd` smoke skipped on macOS
 - source package self-tests for the current release line: EditMode `6/6`, PlayMode `5/5` on runnable installed Unity `2021.3`, `2022.3`, and `6000.x` editors after offline optional Test Framework setup
 - multi-project batch compile matrix in a consumer repo: `9/9` projects, `38/38` lanes, `0` failures
 
@@ -351,6 +352,28 @@ Pass criteria:
   `recommended_next_action=none`
 - unproven lifecycle failures keep warning-first wording and do not claim Unity
   completion
+
+### 18. Scenario Decision Verdict Smoke
+
+Use `unity_scenario_run_and_wait` on a small passing scenario and one failing
+scenario.
+
+Pass criteria:
+
+- the default response is a compact decision envelope, not the raw scenario
+  payload
+- passing responses expose `verdict=passed`, `trust_class=authoritative`,
+  `scenario_status=passed`, short `steps`, and `recommended_next_action=none`
+- failing responses expose `verdict=failed`, a stable `failure_class`, and a
+  compact `error.code` without dumping large hook payloads
+- UI-smoke hook payloads promote `user_path`, `selected_tab`, model/UI before
+  and after values, screenshot path, and path coverage summary when present
+- full scenario payloads remain available only through the documented
+  verbose/full-payload opt-in
+- lifecycle recovery that opens or reopens Unity includes
+  `editor_relaunched`, `previous_editor_pid`, `current_editor_pid`,
+  `bridge_generation_before`, `bridge_generation_after`, and
+  `cold_start_reason`
 
 ## Public Template Assets
 

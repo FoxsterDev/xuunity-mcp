@@ -54,6 +54,10 @@ class ReleaseVersioningTests(unittest.TestCase):
             'SERVER_INFO = {\n    "name": "xuunity-mcp",\n    "version": "0.3.16",\n}\n',
         )
         write_text(
+            root / "templates" / "server_batch_orchestrator.py",
+            'SERVER_INFO = {\n    "name": "xuunity-mcp",\n    "version": "0.3.16",\n}\n',
+        )
+        write_text(
             root / "README.md",
             "\n".join(
                 [
@@ -139,11 +143,16 @@ class ReleaseVersioningTests(unittest.TestCase):
 
             self.assertIn(Path("packages/com.xuunity.light-mcp/package.json"), changed)
             self.assertIn(Path("templates/server.py"), changed)
+            self.assertIn(Path("templates/server_batch_orchestrator.py"), changed)
             self.assertEqual(
                 "0.3.17",
                 json.loads((root / "packages" / "com.xuunity.light-mcp" / "package.json").read_text())["version"],
             )
             self.assertIn('"version": "0.3.17"', (root / "templates" / "server.py").read_text(encoding="utf-8"))
+            self.assertIn(
+                '"version": "0.3.17"',
+                (root / "templates" / "server_batch_orchestrator.py").read_text(encoding="utf-8"),
+            )
 
             readme = (root / "README.md").read_text(encoding="utf-8")
             self.assertIn("Status: `current for v0.3.17`", readme)
@@ -203,6 +212,20 @@ class ReleaseVersioningTests(unittest.TestCase):
             errors = release_consistency.check_release_version_consistency(root)
 
             self.assertTrue(any("docs/index.html:1" in error.replace("\\", "/") for error in errors), errors)
+
+    def test_release_version_consistency_detects_stale_orchestrator_server_info(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.create_minimal_release_tree(root)
+            text = (root / "templates" / "server_batch_orchestrator.py").read_text(encoding="utf-8")
+            (root / "templates" / "server_batch_orchestrator.py").write_text(
+                text.replace('"version": "0.3.16"', '"version": "0.3.15"'),
+                encoding="utf-8",
+            )
+
+            errors = release_consistency.check_release_version_consistency(root)
+
+            self.assertTrue(any("templates/server_batch_orchestrator.py" in error for error in errors), errors)
 
 
 if __name__ == "__main__":

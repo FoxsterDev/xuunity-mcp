@@ -142,6 +142,7 @@ from server_scenario_polling import (
     wait_for_scenario_result_data,
 )
 from server_summaries import (
+    build_scenario_decision_verdict,
     build_scenario_result_summary,
     build_status_summary,
     normalize_scenario_payload,
@@ -224,7 +225,7 @@ from server_process_launcher import ProcessLauncher
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.23",
+    "version": "0.3.32",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -630,6 +631,33 @@ def build_batch_editor_conflict_details(project_root: Path, live_editor_pids: li
     }
 
 
+def _best_effort_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def build_editor_relaunch_attribution(
+    *,
+    before_state: dict[str, Any] | None,
+    after_state: dict[str, Any] | None,
+    previous_editor_pid: int,
+    current_editor_pid: int,
+    cold_start_reason: str,
+) -> dict[str, Any]:
+    before = before_state if isinstance(before_state, dict) else {}
+    after = after_state if isinstance(after_state, dict) else {}
+    return {
+        "editor_relaunched": True,
+        "previous_editor_pid": _best_effort_int(previous_editor_pid or before.get("editor_pid")),
+        "current_editor_pid": _best_effort_int(current_editor_pid or after.get("editor_pid")),
+        "bridge_generation_before": _best_effort_int(before.get("bridge_generation")),
+        "bridge_generation_after": _best_effort_int(after.get("bridge_generation")),
+        "cold_start_reason": cold_start_reason,
+    }
+
+
 def execute_host_health_recovery_policy(
     project_root: Path,
     *,
@@ -638,6 +666,7 @@ def execute_host_health_recovery_policy(
     allow_open_editor: bool,
     background_open: bool = False,
 ) -> dict[str, Any]:
+    before_state = current_project_context_bridge_state(project_root)
     discovery = current_project_context_discovery_details(project_root)
     termination_policy = str(discovery.get("host_health_termination_policy") or "observe_only")
     health_classification = str(discovery.get("host_health_classification") or "")
@@ -698,6 +727,15 @@ def execute_host_health_recovery_policy(
     )
     result["launch"] = launch
     result["bridge_state"] = state
+    result.update(
+        build_editor_relaunch_attribution(
+            before_state=before_state,
+            after_state=state,
+            previous_editor_pid=candidate_pid,
+            current_editor_pid=int(state.get("editor_pid") or launch.get("editor_pid") or 0),
+            cold_start_reason=f"host_health_{health_classification or 'recovery'}",
+        )
+    )
     if not bool((launch or {}).get("reused_existing_editor")):
         update_host_editor_session_pid(project_root, int(state.get("editor_pid") or 0))
     refresh_project_context(project_root)
@@ -793,6 +831,15 @@ def recover_project_bridge_for_reconciliation(
     recovery["bridge_state"] = state
     launch_payload = recovery.get("launch")
     if isinstance(launch_payload, dict) and not bool(launch_payload.get("reused_existing_editor")):
+        recovery.update(
+            build_editor_relaunch_attribution(
+                before_state=current_state,
+                after_state=state,
+                previous_editor_pid=int(current_state.get("editor_pid") or 0),
+                current_editor_pid=int(state.get("editor_pid") or launch_payload.get("editor_pid") or 0),
+                cold_start_reason=str(discovery.get("reconciliation_case") or next_action or "open_editor_recovery"),
+            )
+        )
         update_host_editor_session_pid(project_root, int(state.get("editor_pid") or 0))
     refresh_project_context(project_root)
     return recovery
@@ -1362,6 +1409,8 @@ def call_unity_scenario_run_and_wait_tool(arguments: dict[str, Any]) -> dict[str
         invoke_bridge=invoke_bridge,
         bridge_response_to_tool_result=bridge_response_to_tool_result,
         wait_for_scenario_result=wait_for_scenario_result,
+        build_scenario_decision_verdict=build_scenario_decision_verdict,
+        scenario_terminal_statuses=SCENARIO_TERMINAL_STATUSES,
         build_tool_error_payload=build_tool_error_payload,
         scenario_failure_tool_result=scenario_failure_tool_result,
     )

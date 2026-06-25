@@ -419,6 +419,8 @@ def build_parser() -> argparse.ArgumentParser:
     scenario_run_wait_cmd.add_argument("--scenario-file", required=True)
     scenario_run_wait_cmd.add_argument("--timeout-ms", type=int, default=None)
     scenario_run_wait_cmd.add_argument("--poll-interval-ms", type=int, default=1000)
+    scenario_run_wait_cmd.add_argument("--verbose", action="store_true")
+    scenario_run_wait_cmd.add_argument("--include-full-payload", action="store_true")
     scenario_run_wait_cmd.set_defaults(func_name="cmd_request_scenario_run_and_wait")
 
     scenario_result_cmd = sub.add_parser("request-scenario-result", help="Read the current or completed result of a Unity scenario run.")

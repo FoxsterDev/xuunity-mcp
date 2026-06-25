@@ -109,6 +109,8 @@ def call_unity_scenario_run_and_wait_tool(
     invoke_bridge: Callable[[str, str, dict[str, Any], int], dict[str, Any]],
     bridge_response_to_tool_result: Callable[[dict[str, Any]], dict[str, Any]],
     wait_for_scenario_result: Callable[..., dict[str, Any]],
+    build_scenario_decision_verdict: Callable[[dict[str, Any], set[str]], dict[str, Any]],
+    scenario_terminal_statuses: set[str],
     build_tool_error_payload: Callable[[Exception], dict[str, Any]],
     scenario_failure_tool_result: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> dict[str, Any]:
@@ -131,6 +133,14 @@ def call_unity_scenario_run_and_wait_tool(
     poll_interval_ms = arguments.get("pollIntervalMs", 1000)
     if not isinstance(poll_interval_ms, int):
         raise JsonRpcError(-32602, "pollIntervalMs must be an integer.")
+
+    verbose = arguments.get("verbose", False)
+    include_full_payload = arguments.get("includeFullPayload", False)
+    if not isinstance(verbose, bool):
+        raise JsonRpcError(-32602, "verbose must be a boolean when provided.")
+    if not isinstance(include_full_payload, bool):
+        raise JsonRpcError(-32602, "includeFullPayload must be a boolean when provided.")
+    full_payload_mode = verbose or include_full_payload
 
     try:
         run_response = invoke_bridge(
@@ -157,6 +167,36 @@ def call_unity_scenario_run_and_wait_tool(
         return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
 
     result_payload["run_start"] = run_payload
+    if not full_payload_mode:
+        verdict_payload = build_scenario_decision_verdict(result_payload, scenario_terminal_statuses)
+        if not bool(result_payload.get("succeeded")):
+            scenario_name = str(verdict_payload.get("scenario_name") or "unknown_scenario")
+            status = str(verdict_payload.get("scenario_status") or "failed")
+            verdict_payload["error"] = {
+                "code": "scenario_failed",
+                "message": f"Scenario '{scenario_name}' finished with status '{status}'.",
+            }
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(verdict_payload, ensure_ascii=True),
+                    }
+                ],
+                "structuredContent": verdict_payload,
+                "isError": True,
+            }
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(verdict_payload, ensure_ascii=True),
+                }
+            ],
+            "structuredContent": verdict_payload,
+            "isError": False,
+        }
+
     if not bool(result_payload.get("succeeded")):
         return scenario_failure_tool_result(result_payload)
     return {

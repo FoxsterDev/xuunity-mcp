@@ -15,7 +15,10 @@ PACKAGE_MANIFESTS = (
     Path("templates") / "package-manifests" / "unity-package-2021_2022.json",
     Path("templates") / "package-manifests" / "unity-package-6000.json",
 )
-SERVER_TEMPLATE = Path("templates") / "server.py"
+SERVER_INFO_TEMPLATES = (
+    Path("templates") / "server.py",
+    Path("templates") / "server_batch_orchestrator.py",
+)
 CHANGELOG = Path("CHANGELOG.md")
 
 RELEASE_DOCS = (
@@ -87,23 +90,25 @@ def update_package_metadata(source_root: Path, version: str) -> list[Path]:
 
 
 def update_server_info(source_root: Path, old_version: str, version: str) -> list[Path]:
-    path = source_root / SERVER_TEMPLATE
-    if not path.is_file():
-        return []
-    text = path.read_text(encoding="utf-8")
-    pattern = re.compile(
-        r'(SERVER_INFO\s*=\s*\{\s*"name":\s*"xuunity-mcp",\s*"version":\s*")'
-        + re.escape(old_version)
-        + r'(")',
-        re.MULTILINE,
-    )
-    updated, count = pattern.subn(rf"\g<1>{version}\2", text, count=1)
-    if count == 0:
-        raise SystemExit(f"could not update SERVER_INFO version in {SERVER_TEMPLATE}")
-    if updated == text:
-        return []
-    path.write_text(updated, encoding="utf-8")
-    return [SERVER_TEMPLATE]
+    changed: list[Path] = []
+    for relative_path in SERVER_INFO_TEMPLATES:
+        path = source_root / relative_path
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        pattern = re.compile(
+            r'(SERVER_INFO\s*=\s*\{\s*"name":\s*"xuunity-mcp",\s*"version":\s*")'
+            + re.escape(old_version)
+            + r'(")',
+            re.MULTILINE,
+        )
+        updated, count = pattern.subn(rf"\g<1>{version}\2", text, count=1)
+        if count == 0:
+            raise SystemExit(f"could not update SERVER_INFO version in {relative_path}")
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
+            changed.append(relative_path)
+    return changed
 
 
 def update_release_doc_text(text: str, old_version: str, version: str) -> str:

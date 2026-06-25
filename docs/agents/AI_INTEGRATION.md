@@ -177,7 +177,7 @@ For production consumers, use the current Git UPM release path:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.31"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.32"
   }
 }
 ```
@@ -247,6 +247,12 @@ Only after that:
 - play mode
 - screenshots
 - scenario runs
+
+For scenario acceptance checks, prefer the `unity_scenario_run_and_wait`
+compact verdict path first. It returns the terminal decision, trust class,
+failure class, recommended next action, short step summaries, and lifecycle
+relaunch attribution when Unity had to be opened or reopened. Request verbose
+or full payload output only for deep diagnostics.
 
 If readiness checks succeed but a later compile or test run fails, treat that as
 a Unity project or runtime failure unless the error explicitly points back to

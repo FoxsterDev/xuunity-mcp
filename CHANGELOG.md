@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+## 0.3.32
+
+Release tag: `v0.3.32`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.32
+```
+
+### Changed
+
+- Released `v0.3.32` package metadata, server metadata, package manifests, and Git UPM examples.
+- `unity_scenario_run_and_wait` now returns a compact decision verdict by
+  default: verdict, trust class, failure class, recommended next action,
+  terminal scenario status, short step summaries, UI smoke fields, and path
+  coverage. Full raw scenario payloads remain available with `verbose` or
+  `includeFullPayload`.
+- Scenario lifecycle recovery now attributes editor cold starts and relaunches
+  with `editor_relaunched`, `previous_editor_pid`, `current_editor_pid`,
+  `bridge_generation_before`, `bridge_generation_after`, and
+  `cold_start_reason` so latency is explainable without weakening the verdict.
+- Scenario compile steps now prefer post-settle compile truth from
+  `idle_wait_after`, keeping request-time transport success separate from
+  final Unity compiler state.
+- Infrastructure timeouts are classified as `infrastructure_timeout`, while UI
+  smoke summaries continue to distinguish product assertions, preconditions,
+  blocking popups, cleanup, and unproven Unity completion.
+- Release version consistency now covers both MCP protocol metadata sources so
+  `initialize.serverInfo.version` stays aligned with package metadata.
+
 ## 0.3.31
 
 Release tag: `v0.3.31`

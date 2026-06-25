@@ -1161,6 +1161,8 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "scenario": SCENARIO_DEFINITION_SCHEMA,
                 "timeoutMs": {"type": "integer", "default": 600000, "minimum": 1000},
                 "pollIntervalMs": {"type": "integer", "default": 1000, "minimum": 100},
+                "verbose": {"type": "boolean", "default": False},
+                "includeFullPayload": {"type": "boolean", "default": False},
             },
             "required": ["projectRoot", "scenario"],
         },
