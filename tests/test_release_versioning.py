@@ -225,7 +225,10 @@ class ReleaseVersioningTests(unittest.TestCase):
 
             errors = release_consistency.check_release_version_consistency(root)
 
-            self.assertTrue(any("templates/server_batch_orchestrator.py" in error for error in errors), errors)
+            self.assertTrue(
+                any("templates/server_batch_orchestrator.py" in error.replace("\\", "/") for error in errors),
+                errors,
+            )
 
 
 if __name__ == "__main__":
