@@ -164,7 +164,7 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 Assert.That(normalized, Is.True, $"{errorCode}: {errorMessage}");
                 var args = JsonUtility.FromJson<XUUnityLightMcpScenarioValidateArgs>(normalizedArgsJson);
                 Assert.That(args.scenario.steps[0].kind, Is.EqualTo("project_defined_hook"));
-                Assert.That(args.scenario.steps[0].hookName, Is.EqualTo("apperfunhub.localization"));
+                Assert.That(args.scenario.steps[0].hookName, Is.EqualTo("sample.localization"));
                 Assert.That(args.scenario.steps[0].hookPayloadJson, Does.Contain("\"action\":\"localization.scan\""));
                 Assert.That(args.scenario.steps[0].hookPayloadJson, Does.Contain("\"target_language\":\"pt-BR\""));
             }
@@ -363,7 +363,7 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 + "  localization.scan:\n"
                 + "    aliases:\n"
                 + "      - localization.discovery\n"
-                + "    hookName: apperfunhub.localization\n"
+                + "    hookName: sample.localization\n"
                 + "    payload: {}\n"
                 + "    mutates:\n"
                 + "      - repo-level localization pipeline reports\n");

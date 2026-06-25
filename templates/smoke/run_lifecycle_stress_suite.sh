@@ -223,7 +223,8 @@ run_step background_contract_scenario \
   --project-root "$PROJECT_ROOT" \
   --scenario-file "$STRESS_SCENARIO_FILE" \
   --timeout-ms 180000 \
-  --poll-interval-ms 500
+  --poll-interval-ms 500 \
+  --include-full-payload
 summarize_json \
   "background-contract-scenario" \
   "$TMP_DIR/background_contract_scenario.json" \

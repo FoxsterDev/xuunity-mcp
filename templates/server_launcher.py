@@ -560,6 +560,24 @@ def switch_project_to_devmode(paths: LauncherPaths, args: list) -> None:
     print("package_source=%s" % package_source_path)
     print("packages_lock_entry_removed=true")
     print("next_step=let Unity re-resolve packages by reopen, focus, or explicit refresh")
+    print(
+        "recommended_refresh_command=xuunity_light_unity_mcp.sh request-project-refresh "
+        "--project-root %s --resolve-packages --timeout-ms 180000" % project_root
+    )
+    print(
+        "recommended_refresh_args_json=%s"
+        % json.dumps(
+            [
+                "request-project-refresh",
+                "--project-root",
+                project_root,
+                "--resolve-packages",
+                "--timeout-ms",
+                "180000",
+            ],
+            ensure_ascii=True,
+        )
+    )
 
 
 def switch_project_to_prodmode(paths: LauncherPaths, args: list) -> None:

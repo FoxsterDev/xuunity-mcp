@@ -624,17 +624,17 @@ Use this prompt to start a new implementation chat:
 
 ```text
 You are working in this repo:
-/Users/siarheikha/Projects/Work/GameStory/Apperfun/AIRoot
+<AIRoot>
 
 Goal: implement the design in this file:
-/Users/siarheikha/Projects/Work/GameStory/Apperfun/AIRoot/Operations/XUUnityLightUnityMcp/docs/architecture/designs/XUUNITY_MCP_MONOLITH_REDUCTION_FIRST_PRINCIPLES_PLAN_2026-06-25.md
+<AIRoot>/Operations/XUUnityLightUnityMcp/docs/architecture/designs/XUUNITY_MCP_MONOLITH_REDUCTION_FIRST_PRINCIPLES_PLAN_2026-06-25.md
 
 Target: the server/template side of XUUnity Light Unity MCP:
-/Users/siarheikha/Projects/Work/GameStory/Apperfun/AIRoot/Operations/XUUnityLightUnityMcp/templates
+<AIRoot>/Operations/XUUnityLightUnityMcp/templates
 
 Coordination note:
 Another chat is already working on the Unity C# package side:
-/Users/siarheikha/Projects/Work/GameStory/Apperfun/AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp
+<AIRoot>/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp
 
 Do not edit `packages/com.xuunity.light-mcp`.
 You may read Unity package files only for contract inspection.

@@ -33,10 +33,12 @@ class HostPlatformAdapter:
 
         _clear_thread_exception()
 
-        is_windows_like = (os.name == "nt" or sys.platform in ("win32", "cygwin", "msys"))
+        # Route by the adapter's logical host. Tests and WSL simulations may
+        # run on native Windows while intentionally exercising Linux behavior.
+        is_windows_like = (self.platform_kind == "windows" or sys.platform in ("cygwin", "msys"))
 
         if is_windows_like:
-            if os.name == "nt":
+            if os.name == "nt" and self.platform_kind == "windows":
                 try:
                     import ctypes
                     from ctypes import wintypes

@@ -49,6 +49,7 @@ host-local registry.
 
 | Date | File | Scope | Registry Status | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-06-25 | `2026-06-25_scenario_run_wait_compact_smoke_false_negative_retro.md` | scenario run-and-wait compact envelope versus full per-step payload evidence | implemented with follow-up watch | Implemented same day: compact payload-mode fields, structured full-payload recovery hints, public smoke full-payload opt-in where step-level assertions parse raw fields, regression test, README/docs/tool-schema updates, and concrete devmode refresh guidance. Keep watching real Unity editor disappearance during PlayMode lifecycle smoke as infrastructure churn, not this contract issue. |
 | 2026-05-07 | `2026-05-07_token_stability_and_summary_first_recovery_retro.md` | token stability and summary-first recovery | implemented history | Sanitized from host-private single-project evidence; private source removed after promotion. |
 | 2026-05-09 | `2026-05-09_cleanup_and_regression_lessons.md` | cleanup and regression lessons | historical lesson | Reusable lesson retained for history. |
 | 2026-05-11 | `2026-05-11_operator_and_backend_lessons.md` | operator and backend lessons | historical lesson | Reusable distilled lesson retained for history. |

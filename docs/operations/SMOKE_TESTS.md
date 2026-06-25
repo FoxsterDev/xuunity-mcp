@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-05-23`
-Status: `current for v0.3.32`
+Status: `current for v0.3.33`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,8 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.32`: `255/255`, with one expected native
-  Windows `.cmd` smoke skipped on macOS
+- host Python tests for `v0.3.33`: `264` tests passed, with one expected skip
 - source package self-tests for the current release line: EditMode `6/6`, PlayMode `5/5` on runnable installed Unity `2021.3`, `2022.3`, and `6000.x` editors after offline optional Test Framework setup
 - multi-project batch compile matrix in a consumer repo: `9/9` projects, `38/38` lanes, `0` failures
 
@@ -469,6 +468,23 @@ Token-discipline contract:
   digging when the request id is not already known
 - prefer persisted scenario-result summaries over tight `unity.scenario.result`
   polling loops
+
+Scenario payload contract:
+
+- `request-scenario-run-and-wait` defaults to a compact decision envelope. Its
+  `steps` field is a compact summary, not the raw persisted scenario `steps`.
+- compact run-and-wait responses expose `payload_mode=compact_decision`,
+  `steps_payload_mode=compact_summary`, `raw_steps_included=false`,
+  `raw_steps_available`, `raw_step_count`, `compact_step_count`,
+  `full_payload_cli_args`, `full_payload_tool`, and
+  `full_payload_tool_arguments`.
+- smoke helpers that assert `payload_json`, `hook_name`, exact raw step fields,
+  or scenario parity fixtures must pass `--include-full-payload`.
+- operators can recover full evidence from a compact verdict by using the
+  structured `full_payload_cli_args` or by calling `unity_scenario_result` with
+  the emitted `run_id`.
+- compact scenario output remains the default for low-token operator decisions;
+  raw full payload output is the explicit evidence/parity mode.
 - prefer compact batch failure summaries over direct `prepare.log` or
   `build.log` tailing
 - treat a smoke workflow as failed if it repeatedly dumps raw scenario results

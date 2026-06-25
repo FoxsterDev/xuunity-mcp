@@ -953,8 +953,22 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
     if first_failure is None and isinstance(summary.get("error"), dict):
         first_failure = dict(summary.get("error") or {})
 
+    project_root = str(summary.get("project_root") or "")
+    run_id = str(summary.get("run_id") or "")
+    full_payload_cli_args = ["request-scenario-result"]
+    if project_root:
+        full_payload_cli_args.extend(["--project-root", project_root])
+    if run_id:
+        full_payload_cli_args.extend(["--run-id", run_id])
+    full_payload_tool_arguments: dict[str, Any] = {}
+    if project_root:
+        full_payload_tool_arguments["projectRoot"] = project_root
+    if run_id:
+        full_payload_tool_arguments["runId"] = run_id
+
     envelope: dict[str, Any] = {
         "action": "unity_scenario_run_and_wait",
+        "payload_mode": "compact_decision",
         "verdict": verdict,
         "trust_class": trust_class,
         "failure_class": failure_class,
@@ -967,6 +981,21 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         "result_path": str(summary.get("result_path") or ""),
         "first_failure": first_failure,
         "steps": list(summary.get("steps") or []),
+        "steps_payload_mode": "compact_summary",
+        "steps_are_compact": True,
+        "raw_steps_included": False,
+        "raw_steps_available": bool(step_items),
+        "raw_step_count": len(step_items),
+        "compact_step_count": len(summary.get("steps") or []),
+        "full_payload_cli_args": full_payload_cli_args,
+        "full_payload_tool": "unity_scenario_result",
+        "full_payload_tool_arguments": full_payload_tool_arguments,
+        "full_payload_required_for": [
+            "per_step_payload_json",
+            "raw_hook_payloads",
+            "hook_name_assertions",
+            "scenario_parity_fixtures",
+        ],
         "recommended_next_action": recommended_next_action,
         "full_payload_available": True,
     }

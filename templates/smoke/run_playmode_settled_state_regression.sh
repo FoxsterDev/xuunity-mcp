@@ -161,7 +161,8 @@ PY
   --project-root "$PROJECT_ROOT" \
   --scenario-file "$SCENARIO_FILE" \
   --timeout-ms "$SCENARIO_TIMEOUT_MS" \
-  --poll-interval-ms "$POLL_INTERVAL_MS" >"$TMP_DIR/scenario.json" || fail_step "scenario_playmode_request"
+  --poll-interval-ms "$POLL_INTERVAL_MS" \
+  --include-full-payload >"$TMP_DIR/scenario.json" || fail_step "scenario_playmode_request"
 
 python3 - "$TMP_DIR/direct.json" "$TMP_DIR/scenario.json" <<'PY'
 import json

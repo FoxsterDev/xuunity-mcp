@@ -301,6 +301,8 @@ class WindowsHostHelperTests(unittest.TestCase):
             with (
                 mock.patch.object(server_host_platform, "is_wsl", return_value=True),
                 mock.patch.object(server_host_platform, "WSL_PROC_ROOT", proc_root),
+                mock.patch.object(server_host_platform.os, "name", "nt"),
+                mock.patch.object(sys, "platform", "win32"),
                 mock.patch.object(server_host_platform.os, "readlink", return_value="/init"),
                 mock.patch.object(server_host_platform.subprocess, "run") as mock_run,
             ):

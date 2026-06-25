@@ -73,18 +73,118 @@
     }
   },
   "cli_help": {
-    "request_scenario_run_and_wait_sha256": "bccc73d19e26e11d54b00371c7b33f6eb3b3bad4bcb5304663276ec2e2c442d6",
-    "request_status_summary_sha256": "4182332c2cc787642a85cfd1baaaf643b395e968bc0c6d5bea8b655196fdc067",
+    "request_scenario_run_and_wait_options": [
+      [
+        "-h",
+        "--help"
+      ],
+      [
+        "--project-root"
+      ],
+      [
+        "--scenario-file"
+      ],
+      [
+        "--timeout-ms"
+      ],
+      [
+        "--poll-interval-ms"
+      ],
+      [
+        "--verbose"
+      ],
+      [
+        "--include-full-payload"
+      ]
+    ],
+    "request_status_summary_options": [
+      [
+        "-h",
+        "--help"
+      ],
+      [
+        "--project-root"
+      ],
+      [
+        "--timeout-ms"
+      ]
+    ],
     "root_contains": [
       "setup-plan",
       "request-status-summary",
       "request-scenario-run-and-wait",
       "batch-compile"
     ],
-    "root_sha256": "2d200b7c5f59bf1039e6269cdcd5655d7f8dd7b96096cc7347f3ac7b97d64436"
+    "root_command_count": 64,
+    "root_commands": [
+      "setup-plan",
+      "setup-apply",
+      "uninstall-plan",
+      "uninstall-apply",
+      "validate-setup",
+      "install-test-framework",
+      "license-capabilities",
+      "bridge-state",
+      "request-status",
+      "request-status-summary",
+      "request-latest-status",
+      "request-final-status",
+      "request-cancel",
+      "request-stale-cleanup",
+      "request-playmode-state",
+      "request-playmode-set",
+      "request-capabilities",
+      "request-health-probe",
+      "request-build-target-get",
+      "request-build-target-switch",
+      "request-build-player",
+      "request-scene-assert",
+      "request-console-grep",
+      "request-loading-timing",
+      "request-editor-quit",
+      "verify-editor-closed",
+      "request-project-refresh",
+      "project-action-list",
+      "project-action-invoke",
+      "project-hook-scaffold",
+      "artifact-register",
+      "artifact-write-report",
+      "request-install-test-framework",
+      "request-edm4u-resolve",
+      "request-sdk-dependency-verify",
+      "request-editmode-tests",
+      "request-playmode-tests",
+      "request-compile",
+      "request-compile-matrix",
+      "request-build-config-compile-matrix",
+      "request-scenario-validate",
+      "request-scenario-run",
+      "request-scenario-run-and-wait",
+      "request-scenario-result",
+      "request-scenario-result-summary",
+      "request-scenario-results-list",
+      "request-scenario-result-latest",
+      "open-editor",
+      "ensure-ready",
+      "restore-editor-state",
+      "recover-editor-session",
+      "runtime-config-show",
+      "project-discovery-report",
+      "registry-context-report",
+      "registry-prune-contexts",
+      "batch-compile",
+      "batch-compile-matrix",
+      "batch-build-config-compile-matrix",
+      "batch-editmode-tests",
+      "test-results-table",
+      "batch-test-framework-version-regression",
+      "batch-build-player",
+      "artifact-probe",
+      "maintenance-prune"
+    ]
   },
   "mcp_tools_list": {
-    "sha256": "008104b2ef3b4a233a053d36ba09f8296944b001beb897de9001de4de3dd0864",
+    "sha256": "38dcb99811bb680159a119147501ede9168f7a6dc1c74ff7809d235345f2a1f3",
     "tool_count": 44,
     "tool_names": [
       "xuunity_setup_plan",

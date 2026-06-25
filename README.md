@@ -454,7 +454,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.32
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.33
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -462,7 +462,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.32"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.33"
   }
 }
 ```
@@ -690,6 +690,9 @@ Scenario JSON may use Unity-native `project_action` steps for catalog-backed
 project actions. Unity resolves `project_actions.yaml`, enforces mutation
 approval, and executes the matching `project_defined_hook`; the host wrapper
 also performs the same normalization before dispatch as an early diagnostic.
+`unity_scenario_run_and_wait` returns a compact decision envelope by default;
+use `includeFullPayload=true` or the emitted `full_payload_tool_arguments` when
+asserting raw per-step `payload_json`, `hook_name`, or parity-fixture fields.
 
 See [FEATURES.md](docs/reference/FEATURES.md) for maturity levels and implementation evidence.
 

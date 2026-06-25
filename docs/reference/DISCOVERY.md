@@ -1,7 +1,7 @@
 # Discovery Guide
 
 Date: `2026-05-23`
-Status: `current for v0.3.32`
+Status: `current for v0.3.33`
 
 This project is relevant for searches like:
 
@@ -38,7 +38,7 @@ Full technical package name: `XUUnity Light Unity MCP`.
 Current Git UPM package URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.32
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.33
 ```
 
 Use `packages/com.xuunity.light-mcp` as the canonical Unity package path.

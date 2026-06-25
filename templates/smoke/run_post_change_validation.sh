@@ -375,7 +375,8 @@ run_step acceptance_scenario \
   --project-root "$PROJECT_ROOT" \
   --scenario-file "$ACCEPTANCE_SCENARIO" \
   --timeout-ms "$ACCEPTANCE_SCENARIO_TIMEOUT_MS" \
-  --poll-interval-ms 500
+  --poll-interval-ms 500 \
+  --include-full-payload
 summarize_json \
   "acceptance-scenario" \
   "$TMP_DIR/acceptance_scenario.json" \
@@ -386,7 +387,8 @@ run_step contract_scenario \
   --project-root "$PROJECT_ROOT" \
   --scenario-file "$CONTRACT_SCENARIO" \
   --timeout-ms "$CONTRACT_SCENARIO_TIMEOUT_MS" \
-  --poll-interval-ms 500
+  --poll-interval-ms 500 \
+  --include-full-payload
 summarize_json \
   "contract-scenario" \
   "$TMP_DIR/contract_scenario.json" \

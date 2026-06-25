@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+## 0.3.33
+
+Release tag: `v0.3.33`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.33
+```
+
+### Changed
+
+- Released `v0.3.33` package metadata, server metadata, package manifests, and Git UPM examples.
+- Reduced monolithic ownership on the Unity package side while preserving public
+  MCP operation names, JSON payload shapes, scenario timing semantics, and
+  persisted bridge state contracts. The existing scenario runner, project-action
+  normalizer, bridge runtime state, and model entrypoints remain compatibility
+  facades over smaller DTO, runtime, compiler, scheduler, catalog, and handler
+  units.
+- Reduced monolithic ownership on the Python server side across batch
+  orchestration, bridge runtime, CLI command routing, editor-host lifecycle,
+  setup wizard, summaries, and tool specs while keeping public command and MCP
+  tool contracts stable.
+- Tightened `unity_scenario_run_and_wait` compact/full payload semantics:
+  public smoke helpers that need step-level evidence now request
+  `includeFullPayload`, while compact summaries remain the default contract for
+  agent-facing verdicts.
+- Added regression coverage for the compact payload contract, scenario decision
+  verdict parity, server parity baselines, and Windows/WSL process visibility
+  routing.
+
+### Fixed
+
+- Fixed native Windows CI routing for `HostPlatformAdapter(platform_kind="linux")`
+  so WSL-simulated PID checks do not accidentally use the host Windows
+  `OpenProcess` path and report unrelated live PIDs as Unity processes.
+- Hardened smoke validation docs and reusable smoke scripts so compact scenario
+  results are not misread as missing per-step evidence.
+
+### Validation
+
+- Host Python unittest suite: `264` tests passed with `1` expected skip.
+- Project devmode MCP post-change smoke passed, including readiness,
+  compile matrix, acceptance, contract, playmode settled-state regression,
+  lifecycle retry, and project-action catalog consistency.
+- Project devmode package self-tests passed: EditMode `12/12` and PlayMode
+  `5/5`.
+
 ## 0.3.32
 
 Release tag: `v0.3.32`

@@ -829,7 +829,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "unity_scenario_run_and_wait": {
-        "description": "Start a Unity automation scenario and wait until it reaches a terminal state.",
+        "description": "Start a Unity automation scenario and wait until it reaches a terminal state. By default returns a compact decision envelope; set includeFullPayload=true when asserting raw per-step payload_json, hook_name, or parity fixture fields.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -838,7 +838,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "timeoutMs": {"type": "integer", "default": 600000, "minimum": 1000},
                 "pollIntervalMs": {"type": "integer", "default": 1000, "minimum": 100},
                 "verbose": {"type": "boolean", "default": False},
-                "includeFullPayload": {"type": "boolean", "default": False},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Return the raw scenario result including full steps and payload_json. Required for smoke helpers that assert per-step payload_json, hook_name, or exact raw step fields.",
+                },
             },
             "required": ["projectRoot", "scenario"],
         },

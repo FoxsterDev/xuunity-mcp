@@ -43,6 +43,17 @@ def get_subparser(parser: argparse.ArgumentParser, command: str) -> argparse.Arg
     raise AssertionError(f"Parser has no subcommands; expected {command}.")
 
 
+def get_root_subcommands(parser: argparse.ArgumentParser) -> list[str]:
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return list(action.choices)
+    raise AssertionError("Parser has no subcommands.")
+
+
+def get_option_groups(parser: argparse.ArgumentParser) -> list[list[str]]:
+    return [list(action.option_strings) for action in parser._actions if action.option_strings]
+
+
 def fake_bridge_response_to_tool_result(response: dict) -> dict:
     payload = {"bridge_response": response}
     return {
@@ -67,14 +78,17 @@ class ServerParityBaselineTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"COLUMNS": "80"}), mock.patch.object(sys, "argv", ["server.py"]):
             parser = server.build_parser()
             root_help = parser.format_help()
-            status_help = get_subparser(parser, "request-status-summary").format_help()
-            scenario_help = get_subparser(parser, "request-scenario-run-and-wait").format_help()
+            root_commands = get_root_subcommands(parser)
+            status_parser = get_subparser(parser, "request-status-summary")
+            scenario_parser = get_subparser(parser, "request-scenario-run-and-wait")
 
         for needle in expected["root_contains"]:
             self.assertIn(needle, root_help)
-        self.assertEqual(expected["root_sha256"], sha256_text(root_help))
-        self.assertEqual(expected["request_status_summary_sha256"], sha256_text(status_help))
-        self.assertEqual(expected["request_scenario_run_and_wait_sha256"], sha256_text(scenario_help))
+        self.assertIn("XUUnity Light Unity MCP server.", root_help)
+        self.assertEqual(expected["root_command_count"], len(root_commands))
+        self.assertEqual(expected["root_commands"], root_commands)
+        self.assertEqual(expected["request_status_summary_options"], get_option_groups(status_parser))
+        self.assertEqual(expected["request_scenario_run_and_wait_options"], get_option_groups(scenario_parser))
 
     def test_mcp_tool_list_json_baseline_matches_fixture(self) -> None:
         expected = load_baseline()["mcp_tools_list"]

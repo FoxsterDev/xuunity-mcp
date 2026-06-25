@@ -89,10 +89,34 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
 
         self.assertFalse(response["result"]["isError"])
         structured = response["result"]["structuredContent"]
+        self.assertEqual("compact_decision", structured["payload_mode"])
         self.assertEqual("passed", structured["verdict"])
         self.assertEqual("authoritative", structured["trust_class"])
         self.assertEqual("passed", structured["scenario_status"])
         self.assertTrue(structured["full_payload_available"])
+        self.assertEqual("compact_summary", structured["steps_payload_mode"])
+        self.assertTrue(structured["steps_are_compact"])
+        self.assertFalse(structured["raw_steps_included"])
+        self.assertTrue(structured["raw_steps_available"])
+        self.assertEqual(1, structured["raw_step_count"])
+        self.assertEqual(1, structured["compact_step_count"])
+        self.assertEqual(
+            [
+                "request-scenario-result",
+                "--project-root",
+                str(project_root),
+                "--run-id",
+                "run-compact",
+            ],
+            structured["full_payload_cli_args"],
+        )
+        self.assertEqual("unity_scenario_result", structured["full_payload_tool"])
+        self.assertEqual(
+            {"projectRoot": str(project_root), "runId": "run-compact"},
+            structured["full_payload_tool_arguments"],
+        )
+        self.assertIn("per_step_payload_json", structured["full_payload_required_for"])
+        self.assertIn("hook_name_assertions", structured["full_payload_required_for"])
         self.assertEqual("none", structured["recommended_next_action"])
         self.assertTrue(structured["editor_relaunched"])
         self.assertEqual(0, structured["previous_editor_pid"])
@@ -204,9 +228,13 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
 
         self.assertTrue(response["result"]["isError"])
         structured = response["result"]["structuredContent"]
+        self.assertEqual("compact_decision", structured["payload_mode"])
         self.assertEqual("failed", structured["verdict"])
         self.assertEqual("authoritative", structured["trust_class"])
         self.assertEqual("product_assertion", structured["failure_class"])
+        self.assertEqual("compact_summary", structured["steps_payload_mode"])
+        self.assertFalse(structured["raw_steps_included"])
+        self.assertTrue(structured["raw_steps_available"])
         self.assertEqual("scenario_failed", structured["error"]["code"])
         self.assertNotIn("scenario", structured)
         self.assertNotIn(heavy_payload, json.dumps(structured))
