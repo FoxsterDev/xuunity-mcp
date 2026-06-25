@@ -250,482 +250,96 @@ def load_report_content_args(args) -> str:
         except OSError as exc:
             raise ToolInvocationError("report_content_file_unreadable", str(exc)) from exc
     return content
+from server_cli_setup_commands import (
+    cmd_install_test_framework,
+    cmd_license_capabilities,
+    cmd_request_install_test_framework,
+    cmd_setup_apply,
+    cmd_setup_plan,
+    cmd_uninstall_apply,
+    cmd_uninstall_plan,
+    cmd_validate_setup,
+)
+from server_cli_bridge_commands import (
+    cmd_bridge_state,
+    cmd_ensure_ready,
+    cmd_open_editor,
+    cmd_project_discovery_report,
+    cmd_recover_editor_session,
+    cmd_registry_context_report,
+    cmd_registry_prune_contexts,
+    cmd_request_build_config_compile_matrix,
+    cmd_request_build_player,
+    cmd_request_build_target_get,
+    cmd_request_build_target_switch,
+    cmd_request_cancel,
+    cmd_request_capabilities,
+    cmd_request_compile,
+    cmd_request_compile_matrix,
+    cmd_request_console_grep,
+    cmd_request_edm4u_resolve,
+    cmd_request_editmode_tests,
+    cmd_request_editor_quit,
+    cmd_request_final_status,
+    cmd_request_health_probe,
+    cmd_request_latest_status,
+    cmd_request_loading_timing,
+    cmd_request_playmode_set,
+    cmd_request_playmode_state,
+    cmd_request_playmode_tests,
+    cmd_request_project_refresh,
+    cmd_request_scene_assert,
+    cmd_request_sdk_dependency_verify,
+    cmd_request_stale_cleanup,
+    cmd_request_status,
+    cmd_request_status_summary,
+    cmd_restore_editor_state,
+    cmd_runtime_config_show,
+    cmd_verify_editor_closed,
+)
+from server_cli_project_commands import (
+    cmd_artifact_probe,
+    cmd_artifact_register,
+    cmd_artifact_write_report,
+    cmd_maintenance_prune,
+    cmd_project_action_invoke,
+    cmd_project_action_list,
+    cmd_project_hook_scaffold,
+    cmd_request_scenario_result,
+    cmd_request_scenario_result_latest,
+    cmd_request_scenario_result_summary,
+    cmd_request_scenario_results_list,
+    cmd_request_scenario_run,
+    cmd_request_scenario_run_and_wait,
+    cmd_request_scenario_validate,
+)
+from server_cli_batch_commands import (
+    cmd_batch_build_player as cmd_batch_build_player_base,
+)
 
 
-def cmd_recover_editor_session(args):
-    project_root = ensure_project_root(args.project_root)
-    refresh_project_context(project_root)
-    initial_discovery = build_project_discovery_report(project_root)
-
-    payload: dict[str, Any] = {
-        "action": "recover_editor_session",
-        "project_root": str(project_root),
-        "dialog_policy": "observe_only",
-        "recovery_classification": "inspection_only",
-        "initial_discovery": initial_discovery,
-        "closeout_attempted": False,
-        "compile_probe_attempted": False,
-    }
-
-    host_session_state = current_project_context_host_session_state(project_root)
-    if bool(host_session_state.get("opened_by_host")):
-        payload["closeout_attempted"] = True
-        closeout = restore_host_opened_editor_state(project_root, args.close_timeout_ms, request_editor_quit)
-        payload["closeout"] = closeout
-        refresh_project_context(project_root)
-        if not bool(closeout.get("closeout_verified")):
-            payload["recovery_classification"] = "closeout_incomplete"
-            payload["recovery_recommended_next_action"] = str(
-                closeout.get("recommended_next_action")
-                or "manual_editor_close"
-            )
-            payload["recommended_recovery_command"] = str(closeout.get("recommended_recovery_command") or "")
-            payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
-            print_json(payload)
-            raise SystemExit(1)
-
-    refresh_project_context(project_root)
-    discovery_after_closeout = build_project_discovery_report(project_root)
-    payload["discovery_after_closeout"] = discovery_after_closeout
-
-    detected_editor_pids = list(discovery_after_closeout.get("detected_editor_pids") or [])
-    if (
-        not detected_editor_pids
-        and str(discovery_after_closeout.get("reconciliation_case") or "") in {"stale_bridge_state", "stale_bridge_and_host_session"}
-    ):
-        payload["stale_bridge_state_cleared"] = clear_stale_bridge_state(project_root)
-        refresh_project_context(project_root)
-        discovery_after_closeout = build_project_discovery_report(project_root)
-        payload["discovery_after_closeout"] = discovery_after_closeout
-
-    diagnosis = dict(discovery_after_closeout.get("editor_log_diagnosis") or {})
-    diagnosis_code = str(diagnosis.get("code") or "")
-    compile_block_detected = diagnosis_code in {
-        "interactive_compile_block_detected",
-        "safe_mode_manual_required",
-        "package_resolution_failed",
-    }
-
-    if compile_block_detected or bool(args.force_compile_probe):
-        payload["compile_probe_attempted"] = True
-        compile_probe = run_batch_build_config_compile_matrix_probe(
-            project_root,
-            timeout_ms=args.timeout_ms,
-        )
-        payload["compile_probe"] = compile_probe
-        if not bool(compile_probe.get("succeeded")):
-            recovery_classification, next_action, recovery_command_template = classify_compile_probe_failure(compile_probe)
-            payload["recovery_classification"] = recovery_classification
-            payload["recovery_recommended_next_action"] = next_action
-            payload["recommended_recovery_command"] = recovery_command_template.format(project_root=str(project_root))
-            if recovery_classification == "compile_red_confirmed":
-                payload["reopen_blocked"] = True
-                payload["reopen_block_reason"] = "compile_red_after_batch_restore"
-            payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
-            print_json(payload)
-            raise SystemExit(1)
-
-    if args.open_editor:
-        ensure_payload, ensure_completed = run_self_json_command_with_completed(
-            [
-                "ensure-ready",
-                "--project-root",
-                str(project_root),
-                "--open-editor",
-                "--timeout-ms",
-                str(args.timeout_ms),
-                "--heartbeat-max-age-seconds",
-                str(args.heartbeat_max_age_seconds),
-                "--startup-policy",
-                str(args.startup_policy),
-            ]
-        )
-        payload["ensure_ready"] = ensure_payload or {}
-        if ensure_completed.returncode != 0:
-            payload["recovery_classification"] = "reopen_failed"
-            error_payload = dict((ensure_payload or {}).get("error") or {})
-            details = dict(error_payload.get("details") or {})
-            payload["recovery_recommended_next_action"] = str(
-                details.get("recommended_next_action")
-                or "inspect_editor_log"
-            )
-            payload["recommended_recovery_command"] = str(
-                details.get("recommended_recovery_command")
-                or recommended_recovery_command_for_project(project_root, payload["recovery_recommended_next_action"])
-            )
-            payload["reopen_error"] = {
-                "code": str(error_payload.get("code") or "ensure_ready_failed"),
-                "message": str(error_payload.get("message") or truncate_text(ensure_completed.stderr or "", 400)),
-                "details": details,
-            }
-            payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
-            print_json(payload)
-            raise SystemExit(1)
-
-    payload["recovery_classification"] = "recovered"
-    payload["recovery_recommended_next_action"] = "none"
-    payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
-    print_json(payload)
-
-
-def cmd_setup_plan(args):
-    payload = build_setup_plan(
-        workspace_root=args.workspace_root,
-        project_roots=list(args.project_root or []),
-        recursive=bool(args.recursive),
-        include_test_framework=args.include_test_framework,
-        package_source=args.package_source,
-        package_version=args.package_version or default_light_mcp_package_version(),
-        local_package_source=args.local_package_source or str(default_local_package_source()),
-    )
-    print_json(payload)
-
-
-def cmd_setup_apply(args):
-    plan_path = Path(args.plan_file).expanduser()
-    if not plan_path.is_absolute():
-        plan_path = (Path.cwd() / plan_path).resolve()
-    plan = read_json(plan_path)
-    payload = apply_setup_plan(
-        plan,
-        approve=bool(args.yes),
-        selected_project_roots=list(args.project_root or []),
-    )
-    print_json(payload)
-
-
-def cmd_uninstall_plan(args):
-    payload = build_uninstall_plan(
-        mode=args.mode,
-        project_roots=list(args.project_root or []),
-        workspace_root=args.workspace_root,
-        recursive=bool(args.recursive),
-        client=args.client,
-        include_other_client_helpers=bool(args.include_other_client_helpers),
-    )
-    print_json(payload)
-
-
-def cmd_uninstall_apply(args):
-    plan_path = Path(args.plan_file).expanduser()
-    if not plan_path.is_absolute():
-        plan_path = (Path.cwd() / plan_path).resolve()
-    plan = read_json(plan_path)
-    payload = apply_uninstall_plan(plan, approve=bool(args.yes))
-    print_json(payload)
-
-
-def cmd_validate_setup(args):
-    project_root = normalize_setup_project_root(args.project_root)
-    payload = validate_setup(project_root, include_tests=bool(args.include_tests))
-    print_json(payload)
-    if payload.get("validation_status") != "ready":
-        raise SystemExit(1)
-
-
-def cmd_install_test_framework(args):
-    project_root = normalize_setup_project_root(args.project_root)
-    payload = install_test_framework(project_root, approve=bool(args.yes), version=args.version or "")
-    print_json(payload)
-
-
-def cmd_license_capabilities(args):
-    project_root = ensure_project_root(args.project_root)
-    unity_app = detect_unity_app_path_for_project(project_root, args.unity_app)
-    payload = build_license_capabilities(
-        project_root=project_root,
-        unity_app=unity_app,
-        refresh=bool(args.refresh),
-        timeout_ms=int(args.timeout_ms or 30000),
-    )
-    print_json(payload)
-
-
-def cmd_request_install_test_framework(args):
-    project_root = ensure_project_root(args.project_root)
-    response = invoke_bridge(
-        str(project_root),
-        "unity.package.install_test_framework",
-        {
-            "approve": bool(args.yes),
-            "version": args.version or "",
-        },
-        resolve_operation_default_timeout_ms(project_root, "unity.package.install_test_framework", 300000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_bridge_state(args):
-    project_root = ensure_project_root(args.project_root)
-    if not bridge_enabled(project_root):
-        raise SystemExit(
-            "Bridge is disabled for this project. Enable it with "
-            "init_xuunity_light_unity_mcp.sh --project-root <path> --enable-project and reopen Unity."
-        )
-    state_path = bridge_state_path(project_root)
-    if not state_path.is_file():
-        raise SystemExit(f"Bridge state file not found: {state_path}")
-    print_json(annotate_bridge_state_with_liveness(read_json(state_path)))
-
-
-def cmd_request_status(args):
-    response = invoke_bridge(args.project_root, "unity.status", {}, args.timeout_ms)
-    print_json(response)
-
-
-def cmd_request_status_summary(args):
-    project_root = ensure_project_root(args.project_root)
-    try:
-        response = invoke_bridge(str(project_root), "unity.status", {}, args.timeout_ms)
-    except ToolInvocationError as exc:
-        if exc.code in DISCOVERY_STATUS_FALLBACK_ERROR_CODES:
-            print_json(build_discovery_status_summary_for_error(project_root, exc))
-            return
-        raise
-
-    tool_result = bridge_response_to_tool_result(response)
-    if tool_result.get("isError"):
-        print_json(tool_result.get("structuredContent") or {})
-        raise SystemExit(1)
-    payload = tool_result.get("structuredContent") or {}
-    print_json(build_status_summary_from_context(project_root, payload if isinstance(payload, dict) else {}))
-
-
-def cmd_request_latest_status(args):
-    project_root = ensure_project_root(args.project_root)
-    operations = [str(operation).strip() for operation in list(args.operation or []) if str(operation).strip()]
-    current_state = current_project_context_bridge_state(project_root)
-    latest_event = find_latest_request_event(project_root, operations)
-
-    if latest_event is None:
-        stabilization = build_bridge_stabilization_summary(current_state)
-        print_json(apply_discovery_to_final_status_summary({
-            "lookup_mode": "latest_request_by_operation",
-            "lookup_found": False,
-            "matched_operations": operations,
-            "request_id": "",
-            "operation": operations[-1] if operations else "",
-            "request_started": False,
-            "request_completed": False,
-            "completion_status": "",
-            "operation_outcome": "unknown",
-            "reclassified": False,
-            "reclassified_status": "",
-            "reclassified_reason": "",
-            "retryable": False,
-            "recommended_next_action": (
-                "retry_request" if stabilization["safe_to_retry"] else "wait_for_bridge_stabilization"
-            ),
-            "request_started_at_utc": "",
-            "request_completed_at_utc": "",
-            "last_event_type": "",
-            "last_event_at_utc": "",
-            "last_bridge_generation_seen": int((current_state or {}).get("bridge_generation") or 0),
-            "last_bridge_session_id_seen": str((current_state or {}).get("bridge_session_id") or ""),
-            "journal_event_count": 0,
-            "journal_event_paths": [],
-            "bridge_stabilization": stabilization,
-        }, project_root))
-        return
-
-    request_id = str(latest_event.get("request_id") or "").strip()
-    operation = str(latest_event.get("operation") or "").strip()
-    summary = build_request_final_status_from_context(project_root, request_id, operation, args.timeout_ms)
-    summary["lookup_mode"] = "latest_request_by_operation"
-    summary["lookup_found"] = True
-    summary["matched_operations"] = operations
-    summary["lookup_event_type"] = str(latest_event.get("event_type") or "")
-    summary["lookup_event_at_utc"] = str(latest_event.get("event_at_utc") or "")
-    summary["lookup_event_path"] = str(latest_event.get("_path") or "")
-    print_json(summary)
-
-
-def cmd_request_final_status(args):
-    project_root = ensure_project_root(args.project_root)
-    summary = build_request_final_status_from_context(project_root, args.request_id, args.operation or "", args.timeout_ms)
-    print_json(summary)
-
-
-def cmd_request_cancel(args):
-    project_root = ensure_project_root(args.project_root)
-    print_json(
-        cancel_request_best_effort(
-            project_root,
-            str(args.request_id or ""),
-            operation=str(args.operation or ""),
-        )
-    )
-
-
-def cmd_request_stale_cleanup(args):
-    project_root = ensure_project_root(args.project_root)
-    current_state = current_project_context_bridge_state(project_root)
-    print_json(
-        cleanup_stale_request_artifacts(
-            project_root,
-            current_state=current_state,
-            stale_age_seconds=max(1, int(args.stale_age_seconds or 600)),
-            dry_run=bool(args.dry_run),
-            max_entries=max(1, int(args.max_entries or 50)),
-        )
-    )
-
-
-def cmd_request_playmode_state(args):
-    response = invoke_bridge(args.project_root, "unity.playmode.state", {}, args.timeout_ms)
-    print_json(response)
-
-
-def cmd_request_playmode_set(args):
-    project_root = ensure_project_root(args.project_root)
-    response = invoke_bridge(
-        str(project_root),
-        "unity.playmode.set",
-        {"action": args.action},
-        resolve_operation_default_timeout_ms(project_root, "unity.playmode.set", 180000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_capabilities(args):
-    response = invoke_bridge(args.project_root, "unity.capabilities.get", {}, args.timeout_ms)
-    print_json(response)
-
-
-def cmd_request_health_probe(args):
-    response = invoke_bridge(args.project_root, "unity.health.probe", {}, args.timeout_ms)
-    print_json(response)
-
-
-def cmd_request_build_target_get(args):
-    response = invoke_bridge(args.project_root, "unity.build_target.get", {}, args.timeout_ms)
-    print_json(response)
-
-
-def cmd_request_build_target_switch(args):
-    response = invoke_bridge(
-        args.project_root,
-        "unity.build_target.switch",
-        {"target": args.target},
-        args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_build_player(args):
-    project_root = ensure_project_root(args.project_root)
-    build_target = str(args.build_target or "").strip()
-    if not build_target:
-        raise ToolInvocationError("missing_build_target", "--build-target is required.")
-    output_path = resolve_batch_build_output_path(project_root, args.output_path)
-    scene_paths = list(args.scene_path or [])
-    build_options = list(args.build_option or [])
-    result_path = (
-        Path(args.result_file).expanduser().resolve()
-        if getattr(args, "result_file", "")
-        else default_batch_build_result_path(project_root, build_target)
-    )
-    bridge_args = {
-        "buildTarget": build_target,
-        "outputPath": output_path,
-        "resultFile": str(result_path),
-        "scenePaths": scene_paths,
-        "buildOptions": build_options,
-    }
-    response = invoke_bridge(
-        str(project_root),
-        "unity.build_player",
-        bridge_args,
-        resolve_operation_default_timeout_ms(project_root, "unity.build_player", 600000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    payload = {
-        "action": "request_build_player",
-        "project_root": str(project_root),
-        "bridge_response": response,
-        "build_target": build_target,
-        "output_path": output_path,
-        "scene_paths": scene_paths,
-        "build_options": build_options,
-        "result_file": str(result_path),
-    }
-    artifact_probe_config = load_artifact_probe_config(
-        artifact_probe_file=getattr(args, "artifact_probe_file", "") or "",
-        artifact_probe_json=getattr(args, "artifact_probe_json", "") or "",
-        tool_error_type=ToolInvocationError,
-    )
-    if artifact_probe_config is not None:
-        summary = run_artifact_probe(
-            artifact_probe_config,
-            artifact_path_override=output_path,
-            truncate_text=truncate_text,
-        )
-        payload["artifact_probe_summary"] = summary
-        payload["artifact_probe_succeeded"] = bool(summary.get("succeeded"))
-        if not bool(summary.get("succeeded")) and not bool(getattr(args, "artifact_probe_warn_only", False)):
-            print_json(payload)
-            raise SystemExit(1)
-    print_json(payload)
-
-
-def cmd_request_scene_assert(args):
-    response = invoke_bridge(
-        args.project_root,
-        "unity.scene.assert",
-        {
-            "expectedName": args.expected_name or "",
-            "expectedPath": args.expected_path or "",
-            "requiredRootNames": args.required_root_name or None,
-            "allowDirty": args.allow_dirty,
-        },
-        args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_console_grep(args):
-    response = invoke_bridge(
-        args.project_root,
-        "unity.console.grep",
-        {
-            "pattern": args.pattern,
-            "regex": bool(args.regex),
-            "ignoreCase": bool(args.ignore_case),
-            "includeStackTraces": bool(args.include_stack_traces),
-            "limit": max(1, int(args.limit or 20)),
-            "includeTypes": args.include_type or None,
-        },
-        args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_loading_timing(args):
-    project_root = ensure_project_root(args.project_root)
-    summary = request_loading_timing_summary(
-        project_root=project_root,
-        markers=args.marker or [],
-        timing_only=not bool(args.include_non_timing),
-        include_stack_traces=bool(args.include_stack_traces),
-        include_types=args.include_type or [],
-        limit=int(args.limit or 20),
-        timeout_ms=int(args.timeout_ms or 5000),
-        invoke_bridge=invoke_bridge,
-    )
-    print_json(summary)
-    if not bool(summary.get("succeeded")):
-        raise SystemExit(1)
+def _compat_dep(name: str) -> Any:
+    server_module = sys.modules.get("server")
+    if server_module is not None and hasattr(server_module, name):
+        return getattr(server_module, name)
+    return globals()[name]
 
 
 def cmd_request_editor_quit(args):
-    project_root = ensure_project_root(args.project_root)
-    response = request_editor_quit(str(project_root), args.timeout_ms)
+    ensure_project_root_fn = _compat_dep("ensure_project_root")
+    request_editor_quit_fn = _compat_dep("request_editor_quit")
+    verify_project_editor_closed_fn = _compat_dep("verify_project_editor_closed")
+    print_json_fn = _compat_dep("print_json")
+
+    project_root = ensure_project_root_fn(args.project_root)
+    response = request_editor_quit_fn(str(project_root), args.timeout_ms)
     response["quit_request_accepted"] = response.get("status") == "ok"
     response["process_exit_verified"] = False
     if not bool(getattr(args, "wait_for_exit", False)):
-        print_json(response)
+        print_json_fn(response)
         return
 
-    verification = verify_project_editor_closed(project_root, args.exit_timeout_ms)
+    verification = verify_project_editor_closed_fn(project_root, args.exit_timeout_ms)
     payload = {
         "action": "request_editor_quit",
         "project_root": str(project_root),
@@ -739,7 +353,7 @@ def cmd_request_editor_quit(args):
         payload["closeout_classification"] = "quit_ack_and_process_exit_verified"
         payload["recommended_next_action"] = "none"
         payload["next_distinct_action"] = "rerun_closed_editor_batch_lane"
-        print_json(payload)
+        print_json_fn(payload)
         return
 
     if not bool(payload.get("process_visibility_available")):
@@ -769,10 +383,14 @@ def cmd_request_editor_quit(args):
 
 
 def cmd_verify_editor_closed(args):
-    project_root = ensure_project_root(args.project_root)
-    payload = verify_project_editor_closed(project_root, args.timeout_ms)
+    ensure_project_root_fn = _compat_dep("ensure_project_root")
+    verify_project_editor_closed_fn = _compat_dep("verify_project_editor_closed")
+    print_json_fn = _compat_dep("print_json")
+
+    project_root = ensure_project_root_fn(args.project_root)
+    payload = verify_project_editor_closed_fn(project_root, args.timeout_ms)
     if bool(payload.get("same_project_editor_closed")):
-        print_json(payload)
+        print_json_fn(payload)
         return
 
     if not bool(payload.get("process_visibility_available")):
@@ -792,424 +410,26 @@ def cmd_verify_editor_closed(args):
     )
 
 
-def cmd_request_project_refresh(args):
-    project_root = ensure_project_root(args.project_root)
-    response = invoke_bridge(
-        str(project_root),
-        "unity.project.refresh",
-        {
-            "forceAssetRefresh": args.force_asset_refresh,
-            "resolvePackages": args.resolve_packages,
-            "rerunHealthProbe": args.rerun_health_probe,
-        },
-        resolve_operation_default_timeout_ms(project_root, "unity.project.refresh", 180000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_edm4u_resolve(args):
-    project_root = ensure_project_root(args.project_root)
-    response = invoke_bridge(
-        str(project_root),
-        "unity.edm4u.resolve",
-        {
-            "platform": args.platform,
-            "force": args.force,
-            "refreshBefore": args.refresh_before,
-            "refreshAfter": args.refresh_after,
-            "menuPathCandidates": args.menu_path_candidate or None,
-        },
-        resolve_operation_default_timeout_ms(project_root, "unity.edm4u.resolve", 300000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_sdk_dependency_verify(args):
-    project_root = ensure_project_root(args.project_root)
-    config_path = Path(args.config_file).expanduser()
-    if not config_path.is_absolute():
-        config_path = (Path.cwd() / config_path).resolve()
-    config = read_json(config_path)
-    if not isinstance(config, dict):
-        raise ToolInvocationError("invalid_dependency_verify_config", "Dependency verification config must be a JSON object.")
-
-    response = invoke_bridge(
-        str(project_root),
-        "unity.sdk.dependency.verify",
-        config,
-        resolve_operation_default_timeout_ms(project_root, "unity.sdk.dependency.verify", 30000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_editmode_tests(args):
-    project_root = ensure_project_root(args.project_root)
-    response = invoke_bridge(
-        str(project_root),
-        "unity.tests.run_editmode",
-        {
-            "testNames": args.test_names or None,
-            "groupNames": args.group_names or None,
-            "categoryNames": args.category_names or None,
-            "assemblyNames": args.assembly_names or None,
-        },
-        resolve_operation_default_timeout_ms(project_root, "unity.tests.run_editmode", 300000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_playmode_tests(args):
-    project_root = ensure_project_root(args.project_root)
-    request_args = {
-        "testNames": args.test_names or None,
-        "groupNames": args.group_names or None,
-        "categoryNames": args.category_names or None,
-        "assemblyNames": args.assembly_names or None,
-    }
-    timeout_ms = resolve_operation_default_timeout_ms(project_root, "unity.tests.run_playmode", 300000) if args.timeout_ms is None else args.timeout_ms
-    response = invoke_bridge(
-        str(project_root),
-        "unity.tests.run_playmode",
-        request_args,
-        timeout_ms,
-    )
-
-    error_code = _bridge_error_code(response)
-    if error_code == "playmode_state_invalid":
-        invoke_bridge(
-            str(project_root),
-            "unity.playmode.set",
-            {"action": "exit"},
-            resolve_operation_default_timeout_ms(project_root, "unity.playmode.set", 180000),
-        )
-        response = invoke_bridge(
-            str(project_root),
-            "unity.tests.run_playmode",
-            request_args,
-            timeout_ms,
-        )
-
-    print_json(response)
-
-
-def cmd_request_compile(args):
-    project_root = ensure_project_root(args.project_root)
-    response = invoke_bridge(
-        str(project_root),
-        "unity.compile.player_scripts",
-        {
-            "name": args.name,
-            "target": args.target,
-            "optionFlags": args.option_flags,
-            "extraDefines": args.extra_defines,
-        },
-        resolve_operation_default_timeout_ms(project_root, "unity.compile.player_scripts", 180000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_compile_matrix(args):
-    project_root = ensure_project_root(args.project_root)
-    config_file = Path(args.config_file).expanduser().resolve()
-    if not config_file.is_file():
-        raise ToolInvocationError("compile_matrix_config_not_found", f"Compile matrix config file not found: {config_file}")
-
-    try:
-        matrix_args = json.loads(config_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ToolInvocationError("compile_matrix_config_invalid", str(exc)) from exc
-
-    response = invoke_bridge(
-        str(project_root),
-        "unity.compile.matrix",
-        matrix_args,
-        resolve_operation_default_timeout_ms(project_root, "unity.compile.matrix", 300000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_build_config_compile_matrix(args):
-    project_root = ensure_project_root(args.project_root)
-    compile_plan = build_compile_matrix_args_from_build_config(
-        project_root=project_root,
-        build_config_asset=args.build_config_asset,
-        requested_profiles=args.profile,
-        requested_targets=args.target,
-        stop_on_first_failure=args.stop_on_first_failure,
-        tool_error_type=ToolInvocationError,
-    )
-    response = invoke_bridge(
-        str(project_root),
-        "unity.compile.matrix",
-        compile_plan["matrixArgs"],
-        resolve_operation_default_timeout_ms(project_root, "unity.compile.matrix", 300000) if args.timeout_ms is None else args.timeout_ms,
-    )
-
-    payload = {
-        "build_config_asset": compile_plan["assetPath"],
-        "profiles": compile_plan["profiles"],
-        "bridge_response": response,
-    }
-    print_json(payload)
-
-
-def cmd_project_action_list(args):
-    project_root = ensure_project_root(args.project_root)
-    catalog = load_project_action_catalog(project_root, args.catalog_file or "")
-    print_json(project_action_catalog_payload(catalog))
-
-
-def cmd_project_action_invoke(args):
-    project_root = ensure_project_root(args.project_root)
-    result, is_error = invoke_project_action_from_catalog(
-        project_root=project_root,
-        requested_action=args.action_id,
-        action_payload=load_project_action_payload_args(args),
-        catalog_path=args.catalog_file or "",
-        scenario_name=args.scenario_name or "",
-        timeout_ms=resolve_operation_default_timeout_ms(project_root, "unity.scenario.run", 600000) if args.timeout_ms is None else args.timeout_ms,
-        poll_interval_ms=args.poll_interval_ms,
-        wait_for_result=not bool(args.no_wait),
-        allow_mutating=bool(args.allow_mutating),
-    )
-    print_json(result)
-    if is_error:
-        raise SystemExit(1)
-
-
-def cmd_project_hook_scaffold(args):
-    result = scaffold_project_hook(
-        hook_name=args.hook_name,
-        action_id=args.action_id,
-        class_name=args.class_name,
-        namespace=args.namespace,
-        output_dir=Path(args.output_dir).expanduser().resolve(),
-        mutating=bool(args.mutating),
-        write_files=bool(args.write),
-    )
-    print_json(result)
-
-
-def cmd_artifact_register(args):
-    project_root = ensure_project_root(args.project_root)
-    payload = register_artifact(
-        project_root=project_root,
-        artifact_path=args.path,
-        destination=args.destination,
-        kind=args.kind,
-        producer=args.producer,
-        artifact_schema_version=args.artifact_schema_version,
-        language=args.language,
-        retention_policy=args.retention_policy,
-        metadata=load_optional_json_object(args.metadata_json, "artifact_metadata_invalid"),
-        workspace_root=args.workspace_root,
-        allow_unity_assets=bool(args.allow_unity_assets),
-    )
-    print_json(payload)
-
-
-def cmd_artifact_write_report(args):
-    project_root = ensure_project_root(args.project_root)
-    payload = write_artifact_report(
-        project_root=project_root,
-        content=load_report_content_args(args),
-        destination=args.destination,
-        category=args.category,
-        relative_path=args.relative_path,
-        kind=args.kind,
-        producer=args.producer,
-        artifact_schema_version=args.artifact_schema_version,
-        language=args.language,
-        retention_policy=args.retention_policy,
-        metadata=load_optional_json_object(args.metadata_json, "artifact_metadata_invalid"),
-        workspace_root=args.workspace_root,
-        allow_unity_assets=bool(args.allow_unity_assets),
-    )
-    print_json(payload)
-
-
-def cmd_request_scenario_validate(args):
-    project_root = ensure_project_root(args.project_root)
-    scenario = normalize_project_action_scenario(
-        project_root=project_root,
-        scenario=load_json_file(args.scenario_file, "scenario_file_invalid"),
-    )
-    response = invoke_bridge(
-        str(project_root),
-        "unity.scenario.validate",
-        {"scenario": scenario},
-        args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_scenario_run(args):
-    project_root = ensure_project_root(args.project_root)
-    scenario = normalize_project_action_scenario(
-        project_root=project_root,
-        scenario=load_json_file(args.scenario_file, "scenario_file_invalid"),
-    )
-    response = invoke_bridge(
-        str(project_root),
-        "unity.scenario.run",
-        {"scenario": scenario},
-        resolve_operation_default_timeout_ms(project_root, "unity.scenario.run", 600000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_scenario_run_and_wait(args):
-    project_root = ensure_project_root(args.project_root)
-    scenario = normalize_project_action_scenario(
-        project_root=project_root,
-        scenario=load_json_file(args.scenario_file, "scenario_file_invalid"),
-    )
-    result = call_unity_scenario_run_and_wait_tool(
-        {
-            "projectRoot": str(project_root),
-            "scenario": scenario,
-            "timeoutMs": args.timeout_ms,
-            "pollIntervalMs": args.poll_interval_ms,
-            "verbose": bool(args.verbose),
-            "includeFullPayload": bool(args.include_full_payload),
-        }
-    )
-    print_json(result.get("structuredContent") or {})
-    if result.get("isError"):
-        raise SystemExit(1)
-
-
-def cmd_request_scenario_result(args):
-    bridge_args: dict[str, Any] = {}
-    if args.run_id:
-        bridge_args["runId"] = args.run_id
-    if args.scenario_name:
-        bridge_args["scenarioName"] = args.scenario_name
-
-    response = invoke_bridge(
-        args.project_root,
-        "unity.scenario.result",
-        bridge_args,
-        args.timeout_ms,
-    )
-    print_json(response)
-
-
-def cmd_request_scenario_result_summary(args):
-    project_root = ensure_project_root(args.project_root)
-    bridge_args: dict[str, Any] = {}
-    if args.run_id:
-        bridge_args["runId"] = args.run_id
-    if args.scenario_name:
-        bridge_args["scenarioName"] = args.scenario_name
-
-    try:
-        response = invoke_bridge(
-            str(project_root),
-            "unity.scenario.result",
-            bridge_args,
-            args.timeout_ms,
-        )
-    except ToolInvocationError as exc:
-        if exc.code in DISCOVERY_STATUS_FALLBACK_ERROR_CODES.union(SCENARIO_RECOVERY_ERROR_CODES):
-            print_json(
-                build_discovery_scenario_result_summary_for_error(
-                    project_root,
-                    bridge_args.get("runId", ""),
-                    bridge_args.get("scenarioName", ""),
-                    exc,
-                )
-            )
-            return
-        raise
-
-    tool_result = bridge_response_to_tool_result(response)
-    if tool_result.get("isError"):
-        print_json(tool_result.get("structuredContent") or {})
-        raise SystemExit(1)
-    payload = tool_result.get("structuredContent") or {}
-    print_json(build_scenario_result_summary_from_context(project_root, payload if isinstance(payload, dict) else {}))
-
-
-def cmd_request_scenario_results_list(args):
-    project_root = ensure_project_root(args.project_root)
-    print_json(
-        list_persisted_scenario_result_summaries(
-            project_root,
-            scenario_results_dir=scenario_results_dir,
-            read_json=read_json,
-            parse_utc_timestamp=parse_utc_timestamp,
-            attach_persisted_scenario_result_evidence=attach_persisted_scenario_result_evidence,
-            build_scenario_result_summary=build_scenario_result_summary,
-            scenario_terminal_statuses=SCENARIO_TERMINAL_STATUSES,
-            scenario_name=str(args.scenario_name or ""),
-            limit=int(args.limit or 20),
-        )
-    )
-
-
-def cmd_request_scenario_result_latest(args):
-    project_root = ensure_project_root(args.project_root)
-    print_json(
-        latest_persisted_scenario_result_summary(
-            project_root,
-            scenario_results_dir=scenario_results_dir,
-            read_json=read_json,
-            parse_utc_timestamp=parse_utc_timestamp,
-            attach_persisted_scenario_result_evidence=attach_persisted_scenario_result_evidence,
-            build_scenario_result_summary=build_scenario_result_summary,
-            scenario_terminal_statuses=SCENARIO_TERMINAL_STATUSES,
-            scenario_name=str(args.scenario_name or ""),
-        )
-    )
-
-
-def cmd_maintenance_prune(args):
-    project_root = ensure_project_root(args.project_root)
-    result = prune_project_artifacts(
-        project_root,
-        {
-            "dryRun": args.dry_run,
-            "requestJournalMaxAgeHours": args.request_journal_max_age_hours,
-            "requestJournalKeepLatest": args.request_journal_keep_latest,
-            "scenarioSuccessMaxAgeHours": args.scenario_success_max_age_hours,
-            "scenarioFailureMaxAgeHours": args.scenario_failure_max_age_hours,
-            "scenarioRunningMaxAgeHours": args.scenario_running_max_age_hours,
-            "scenarioKeepLatestSuccess": args.scenario_keep_latest_success,
-            "scenarioKeepLatestFailure": args.scenario_keep_latest_failure,
-            "scenarioKeepLatestRunning": args.scenario_keep_latest_running,
-            "capturesMaxAgeHours": args.captures_max_age_hours,
-            "capturesKeepLatest": args.captures_keep_latest,
-            "pruneLogs": args.prune_logs,
-            "logsMaxAgeHours": args.logs_max_age_hours,
-            "logsKeepLatest": args.logs_keep_latest,
-        },
-        bridge_root=bridge_root,
-        request_journal_dir=request_journal_dir,
-        scenario_results_dir=scenario_results_dir,
-        active_scenario_run_path=active_scenario_run_path,
-        captures_dir=captures_dir,
-        logs_dir=logs_dir,
-        default_editor_log_path=default_editor_log_path,
-        read_json=read_json,
-    )
-    print_json(result)
-
-
-def cmd_open_editor(args):
-    project_root = ensure_project_root(args.project_root)
-    unity_app = detect_unity_app_path_for_project(project_root, args.unity_app)
-    log_path = resolve_editor_log_path(project_root, args.editor_log_path)
-    payload = open_unity_editor(project_root, log_path, unity_app, args.background_open)
-    payload["project_root"] = str(project_root)
-    refresh_project_context(project_root)
-    print_json(payload)
-
-
 def cmd_ensure_ready(args):
-    project_root = ensure_project_root(args.project_root)
-    log_path = resolve_editor_log_path(project_root, args.editor_log_path)
-    package_import_state_before_ready = inspect_light_mcp_import_state(project_root)
+    ensure_project_root_fn = _compat_dep("ensure_project_root")
+    resolve_editor_log_path_fn = _compat_dep("resolve_editor_log_path")
+    inspect_light_mcp_import_state_fn = _compat_dep("inspect_light_mcp_import_state")
+    build_project_discovery_report_fn = _compat_dep("build_project_discovery_report")
+    maybe_fail_fast_offline_ensure_ready_without_open_fn = _compat_dep("maybe_fail_fast_offline_ensure_ready_without_open")
+    current_project_context_bridge_state_fn = _compat_dep("current_project_context_bridge_state")
+    bridge_state_is_ready_fn = _compat_dep("bridge_state_is_ready")
+    detect_unity_app_path_for_project_fn = _compat_dep("detect_unity_app_path_for_project")
+    open_unity_editor_fn = _compat_dep("open_unity_editor")
+    wait_for_ready_fn = _compat_dep("wait_for_ready")
+    enrich_tool_invocation_error_with_discovery_fn = _compat_dep("enrich_tool_invocation_error_with_discovery")
+    update_host_editor_session_pid_fn = _compat_dep("update_host_editor_session_pid")
+    refresh_project_context_fn = _compat_dep("refresh_project_context")
+    inspect_package_dependency_alignment_fn = _compat_dep("inspect_package_dependency_alignment")
+    print_json_fn = _compat_dep("print_json")
+
+    project_root = ensure_project_root_fn(args.project_root)
+    log_path = resolve_editor_log_path_fn(project_root, args.editor_log_path)
+    package_import_state_before_ready = inspect_light_mcp_import_state_fn(project_root)
 
     payload: dict[str, Any] = {
         "project_root": str(project_root),
@@ -1218,17 +438,17 @@ def cmd_ensure_ready(args):
         "package_import_state": package_import_state_before_ready,
         "package_import_state_before_ready": package_import_state_before_ready,
     }
-    payload["discovery"] = build_project_discovery_report(project_root)
+    payload["discovery"] = build_project_discovery_report_fn(project_root)
 
     try:
         if not args.open_editor:
-            maybe_fail_fast_offline_ensure_ready_without_open(
+            maybe_fail_fast_offline_ensure_ready_without_open_fn(
                 project_root,
                 payload["discovery"],
             )
-        current_state = current_project_context_bridge_state(project_root)
+        current_state = current_project_context_bridge_state_fn(project_root)
 
-        if args.open_editor and bridge_state_is_ready(current_state, args.heartbeat_max_age_seconds):
+        if args.open_editor and bridge_state_is_ready_fn(current_state, args.heartbeat_max_age_seconds):
             payload["launch"] = {
                 "reused_existing_editor": True,
                 "reused_via": "healthy_bridge_state",
@@ -1236,10 +456,10 @@ def cmd_ensure_ready(args):
                 "unity_version": str(current_state.get("unity_version") or ""),
             }
         elif args.open_editor:
-            unity_app = detect_unity_app_path_for_project(project_root, args.unity_app)
-            payload["launch"] = open_unity_editor(project_root, log_path, unity_app, args.background_open)
+            unity_app = detect_unity_app_path_for_project_fn(project_root, args.unity_app)
+            payload["launch"] = open_unity_editor_fn(project_root, log_path, unity_app, args.background_open)
 
-        state = wait_for_ready(
+        state = wait_for_ready_fn(
             project_root=project_root,
             timeout_ms=args.timeout_ms,
             heartbeat_max_age_seconds=args.heartbeat_max_age_seconds,
@@ -1250,10 +470,10 @@ def cmd_ensure_ready(args):
         if str(exc.details.get("fail_fast_reason") or "") == "ensure_ready_without_open_editor_offline":
             raise
         details = dict(exc.details or {})
-        package_import_state = inspect_light_mcp_import_state(project_root)
+        package_import_state = inspect_light_mcp_import_state_fn(project_root)
         details["package_import_state"] = package_import_state
         import_state = str(package_import_state.get("import_state") or "")
-        discovery = build_project_discovery_report(project_root)
+        discovery = build_project_discovery_report_fn(project_root)
         live_editor_pids: list[int] = []
         for pid_value in discovery.get("detected_editor_pids") or discovery.get("live_project_editor_pids") or []:
             try:
@@ -1263,7 +483,7 @@ def cmd_ensure_ready(args):
             if pid > 0:
                 live_editor_pids.append(pid)
         bridge_state_present = bool(package_import_state.get("bridge_state_present")) or bool(
-            current_project_context_bridge_state(project_root)
+            current_project_context_bridge_state_fn(project_root)
         )
         if (
             args.open_editor
@@ -1278,27 +498,34 @@ def cmd_ensure_ready(args):
                 f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor"
             )
             details["live_project_editor_pids"] = live_editor_pids
-        raise enrich_tool_invocation_error_with_discovery(
+        raise enrich_tool_invocation_error_with_discovery_fn(
             project_root,
             ToolInvocationError(exc.code, exc.message, details),
         )
 
     payload["bridge_state"] = state
     if payload.get("launch") and not bool(payload["launch"].get("reused_existing_editor")):
-        update_host_editor_session_pid(project_root, int(state.get("editor_pid") or 0))
-    refresh_project_context(project_root)
-    payload["discovery_after_ready"] = build_project_discovery_report(project_root)
-    payload["package_dependency"] = inspect_package_dependency_alignment(project_root)
-    payload["package_import_state"] = inspect_light_mcp_import_state(project_root)
+        update_host_editor_session_pid_fn(project_root, int(state.get("editor_pid") or 0))
+    refresh_project_context_fn(project_root)
+    payload["discovery_after_ready"] = build_project_discovery_report_fn(project_root)
+    payload["package_dependency"] = inspect_package_dependency_alignment_fn(project_root)
+    payload["package_import_state"] = inspect_light_mcp_import_state_fn(project_root)
     payload["package_import_state_after_ready"] = payload["package_import_state"]
-    print_json(payload)
+    print_json_fn(payload)
 
 
 def cmd_restore_editor_state(args):
-    project_root = ensure_project_root(args.project_root)
-    payload = restore_host_opened_editor_state(project_root, args.timeout_ms, request_editor_quit)
-    refresh_project_context(project_root)
-    payload["post_close_discovery"] = build_project_discovery_report(project_root)
+    ensure_project_root_fn = _compat_dep("ensure_project_root")
+    restore_host_opened_editor_state_fn = _compat_dep("restore_host_opened_editor_state")
+    request_editor_quit_fn = _compat_dep("request_editor_quit")
+    refresh_project_context_fn = _compat_dep("refresh_project_context")
+    build_project_discovery_report_fn = _compat_dep("build_project_discovery_report")
+    print_json_fn = _compat_dep("print_json")
+
+    project_root = ensure_project_root_fn(args.project_root)
+    payload = restore_host_opened_editor_state_fn(project_root, args.timeout_ms, request_editor_quit_fn)
+    refresh_project_context_fn(project_root)
+    payload["post_close_discovery"] = build_project_discovery_report_fn(project_root)
     if bool(payload.get("host_opened_session_found")) and not bool(payload.get("closeout_verified")):
         closeout_classification = str(payload.get("closeout_classification") or "restore_editor_state_incomplete")
         recommended_next_action = str(payload.get("recommended_next_action") or "inspect_project_editor_processes")
@@ -1326,35 +553,8 @@ def cmd_restore_editor_state(args):
             ),
             payload,
         )
-    print_json(payload)
+    print_json_fn(payload)
 
-
-def cmd_runtime_config_show(args):
-    project_root = ensure_project_root(args.project_root)
-    print_json(build_runtime_config_report(project_root))
-
-
-def cmd_project_discovery_report(args):
-    project_root = ensure_project_root(args.project_root)
-    print_json(build_project_discovery_report(project_root))
-
-
-def cmd_registry_context_report(args):
-    print_json(build_registry_context_report())
-
-
-def cmd_registry_prune_contexts(args):
-    pruned = prune_stale_project_contexts(
-        offline_context_max_idle_seconds=args.offline_context_max_idle_seconds,
-        general_context_max_idle_seconds=args.general_context_max_idle_seconds,
-    )
-    print_json(
-        {
-            "pruned_count": len(pruned),
-            "pruned": pruned,
-            "remaining": build_registry_context_report(),
-        }
-    )
 
 
 def cmd_batch_test_framework_version_regression(args):
@@ -1890,113 +1090,34 @@ def _discover_test_result_project_roots(workspace_root: Path) -> list[Path]:
     return roots
 
 
-def cmd_artifact_probe(args):
-    artifact_probe_config = load_artifact_probe_config(
-        artifact_probe_file=getattr(args, "artifact_probe_file", "") or "",
-        artifact_probe_json=getattr(args, "artifact_probe_json", "") or "",
-        tool_error_type=ToolInvocationError,
-    )
-    if artifact_probe_config is None:
-        raise ToolInvocationError(
-            "artifact_probe_missing",
-            "Pass --artifact-probe-file or --artifact-probe-json.",
-        )
+_BATCH_COMMAND_PATCHABLE_DEPENDENCIES = [
+    "DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS",
+    "ToolInvocationError",
+    "build_plain_batch_build_command",
+    "default_batch_build_log_path",
+    "default_batch_build_result_path",
+    "detect_unity_app_path_for_project",
+    "ensure_project_root",
+    "load_artifact_probe_config",
+    "load_batch_side_effect_allow_config",
+    "progress_stdout_enabled",
+    "resolve_batch_build_output_path",
+    "resolve_workspace_root",
+    "run_batch_operation",
+]
 
-    summary = run_artifact_probe(
-        artifact_probe_config,
-        artifact_path_override=args.artifact_path or "",
-        truncate_text=truncate_text,
-    )
-    print_json({"artifact_probe_summary": summary})
-    if not bool(summary.get("succeeded")) and not bool(args.artifact_probe_warn_only):
-        raise SystemExit(1)
+
+def _sync_batch_command_patchable_dependencies() -> None:
+    import server_cli_batch_commands
+
+    for name in _BATCH_COMMAND_PATCHABLE_DEPENDENCIES:
+        if name in globals():
+            setattr(server_cli_batch_commands, name, globals()[name])
 
 
 def cmd_batch_build_player(args):
-    project_root = ensure_project_root(args.project_root)
-    unity_app = detect_unity_app_path_for_project(project_root, args.unity_app)
-    build_target = str(args.build_target or "").strip()
-    if not build_target:
-        raise ToolInvocationError("missing_build_target", "--build-target is required.")
-
-    log_path = (
-        Path(args.batch_log_path).expanduser().resolve()
-        if args.batch_log_path
-        else default_batch_build_log_path(project_root, build_target)
-    )
-    result_path = (
-        Path(args.result_file).expanduser().resolve()
-        if args.result_file
-        else default_batch_build_result_path(project_root, build_target)
-    )
-    output_path = resolve_batch_build_output_path(project_root, args.output_path)
-    from server_host_platform import is_wsl, wsl_to_windows_path
-    output_path_windows = wsl_to_windows_path(output_path) if is_wsl() else output_path
-    result_path_host = wsl_to_windows_path(result_path) if is_wsl() else str(result_path)
-    scene_paths = list(args.scene_path or [])
-    build_options = list(args.build_option or [])
-    artifact_probe_config = load_artifact_probe_config(
-        artifact_probe_file=getattr(args, "artifact_probe_file", "") or "",
-        artifact_probe_json=getattr(args, "artifact_probe_json", "") or "",
-        tool_error_type=ToolInvocationError,
-    )
-    artifact_probe_warn_only = bool(getattr(args, "artifact_probe_warn_only", False))
-
-    command = build_plain_batch_build_command(
-        project_root=project_root,
-        unity_app=unity_app,
-        log_path=log_path,
-        result_path=result_path,
-        build_target=build_target,
-        output_path=output_path_windows,
-        scene_paths=scene_paths,
-        build_options=build_options,
-    )
-
-    payload: dict[str, Any] = {
-        "action": "plain_batch_build",
-        "project_root": str(project_root),
-        "unity_app": str(unity_app),
-        "build_target": build_target,
-        "output_path": output_path,
-        "scene_paths": scene_paths,
-        "build_options": build_options,
-        "log_path": str(log_path),
-        "result_file": str(result_path),
-        "command": command,
-        "dry_run": args.dry_run,
-        "artifact_probe_enabled": artifact_probe_config is not None,
-        "artifact_probe_warn_only": artifact_probe_warn_only,
-    }
-    run_batch_operation(
-        project_root=project_root,
-        unity_app=unity_app,
-        command=command,
-        payload=payload,
-        log_path=log_path,
-        result_path=result_path,
-        dry_run=args.dry_run,
-        timeout_ms=args.timeout_ms,
-        workspace_root=resolve_workspace_root(project_root, getattr(args, "workspace_root", None)),
-        side_effect_mode=getattr(args, "side_effect_mode", "git"),
-        side_effect_allow_config=load_batch_side_effect_allow_config(getattr(args, "side_effect_allow_file", None)),
-        progress_interval_seconds=float(getattr(args, "progress_interval_seconds", DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS)),
-        progress_stdout=progress_stdout_enabled(args),
-        batch_fallback_mode=getattr(args, "batch_fallback_mode", "auto"),
-        refresh_license=bool(getattr(args, "refresh_license", False)),
-        gui_operation="unity.build_player",
-        gui_operation_args={
-            "buildTarget": build_target,
-            "outputPath": output_path_windows,
-            "resultFile": result_path_host,
-            "scenePaths": scene_paths,
-            "buildOptions": build_options,
-        },
-        artifact_probe_config=artifact_probe_config,
-        artifact_probe_path_override=output_path,
-        artifact_probe_warn_only=artifact_probe_warn_only,
-        last_known_output_path=output_path,
-    )
+    _sync_batch_command_patchable_dependencies()
+    return cmd_batch_build_player_base(args)
 
 
 from server_core import wrap_globals_with_proxies

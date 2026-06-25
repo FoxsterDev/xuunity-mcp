@@ -211,6 +211,20 @@ from server_batch_reporting import (
     batch_progress_sidecar_path,
     first_non_empty_line,
 )
+from server_batch_lanes import (
+    attach_batch_lane_fields_to_summary_data,
+    attach_license_lane_fields_data,
+    batch_lane_preflight_blocker_data,
+    batch_start_editor_state_data,
+    ensure_batch_project_closed_data,
+    gui_fallback_busy_reasons_data,
+    infer_gui_operation_succeeded_data,
+    load_batch_side_effect_allow_config_data,
+    normalize_batch_fallback_mode_data,
+    progress_stdout_enabled_data,
+    run_batch_operation_data,
+    run_gui_fallback_operation_data,
+)
 from server_runtime_config import (
     resolve_operation_default_timeout_ms,
     resolve_operation_lifecycle_policy_overrides,
@@ -220,6 +234,48 @@ from server_artifact_registry import register_artifact, write_artifact_report
 
 # ProcessLauncher for self-invocation
 from server_process_launcher import ProcessLauncher
+from server_batch_context import (
+    DISCOVERY_NEXT_ACTION_COMMANDS,
+    DISCOVERY_STATUS_FALLBACK_ERROR_CODES,
+    MUTATING_BRIDGE_OPERATIONS,
+    RECOVERY_RECONCILIATION_ACTIONS,
+    SCENARIO_RECOVERY_ERROR_CODES,
+    TProjectOperationResult,
+    apply_discovery_to_final_status_summary,
+    apply_discovery_to_scenario_payload,
+    bridge_operation_requires_request_lock,
+    build_discovery_scenario_result_summary_for_error,
+    build_project_discovery_report,
+    build_registry_context_report,
+    build_request_final_status_from_context,
+    build_scenario_result_summary_from_context,
+    build_status_summary_from_context,
+    build_tool_error_payload,
+    current_project_context_bridge_state,
+    current_project_context_discovery_details,
+    current_project_context_host_session_state,
+    default_light_mcp_package_version,
+    default_local_package_source,
+    emit_tool_error_summary,
+    enrich_error_details_with_discovery,
+    enrich_tool_invocation_error_with_discovery,
+    ensure_project_root,
+    mcp_json_result,
+    recommended_recovery_command_for_project,
+    run_in_project_request_lock,
+)
+from server_batch_recovery import (
+    build_batch_editor_conflict_details,
+    build_discovery_status_summary_for_error,
+    build_editor_relaunch_attribution,
+    classify_compile_probe_failure,
+    execute_host_health_recovery_policy,
+    maybe_fail_fast_offline_ensure_ready_without_open,
+    recover_project_bridge_for_reconciliation,
+    run_batch_build_config_compile_matrix_probe,
+    run_self_json_command,
+    run_self_json_command_with_completed,
+)
 
 # Protocol metadata
 PROTOCOL_VERSION = "2025-06-18"
@@ -520,18 +576,6 @@ def build_project_discovery_report(project_root: Path) -> dict[str, Any]:
     )
 
 
-RECOVERY_RECONCILIATION_ACTIONS = frozenset(
-    {
-        "ensure_ready_or_recover_bridge",
-        "wait_for_bridge_or_recover_editor",
-        "recover_editor_session",
-        "open_editor_or_ensure_ready",
-        "start_or_recover_editor",
-        "clear_stale_host_session_and_retry",
-    }
-)
-
-
 def build_status_summary_from_context(
     project_root: Path,
     payload: dict[str, Any],
@@ -547,45 +591,6 @@ def build_status_summary_from_context(
         summarize_state_for_error=summarize_state_for_error,
         discovery_details=current_project_context_discovery_details(project_root),
     )
-
-
-DISCOVERY_STATUS_FALLBACK_ERROR_CODES = frozenset(
-    {
-        "editor_not_running",
-        "process_visibility_restricted",
-        "process_visibility_restricted_before_open",
-        "transport_not_ready",
-        "bridge_disabled",
-    }
-)
-
-SCENARIO_RECOVERY_ERROR_CODES = frozenset(
-    {
-        "editor_not_running",
-        "transport_not_ready",
-        "transport_connect_failed",
-        "transport_response_missing",
-        "request_lifecycle_reset",
-        "response_missing_after_lifecycle_reset",
-    }
-)
-
-
-DISCOVERY_NEXT_ACTION_COMMANDS = {
-    "enable_bridge_and_retry": "init_xuunity_light_unity_mcp.sh --project-root {project_root} --enable-project",
-    "open_editor_or_ensure_ready": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "ensure_ready_or_recover_bridge": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "wait_for_bridge_or_recover_editor": "xuunity_light_unity_mcp.sh recover-editor-session --project-root {project_root} --timeout-ms 180000",
-    "recover_editor_session": "xuunity_light_unity_mcp.sh recover-editor-session --project-root {project_root} --timeout-ms 180000",
-    "close_same_project_editor_or_use_interactive_lane": "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
-    "start_or_recover_editor": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "clear_stale_host_session_and_retry": "xuunity_light_unity_mcp.sh restore-editor-state --project-root {project_root} --timeout-ms 15000",
-    "refresh_host_session_if_needed": "xuunity_light_unity_mcp.sh request-status-summary --project-root {project_root} --timeout-ms 5000",
-    "inspect_editor_log": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
-    "inspect_editor_log_and_observe": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
-    "inspect_editor_log_and_consider_graceful_restart": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "restore_host_process_visibility": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
-}
 
 
 def recommended_recovery_command_for_project(project_root: Path, next_action: str) -> str:
@@ -612,6 +617,19 @@ def enrich_tool_invocation_error_with_discovery(project_root: Path, exc: ToolInv
     )
 
 
+def build_discovery_status_summary_for_error(
+    project_root: Path,
+    exc: ToolInvocationError | None = None,
+) -> dict[str, Any]:
+    return build_discovery_status_summary_for_error_data(
+        project_root,
+        exc=exc,
+        discovery=current_project_context_discovery_details(project_root),
+        build_status_summary_from_context=build_status_summary_from_context,
+        enrich_error_details_with_discovery=enrich_error_details_with_discovery,
+    )
+
+
 def build_batch_editor_conflict_details(project_root: Path, live_editor_pids: list[int]) -> dict[str, Any]:
     next_action = "close_same_project_editor_or_use_interactive_lane"
     visibility = process_visibility_summary()
@@ -628,33 +646,6 @@ def build_batch_editor_conflict_details(project_root: Path, live_editor_pids: li
         "recommended_recovery_command": recommended_recovery_command_for_project(project_root, next_action),
         "closeout_verification_required": True,
         "closeout_verification_note": "Verify editor process exit before rerunning the closed-project batch lane.",
-    }
-
-
-def _best_effort_int(value: Any) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-def build_editor_relaunch_attribution(
-    *,
-    before_state: dict[str, Any] | None,
-    after_state: dict[str, Any] | None,
-    previous_editor_pid: int,
-    current_editor_pid: int,
-    cold_start_reason: str,
-) -> dict[str, Any]:
-    before = before_state if isinstance(before_state, dict) else {}
-    after = after_state if isinstance(after_state, dict) else {}
-    return {
-        "editor_relaunched": True,
-        "previous_editor_pid": _best_effort_int(previous_editor_pid or before.get("editor_pid")),
-        "current_editor_pid": _best_effort_int(current_editor_pid or after.get("editor_pid")),
-        "bridge_generation_before": _best_effort_int(before.get("bridge_generation")),
-        "bridge_generation_after": _best_effort_int(after.get("bridge_generation")),
-        "cold_start_reason": cold_start_reason,
     }
 
 
@@ -843,164 +834,6 @@ def recover_project_bridge_for_reconciliation(
         update_host_editor_session_pid(project_root, int(state.get("editor_pid") or 0))
     refresh_project_context(project_root)
     return recovery
-
-
-def maybe_fail_fast_offline_ensure_ready_without_open(
-    project_root: Path,
-    discovery: dict[str, Any],
-) -> None:
-    if str(discovery.get("reconciliation_case") or "") != "host_launchable_not_active":
-        return
-
-    next_action = str(discovery.get("reconciliation_recommended_next_action") or "open_editor_or_ensure_ready")
-    recovery_command = recommended_recovery_command_for_project(project_root, next_action)
-    details = dict(discovery)
-    details.update({
-        "fail_fast_reason": "ensure_ready_without_open_editor_offline",
-        "recommended_next_action": next_action,
-        "recommended_recovery_command": recovery_command,
-    })
-    message = (
-        "No matching Unity editor is running for this project, so plain ensure-ready cannot observe a bridge. "
-        "Run ensure-ready with --open-editor to start the project editor."
-    )
-    if recovery_command:
-        message += f" next_step: {recovery_command}"
-    raise ToolInvocationError("editor_not_running", message, details)
-
-
-def build_discovery_status_summary_for_error(
-    project_root: Path,
-    exc: ToolInvocationError | None = None,
-) -> dict[str, Any]:
-    return build_discovery_status_summary_for_error_data(
-        project_root,
-        exc=exc,
-        discovery=current_project_context_discovery_details(project_root),
-        build_status_summary_from_context=build_status_summary_from_context,
-        enrich_error_details_with_discovery=enrich_error_details_with_discovery,
-    )
-
-
-def run_batch_build_config_compile_matrix_probe(
-    project_root: Path,
-    *,
-    timeout_ms: int,
-) -> dict[str, Any]:
-    command = [
-        *(ProcessLauncher.get_self_invocation_base_command()),
-        "batch-build-config-compile-matrix",
-        "--project-root",
-        str(project_root),
-    ]
-    completed = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    stdout = str(completed.stdout or "").strip()
-    stderr = str(completed.stderr or "").strip()
-    payload: dict[str, Any] = {
-        "action": "batch_build_config_compile_matrix_probe",
-        "command": command,
-        "batch_exit_code": completed.returncode,
-        "timeout_ms": timeout_ms,
-    }
-
-    if stdout:
-        try:
-            payload["batch_probe"] = json.loads(stdout)
-        except json.JSONDecodeError:
-            payload["batch_probe_stdout"] = truncate_text(stdout, 1200)
-    if stderr:
-        payload["batch_probe_stderr"] = truncate_text(stderr, 1200)
-
-    batch_probe = payload.get("batch_probe")
-    if isinstance(batch_probe, dict):
-        payload["succeeded"] = bool(batch_probe.get("succeeded"))
-        payload["summary_file"] = str(batch_probe.get("summary_file") or "")
-        payload["result_file"] = str(batch_probe.get("result_file") or "")
-        payload["log_path"] = str(batch_probe.get("log_path") or "")
-        result_summary = batch_probe.get("result_summary")
-        if isinstance(result_summary, dict):
-            payload["compile_gate_summary"] = result_summary
-            payload["top_actionable_error"] = str(result_summary.get("top_actionable_error") or "")
-    else:
-        payload["succeeded"] = completed.returncode == 0
-
-    return payload
-
-
-def classify_compile_probe_failure(compile_probe: dict[str, Any]) -> tuple[str, str, str]:
-    batch_probe = dict(compile_probe.get("batch_probe") or {})
-    error_payload = dict(batch_probe.get("error") or {})
-    error_code = str(error_payload.get("code") or "")
-
-    if error_code == "editor_running_batch_conflict":
-        return (
-            "compile_probe_blocked_by_live_editor",
-            "close_same_project_editor_or_use_interactive_lane",
-            "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
-        )
-
-    return (
-        "compile_red_confirmed",
-        "fix_compile_errors_before_gui_reopen",
-        "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
-    )
-
-
-def run_self_json_command_with_completed(args: list[str]) -> tuple[dict[str, Any] | None, subprocess.CompletedProcess[str]]:
-    completed = subprocess.run(
-        ProcessLauncher.get_self_invocation_base_command() + [ *args],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    payload: dict[str, Any] | None = None
-    stdout = str(completed.stdout or "").strip()
-    if stdout:
-        try:
-            parsed = json.loads(stdout)
-            if isinstance(parsed, dict):
-                payload = parsed
-        except json.JSONDecodeError:
-            payload = None
-    return payload, completed
-
-
-def run_self_json_command(command_args: list[str]) -> dict[str, Any]:
-    completed = subprocess.run(
-        ProcessLauncher.get_self_invocation_base_command() + [*command_args],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    stdout_text = completed.stdout or ""
-    stderr_text = completed.stderr or ""
-    parsed_stdout: dict[str, Any] | None = None
-    parse_error = ""
-    if stdout_text.strip():
-        try:
-            parsed_candidate = json.loads(stdout_text)
-            if isinstance(parsed_candidate, dict):
-                parsed_stdout = parsed_candidate
-        except json.JSONDecodeError as exc:
-            parse_error = str(exc)
-
-    payload: dict[str, Any] = {
-        "command": ProcessLauncher.get_self_invocation_base_command() + [*command_args],
-        "exit_code": completed.returncode,
-        "stdout": stdout_text,
-        "stderr": stderr_text,
-    }
-    if parsed_stdout is not None:
-        payload["stdout_json"] = parsed_stdout
-    if parse_error:
-        payload["stdout_parse_error"] = parse_error
-    return payload
 
 
 # === Block B: Bridge, Tool, MCP Stdio Helpers ===
@@ -2115,102 +1948,53 @@ def serve_stdio() -> int:
 
 # === Block C: Batch Execution Engine ===
 def load_batch_side_effect_allow_config(path_value: str | None) -> dict[str, Any]:
-    return load_side_effect_allow_file(path_value or "", tool_error_type=ToolInvocationError)
+    return load_batch_side_effect_allow_config_data(
+        path_value,
+        load_side_effect_allow_file=load_side_effect_allow_file,
+        ToolInvocationError=ToolInvocationError,
+    )
 
 
 def progress_stdout_enabled(args: Any) -> bool:
-    return not bool(getattr(args, "no_progress_stdout", False))
+    return progress_stdout_enabled_data(args)
 
 
 def normalize_batch_fallback_mode(value: Any) -> str:
-    mode = str(value or "auto").strip()
-    if mode not in {"auto", "off", "require-batch"}:
-        raise ToolInvocationError(
-            "invalid_batch_fallback_mode",
-            "--batch-fallback-mode must be one of: auto, off, require-batch.",
-        )
-    return mode
+    return normalize_batch_fallback_mode_data(
+        value,
+        ToolInvocationError=ToolInvocationError,
+    )
 
 
 def batch_start_editor_state(project_root: Path) -> dict[str, Any]:
-    visibility = process_visibility_summary()
-    process_visibility_available = bool(visibility.get("process_visibility_available"))
-    live_project_editor_pids = list_live_project_editor_pids(project_root) if process_visibility_available else []
-    bridge_state = try_read_live_editor_state(project_root)
-    if not bridge_state:
-        try:
-            bridge_state = current_project_context_bridge_state(project_root)
-        except ToolInvocationError:
-            bridge_state = {}
-    return {
-        "process_visibility_available": process_visibility_available,
-        "process_visibility_error_code": str(visibility.get("process_visibility_error_code") or ""),
-        "live_project_editor_pids": live_project_editor_pids,
-        "same_project_editor_closed": process_visibility_available and not live_project_editor_pids,
-        "bridge_state_present": bool(bridge_state),
-        "bridge_editor_pid": int((bridge_state or {}).get("editor_pid") or 0),
-        "health_status": str((bridge_state or {}).get("health_status") or ""),
-        "playmode_state": str((bridge_state or {}).get("playmode_state") or ""),
-        "is_compiling": bool((bridge_state or {}).get("is_compiling")),
-        "is_updating": bool((bridge_state or {}).get("is_updating")),
-        "is_playing": bool((bridge_state or {}).get("is_playing")),
-        "is_playing_or_will_change_playmode": bool((bridge_state or {}).get("is_playing_or_will_change_playmode")),
-    }
+    return batch_start_editor_state_data(
+        project_root,
+        process_visibility_summary=process_visibility_summary,
+        list_live_project_editor_pids=list_live_project_editor_pids,
+        try_read_live_editor_state=try_read_live_editor_state,
+        current_project_context_bridge_state=current_project_context_bridge_state,
+        ToolInvocationError=ToolInvocationError,
+    )
 
 
 def gui_fallback_busy_reasons(project_root: Path, start_editor_state: dict[str, Any]) -> list[str]:
-    reasons: list[str] = []
-    bridge_state = try_read_live_editor_state(project_root)
-    if not bridge_state:
-        try:
-            bridge_state = current_project_context_bridge_state(project_root)
-        except ToolInvocationError:
-            bridge_state = {}
-    if not bridge_state:
-        return ["bridge_state_unavailable"]
-    if not bridge_state_is_ready(bridge_state, DEFAULT_HEARTBEAT_MAX_AGE_SECONDS):
-        reasons.append("bridge_not_ready")
-    if bool(bridge_state.get("is_compiling")):
-        reasons.append("is_compiling")
-    if bool(bridge_state.get("is_updating")):
-        reasons.append("is_updating")
-    if bool(bridge_state.get("is_playing")):
-        reasons.append("is_playing")
-    if bool(bridge_state.get("is_playing_or_will_change_playmode")):
-        reasons.append("is_playing_or_will_change_playmode")
-    if bool(bridge_state.get("playmode_transition_pending")):
-        reasons.append("playmode_transition_pending")
-    playmode_state = str(bridge_state.get("playmode_state") or "")
-    if playmode_state and playmode_state != "edit":
-        reasons.append(f"playmode_state:{playmode_state}")
-    return reasons
+    return gui_fallback_busy_reasons_data(
+        project_root,
+        start_editor_state,
+        try_read_live_editor_state=try_read_live_editor_state,
+        current_project_context_bridge_state=current_project_context_bridge_state,
+        bridge_state_is_ready=bridge_state_is_ready,
+        DEFAULT_HEARTBEAT_MAX_AGE_SECONDS=DEFAULT_HEARTBEAT_MAX_AGE_SECONDS,
+        ToolInvocationError=ToolInvocationError,
+    )
 
 
 def attach_license_lane_fields(payload: dict[str, Any], license_capabilities: dict[str, Any] | None) -> None:
-    license_capabilities = dict(license_capabilities or {})
-    payload["license_capabilities"] = license_capabilities
-    payload["license_batchmode_supported"] = license_capabilities.get("batchmode_supported")
-    payload["license_blocker_code"] = str(license_capabilities.get("batchmode_blocker_code") or "")
-    payload["license_recommended_execution_lane"] = str(license_capabilities.get("recommended_execution_lane") or "")
-    payload["batchmode_probe_log_path"] = str(license_capabilities.get("batchmode_probe_log_path") or "")
+    attach_license_lane_fields_data(payload, license_capabilities)
 
 
 def attach_batch_lane_fields_to_summary(summary: dict[str, Any], payload: dict[str, Any]) -> None:
-    for key in (
-        "requested_execution_lane",
-        "effective_execution_lane",
-        "lane_fallback_reason",
-        "batch_fallback_mode",
-        "license_batchmode_supported",
-        "license_blocker_code",
-        "batchmode_probe_log_path",
-        "start_editor_state",
-        "restore_editor_state",
-        "gui_fallback_log_path",
-        "next_distinct_action",
-    ):
-        if key in payload:
-            summary[key] = payload[key]
+    attach_batch_lane_fields_to_summary_data(summary, payload)
 
 
 def batch_lane_preflight_blocker(
@@ -2223,132 +2007,26 @@ def batch_lane_preflight_blocker(
     timeout_ms: int | None,
     refresh_license: bool = False,
 ) -> tuple[str, dict[str, Any] | None]:
-    mode = normalize_batch_fallback_mode(batch_fallback_mode)
-    payload["requested_execution_lane"] = "batch"
-    payload["effective_execution_lane"] = "batch"
-    payload["batch_fallback_mode"] = mode
-    payload.setdefault("license_batchmode_supported", None)
-    payload.setdefault("license_blocker_code", "")
-    payload.setdefault("batchmode_probe_log_path", "")
-
-    start_state = batch_start_editor_state(project_root)
-    payload["start_editor_state"] = start_state
-    if not bool(start_state.get("process_visibility_available")):
-        details = {
-            "live_editor_pids": [],
-            "live_project_editor_pids": [],
-            "same_project_editor_closed": False,
-            "process_exit_verified": False,
-            "process_visibility_available": False,
-            "process_visibility_error_code": str(start_state.get("process_visibility_error_code") or "process_visibility_restricted"),
-            "closeout_classification": "process_visibility_restricted",
-            "recommended_next_action": "restore_host_process_visibility",
-            "next_distinct_action": "restore_host_process_visibility",
-            "closeout_verification_required": True,
-            "closeout_verification_note": "Batch lane selection requires host process visibility before launch or GUI fallback.",
-            "requested_execution_lane": "batch",
-            "effective_execution_lane": "none",
-            "batch_fallback_mode": mode,
-        }
-        raise ToolInvocationError(
-            "process_visibility_restricted",
-            (
-                f"Refusing to start {action_label} because host process visibility is unavailable. "
-                "The MCP cannot prove closed-editor batch safety or safe GUI fallback restoration."
-            ),
-            details,
-        )
-
-    live_editor_pids = list(start_state.get("live_project_editor_pids") or [])
-    if live_editor_pids:
-        if mode == "auto":
-            payload["effective_execution_lane"] = "gui"
-            payload["lane_fallback_reason"] = "editor_running_batch_conflict"
-            return "gui", None
-        raise ToolInvocationError(
-            "editor_running_batch_conflict",
-            (
-                f"Refusing to start {action_label} while the Unity project is open in the editor. "
-                f"Live editor pid(s): {', '.join(str(pid) for pid in live_editor_pids)}. "
-                "Close the same project editor instance first or use the interactive MCP lane."
-            ),
-            {
-                **build_batch_editor_conflict_details(project_root, live_editor_pids),
-                "requested_execution_lane": "batch",
-                "effective_execution_lane": "none",
-                "batch_fallback_mode": mode,
-            },
-        )
-
-    license_capabilities = build_license_capabilities(
+    return batch_lane_preflight_blocker_data(
         project_root=project_root,
         unity_app=unity_app,
-        refresh=refresh_license,
-        timeout_ms=timeout_ms or 30000,
+        batch_fallback_mode=batch_fallback_mode,
+        payload=payload,
+        action_label=action_label,
+        timeout_ms=timeout_ms,
+        refresh_license=refresh_license,
+        normalize_batch_fallback_mode=normalize_batch_fallback_mode,
+        batch_start_editor_state=batch_start_editor_state,
+        list_live_project_editor_pids=list_live_project_editor_pids,
+        build_license_capabilities=build_license_capabilities,
+        attach_license_lane_fields=attach_license_lane_fields,
+        build_batch_editor_conflict_details=build_batch_editor_conflict_details,
+        ToolInvocationError=ToolInvocationError,
     )
-    attach_license_lane_fields(payload, license_capabilities)
-    batchmode_supported = license_capabilities.get("batchmode_supported")
-    if mode == "require-batch" and batchmode_supported is not True:
-        blocker_code = str(license_capabilities.get("batchmode_blocker_code") or "batchmode_not_proven")
-        details = {
-            "requested_execution_lane": "batch",
-            "effective_execution_lane": "none",
-            "batch_fallback_mode": mode,
-            "license_batchmode_supported": batchmode_supported,
-            "license_blocker_code": blocker_code,
-            "batchmode_probe_log_path": str(license_capabilities.get("batchmode_probe_log_path") or ""),
-            "license_capabilities": license_capabilities,
-            "recommended_next_action": "use_gui_fallback_or_fix_batch_license",
-            "next_distinct_action": "rerun_with_batch_fallback_auto_or_restore_batch_license",
-        }
-        raise ToolInvocationError(
-            "batchmode_not_supported",
-            f"Unity batchmode support is not proven for this editor/session. blocker={blocker_code}.",
-            details,
-        )
-    if mode == "auto" and batchmode_supported is False:
-        if license_capabilities.get("editor_ui_supported") is False:
-            details = {
-                "requested_execution_lane": "batch",
-                "effective_execution_lane": "none",
-                "batch_fallback_mode": mode,
-                "license_batchmode_supported": False,
-                "license_blocker_code": str(license_capabilities.get("batchmode_blocker_code") or ""),
-                "batchmode_probe_log_path": str(license_capabilities.get("batchmode_probe_log_path") or ""),
-                "license_capabilities": license_capabilities,
-                "recommended_next_action": "fix_license_or_use_batch_capable_editor",
-                "next_distinct_action": "inspect_license_capabilities",
-            }
-            raise ToolInvocationError(
-                "batchmode_and_gui_unavailable",
-                "Unity batchmode is blocked and this license/session does not appear to allow editor UI fallback.",
-                details,
-            )
-        payload["effective_execution_lane"] = "gui"
-        payload["lane_fallback_reason"] = str(license_capabilities.get("batchmode_blocker_code") or "batchmode_unavailable")
-        return "gui", license_capabilities
-    return "batch", license_capabilities
 
 
 def infer_gui_operation_succeeded(response: dict[str, Any], result_payload: dict[str, Any] | None) -> bool:
-    if response.get("status") != "ok":
-        return False
-    if not isinstance(result_payload, dict):
-        return True
-    if "succeeded" in result_payload:
-        return bool(result_payload.get("succeeded"))
-    status = str(result_payload.get("status") or "").strip().lower()
-    if status:
-        return status in {"passed", "success", "succeeded", "ok"}
-    result = result_payload.get("result")
-    if isinstance(result, dict):
-        result_status = str(result.get("status") or "").strip().lower()
-        if result_status:
-            return result_status in {"passed", "success", "succeeded", "ok"}
-    build_result = str(result_payload.get("build_result") or "").strip().lower()
-    if build_result:
-        return build_result == "succeeded"
-    return True
+    return infer_gui_operation_succeeded_data(response, result_payload)
 
 
 def run_gui_fallback_operation(
@@ -2370,200 +2048,59 @@ def run_gui_fallback_operation(
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
 ) -> None:
-    start_state = dict(payload.get("start_editor_state") or batch_start_editor_state(project_root))
-    payload["start_editor_state"] = start_state
-    payload["requested_execution_lane"] = "batch"
-    payload["effective_execution_lane"] = "gui"
-    payload["gui_operation"] = operation
-    payload["gui_operation_args"] = operation_args
-    payload["gui_fallback_log_path"] = str(log_path)
-    payload["next_distinct_action"] = "inspect_gui_fallback_summary"
-
-    live_editor_pids = list(start_state.get("live_project_editor_pids") or [])
-    opened_by_fallback = not live_editor_pids
-    if live_editor_pids:
-        busy_reasons = gui_fallback_busy_reasons(project_root, start_state)
-        if busy_reasons:
-            details = dict(payload)
-            details["gui_fallback_busy_reasons"] = busy_reasons
-            details["recommended_next_action"] = "wait_for_editor_idle_or_exit_playmode"
-            details["next_distinct_action"] = "return_editor_to_idle_edit_mode_then_retry"
-            raise ToolInvocationError(
-                "gui_fallback_editor_busy",
-                (
-                    "Batch lane selected GUI fallback because batch is unavailable or conflicting, "
-                    f"but the currently open editor is not safely idle: {', '.join(busy_reasons)}."
-                ),
-                details,
-            )
-    else:
-        try:
-            launch = open_unity_editor(project_root, log_path, unity_app, True)
-            ready_state = wait_for_ready(
-                project_root=project_root,
-                timeout_ms=timeout_ms or 300000,
-                heartbeat_max_age_seconds=DEFAULT_HEARTBEAT_MAX_AGE_SECONDS,
-                startup_policy="fail_fast_on_interactive_compile_block",
-                editor_log_path=log_path,
-            )
-            if not bool((launch or {}).get("reused_existing_editor")):
-                update_host_editor_session_pid(project_root, int(ready_state.get("editor_pid") or 0))
-            refresh_project_context(project_root)
-            payload["gui_fallback_launch"] = launch
-            payload["gui_fallback_ready_state"] = ready_state
-        except Exception:
-            payload["restore_editor_state"] = restore_host_opened_editor_state(project_root, 30000, request_editor_quit)
-            raise
-
-    effective_workspace_root = (workspace_root or project_root).expanduser().resolve()
-    before_side_effect_mode = "unavailable"
-    before_dirty_paths: list[str] = []
-    if side_effect_mode != "off":
-        before_side_effect_mode, before_dirty_paths = capture_git_dirty_paths(effective_workspace_root)
-
-    result_payload: dict[str, Any] | None = None
-    response: dict[str, Any] = {}
-    restore_state: dict[str, Any] = {}
-    try:
-        response = invoke_bridge(
-            str(project_root),
-            operation,
-            operation_args,
-            resolve_operation_default_timeout_ms(project_root, operation, timeout_ms or 300000) if timeout_ms is None else timeout_ms,
-        )
-        result_payload = _decode_bridge_payload_dict(response)
-        if isinstance(result_payload, dict):
-            result_payload.setdefault("operation", operation)
-            result_payload.setdefault("validation_evidence", "unity_gui")
-            result_path.parent.mkdir(parents=True, exist_ok=True)
-            write_json(result_path, result_payload)
-    finally:
-        if opened_by_fallback:
-            restore_state = restore_host_opened_editor_state(project_root, 30000, request_editor_quit)
-            payload["restore_editor_state"] = restore_state
-            if not bool(restore_state.get("same_project_editor_closed")):
-                payload["next_distinct_action"] = "manual_editor_close_or_terminate_then_verify_closed"
-        else:
-            payload["restore_editor_state"] = {
-                "project_root": str(project_root),
-                "restored": False,
-                "reason": "editor_was_already_open_before_gui_fallback",
-                "same_project_editor_closed": False,
-                "process_exit_verified": False,
-                "closeout_classification": "left_open_initial_editor",
-                "recommended_next_action": "none",
-            }
-
-    if side_effect_mode == "off":
-        side_effects = unavailable_workspace_side_effects(effective_workspace_root, mode="off")
-    else:
-        after_side_effect_mode, after_dirty_paths = capture_git_dirty_paths(effective_workspace_root)
-        effective_side_effect_mode = "git" if before_side_effect_mode == "git" and after_side_effect_mode == "git" else "unavailable"
-        side_effects = (
-            build_workspace_side_effects(
-                workspace_root=effective_workspace_root,
-                before_dirty_paths=before_dirty_paths,
-                after_dirty_paths=after_dirty_paths,
-                mode=effective_side_effect_mode,
-                allow_config=side_effect_allow_config,
-            )
-            if effective_side_effect_mode == "git"
-            else unavailable_workspace_side_effects(effective_workspace_root)
-        )
-    payload["workspace_side_effects"] = side_effects
-
-    succeeded = infer_gui_operation_succeeded(response, result_payload)
-    artifact_probe_summary = None
-    artifact_probe_succeeded = True
-    if artifact_probe_config is not None:
-        artifact_probe_summary = run_artifact_probe(
-            artifact_probe_config,
-            artifact_path_override=artifact_probe_path_override,
-            truncate_text=truncate_text,
-        )
-        artifact_probe_succeeded = bool(artifact_probe_summary.get("succeeded"))
-        payload["artifact_probe_summary"] = artifact_probe_summary
-        payload["artifact_probe_succeeded"] = artifact_probe_succeeded
-        succeeded = succeeded and (artifact_probe_succeeded or artifact_probe_warn_only)
-
-    payload["bridge_response"] = response
-    payload["result_payload_present"] = result_payload is not None
-    if str(payload.get("action") or "") == "plain_batch_build":
-        payload["build_result_payload_present"] = result_payload is not None
-        payload["build_succeeded"] = infer_gui_operation_succeeded(response, result_payload)
-    payload["result_file"] = str(result_path)
-    payload["succeeded"] = bool(succeeded)
-    result_summary = build_batch_execution_summary(
-        action=str(payload.get("action") or action_label),
-        result_payload=result_payload,
-        batch_exit_code=0 if response.get("status") == "ok" else 1,
-        succeeded=bool(succeeded),
-        result_path=result_path,
+    return run_gui_fallback_operation_data(
+        project_root=project_root,
+        unity_app=unity_app,
+        payload=payload,
+        action_label=action_label,
+        operation=operation,
+        operation_args=operation_args,
+        timeout_ms=timeout_ms,
         log_path=log_path,
-        log_excerpt_hint="",
+        result_path=result_path,
+        summary_path=summary_path,
+        workspace_root=workspace_root,
+        side_effect_mode=side_effect_mode,
+        side_effect_allow_config=side_effect_allow_config,
+        artifact_probe_config=artifact_probe_config,
+        artifact_probe_path_override=artifact_probe_path_override,
+        artifact_probe_warn_only=artifact_probe_warn_only,
+        batch_start_editor_state=batch_start_editor_state,
+        gui_fallback_busy_reasons=gui_fallback_busy_reasons,
+        ToolInvocationError=ToolInvocationError,
+        open_unity_editor=open_unity_editor,
+        wait_for_ready=wait_for_ready,
+        DEFAULT_HEARTBEAT_MAX_AGE_SECONDS=DEFAULT_HEARTBEAT_MAX_AGE_SECONDS,
+        update_host_editor_session_pid=update_host_editor_session_pid,
+        refresh_project_context=refresh_project_context,
+        restore_host_opened_editor_state=restore_host_opened_editor_state,
+        request_editor_quit=request_editor_quit,
+        capture_git_dirty_paths=capture_git_dirty_paths,
+        invoke_bridge=invoke_bridge,
+        resolve_operation_default_timeout_ms=resolve_operation_default_timeout_ms,
+        _decode_bridge_payload_dict=_decode_bridge_payload_dict,
+        write_json=write_json,
+        unavailable_workspace_side_effects=unavailable_workspace_side_effects,
+        build_workspace_side_effects=build_workspace_side_effects,
+        run_artifact_probe=run_artifact_probe,
         truncate_text=truncate_text,
+        infer_gui_operation_succeeded=infer_gui_operation_succeeded,
+        build_batch_execution_summary=build_batch_execution_summary,
+        attach_batch_lane_fields_to_summary=attach_batch_lane_fields_to_summary,
+        write_batch_summary_artifact=write_batch_summary_artifact,
+        print_json=print_json,
     )
-    result_summary["transport_outcome"] = "gui_operation_completed" if response.get("status") == "ok" else "gui_operation_failed"
-    result_summary["effective_execution_lane"] = "gui"
-    result_summary["workspace_side_effects"] = side_effects
-    if "build_succeeded" in payload:
-        result_summary["build_succeeded"] = payload["build_succeeded"]
-    if str(payload.get("action") or "") == "plain_batch_build":
-        result_summary["artifact_probe_succeeded"] = artifact_probe_succeeded
-    if artifact_probe_summary is not None:
-        result_summary["artifact_probe_succeeded"] = artifact_probe_succeeded
-        result_summary["artifact_probe_summary"] = artifact_probe_summary
-    attach_batch_lane_fields_to_summary(result_summary, payload)
-    write_batch_summary_artifact(summary_path, result_summary)
-    payload["summary_file"] = str(summary_path)
-    payload["result_summary"] = result_summary
-    if str(payload.get("action") or "") == "plain_batch_build":
-        payload["build_result_summary"] = result_summary
-    if "top_actionable_error" in result_summary:
-        payload["top_actionable_error"] = result_summary["top_actionable_error"]
-    if opened_by_fallback and not bool((restore_state or {}).get("same_project_editor_closed")):
-        payload["succeeded"] = False
-        payload["top_actionable_error"] = "GUI fallback completed but editor closeout was not verified."
-
-    print_json(payload)
-    if not bool(payload.get("succeeded")):
-        raise SystemExit(1)
 
 
-def ensure_batch_project_closed(project_root: Path, action_label: str):
-    visibility = process_visibility_summary()
-    if not bool(visibility.get("process_visibility_available")):
-        details = {
-            "live_editor_pids": [],
-            "live_project_editor_pids": [],
-            "same_project_editor_closed": False,
-            "process_exit_verified": False,
-            "closeout_classification": "process_visibility_restricted",
-            "recommended_next_action": "restore_host_process_visibility",
-            "next_distinct_action": "restore_host_process_visibility",
-            "closeout_verification_required": True,
-            "closeout_verification_note": "Closed-editor batch lanes require host process visibility before launch.",
-        }
-        details.update(visibility)
-        raise ToolInvocationError(
-            "process_visibility_restricted",
-            (
-                f"Refusing to start {action_label} because host process visibility is unavailable. "
-                "The closed-project batch lane cannot prove that this Unity project editor is closed."
-            ),
-            details,
-        )
-    live_editor_pids = list_live_project_editor_pids(project_root)
-    if live_editor_pids:
-        raise ToolInvocationError(
-            "editor_running_batch_conflict",
-            (
-                f"Refusing to start {action_label} while the Unity project is open in the editor. "
-                f"Live editor pid(s): {', '.join(str(pid) for pid in live_editor_pids)}. "
-                "Close the same project editor instance first or use the interactive MCP lane."
-            ),
-            build_batch_editor_conflict_details(project_root, live_editor_pids),
-        )
+def ensure_batch_project_closed(project_root: Path, action_label: str) -> None:
+    return ensure_batch_project_closed_data(
+        project_root,
+        action_label,
+        process_visibility_summary=process_visibility_summary,
+        list_live_project_editor_pids=list_live_project_editor_pids,
+        build_batch_editor_conflict_details=build_batch_editor_conflict_details,
+        ToolInvocationError=ToolInvocationError,
+    )
 
 
 def run_batch_operation(
@@ -2589,220 +2126,56 @@ def run_batch_operation(
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
     last_known_output_path: str = "",
-):
-    if timeout_ms is not None and timeout_ms <= 0:
-        timeout_ms = None
-    payload["timeout_ms"] = timeout_ms
-    payload["requested_execution_lane"] = "batch"
-    payload["effective_execution_lane"] = "batch"
-    payload["batch_fallback_mode"] = normalize_batch_fallback_mode(batch_fallback_mode)
-
-    if dry_run:
-        print_json(payload)
-        return
-
-    summary_path = batch_summary_artifact_path(result_path)
-    payload["summary_file"] = str(summary_path)
-    run_id = build_batch_run_id(
-        str(payload.get("action") or "batch_operation"),
-        str(payload.get("build_target") or payload.get("compile_name") or payload.get("name") or ""),
-    )
-    progress_path = batch_progress_sidecar_path(project_root, run_id)
-    progress_reporter = BatchProgressReporter(
-        run_id=run_id,
-        operation=str(payload.get("action") or "batch operation"),
+) -> None:
+    return run_batch_operation_data(
+        project_root=project_root,
+        unity_app=unity_app,
+        command=command,
+        payload=payload,
         log_path=log_path,
-        progress_path=progress_path,
-        interval_seconds=progress_interval_seconds,
-        stdout=progress_stdout,
-    )
-    payload["run_id"] = run_id
-    payload["progress_file"] = str(progress_path)
-    progress_reporter.emit("preflight")
-
-    try:
-        progress_reporter.emit("prepare_started")
-        selected_lane, _license_capabilities = batch_lane_preflight_blocker(
-            project_root=project_root,
-            unity_app=unity_app,
-            batch_fallback_mode=batch_fallback_mode,
-            payload=payload,
-            action_label=str(payload.get("action") or "batch operation"),
-            timeout_ms=timeout_ms,
-            refresh_license=refresh_license,
-        )
-        if selected_lane == "gui":
-            if not gui_operation:
-                raise ToolInvocationError(
-                    "gui_fallback_not_available",
-                    f"{payload.get('action') or 'batch operation'} does not provide a GUI fallback operation.",
-                    {
-                        "requested_execution_lane": "batch",
-                        "effective_execution_lane": "none",
-                        "batch_fallback_mode": batch_fallback_mode,
-                        "lane_fallback_reason": str(payload.get("lane_fallback_reason") or ""),
-                        "recommended_next_action": "use_batch_fallback_off_or_fix_batchmode",
-                        "next_distinct_action": "inspect_license_capabilities",
-                    },
-                )
-            progress_reporter.emit("prepare_completed", message="Batch preflight selected GUI fallback.")
-            run_gui_fallback_operation(
-                project_root=project_root,
-                unity_app=unity_app,
-                payload=payload,
-                action_label=str(payload.get("action") or "batch operation"),
-                operation=gui_operation,
-                operation_args=dict(gui_operation_args or {}),
-                timeout_ms=timeout_ms,
-                log_path=log_path,
-                result_path=result_path,
-                summary_path=summary_path,
-                workspace_root=workspace_root,
-                side_effect_mode=side_effect_mode,
-                side_effect_allow_config=side_effect_allow_config,
-                artifact_probe_config=artifact_probe_config,
-                artifact_probe_path_override=artifact_probe_path_override,
-                artifact_probe_warn_only=artifact_probe_warn_only,
-            )
-            return
-    except ToolInvocationError as exc:
-        summary = build_batch_prepare_failure_summary(
-            action=str(payload.get("action") or "batch operation"),
-            result_path=result_path,
-            log_path=log_path,
-            exc=exc,
-            truncate_text=truncate_text,
-        )
-        attach_batch_lane_fields_to_summary(summary, payload)
-        write_batch_summary_artifact(summary_path, summary)
-        raise attach_batch_summary_to_error(
-            exc,
-            summary_path=summary_path,
-            summary=summary,
-            tool_invocation_error_type=ToolInvocationError,
-        )
-
-    progress_reporter.emit("prepare_completed")
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    result_path.parent.mkdir(parents=True, exist_ok=True)
-    payload["stale_lock"] = clear_stale_project_lock(project_root)
-
-    effective_workspace_root = (workspace_root or project_root).expanduser().resolve()
-    side_effect_mode = str(side_effect_mode or "git")
-    before_side_effect_mode = "unavailable"
-    before_dirty_paths: list[str] = []
-    if side_effect_mode != "off":
-        before_side_effect_mode, before_dirty_paths = capture_git_dirty_paths(effective_workspace_root)
-
-    command_started_at = time.time()
-    batch_exit_code, timed_out = run_subprocess_with_progress(
-        command,
-        reporter=progress_reporter,
-        timeout_ms=timeout_ms,
-        last_known_output_path=last_known_output_path,
-    )
-
-    payload["batch_exit_code"] = batch_exit_code
-    payload["timed_out"] = timed_out
-    if side_effect_mode == "off":
-        side_effects = unavailable_workspace_side_effects(effective_workspace_root, mode="off")
-    else:
-        after_side_effect_mode, after_dirty_paths = capture_git_dirty_paths(effective_workspace_root)
-        effective_side_effect_mode = "git" if before_side_effect_mode == "git" and after_side_effect_mode == "git" else "unavailable"
-        side_effects = (
-            build_workspace_side_effects(
-                workspace_root=effective_workspace_root,
-                before_dirty_paths=before_dirty_paths,
-                after_dirty_paths=after_dirty_paths,
-                mode=effective_side_effect_mode,
-                allow_config=side_effect_allow_config,
-            )
-            if effective_side_effect_mode == "git"
-            else unavailable_workspace_side_effects(effective_workspace_root)
-        )
-    payload["workspace_side_effects"] = side_effects
-    progress_reporter.emit("side_effect_scan_completed")
-
-    result_payload = try_read_json_dict(result_path, read_json)
-    payload["result_payload_present"] = result_payload is not None
-    base_operation_succeeded = (
-        bool(result_payload.get("succeeded", False)) and batch_exit_code == 0 and not timed_out
-        if result_payload is not None
-        else batch_exit_code == 0 and not timed_out
-    )
-    payload["succeeded"] = base_operation_succeeded
-    if str(payload.get("action") or "") == "plain_batch_build":
-        payload["build_result_payload_present"] = result_payload is not None
-        payload["build_succeeded"] = base_operation_succeeded
-
-    artifact_probe_summary = None
-    artifact_probe_succeeded = True
-    if artifact_probe_config is not None:
-        progress_reporter.emit("artifact_probe_started", last_known_output_path=artifact_probe_path_override)
-        artifact_probe_summary = run_artifact_probe(
-            artifact_probe_config,
-            artifact_path_override=artifact_probe_path_override,
-            truncate_text=truncate_text,
-        )
-        artifact_probe_succeeded = bool(artifact_probe_summary.get("succeeded"))
-        payload["artifact_probe_summary"] = artifact_probe_summary
-        payload["artifact_probe_succeeded"] = artifact_probe_succeeded
-        payload["succeeded"] = bool(payload.get("succeeded")) and (artifact_probe_succeeded or artifact_probe_warn_only)
-        progress_reporter.emit("artifact_probe_completed", last_known_output_path=artifact_probe_path_override)
-
-    log_excerpt_hint = ""
-    if batch_exit_code != 0 or not bool(payload.get("succeeded")):
-        log_excerpt = read_recent_editor_log(log_path, command_started_at)
-        if log_excerpt:
-            log_excerpt_hint = truncate_text(log_excerpt[-600:], 600)
-
-    result_summary = build_batch_execution_summary(
-        action=str(payload.get("action") or "batch operation"),
-        result_payload=result_payload,
-        batch_exit_code=batch_exit_code,
-        succeeded=bool(payload.get("succeeded")),
         result_path=result_path,
-        log_path=log_path,
-        log_excerpt_hint=log_excerpt_hint,
+        dry_run=dry_run,
+        timeout_ms=timeout_ms,
+        workspace_root=workspace_root,
+        side_effect_mode=side_effect_mode,
+        side_effect_allow_config=side_effect_allow_config,
+        progress_interval_seconds=progress_interval_seconds,
+        progress_stdout=progress_stdout,
+        batch_fallback_mode=batch_fallback_mode,
+        refresh_license=refresh_license,
+        gui_operation=gui_operation,
+        gui_operation_args=gui_operation_args,
+        artifact_probe_config=artifact_probe_config,
+        artifact_probe_path_override=artifact_probe_path_override,
+        artifact_probe_warn_only=artifact_probe_warn_only,
+        last_known_output_path=last_known_output_path,
+        normalize_batch_fallback_mode=normalize_batch_fallback_mode,
+        print_json=print_json,
+        batch_summary_artifact_path=batch_summary_artifact_path,
+        build_batch_run_id=build_batch_run_id,
+        batch_progress_sidecar_path=batch_progress_sidecar_path,
+        BatchProgressReporter=BatchProgressReporter,
+        batch_lane_preflight_blocker=batch_lane_preflight_blocker,
+        run_gui_fallback_operation=run_gui_fallback_operation,
+        ToolInvocationError=ToolInvocationError,
+        build_batch_prepare_failure_summary=build_batch_prepare_failure_summary,
         truncate_text=truncate_text,
+        attach_batch_lane_fields_to_summary=attach_batch_lane_fields_to_summary,
+        write_batch_summary_artifact=write_batch_summary_artifact,
+        attach_batch_summary_to_error=attach_batch_summary_to_error,
+        clear_stale_project_lock=clear_stale_project_lock,
+        capture_git_dirty_paths=capture_git_dirty_paths,
+        run_subprocess_with_progress=run_subprocess_with_progress,
+        unavailable_workspace_side_effects=unavailable_workspace_side_effects,
+        build_workspace_side_effects=build_workspace_side_effects,
+        try_read_json_dict=try_read_json_dict,
+        read_json=read_json,
+        run_artifact_probe=run_artifact_probe,
+        read_recent_editor_log=read_recent_editor_log,
+        build_batch_execution_summary=build_batch_execution_summary,
+        clear_stale_bridge_state=clear_stale_bridge_state,
+        time_time=time.time,
     )
-    if timed_out:
-        result_summary["timed_out"] = True
-        result_summary["timeout_ms"] = timeout_ms
-        result_summary.setdefault(
-            "top_actionable_error",
-            f"Unity batch operation timed out after {timeout_ms} ms.",
-        )
-    if artifact_probe_summary is not None:
-        result_summary["artifact_probe_succeeded"] = artifact_probe_succeeded
-        result_summary["artifact_probe_summary"] = artifact_probe_summary
-        if not artifact_probe_succeeded:
-            failures = artifact_probe_summary.get("failures")
-            if isinstance(failures, list) and failures:
-                first_failure = failures[0] if isinstance(failures[0], dict) else {}
-                result_summary.setdefault(
-                    "top_actionable_error",
-                    truncate_text(first_failure.get("message") or "Artifact probe failed.", 320),
-                )
-    if "build_succeeded" in payload:
-        result_summary["build_succeeded"] = payload["build_succeeded"]
-    result_summary["workspace_side_effects"] = side_effects
-    attach_batch_lane_fields_to_summary(result_summary, payload)
-    write_batch_summary_artifact(summary_path, result_summary)
-    progress_reporter.emit("summary_written")
-    payload["result_summary"] = result_summary
-    if str(payload.get("action") or "") == "plain_batch_build":
-        payload["build_result_summary"] = result_summary
-    payload["stale_bridge_state_cleared"] = clear_stale_bridge_state(project_root)
-    if "top_actionable_error" in result_summary:
-        payload["top_actionable_error"] = result_summary["top_actionable_error"]
-
-    print_json(payload)
-    if batch_exit_code != 0 or not bool(payload.get("succeeded")):
-        raise SystemExit(1)
-
-
-
 
 
 # Helper to maintain output formatting

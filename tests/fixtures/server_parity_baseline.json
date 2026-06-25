@@ -1,0 +1,220 @@
+{
+  "batch_prepare_failure_summary": {
+    "action": "batch-compile",
+    "next_step": "Resolve the prepare blocker, then rerun the batch command.",
+    "phase": "prepare",
+    "process_visibility_available": true,
+    "raw_log_path": "unity.log",
+    "recommended_next_action": "close_editor_then_retry",
+    "result_file": "result.json",
+    "same_project_editor_closed": false,
+    "succeeded": false,
+    "top_actionable_error": "Unity editor is already open.",
+    "transport_outcome": "batch_prepare_blocked",
+    "unity_outcome": "not_started"
+  },
+  "bridge_stabilization_summary": {
+    "blocking_reasons": [
+      "editor_not_running",
+      "mcp_not_reachable",
+      "health_not_healthy",
+      "domain_reload_in_progress",
+      "compile_settle_pending",
+      "pending_request_in_flight",
+      "transport_listener_not_ready"
+    ],
+    "bridge_generation": 12,
+    "bridge_session_id": "session-parity",
+    "health_status": "unstable",
+    "listener_required": true,
+    "pending_request_count": 2,
+    "request_flow_state": "not_ready",
+    "safe_to_retry": false,
+    "stabilized": false,
+    "transport": "tcp_loopback",
+    "transport_listener_state": "closed",
+    "transport_ready_for_requests": false
+  },
+  "call_tool_error": {
+    "content": [
+      {
+        "text": "{\"error\": {\"code\": \"bridge_unavailable\", \"message\": \"Bridge unavailable for parity fixture.\", \"details\": {\"project_root\": \"ParityProject\"}}}",
+        "type": "text"
+      }
+    ],
+    "isError": true,
+    "structuredContent": {
+      "error": {
+        "code": "bridge_unavailable",
+        "details": {
+          "project_root": "ParityProject"
+        },
+        "message": "Bridge unavailable for parity fixture."
+      }
+    }
+  },
+  "call_tool_success": {
+    "content": [
+      {
+        "text": "{\"bridge_response\": {\"root\": \"ParityProject\", \"operation\": \"unity.scene.snapshot\", \"args\": {\"includeInactive\": true}, \"timeout_ms\": 1234}}",
+        "type": "text"
+      }
+    ],
+    "isError": false,
+    "structuredContent": {
+      "bridge_response": {
+        "args": {
+          "includeInactive": true
+        },
+        "operation": "unity.scene.snapshot",
+        "root": "ParityProject",
+        "timeout_ms": 1234
+      }
+    }
+  },
+  "cli_help": {
+    "request_scenario_run_and_wait_sha256": "bccc73d19e26e11d54b00371c7b33f6eb3b3bad4bcb5304663276ec2e2c442d6",
+    "request_status_summary_sha256": "4182332c2cc787642a85cfd1baaaf643b395e968bc0c6d5bea8b655196fdc067",
+    "root_contains": [
+      "setup-plan",
+      "request-status-summary",
+      "request-scenario-run-and-wait",
+      "batch-compile"
+    ],
+    "root_sha256": "2d200b7c5f59bf1039e6269cdcd5655d7f8dd7b96096cc7347f3ac7b97d64436"
+  },
+  "mcp_tools_list": {
+    "sha256": "008104b2ef3b4a233a053d36ba09f8296944b001beb897de9001de4de3dd0864",
+    "tool_count": 44,
+    "tool_names": [
+      "xuunity_setup_plan",
+      "xuunity_setup_apply",
+      "xuunity_uninstall_plan",
+      "xuunity_uninstall_apply",
+      "xuunity_setup_validate",
+      "unity_license_capabilities",
+      "unity_status",
+      "unity_capabilities",
+      "unity_health_probe",
+      "unity_build_target_get",
+      "unity_build_target_switch",
+      "unity_status_summary",
+      "unity_request_final_status",
+      "unity_project_refresh",
+      "unity_project_action_list",
+      "unity_project_action_invoke",
+      "unity_artifact_register",
+      "unity_artifact_write_report",
+      "unity_package_install_test_framework",
+      "unity_edm4u_resolve",
+      "unity_sdk_dependency_verify",
+      "unity_console_tail",
+      "unity_console_grep",
+      "unity_loading_timing",
+      "unity_scene_snapshot",
+      "unity_scene_assert",
+      "unity_tests_run_editmode",
+      "unity_tests_run_playmode",
+      "unity_playmode_state",
+      "unity_playmode_set",
+      "unity_game_view_configure",
+      "unity_game_view_screenshot",
+      "unity_compile_player_scripts",
+      "unity_compile_matrix",
+      "unity_build_player",
+      "unity_compile_build_config_matrix",
+      "unity_scenario_validate",
+      "unity_scenario_run",
+      "unity_scenario_result",
+      "unity_scenario_result_summary",
+      "unity_scenario_results_list",
+      "unity_scenario_result_latest",
+      "unity_scenario_run_and_wait",
+      "unity_maintenance_prune"
+    ]
+  },
+  "request_final_status_projection": {
+    "bridge_changed_since_submission": true,
+    "journal_event_count": 1,
+    "operation_outcome": "submitted_lost_after_lifecycle_churn",
+    "operator_verdict": {
+      "message": "Unity completion was not proven; inspect final status and recovery evidence before retrying.",
+      "next_action": "verify_effect_or_retry",
+      "should_retry": true,
+      "status": "unity_completion_unproven"
+    },
+    "recommended_next_action": "verify_effect_or_retry",
+    "recovery_gap_detected": true,
+    "request_completed": false,
+    "request_observed_in_unity_journal": false,
+    "request_started": false,
+    "request_submitted": true,
+    "result_trust_class": "wrapper_failed_unity_unproven"
+  },
+  "scenario_result_summary": {
+    "action": "unity_scenario_result_summary",
+    "active_step": {
+      "duration_seconds": 0.5,
+      "error_code": "missing_root",
+      "error_message": "Root object missing.",
+      "kind": "assert_scene",
+      "outcome": "",
+      "status": "failed",
+      "step_id": "assert"
+    },
+    "completed_at_utc": "2026-06-25T10:00:05Z",
+    "current_step_index": 1,
+    "duration_seconds": 5.432,
+    "failed_steps": 1,
+    "first_failed_step": {
+      "duration_seconds": 0.5,
+      "error_code": "missing_root",
+      "error_message": "Root object missing.",
+      "kind": "assert_scene",
+      "outcome": "",
+      "status": "failed",
+      "step_id": "assert"
+    },
+    "last_completed_step": {
+      "duration_seconds": 0.5,
+      "error_code": "missing_root",
+      "error_message": "Root object missing.",
+      "kind": "assert_scene",
+      "outcome": "",
+      "status": "failed",
+      "step_id": "assert"
+    },
+    "passed_steps": 1,
+    "project_root": "ParityProject",
+    "result_path": "scenario-result.json",
+    "run_id": "run-parity",
+    "scenario_name": "scenario_parity",
+    "skipped_steps": 0,
+    "started_at_utc": "2026-06-25T10:00:00Z",
+    "status": "failed",
+    "steps": [
+      {
+        "duration_seconds": 1.2,
+        "kind": "scene_snapshot",
+        "outcome": "",
+        "status": "passed",
+        "step_id": "open"
+      },
+      {
+        "duration_seconds": 0.5,
+        "error_code": "missing_root",
+        "error_message": "Root object missing.",
+        "kind": "assert_scene",
+        "outcome": "",
+        "status": "failed",
+        "step_id": "assert"
+      }
+    ],
+    "succeeded": false,
+    "terminal": true,
+    "terminal_status": "failed",
+    "total_steps": 2,
+    "updated_at_utc": "2026-06-25T10:00:05Z",
+    "waiting_until_utc": ""
+  }
+}
