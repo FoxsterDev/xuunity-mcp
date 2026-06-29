@@ -34,7 +34,7 @@ def call_unity_compile_build_config_matrix_tool(
     build_compile_matrix_args_from_build_config: Callable[..., dict[str, Any]],
     invoke_bridge: Callable[[str, str, dict[str, Any], int], dict[str, Any]],
     build_tool_error_payload: Callable[[Exception], dict[str, Any]],
-    bridge_response_to_tool_result: Callable[[dict[str, Any]], dict[str, Any]],
+    bridge_response_to_tool_result: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
     project_root_value = arguments.get("projectRoot")
     if not isinstance(project_root_value, str) or not project_root_value.strip():
@@ -59,6 +59,9 @@ def call_unity_compile_build_config_matrix_tool(
     stop_on_first_failure = arguments.get("stopOnFirstFailure", False)
     if not isinstance(stop_on_first_failure, bool):
         raise JsonRpcError(-32602, "stopOnFirstFailure must be a boolean when provided.")
+    include_full_payload = arguments.get("includeFullPayload", False)
+    if not isinstance(include_full_payload, bool):
+        raise JsonRpcError(-32602, "includeFullPayload must be a boolean when provided.")
 
     build_config_asset = arguments.get("buildConfigAsset")
     if build_config_asset is not None and not isinstance(build_config_asset, str):
@@ -82,7 +85,7 @@ def call_unity_compile_build_config_matrix_tool(
     except tool_invocation_error_type as exc:
         return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
 
-    tool_result = bridge_response_to_tool_result(response)
+    tool_result = bridge_response_to_tool_result(response, include_full_payload=include_full_payload)
     structured = tool_result.get("structuredContent") or {}
     if not tool_result.get("isError"):
         structured = {
@@ -440,6 +443,7 @@ def call_tool(
     )
 
     bridge_args = dict(args)
+    include_full_payload = bool(bridge_args.pop("includeFullPayload", False))
     bridge_args.pop("projectRoot", None)
     bridge_args.pop("timeoutMs", None)
 
@@ -448,4 +452,4 @@ def call_tool(
     except tool_invocation_error_type as exc:
         return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
 
-    return bridge_response_to_tool_result(response)
+    return bridge_response_to_tool_result(response, include_full_payload=include_full_payload)

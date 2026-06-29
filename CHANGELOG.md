@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+## 0.3.34
+
+Release tag: `v0.3.34`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.34
+```
+
+### Changed
+
+- Released `v0.3.34` package metadata, server metadata, package manifests, and Git UPM examples.
+- MCP tool responses for `unity_project_refresh`,
+  `unity_compile_player_scripts`, `unity_compile_matrix`,
+  `unity_compile_build_config_matrix`, `unity_tests_run_editmode`, and
+  `unity_tests_run_playmode` now default to a compact operation summary that
+  preserves authoritative post-settle verdict fields while omitting full
+  `_xuunity_lifecycle` snapshots. Pass `includeFullPayload=true` to recover the
+  previous full bridge payload for lifecycle debugging or raw artifact
+  inspection.
+
+### Validation
+
+- Host Python unittest suite: `267` tests passed with `1` expected skip.
+- Release version consistency check passed for `0.3.34`.
+- Public site Playwright checks passed: `39/39`.
+- Source checkout helper install refreshed neutral, Codex, and Claude tool
+  installs; all reported package metadata version `0.3.34`.
+- Live MCP compact response validation passed on Dev Acceleration System and
+  ApperfunHub, including post-settle compile truth without default lifecycle
+  dumps.
+- Dev Acceleration System package self-test fast lane passed: EditMode `12/12`
+  and PlayMode `5/5`.
+
 ## 0.3.33
 
 Release tag: `v0.3.33`

@@ -1,8 +1,15 @@
 # Compile Progress Bar Not Cleared on Unity 2022.3 — Operator-Trust Retro
 
 Date: `2026-06-24`
-Status: `active public retro`
+Status: `implemented with response-envelope follow-up split`
 Scope: MCP-triggered compile/refresh leaves Unity's global progress bar ("Hold on… / Importing assets / Compiling…") painted on Unity 2022.3, creating a false "hung / did-not-complete" impression even though Unity-side execution and results were correct.
+
+## Resolution Update
+
+Implemented in public MCP `v0.3.31`: the bridge now clears Unity's editor
+progress bar after MCP-triggered compile, refresh, build, and request-pump
+completion paths. The compact-response follow-up is tracked by the token
+efficiency response-envelope backlog rather than this progress-bar row.
 
 ## 1. Executive Summary
 

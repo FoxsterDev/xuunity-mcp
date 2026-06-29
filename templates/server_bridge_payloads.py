@@ -269,11 +269,178 @@ def normalize_response_payload_from_lifecycle(
     return normalized
 
 
+COMPACT_OPERATION_PAYLOADS = {
+    "unity.project.refresh",
+    "unity.compile.player_scripts",
+    "unity.compile.matrix",
+    "unity.tests.run_editmode",
+    "unity.tests.run_playmode",
+}
+
+
+def _copy_if_present(target: dict[str, Any], source: dict[str, Any], keys: tuple[str, ...]) -> None:
+    for key in keys:
+        if key in source:
+            target[key] = source.get(key)
+
+
+def _artifact_ref(payload: dict[str, Any]) -> dict[str, Any]:
+    manifest = payload.get("artifact_manifest")
+    if not isinstance(manifest, dict):
+        return {}
+
+    ref: dict[str, Any] = {}
+    base_dir = manifest.get("base_dir") or manifest.get("artifact_dir")
+    if base_dir:
+        ref["artifact_dir"] = str(base_dir)
+
+    groups = manifest.get("groups")
+    if isinstance(groups, dict):
+        total = 0
+        for value in groups.values():
+            if isinstance(value, list):
+                total += len(value)
+        ref["artifact_count"] = total
+    return ref
+
+
+def _compact_post_settle_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    compact: dict[str, Any] = {}
+    _copy_if_present(
+        compact,
+        payload,
+        (
+            "authoritative_state_source",
+            "post_settle_compile",
+            "post_settle_error_count",
+            "post_settle_script_compilation_failed",
+            "post_settle_compiler_diagnostics_source",
+            "settle_phase",
+            "completion_basis",
+            "settled_at_utc",
+            "editor_is_compiling_after_settle",
+            "editor_is_updating_after_settle",
+            "playmode_state_after_settle",
+        ),
+    )
+    diagnostics = payload.get("post_settle_diagnostics")
+    if isinstance(diagnostics, list) and diagnostics:
+        compact["post_settle_diagnostics"] = diagnostics[:3]
+    return compact
+
+
+def _compact_compile_payload(payload: dict[str, Any], operation: str) -> dict[str, Any]:
+    compact = {
+        "payload_mode": "compact_operation",
+        "operation": operation,
+    }
+    _copy_if_present(
+        compact,
+        payload,
+        (
+            "name",
+            "target",
+            "status",
+            "outcome",
+            "error_count",
+            "warning_count",
+            "compiled_assembly_count",
+            "duration_seconds",
+            "total",
+            "passed",
+            "failed",
+            "skipped",
+            "stop_on_first_failure",
+            "settle_request_id",
+        ),
+    )
+    errors = payload.get("errors")
+    if isinstance(errors, list) and errors:
+        compact["errors"] = errors[:3]
+    configurations = payload.get("configurations")
+    if isinstance(configurations, list):
+        compact["configuration_count"] = len(configurations)
+        failed_rows = [
+            item for item in configurations
+            if isinstance(item, dict) and str(item.get("status") or "") not in {"", "passed", "ok"}
+        ]
+        if failed_rows:
+            compact["first_failed_configurations"] = failed_rows[:3]
+    compact.update(_compact_post_settle_fields(payload))
+    compact.update(_artifact_ref(payload))
+    return compact
+
+
+def _compact_refresh_payload(payload: dict[str, Any], operation: str) -> dict[str, Any]:
+    compact = {
+        "payload_mode": "compact_operation",
+        "operation": operation,
+    }
+    _copy_if_present(
+        compact,
+        payload,
+        (
+            "status",
+            "outcome",
+            "requested_outcome",
+            "package_resolve_requested",
+            "health_probe_requested",
+            "asset_refresh_requested",
+            "settle_request_id",
+        ),
+    )
+    compact.update(_compact_post_settle_fields(payload))
+    compact.update(_artifact_ref(payload))
+    return compact
+
+
+def _compact_tests_payload(payload: dict[str, Any], operation: str) -> dict[str, Any]:
+    compact = {
+        "payload_mode": "compact_operation",
+        "operation": operation,
+    }
+    _copy_if_present(
+        compact,
+        payload,
+        (
+            "status",
+            "outcome",
+            "test_mode",
+            "run_phase",
+            "test_verdict",
+            "total",
+            "passed",
+            "failed",
+            "skipped",
+            "duration_seconds",
+            "result_path",
+            "settle_request_id",
+        ),
+    )
+    failures = payload.get("failures") or payload.get("first_failures")
+    if isinstance(failures, list) and failures:
+        compact["first_failures"] = failures[:3]
+    compact.update(_compact_post_settle_fields(payload))
+    compact.update(_artifact_ref(payload))
+    return compact
+
+
+def compact_operation_payload(payload: dict[str, Any], operation: str) -> dict[str, Any]:
+    if operation in {"unity.compile.player_scripts", "unity.compile.matrix"}:
+        return _compact_compile_payload(payload, operation)
+    if operation == "unity.project.refresh":
+        return _compact_refresh_payload(payload, operation)
+    if operation in {"unity.tests.run_editmode", "unity.tests.run_playmode"}:
+        return _compact_tests_payload(payload, operation)
+    return payload
+
+
 def bridge_response_to_tool_result(
     response: dict[str, Any],
     *,
     normalize_scenario_payload: Callable[[dict[str, Any], set[str]], dict[str, Any]],
     scenario_terminal_statuses: set[str],
+    include_full_payload: bool = True,
 ) -> dict[str, Any]:
     if response.get("status") == "ok":
         payload = {}
@@ -285,10 +452,21 @@ def bridge_response_to_tool_result(
             payload = {"raw_payload_json": payload_json}
 
         lifecycle = response.get("_xuunity_lifecycle")
+        operation = ""
         if isinstance(lifecycle, dict) and lifecycle:
+            operation = str(lifecycle.get("operation") or "")
             payload["_xuunity_lifecycle"] = lifecycle
         elif payload_type in {"unity.scenario.run", "unity.scenario.result"} and isinstance(payload, dict):
             payload = normalize_scenario_payload(payload, scenario_terminal_statuses)
+
+        if (
+            not include_full_payload
+            and isinstance(payload, dict)
+            and operation in COMPACT_OPERATION_PAYLOADS
+        ):
+            payload = compact_operation_payload(payload, operation)
+            payload["full_payload_available"] = True
+            payload["full_payload_tool_arguments"] = {"includeFullPayload": True}
 
         return {
             "content": [

@@ -1,9 +1,26 @@
 # Token-Efficiency Retro: Response Envelope Minimalism
 
 Date: `2026-06-02`
-Status: `chat retro — public promotion candidate`
+Status: `partially implemented — public token-efficiency backlog`
 Source prompt: `docs/archive/retros/CHAT_RETRO_PROMPT.md`
 Scope: reusable MCP-surface improvements (public-safe; consumer-project specifics redacted)
+
+## Resolution Update
+
+Partially implemented after this retro:
+
+- `unity_scenario_run_and_wait` returns a compact decision verdict by default,
+  with full raw scenario payloads behind `verbose` / `includeFullPayload`.
+- MCP tool responses for `unity_project_refresh`,
+  `unity_compile_player_scripts`, `unity_compile_matrix`,
+  `unity_compile_build_config_matrix`, `unity_tests_run_editmode`, and
+  `unity_tests_run_playmode` now default to compact operation summaries that
+  keep authoritative post-settle verdict fields while omitting full
+  `_xuunity_lifecycle` snapshots unless `includeFullPayload=true`.
+
+Remaining backlog: make `unity_status_summary` genuinely slim, add compact
+ceilings for batch/multi-project summaries, add a token ledger, and define
+fast-path profiles.
 
 ## 1. Executive summary
 

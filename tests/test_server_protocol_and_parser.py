@@ -13,6 +13,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server
+import server_mcp_tools
 import server_project_actions
 import server_summaries
 
@@ -102,6 +103,195 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_project_action_invoke", tool_names)
         self.assertIn("unity_artifact_register", tool_names)
         self.assertIn("unity_artifact_write_report", tool_names)
+        compile_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_compile_player_scripts")
+        self.assertIn("includeFullPayload", compile_tool["inputSchema"]["properties"])
+
+    def test_compile_tool_returns_compact_payload_by_default(self) -> None:
+        invoke_calls: list[tuple[str, dict[str, object], int]] = []
+
+        def fake_invoke_bridge(
+            project_root_value: str,
+            operation: str,
+            operation_args: dict[str, object],
+            timeout_ms: int,
+        ) -> dict[str, object]:
+            invoke_calls.append((operation, dict(operation_args), timeout_ms))
+            return {
+                "status": "ok",
+                "payload_type": "unity.compile.player_scripts",
+                "payload_json": json.dumps(
+                    {
+                        "name": "Standalone",
+                        "target": "StandaloneOSX",
+                        "status": "passed",
+                        "error_count": 0,
+                        "warning_count": 1,
+                        "compiled_assembly_count": 70,
+                        "duration_seconds": 4.25,
+                        "post_settle_compile": "passed",
+                        "post_settle_error_count": 0,
+                        "post_settle_diagnostics": [],
+                        "settle_phase": "settled",
+                        "completion_basis": "unity_compile_settle_watcher",
+                        "artifact_manifest": {
+                            "base_dir": "/tmp/artifacts",
+                            "groups": {"logs": [{"path": "/tmp/artifacts/editor.log"}]},
+                        },
+                    }
+                ),
+                "_xuunity_lifecycle": {
+                    "operation": "unity.compile.player_scripts",
+                    "idle_wait_before": {"health_status": "healthy"},
+                    "idle_wait_after": {"health_status": "healthy"},
+                },
+            }
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+        ):
+            response = server.handle_json_rpc_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 22,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "unity_compile_player_scripts",
+                        "arguments": {
+                            "projectRoot": "/tmp/FakeProject",
+                            "target": "StandaloneOSX",
+                            "timeoutMs": 180000,
+                        },
+                    },
+                },
+                {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+            )
+
+        structured = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual("compact_operation", structured["payload_mode"])
+        self.assertEqual("unity.compile.player_scripts", structured["operation"])
+        self.assertEqual("passed", structured["status"])
+        self.assertEqual("passed", structured["post_settle_compile"])
+        self.assertEqual(0, structured["post_settle_error_count"])
+        self.assertEqual(1, structured["artifact_count"])
+        self.assertNotIn("_xuunity_lifecycle", structured)
+        self.assertTrue(structured["full_payload_available"])
+        self.assertEqual({"includeFullPayload": True}, structured["full_payload_tool_arguments"])
+        self.assertEqual(("unity.compile.player_scripts", {"target": "StandaloneOSX"}, 180000), invoke_calls[0])
+
+    def test_compile_tool_full_payload_opt_in_preserves_lifecycle(self) -> None:
+        invoke_calls: list[tuple[str, dict[str, object], int]] = []
+
+        def fake_invoke_bridge(
+            project_root_value: str,
+            operation: str,
+            operation_args: dict[str, object],
+            timeout_ms: int,
+        ) -> dict[str, object]:
+            invoke_calls.append((operation, dict(operation_args), timeout_ms))
+            return {
+                "status": "ok",
+                "payload_type": "unity.compile.player_scripts",
+                "payload_json": json.dumps({"status": "passed", "error_count": 0}),
+                "_xuunity_lifecycle": {
+                    "operation": "unity.compile.player_scripts",
+                    "idle_wait_after": {"health_status": "healthy"},
+                },
+            }
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+        ):
+            response = server.handle_json_rpc_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 23,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "unity_compile_player_scripts",
+                        "arguments": {
+                            "projectRoot": "/tmp/FakeProject",
+                            "target": "StandaloneOSX",
+                            "includeFullPayload": True,
+                        },
+                    },
+                },
+                {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+            )
+
+        structured = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual("passed", structured["status"])
+        self.assertIn("_xuunity_lifecycle", structured)
+        self.assertNotIn("payload_mode", structured)
+        self.assertEqual(("unity.compile.player_scripts", {"target": "StandaloneOSX"}, 180000), invoke_calls[0])
+
+    def test_build_config_compile_tool_returns_compact_matrix_by_default(self) -> None:
+        invoke_calls: list[tuple[str, dict[str, object], int]] = []
+        fake_plan = {
+            "assetPath": "Assets/BuildConfig.asset",
+            "profiles": ["Dev"],
+            "matrixArgs": {
+                "configurations": [
+                    {"name": "DevAndroid", "target": "Android"},
+                ],
+            },
+        }
+
+        def fake_invoke_bridge(
+            project_root_value: str,
+            operation: str,
+            operation_args: dict[str, object],
+            timeout_ms: int,
+        ) -> dict[str, object]:
+            invoke_calls.append((operation, dict(operation_args), timeout_ms))
+            return {
+                "status": "ok",
+                "payload_type": "unity.compile.matrix",
+                "payload_json": json.dumps(
+                    {
+                        "total": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "post_settle_compile": "passed",
+                        "post_settle_error_count": 0,
+                        "settle_phase": "settled",
+                        "completion_basis": "unity_compile_settle_watcher",
+                    }
+                ),
+                "_xuunity_lifecycle": {
+                    "operation": "unity.compile.matrix",
+                    "idle_wait_after": {"health_status": "healthy"},
+                },
+            }
+
+        response = server_mcp_tools.call_unity_compile_build_config_matrix_tool(
+            {
+                "projectRoot": "/tmp/FakeProject",
+                "profiles": ["Dev"],
+                "timeoutMs": 300000,
+            },
+            tool_invocation_error_type=server.ToolInvocationError,
+            ensure_project_root=lambda value: Path(value),
+            resolve_operation_timeout_ms=lambda project_root, operation, value, default: int(value or default),
+            build_compile_matrix_args_from_build_config=lambda **kwargs: fake_plan,
+            invoke_bridge=fake_invoke_bridge,
+            build_tool_error_payload=server.build_tool_error_payload,
+            bridge_response_to_tool_result=server.bridge_response_to_tool_result,
+        )
+
+        structured = response["structuredContent"]
+        matrix = structured["matrix"]
+        self.assertFalse(response["isError"])
+        self.assertEqual("Assets/BuildConfig.asset", structured["build_config_asset"])
+        self.assertEqual(["Dev"], structured["profiles"])
+        self.assertEqual("compact_operation", matrix["payload_mode"])
+        self.assertEqual("unity.compile.matrix", matrix["operation"])
+        self.assertEqual("passed", matrix["post_settle_compile"])
+        self.assertNotIn("_xuunity_lifecycle", matrix)
+        self.assertEqual(("unity.compile.matrix", fake_plan["matrixArgs"], 300000), invoke_calls[0])
 
     def test_setup_apply_parser_accepts_explicit_project_roots(self) -> None:
         parser = server.build_parser()

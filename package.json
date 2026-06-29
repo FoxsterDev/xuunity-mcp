@@ -1,6 +1,6 @@
 {
   "name": "xuunity-mcp-site-checks",
-  "version": "0.3.33",
+  "version": "0.3.34",
   "private": true,
   "description": "Repo-owned Playwright checks for the XUUnity MCP public docs site.",
   "scripts": {

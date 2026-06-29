@@ -281,7 +281,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.33",
+    "version": "0.3.34",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -1204,11 +1204,12 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
 
     return run_in_project_request_lock(context, operation, perform_invoke)
 
-def bridge_response_to_tool_result(response: dict[str, Any]) -> dict[str, Any]:
+def bridge_response_to_tool_result(response: dict[str, Any], *, include_full_payload: bool = True) -> dict[str, Any]:
     return bridge_response_to_tool_result_data(
         response,
         normalize_scenario_payload=normalize_scenario_payload,
         scenario_terminal_statuses=SCENARIO_TERMINAL_STATUSES,
+        include_full_payload=include_full_payload,
     )
 
 

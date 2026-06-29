@@ -1,7 +1,7 @@
 # Features
 
 Date: `2026-05-26`
-Status: `current for v0.3.33`
+Status: `current for v0.3.34`
 
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
 automation: status, compile, tests, scene checks, Game View evidence, scenario
@@ -40,7 +40,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Compile checks without active platform switch | `Core` | `unity_compile_player_scripts` compiles target/options/defines combinations without switching active Unity build target. | Lets agents validate Android/iOS/profile cases without mutating project-wide target state. |
 | Compile matrix across targets and defines | `Core` | `unity_compile_matrix` runs a sequence of target/options/defines compile checks. | Covers release-profile validation loops in one workflow. |
 | Request journal final accounting | `Core` | `unity_request_final_status`, `request-final-status`, and request journals recover terminal state after reloads or wrapper timeouts. | Separates transport churn from actual Unity operation results. |
-| Compact low-token summaries | `Core` | `unity_status_summary`, scenario summaries, `unity_scenario_run_and_wait` decision verdicts, and final-status payloads compress evidence for agents. | Agents get actionable evidence without dumping logs; verbose/full payload modes remain available for deep debug. |
+| Compact low-token summaries | `Core` | `unity_status_summary`, scenario summaries, `unity_scenario_run_and_wait` decision verdicts, final-status payloads, and compact refresh/compile/test MCP operation summaries compress evidence for agents. | Agents get actionable evidence without dumping logs; `includeFullPayload` / verbose modes remain available for deep debug. |
 | Same-host multi-project routing | `Core` | Host-side project context registry maps requests to concrete Unity project/editor state. | Supports multiple Unity projects on one workstation. |
 | License-aware batch lane selection | `Host helper` | `license-capabilities`, `unity_license_capabilities`, and `--batch-fallback-mode auto|off|require-batch`. | Lets agents prefer real batchmode when proven, use safe GUI fallback when batchmode is blocked, and fail closed when restore safety is unknown. |
 | Closed-project batch validation lanes | `Host helper` | `batch-compile`, `batch-compile-matrix`, `batch-build-config-compile-matrix`, `batch-editmode-tests`, and `batch-build-player`. | Lets agents validate closed projects through non-interactive Unity batchmode or safe GUI fallback when needed. |
@@ -128,7 +128,7 @@ Unity MCP implementations when the user wants safe production validation.
 
 | Target | Status | Validation notes |
 | --- | --- | --- |
-| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.33`; old `templates/unity-package#v0.3.11` is migration-only. |
+| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.34`; old `templates/unity-package#v0.3.11` is migration-only. |
 | macOS host tools | `Validated in this release environment` | Shell syntax checks, JSON/TOML config parsing, and 141 host Python tests passed locally. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |

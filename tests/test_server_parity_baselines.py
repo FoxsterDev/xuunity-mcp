@@ -54,7 +54,7 @@ def get_option_groups(parser: argparse.ArgumentParser) -> list[list[str]]:
     return [list(action.option_strings) for action in parser._actions if action.option_strings]
 
 
-def fake_bridge_response_to_tool_result(response: dict) -> dict:
+def fake_bridge_response_to_tool_result(response: dict, **kwargs) -> dict:
     payload = {"bridge_response": response}
     return {
         "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=True)}],

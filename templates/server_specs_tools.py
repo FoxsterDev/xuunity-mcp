@@ -228,6 +228,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "forceAssetRefresh": {"type": "boolean", "default": True},
                 "resolvePackages": {"type": "boolean", "default": True},
                 "rerunHealthProbe": {"type": "boolean", "default": True},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
+                },
                 "timeoutMs": {"type": "integer", "default": 180000, "minimum": 1000}
             },
             "required": ["projectRoot"]
@@ -547,6 +552,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "type": "array",
                     "items": {"type": "string"}
                 },
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
+                },
                 "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
             },
             "required": ["projectRoot"]
@@ -574,6 +584,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "assemblyNames": {
                     "type": "array",
                     "items": {"type": "string"}
+                },
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
                 },
                 "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
             },
@@ -663,6 +678,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "description": "Optional extra scripting defines for this compile only."
                 },
                 "name": {"type": "string", "description": "Optional display name for this compile configuration."},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
+                },
                 "timeoutMs": {"type": "integer", "default": 180000, "minimum": 1000}
             },
             "required": ["projectRoot", "target"]
@@ -695,6 +715,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "required": ["target"]
                     },
                     "minItems": 1
+                },
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
                 },
                 "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
             },
@@ -747,6 +772,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "description": "Optional subset of compile targets. Defaults to Android and iOS."
                 },
                 "stopOnFirstFailure": {"type": "boolean", "default": False},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
+                },
                 "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
             },
             "required": ["projectRoot"]

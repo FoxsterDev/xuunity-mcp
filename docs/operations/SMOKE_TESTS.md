@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-05-23`
-Status: `current for v0.3.33`
+Status: `current for v0.3.34`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.33`: `264` tests passed, with one expected skip
+- host Python tests for `v0.3.34`: `267` tests passed, with one expected skip
 - source package self-tests for the current release line: EditMode `6/6`, PlayMode `5/5` on runnable installed Unity `2021.3`, `2022.3`, and `6000.x` editors after offline optional Test Framework setup
 - multi-project batch compile matrix in a consumer repo: `9/9` projects, `38/38` lanes, `0` failures
 
@@ -74,6 +74,11 @@ Pass criteria:
 - all required target/profile entries pass for the project contract
 - when Unity-side settle evidence is available, compile payloads should report
   `completion_basis: unity_compile_settle_watcher`
+- MCP compile tools return compact operation summaries by default. Smokes that
+  assert raw lifecycle snapshots or artifact-manifest internals must pass
+  `includeFullPayload=true`; ordinary pass/fail gates should stay on the compact
+  default and read `status`, counts, `post_settle_compile`, `settle_phase`, and
+  `completion_basis`.
 - if the compile gate is blocked because the same project editor is open, the
   batch summary reports `unity_outcome: not_started` and surfaces a concrete
   recovery command before any heavier validation is attempted
