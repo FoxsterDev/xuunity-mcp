@@ -14,13 +14,26 @@ https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-m
 
 ### Changed
 
-- Released `v0.3.35` package metadata, server metadata, package manifests, and Git UPM examples.
+- Released `v0.3.35` package metadata, server metadata, package manifests, Git
+  UPM examples, public site version references, and package documentation.
 - `unity_status_summary` now defaults to a compact polling payload for MCP
   callers and omits nested discovery, transport, state-group, timing, and
   artifact details unless `includeFullPayload=true` is provided. The compact
   payload keeps the decision fields needed for readiness, recovery, compiler
   state, lifecycle stabilization, host health, reconciliation, and process
   visibility.
+- Added explicit `payload_mode=compact_status_summary` /
+  `payload_mode=full_status_summary` markers so agents can tell whether nested
+  diagnostics were intentionally omitted.
+- Added `includeFullPayload` to the `unity_status_summary` tool schema and
+  preserved the full previous nested summary shape for deep lifecycle and
+  transport debugging.
+- Kept the CLI `request-status-summary` helper on its existing full diagnostic
+  default so shell smokes and local wrapper scripts continue to parse nested
+  prerequisite fields without migration churn.
+- Updated the token-efficiency retro registry to mark status-summary slimming
+  complete and leave only batch/multi-project compact ceilings, token ledger,
+  and fast-path profiles as remaining response-envelope backlog.
 
 ### Validation
 
@@ -51,6 +64,16 @@ https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-m
   `_xuunity_lifecycle` snapshots. Pass `includeFullPayload=true` to recover the
   previous full bridge payload for lifecycle debugging or raw artifact
   inspection.
+- Compact operation summaries keep the authoritative post-settle verdict fields
+  that agents need for closeout: status, error counts, first diagnostics,
+  settle phase, completion basis, timing/artifact references, and full-payload
+  recovery arguments.
+- The compact/full bridge response conversion is centralized in
+  `templates/server_bridge_payloads.py`, reducing duplicated response shaping
+  across refresh, compile, build-config compile, and direct EditMode/PlayMode
+  test tools.
+- Public docs and retro registries were updated to record that normal MCP tool
+  calls no longer dump lifecycle snapshots by default.
 
 ### Validation
 
