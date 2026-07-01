@@ -549,6 +549,18 @@ class ServerProjectHelperTests(unittest.TestCase):
                         "artifact_manifest": artifact_manifest,
                     },
                 )
+                compact_status_summary = server.build_status_summary_from_context(
+                    project_root,
+                    {
+                        "editor_running": True,
+                        "mcp_reachable": True,
+                        "health_status": "healthy",
+                        "playmode_state": "edit",
+                        "structured_timing": structured_timing,
+                        "artifact_manifest": artifact_manifest,
+                    },
+                    include_full_payload=False,
+                )
                 scenario_summary = server.build_scenario_result_summary_from_context(
                     project_root,
                     {
@@ -571,6 +583,14 @@ class ServerProjectHelperTests(unittest.TestCase):
             self.assertEqual(structured_timing, status_summary["structured_timing"])
             self.assertEqual(artifact_manifest, status_summary["artifact_manifest"])
             self.assertEqual(host_prerequisites, status_summary["host_prerequisites"])
+            self.assertEqual("compact_status_summary", compact_status_summary["payload_mode"])
+            self.assertNotIn("structured_timing", compact_status_summary)
+            self.assertNotIn("artifact_manifest", compact_status_summary)
+            self.assertNotIn("host_prerequisites", compact_status_summary)
+            self.assertTrue(compact_status_summary["host_prerequisites_ready"])
+            self.assertEqual([], compact_status_summary["host_prerequisite_blocking_codes"])
+            self.assertEqual([], compact_status_summary["host_prerequisite_warning_codes"])
+            self.assertEqual({"includeFullPayload": True}, compact_status_summary["full_payload_tool_arguments"])
             self.assertEqual(structured_timing, scenario_summary["structured_timing"])
             self.assertEqual(artifact_manifest, scenario_summary["artifact_manifest"])
             self.assertEqual(host_prerequisites, scenario_summary["host_prerequisites"])

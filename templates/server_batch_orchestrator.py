@@ -281,7 +281,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.34",
+    "version": "0.3.35",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -579,6 +579,8 @@ def build_project_discovery_report(project_root: Path) -> dict[str, Any]:
 def build_status_summary_from_context(
     project_root: Path,
     payload: dict[str, Any],
+    *,
+    include_full_payload: bool = True,
 ) -> dict[str, Any]:
     return build_status_summary(
         project_root,
@@ -590,6 +592,7 @@ def build_status_summary_from_context(
         derive_busy_reason=derive_busy_reason,
         summarize_state_for_error=summarize_state_for_error,
         discovery_details=current_project_context_discovery_details(project_root),
+        include_full_payload=include_full_payload,
     )
 
 
@@ -620,6 +623,8 @@ def enrich_tool_invocation_error_with_discovery(project_root: Path, exc: ToolInv
 def build_discovery_status_summary_for_error(
     project_root: Path,
     exc: ToolInvocationError | None = None,
+    *,
+    include_full_payload: bool = True,
 ) -> dict[str, Any]:
     return build_discovery_status_summary_for_error_data(
         project_root,
@@ -627,6 +632,7 @@ def build_discovery_status_summary_for_error(
         discovery=current_project_context_discovery_details(project_root),
         build_status_summary_from_context=build_status_summary_from_context,
         enrich_error_details_with_discovery=enrich_error_details_with_discovery,
+        include_full_payload=include_full_payload,
     )
 
 
@@ -1381,13 +1387,20 @@ def call_unity_status_summary_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     timeout_ms = arguments.get("timeoutMs", 5000)
     if not isinstance(timeout_ms, int):
         raise JsonRpcError(-32602, "timeoutMs must be an integer.")
+    include_full_payload = arguments.get("includeFullPayload", False)
+    if not isinstance(include_full_payload, bool):
+        raise JsonRpcError(-32602, "includeFullPayload must be a boolean when provided.")
 
     project_root = ensure_project_root(project_root_value)
     try:
         response = invoke_bridge(str(project_root), "unity.status", {}, timeout_ms)
     except ToolInvocationError as exc:
         if exc.code in DISCOVERY_STATUS_FALLBACK_ERROR_CODES:
-            summary = build_discovery_status_summary_for_error(project_root, exc)
+            summary = build_discovery_status_summary_for_error(
+                project_root,
+                exc,
+                include_full_payload=include_full_payload,
+            )
             return {
                 "content": [{"type": "text", "text": json.dumps(summary, ensure_ascii=True)}],
                 "structuredContent": summary,
@@ -1404,7 +1417,11 @@ def call_unity_status_summary_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         return tool_result
 
     payload = tool_result.get("structuredContent") or {}
-    summary = build_status_summary_from_context(project_root, payload if isinstance(payload, dict) else {})
+    summary = build_status_summary_from_context(
+        project_root,
+        payload if isinstance(payload, dict) else {},
+        include_full_payload=include_full_payload,
+    )
     return {
         "content": [{"type": "text", "text": json.dumps(summary, ensure_ascii=True)}],
         "structuredContent": summary,

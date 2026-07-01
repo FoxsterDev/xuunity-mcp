@@ -17,10 +17,12 @@ Partially implemented after this retro:
   `unity_tests_run_playmode` now default to compact operation summaries that
   keep authoritative post-settle verdict fields while omitting full
   `_xuunity_lifecycle` snapshots unless `includeFullPayload=true`.
+- `unity_status_summary` now defaults to a compact MCP polling summary and
+  keeps nested discovery, transport, state-group, timing, and artifact details
+  behind `includeFullPayload=true`.
 
-Remaining backlog: make `unity_status_summary` genuinely slim, add compact
-ceilings for batch/multi-project summaries, add a token ledger, and define
-fast-path profiles.
+Remaining backlog: add compact ceilings for batch/multi-project summaries, add
+a token ledger, and define fast-path profiles.
 
 ## 1. Executive summary
 

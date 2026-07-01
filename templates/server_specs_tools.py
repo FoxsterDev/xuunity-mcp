@@ -195,11 +195,16 @@ TOOLS: dict[str, dict[str, Any]] = {
         }
     },
     "unity_status_summary": {
-        "description": "Return a compact Unity status summary suitable for polling and low-token diagnostics.",
+        "description": "Return a compact Unity status summary suitable for polling and low-token diagnostics. Set includeFullPayload=true to include nested discovery, transport, state-group, timing, and artifact details.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, include the full nested discovery/status payload instead of the compact polling summary."
+                },
                 "timeoutMs": {"type": "integer", "default": 5000, "minimum": 1000}
             },
             "required": ["projectRoot"]

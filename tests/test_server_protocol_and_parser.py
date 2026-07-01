@@ -103,6 +103,8 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_project_action_invoke", tool_names)
         self.assertIn("unity_artifact_register", tool_names)
         self.assertIn("unity_artifact_write_report", tool_names)
+        status_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_status_summary")
+        self.assertIn("includeFullPayload", status_tool["inputSchema"]["properties"])
         compile_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_compile_player_scripts")
         self.assertIn("includeFullPayload", compile_tool["inputSchema"]["properties"])
 
@@ -1132,6 +1134,7 @@ actions:
         result = response["result"]
         self.assertFalse(result["isError"])
         self.assertEqual("unity_status_summary", result["structuredContent"]["action"])
+        self.assertEqual("compact_status_summary", result["structuredContent"]["payload_mode"])
         self.assertEqual(7, result["structuredContent"]["bridge_generation"])
         self.assertEqual("session-a", result["structuredContent"]["bridge_session_id"])
         self.assertEqual("healthy", result["structuredContent"]["health_status"])
@@ -1139,8 +1142,10 @@ actions:
         self.assertEqual("fresh", result["structuredContent"]["host_health_classification"])
         self.assertEqual("bridge_live", result["structuredContent"]["discovery_classification"])
         self.assertEqual("bridge_state_authoritative", result["structuredContent"]["reconciliation_case"])
-        self.assertEqual("tcp_loopback", result["structuredContent"]["transport_state"]["active_transport"])
-        self.assertEqual(7, result["structuredContent"]["state_groups"]["bridge_identity"]["bridge_generation"])
+        self.assertTrue(result["structuredContent"]["full_payload_available"])
+        self.assertEqual({"includeFullPayload": True}, result["structuredContent"]["full_payload_tool_arguments"])
+        self.assertNotIn("transport_state", result["structuredContent"])
+        self.assertNotIn("state_groups", result["structuredContent"])
 
     def test_tools_call_status_summary_falls_back_to_discovery_when_editor_is_offline(self) -> None:
         with (

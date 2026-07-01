@@ -454,7 +454,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.34
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.35
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -462,7 +462,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.34"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.35"
   }
 }
 ```
@@ -693,6 +693,9 @@ also performs the same normalization before dispatch as an early diagnostic.
 `unity_scenario_run_and_wait` returns a compact decision envelope by default;
 use `includeFullPayload=true` or the emitted `full_payload_tool_arguments` when
 asserting raw per-step `payload_json`, `hook_name`, or parity-fixture fields.
+`unity_status_summary` also defaults to a compact polling summary; use
+`includeFullPayload=true` when you need nested discovery, transport,
+state-group, timing, or artifact details.
 Refresh, compile, and direct test MCP tools also return compact operation
 summaries by default; pass `includeFullPayload=true` when you need full
 `_xuunity_lifecycle` snapshots for transport or lifecycle debugging.

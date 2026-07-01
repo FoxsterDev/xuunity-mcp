@@ -343,6 +343,8 @@ RECOVERY_RECONCILIATION_ACTIONS = frozenset(
 def build_status_summary_from_context(
     project_root: Path,
     payload: dict[str, Any],
+    *,
+    include_full_payload: bool = True,
 ) -> dict[str, Any]:
     return build_status_summary(
         project_root,
@@ -354,6 +356,7 @@ def build_status_summary_from_context(
         derive_busy_reason=derive_busy_reason,
         summarize_state_for_error=summarize_state_for_error,
         discovery_details=current_project_context_discovery_details(project_root),
+        include_full_payload=include_full_payload,
     )
 
 

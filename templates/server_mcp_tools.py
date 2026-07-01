@@ -237,6 +237,9 @@ def call_unity_status_summary_tool(
     timeout_ms = arguments.get("timeoutMs", 5000)
     if not isinstance(timeout_ms, int):
         raise JsonRpcError(-32602, "timeoutMs must be an integer.")
+    include_full_payload = arguments.get("includeFullPayload", False)
+    if not isinstance(include_full_payload, bool):
+        raise JsonRpcError(-32602, "includeFullPayload must be a boolean when provided.")
 
     project_root = ensure_project_root(project_root_value)
     try:
@@ -260,6 +263,7 @@ def call_unity_status_summary_tool(
         heartbeat_age_seconds=heartbeat_age_seconds,
         derive_busy_reason=derive_busy_reason,
         summarize_state_for_error=summarize_state_for_error,
+        include_full_payload=include_full_payload,
     )
     return {
         "content": [

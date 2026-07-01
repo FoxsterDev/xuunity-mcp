@@ -288,6 +288,7 @@ def build_discovery_status_summary_for_error_data(
     discovery: dict[str, Any],
     build_status_summary_from_context: Callable[[Path, dict[str, Any]], dict[str, Any]],
     enrich_error_details_with_discovery: Callable[[Path, dict[str, Any] | None], dict[str, Any]],
+    include_full_payload: bool = True,
 ) -> dict[str, Any]:
     reconciliation_status = str(discovery.get("reconciliation_status") or "")
     payload = {
@@ -303,7 +304,11 @@ def build_discovery_status_summary_for_error_data(
     if exc is not None:
         payload["offline_error_code"] = exc.code
         payload["offline_error_message"] = exc.message
-    summary = build_status_summary_from_context(project_root, payload)
+    summary = build_status_summary_from_context(
+        project_root,
+        payload,
+        include_full_payload=include_full_payload,
+    )
     if exc is not None:
         summary["error"] = {
             "code": exc.code,

@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## 0.3.35
+
+Release tag: `v0.3.35`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.35
+```
+
+### Changed
+
+- Released `v0.3.35` package metadata, server metadata, package manifests, and Git UPM examples.
+- `unity_status_summary` now defaults to a compact polling payload for MCP
+  callers and omits nested discovery, transport, state-group, timing, and
+  artifact details unless `includeFullPayload=true` is provided. The compact
+  payload keeps the decision fields needed for readiness, recovery, compiler
+  state, lifecycle stabilization, host health, reconciliation, and process
+  visibility.
+
+### Validation
+
+- Release version consistency check passed for `0.3.35`.
+- Source checkout helper install refreshed neutral, Codex, and Claude tool
+  installs; all reported package metadata version `0.3.35`.
+- Host Python unittest suite: `267` tests passed with `1` expected skip.
+- Public site Playwright checks passed: `39/39`.
+
 ## 0.3.34
 
 Release tag: `v0.3.34`

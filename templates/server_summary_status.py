@@ -96,6 +96,7 @@ def build_status_summary(
     derive_busy_reason: Callable[[dict[str, Any] | None], str],
     summarize_state_for_error: Callable[[dict[str, Any] | None], str],
     discovery_details: dict[str, Any] | None = None,
+    include_full_payload: bool = True,
 ) -> dict[str, Any]:
     state = read_best_effort_bridge_state(project_root) or try_read_bridge_state(project_root) or {}
     effective = dict(state)
@@ -151,41 +152,60 @@ def build_status_summary(
         "request_journal_head": str(effective.get("request_journal_head") or ""),
         "state_summary": summarize_state_for_error(effective),
     }
-    for key in ("structured_timing", "artifact_manifest"):
-        if key in payload:
-            summary[key] = payload.get(key)
+    if not include_full_payload:
+        summary.update(
+            {
+                "payload_mode": "compact_status_summary",
+                "full_payload_available": True,
+                "full_payload_tool_arguments": {"includeFullPayload": True},
+            }
+        )
+    elif payload:
+        summary["payload_mode"] = "full_status_summary"
+        for key in ("structured_timing", "artifact_manifest"):
+            if key in payload:
+                summary[key] = payload.get(key)
     discovery = dict(discovery_details or {})
     if discovery:
+        host_prerequisites = dict(discovery.get("host_prerequisites") or {})
         summary.update(
             {
                 "host_health_classification": str(discovery.get("host_health_classification") or ""),
                 "host_health_reason": str(discovery.get("host_health_reason") or ""),
                 "host_health_recommended_next_action": str(discovery.get("host_health_recommended_next_action") or ""),
-                "host_health_termination_policy": str(discovery.get("host_health_termination_policy") or ""),
                 "host_health_heartbeat_age_seconds": discovery.get("host_health_heartbeat_age_seconds"),
                 "host_health_busy_reason": str(discovery.get("host_health_busy_reason") or ""),
-                "host_health_progress_evidence": list(discovery.get("host_health_progress_evidence") or []),
                 "anr_classification": str(discovery.get("anr_classification") or ""),
                 "discovery_classification": str(discovery.get("discovery_classification") or ""),
-                "discovery_reason": str(discovery.get("discovery_reason") or ""),
                 "authoritative_state_source": str(discovery.get("authoritative_state_source") or ""),
                 "reconciliation_case": str(discovery.get("reconciliation_case") or ""),
                 "reconciliation_status": str(discovery.get("reconciliation_status") or ""),
-                "reconciliation_reason": str(discovery.get("reconciliation_reason") or ""),
                 "reconciliation_recommended_next_action": str(discovery.get("reconciliation_recommended_next_action") or ""),
                 "detected_editor_count": int(discovery.get("detected_editor_count") or 0),
                 "detected_editor_pids": list(discovery.get("detected_editor_pids") or []),
                 "process_visibility_available": bool(discovery.get("process_visibility_available", True)),
                 "process_visibility_error_code": str(discovery.get("process_visibility_error_code") or ""),
                 "process_visibility_restricted": bool(discovery.get("process_visibility_restricted")),
-                "editor_log_diagnosis": dict(discovery.get("editor_log_diagnosis") or {}),
-                "editor_log_scope": dict(discovery.get("editor_log_scope") or {}),
-                "stale_request_artifacts": dict(discovery.get("stale_request_artifacts") or {}),
-                "host_prerequisites": dict(discovery.get("host_prerequisites") or {}),
-                "transport_state": dict(discovery.get("transport_state") or {}),
-                "state_groups": dict(discovery.get("state_groups") or {}),
+                "host_prerequisites_ready": bool(host_prerequisites.get("ready", False)),
+                "host_prerequisite_blocking_codes": list(host_prerequisites.get("blocking_codes") or []),
+                "host_prerequisite_warning_codes": list(host_prerequisites.get("warning_codes") or []),
             }
         )
+        if include_full_payload:
+            summary.update(
+                {
+                    "host_health_termination_policy": str(discovery.get("host_health_termination_policy") or ""),
+                    "host_health_progress_evidence": list(discovery.get("host_health_progress_evidence") or []),
+                    "discovery_reason": str(discovery.get("discovery_reason") or ""),
+                    "reconciliation_reason": str(discovery.get("reconciliation_reason") or ""),
+                    "editor_log_diagnosis": dict(discovery.get("editor_log_diagnosis") or {}),
+                    "editor_log_scope": dict(discovery.get("editor_log_scope") or {}),
+                    "stale_request_artifacts": dict(discovery.get("stale_request_artifacts") or {}),
+                    "host_prerequisites": host_prerequisites,
+                    "transport_state": dict(discovery.get("transport_state") or {}),
+                    "state_groups": dict(discovery.get("state_groups") or {}),
+                }
+            )
     summary.update(
         build_bridge_stabilization_summary(
             effective,
