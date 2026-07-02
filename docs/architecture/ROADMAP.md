@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Roadmap
 
-Date: `2026-05-22`
+Date: `2026-07-01`
 Status: `active public roadmap`
 
 ## North Star
@@ -66,23 +66,30 @@ survival and more about:
 
 Already implemented:
 
-- standalone public repository and `v0.3.12` Git UPM package path under
+- standalone public repository and current `v0.3.35` Git UPM package path under
   `packages/com.xuunity.light-mcp`
 - bridge enable/disable lifecycle
 - status and capability probing
-- compact status summaries with bridge stabilization fields
+- compact MCP status summaries with bridge stabilization fields and
+  `includeFullPayload=true` full-payload opt-in
 - additive request-scoped `structured_timing` and `artifact_manifest` on
   successful same-host editor responses and `request-final-status`
 - console tail
 - scene snapshot
 - edit-mode tests
 - compile validation without active platform switch
+- authoritative post-settle refresh, compile, and test verdict fields in
+  compact MCP operation summaries
 - play mode control
 - Game View screenshot and resolution control
 - first scenario automation layer:
   - `unity.scenario.validate`
   - `unity.scenario.run`
   - `unity.scenario.result`
+- compact `unity_scenario_run_and_wait` decision verdicts with trust class,
+  failure class, recommended next action, compact step summaries, and lifecycle
+  relaunch attribution
+- project-defined hook poll-until steps and catalog-backed project-action steps
 - public reusable smoke runners for compact and JSON-heavy validation routes
 - host-side editor session restore for host-opened validation runs
 - lifecycle-reset finalization recovery by `request_id`
@@ -111,6 +118,11 @@ Already implemented:
   `designs/XUUNITY_MCP_BATCH_OPERATOR_ERGONOMICS_DESIGN_2026-05-21.md`:
   progress heartbeats, artifact probes, workspace side-effect summaries,
   project-defined hook summaries, and reclassification operator verdicts
+- license-aware batch helper fallback with `auto`, `off`, and `require-batch`
+  modes, including safe GUI bridge fallback when batchmode is blocked and
+  restore safety is known
+- native Windows `.cmd` and `.ps1` launcher/setup paths with conservative docs
+  around `.cmd` preference and PowerShell ExecutionPolicy risk
 - public agent documentation, client templates, workflow templates, comparison,
   security, discovery, and install docs are in place
 
@@ -121,7 +133,7 @@ This is enough for:
 - controlled screenshot capture
 - early automation experiments
 - repeatable same-host multi-project routing and recovery
-- production Git UPM consumption through `v0.3.12`
+- production Git UPM consumption through `v0.3.35`
 
 This is not yet enough for:
 
@@ -145,6 +157,7 @@ Meaning of "operationally strong" here:
 - clear recovery after bridge churn and lifecycle resets
 - stable compact operator status and finalization semantics
 - richer evidence outputs per operation
+- safer batch/GUI fallback behavior under license constraints
 - broader proof across more than one Unity consumer and version
 
 This is not the same as "full world-class device automation platform".
@@ -154,7 +167,8 @@ Near-term emphasis after the architecture milestone:
 
 - submit the package to OpenUPM now that the registry-native package path is in
   place
-- keep hardening the current lane with richer evidence outputs
+- keep hardening compact summaries and artifact/reporting surfaces where they
+  reduce operator guesswork
 - broaden proof across more supported clients and more real consumer projects
 - improve read surfaces so diagnosis needs less shell fallback
 
@@ -170,7 +184,8 @@ Most valuable next milestone:
 
 Why this is next:
 
-- `v0.3.12` moved the package to the registry-native path
+- `v0.3.12` moved the package to the registry-native path and `v0.3.35` is the
+  current public Git UPM line
 - macOS validation is strong enough for current same-host use
 - Linux and Windows claims should remain conservative until executed on those hosts
 - OpenUPM and external catalog pages are the next discoverability gap
@@ -181,9 +196,9 @@ Focus:
 - Linux and native Windows smoke proof
 - broader supported-client proof
 - broader lifecycle fault-injection proof
-- request cancellation semantics
-- keep the new host prerequisite report stable while closing the remaining
-  lifecycle gaps
+- request cancellation hygiene beyond the current host-side intent slice
+- keep host prerequisite, compact-status, and final-status reports stable while
+  closing the remaining lifecycle proof gaps
 
 ## Phased Plan To Broaden Proof
 
@@ -248,8 +263,12 @@ Current progress:
   progress JSONL sidecars, generic artifact probe summaries, tracked workspace
   side-effect accounting, project-defined hook summary promotion, and
   `operator_verdict` final-status wording
-- remaining value in this phase is summary polish, broader proof, and
-  surfacing the evidence consistently across more operator flows
+- compact-by-default scenario, refresh, compile, build-config compile, direct
+  test, and MCP status-summary envelopes are now shipped with full-payload
+  recovery paths
+- remaining value in this phase is summary polish for batch/multi-project
+  ceilings, broader proof, and surfacing evidence consistently across more
+  operator flows
 
 Exit criteria:
 - a failed or timed-out run leaves enough structured evidence for a new chat to continue without journal archaeology

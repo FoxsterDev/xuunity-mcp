@@ -1,6 +1,6 @@
 # XUUnity Light MCP Unity Package
 
-Date: `2026-05-23`
+Date: `2026-07-01`
 Status: `current for package v0.3.35`
 
 This Unity package provides the editor-side bridge for the lightweight
@@ -36,15 +36,25 @@ This package exposes the Unity-side bridge for:
 - status
 - capability probe
 - console tail
+- console grep and compact loading-timing evidence
 - scene snapshot
 - EditMode tests when the optional Test Framework capability is available
-- compile validation
+- PlayMode tests when the optional Test Framework capability is available
+- compile validation and compile matrices without switching the active build target
+- plain BuildPipeline player builds through the editor bridge
 - play mode control
 - Game View control and screenshots
 - scenario validation, execution, and persisted results
 - project-defined scenario hooks through `IXUUnityLightMcpScenarioHook`
+- catalog-backed `project_action` scenario steps
+- poll-until hook scenarios for project-defined acceptance checks
 - compact scenario verdicts for agent acceptance checks, with verbose payloads
   reserved for deep diagnostics
+
+Refresh, compile, build-config compile, and direct test responses preserve
+authoritative post-settle result fields for host-side compact MCP summaries.
+Full raw bridge payloads remain available through the host server's documented
+full-payload opt-in.
 
 Before EditMode and PlayMode test execution, the package runs a best-effort
 test preflight that closes Unity Android Logcat editor windows when they are

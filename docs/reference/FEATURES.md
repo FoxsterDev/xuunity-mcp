@@ -1,6 +1,6 @@
 # Features
 
-Date: `2026-05-26`
+Date: `2026-07-01`
 Status: `current for v0.3.35`
 
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
@@ -40,15 +40,15 @@ Unity MCP implementations when the user wants safe production validation.
 | Compile checks without active platform switch | `Core` | `unity_compile_player_scripts` compiles target/options/defines combinations without switching active Unity build target. | Lets agents validate Android/iOS/profile cases without mutating project-wide target state. |
 | Compile matrix across targets and defines | `Core` | `unity_compile_matrix` runs a sequence of target/options/defines compile checks. | Covers release-profile validation loops in one workflow. |
 | Request journal final accounting | `Core` | `unity_request_final_status`, `request-final-status`, and request journals recover terminal state after reloads or wrapper timeouts. | Separates transport churn from actual Unity operation results. |
-| Compact low-token summaries | `Core` | `unity_status_summary`, scenario summaries, `unity_scenario_run_and_wait` decision verdicts, final-status payloads, and compact refresh/compile/test MCP operation summaries compress evidence for agents. | Agents get actionable evidence without dumping logs; `includeFullPayload` / verbose modes remain available for deep debug. |
+| Compact low-token summaries | `Core` | `unity_status_summary` defaults to `payload_mode=compact_status_summary`; `unity_scenario_run_and_wait` defaults to `payload_mode=compact_decision`; refresh, compile, build-config compile, and direct EditMode/PlayMode test MCP tools default to compact operation summaries. | Agents get actionable evidence without dumping logs; `includeFullPayload=true`, verbose scenario mode, or emitted full-payload recovery arguments remain available for deep debug. |
 | Same-host multi-project routing | `Core` | Host-side project context registry maps requests to concrete Unity project/editor state. | Supports multiple Unity projects on one workstation. |
 | License-aware batch lane selection | `Host helper` | `license-capabilities`, `unity_license_capabilities`, and `--batch-fallback-mode auto|off|require-batch`. | Lets agents prefer real batchmode when proven, use safe GUI fallback when batchmode is blocked, and fail closed when restore safety is unknown. |
 | Closed-project batch validation lanes | `Host helper` | `batch-compile`, `batch-compile-matrix`, `batch-build-config-compile-matrix`, `batch-editmode-tests`, and `batch-build-player`. | Lets agents validate closed projects through non-interactive Unity batchmode or safe GUI fallback when needed. |
 | Build-config-driven compile matrix | `Project-dependent` | `unity_compile_build_config_matrix` and `batch-build-config-compile-matrix` resolve project build-config assets. | Strong fit for projects with named Android/iOS build profiles. |
-| Bounded scenario workflows | `Project-dependent` | `unity_scenario_validate`, `unity_scenario_run`, result summaries, and persisted scenario artifacts. | Supports repeatable validation recipes without opening arbitrary mutation. |
+| Bounded scenario workflows | `Project-dependent` | `unity_scenario_validate`, `unity_scenario_run`, `unity_scenario_run_and_wait`, poll-until hooks, project-action steps, result summaries, and persisted scenario artifacts. | Supports repeatable validation recipes and project-local hooks without opening arbitrary mutation. |
 | Game View screenshot and resolution control | `Reflection-gated` | `unity_game_view_configure` and `unity_game_view_screenshot` are capability-probed editor features. | Provides visual evidence while acknowledging Unity-version sensitivity. |
 | SDK/EDM4U validation helpers | `Project-dependent` | `unity_edm4u_resolve`, `unity_sdk_dependency_verify`, and artifact expectation checks. | Useful for mobile SDK dependency restore/export/build workflows. |
-| Cross-platform client templates | `Template provided` | Linux/macOS configs use `run.sh`; native Windows configs use `run.cmd`; PowerShell launcher is also shipped. | Covers common MCP clients without relying on one OS shell model. |
+| Cross-platform client templates | `Template provided` | Linux/macOS configs use shell launchers; native Windows configs use `.cmd`; PowerShell `.ps1` launchers are also shipped for environments that allow them. | Covers common MCP clients without relying on one OS shell model. |
 | Easy disable/uninstall path | `Core` | `uninstall-plan` and `uninstall-apply` separate project-only cleanup from current-user reset. | Keeps project cleanup understandable and avoids over-deleting client config. |
 
 ## MCP Tool Surface
@@ -59,11 +59,11 @@ Unity MCP implementations when the user wants safe production validation.
 | Capabilities | `unity_capabilities` | `Core` | Capability and health report used to gate version-sensitive operations. |
 | Host/license capabilities | `unity_license_capabilities` | `Host helper` | Probes batchmode support, UI fallback viability, normalized blocker code, and recommended lane. |
 | Health | `unity_health_probe` | `Core` | Re-runs Unity-side health checks and persists a fresh report. |
-| Status summary | `unity_status_summary` | `Core` | Compact polling-friendly project status summary. |
+| Status summary | `unity_status_summary` | `Core` | Compact polling-friendly project status summary by default; pass `includeFullPayload=true` for nested discovery, transport, state-group, timing, and artifact details. |
 | Final accounting | `unity_request_final_status` | `Core` | Resolves final request disposition from journal plus current bridge state. |
 | Build target | `unity_build_target_get` | `Core` | Reads active build target and target group. |
 | Build target | `unity_build_target_switch` | `Supported` | Mutates active target intentionally and waits for idle. |
-| Project refresh | `unity_project_refresh` | `Supported` | Refreshes AssetDatabase and can request package resolve or health re-probe. |
+| Project refresh | `unity_project_refresh` | `Supported` | Refreshes AssetDatabase and can request package resolve or health re-probe; compact default preserves settled refresh fields and full payload is opt-in. |
 | EDM4U | `unity_edm4u_resolve` | `Project-dependent` | Requires External Dependency Manager for Unity and whitelisted resolver menu availability. |
 | SDK validation | `unity_sdk_dependency_verify` | `Project-dependent` | Requires explicit generated-artifact expectations. |
 | Console | `unity_console_tail` | `Core` | Returns recent Unity console items in normalized form. |
@@ -77,9 +77,9 @@ Unity MCP implementations when the user wants safe production validation.
 | Play Mode | `unity_playmode_set` | `Supported` | Enters/exits Play Mode or controls pause state. |
 | Game View | `unity_game_view_configure` | `Reflection-gated` | Sets active Game View fixed resolution after capability checks. |
 | Game View | `unity_game_view_screenshot` | `Reflection-gated` | Captures Unity Editor Game View screenshot evidence after capability checks. |
-| Compile | `unity_compile_player_scripts` | `Core` | Compiles player scripts for one target/options/defines combination without active target switch. |
-| Compile | `unity_compile_matrix` | `Core` | Runs multiple compile checks across targets/options/defines. |
-| Compile | `unity_compile_build_config_matrix` | `Project-dependent` | Resolves build profiles from Unity build-config assets and runs matrix validation. |
+| Compile | `unity_compile_player_scripts` | `Core` | Compiles player scripts for one target/options/defines combination without active target switch; compact summaries include authoritative post-settle compile fields. |
+| Compile | `unity_compile_matrix` | `Core` | Runs multiple compile checks across targets/options/defines; compact summaries preserve per-lane verdicts and post-settle compiler truth. |
+| Compile | `unity_compile_build_config_matrix` | `Project-dependent` | Resolves build profiles from Unity build-config assets and runs matrix validation; compact default and full payload opt-in match other compile tools. |
 | Build | `unity_build_player` | `Project-dependent` | Runs a plain BuildPipeline player build through the GUI bridge; used as the GUI fallback for `batch-build-player`. |
 | Scenarios | `unity_scenario_validate` | `Project-dependent` | Validates scripted scenario JSON before execution. |
 | Scenarios | `unity_scenario_run` | `Project-dependent` | Starts asynchronous scenario execution inside Unity. |
@@ -87,7 +87,11 @@ Unity MCP implementations when the user wants safe production validation.
 | Scenarios | `unity_scenario_result_summary` | `Project-dependent` | Compact scenario result summary. |
 | Scenarios | `unity_scenario_results_list` | `Project-dependent` | Lists persisted scenario result summaries. |
 | Scenarios | `unity_scenario_result_latest` | `Project-dependent` | Returns latest persisted scenario result, optionally filtered by name. |
-| Scenarios | `unity_scenario_run_and_wait` | `Project-dependent` | Starts a scenario and waits for a terminal compact decision verdict, with verbose/full payload opt-in for deep debug. |
+| Scenarios | `unity_scenario_run_and_wait` | `Project-dependent` | Starts a scenario and waits for a terminal compact decision verdict with trust class, failure class, recommended next action, compact steps, and lifecycle relaunch attribution (`editor_relaunched`, previous/current editor PID, bridge generations, and cold-start reason) when applicable. |
+| Project actions | `unity_project_action_list` | `Project-dependent` | Lists catalog-backed project actions from `project_actions.yaml`. |
+| Project actions | `unity_project_action_invoke` | `Project-dependent` | Invokes a typed project action by compiling it to a one-step Unity scenario and enforcing mutation approval. |
+| Artifacts | `unity_artifact_register` | `Supported` | Registers artifact metadata in the project MCP artifact registry without invoking Unity. |
+| Artifacts | `unity_artifact_write_report` | `Supported` | Writes a text report to an approved project output root and registers it. |
 | Maintenance | `unity_maintenance_prune` | `Supported` | Prunes stale request, scenario, capture, and optional log artifacts. |
 
 ## Host-Side Helper Commands
@@ -110,7 +114,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Recovery | `request-editor-quit --wait-for-exit` | `Host helper` | Separates quit acknowledgement from process-exit proof. |
 | Recovery | `restore-editor-state` | `Host helper` | Restores host-opened editor session state. |
 | Recovery | `recover-editor-session` | `Host helper` | Recovers common stale editor/session cases. |
-| Request state | `request-status-summary` | `Host helper` | Compact status summary for polling. |
+| Request state | `request-status-summary` | `Host helper` | CLI status summary for polling and diagnostics when MCP tools are not yet visible in the client session. |
 | Request state | `request-final-status` | `Host helper` | Canonical final status after lifecycle churn or wrapper timeout. |
 | Request state | `request-latest-status` | `Host helper` | Recovers latest matching operation from the request journal. |
 | Request state | `request-cancel` | `Host helper` | Best-effort cancellation marker for in-flight requests. |
@@ -121,6 +125,13 @@ Unity MCP implementations when the user wants safe production validation.
 | Batch tests | `batch-editmode-tests` | `Host helper` | EditMode test lane with license-aware GUI fallback to `unity.tests.run_editmode`. |
 | Batch tests | `batch-test-framework-version-regression` | `Host helper` | Test Framework version sweep across direct and batch validation lanes. |
 | Build | `batch-build-player` | `Project-dependent` | Generic plain Unity build lane; uses batchmode when supported and GUI `unity.build_player` fallback when safe. |
+| Project actions | `project-action-list` | `Project-dependent` | Lists catalog-backed project actions from the host helper. |
+| Project actions | `project-action-invoke` | `Project-dependent` | Invokes a catalog-backed action through scenario normalization from the host helper. |
+| Project actions | `project-hook-scaffold` | `Template provided` | Generates a project hook class, project action fragment, activation scenario, and checklist for review. |
+| Console | `request-console-grep` | `Host helper` | CLI route for compact console grep summaries. |
+| Console | `request-loading-timing` | `Host helper` | CLI route for compact loading/startup timing summaries. |
+| Artifacts | `artifact-register` | `Host helper` | Registers artifact metadata from the host helper. |
+| Artifacts | `artifact-write-report` | `Host helper` | Writes and registers a report artifact from the host helper. |
 | Artifacts | `artifact-probe` | `Host helper` | Checks build artifact files, ZIP entries, and manifest text expectations. |
 | Maintenance | `maintenance-prune` | `Host helper` | Prunes stale local MCP artifacts. |
 
@@ -129,7 +140,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Target | Status | Validation notes |
 | --- | --- | --- |
 | Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.35`; old `templates/unity-package#v0.3.11` is migration-only. |
-| macOS host tools | `Validated in this release environment` | Shell syntax checks, JSON/TOML config parsing, and 141 host Python tests passed locally. |
+| macOS host tools | `Validated in this release environment` | Host Python unittest suite passed for `v0.3.35`: `267` tests with one expected skip. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |
 | Claude Code | `Template provided` | Project `.mcp.json`, Windows `.mcp.windows.json`, and user-scope installer path are documented. |
@@ -137,10 +148,10 @@ Unity MCP implementations when the user wants safe production validation.
 | Cursor | `Template provided` | Project/user `.cursor/mcp.json` templates are provided for Unix-like and native Windows hosts. |
 | Windsurf | `Template provided` | `~/.codeium/windsurf/mcp_config.json` and Windows equivalent templates are provided. |
 | Codex-style agents | `Template provided` | Unix-like and Windows `config.toml` snippets are provided. |
-| Unity 2021.3+ | `Validated` | Default package metadata targets Unity `2021.3`; clean Unity `2021.3.58f1` Git UPM release smoke passed for the previous `v0.3.14` package line, and `v0.3.17` is prepared for the release prodmode tag check after push. |
+| Unity 2021.3+ | `Validated` | Default package metadata targets Unity `2021.3`; current source validation covers installed Unity `2021.3`, `2022.3`, and `6000.x` editor families. |
 | Optional Test Framework capability | `Implemented` | Core MCP is healthy without `com.unity.test-framework`; test operations enable through asmdef Version Defines when `>=1.1.33` is installed. |
-| Package self-tests | `Validated` | Clean installed-editor matrix passed package EditMode `6/6` and PlayMode `5/5`; the previous published `v0.3.14` Git UPM tag passed the same package self-tests on Unity `2021.3.58f1`. |
-| Multi-project batch compile | `Validated in consumer repo` | Private multi-project consumer validation passed `9/9` Unity projects and `38/38` compile lanes after the `v0.3.12` package path update. |
+| Package self-tests | `Validated` | Current release source validation passed package EditMode and PlayMode self-test lanes across runnable installed Unity `2021.3`, `2022.3`, and `6000.x` editors after optional Test Framework setup. |
+| Multi-project batch compile | `Validated in consumer repo` | Public summary evidence records `9/9` Unity projects and `38/38` compile lanes passing after the registry-native package path update. |
 | OpenUPM | `Ready, not published` | Package layout and metadata are registry-ready; use Git UPM until an OpenUPM package page exists. |
 
 ## Supported MCP Clients

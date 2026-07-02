@@ -1,6 +1,6 @@
 # AI Integration Guide
 
-Date: `2026-05-22`
+Date: `2026-07-01`
 Status: `active public guidance`
 
 ## Purpose
@@ -233,7 +233,7 @@ Before doing real work, check in this order:
 4. Unity editor has opened the project
 5. `bridge_state.json` exists
 6. `capabilities_report.json` exists or can be generated
-7. `unity.status` succeeds
+7. `unity.status` or compact `unity_status_summary` succeeds
 8. `unity.capabilities.get` succeeds
 9. `unity.health.probe` succeeds
 10. if the host opened Unity for the validation session, the closeout path is defined
@@ -252,7 +252,8 @@ For scenario acceptance checks, prefer the `unity_scenario_run_and_wait`
 compact verdict path first. It returns the terminal decision, trust class,
 failure class, recommended next action, short step summaries, and lifecycle
 relaunch attribution when Unity had to be opened or reopened. Request verbose
-or full payload output only for deep diagnostics.
+or `includeFullPayload=true` only for deep diagnostics or raw per-step
+assertions.
 
 If readiness checks succeed but a later compile or test run fails, treat that as
 a Unity project or runtime failure unless the error explicitly points back to
@@ -378,7 +379,9 @@ Only after that:
 
 Scenario extension route:
 
-15. implement `IXUUnityLightMcpScenarioHook` in a project `Assets/Editor/` assembly when the consumer needs project-local automation not worth promoting into the shared package yet
+15. list/invoke catalog-backed project actions when the consumer publishes
+    `project_actions.yaml`
+16. implement `IXUUnityLightMcpScenarioHook` in a project `Assets/Editor/` assembly when the consumer needs project-local automation not worth promoting into the shared package yet
 
 ## Where To Extend
 

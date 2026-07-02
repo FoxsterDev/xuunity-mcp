@@ -1,6 +1,6 @@
 # Status
 
-Date: `2026-05-23`
+Date: `2026-07-01`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
@@ -34,6 +34,17 @@ Migration note:
   Test Framework-backed operations optional.
 - `v0.3.15+` adds license-aware batch fallback and Codex helper install-target
   selection.
+- `v0.3.29+` adds project-defined hook poll-until scenarios and richer compact
+  scenario summaries.
+- `v0.3.32+` makes `unity_scenario_run_and_wait` a compact decision-verdict
+  surface by default, with lifecycle relaunch attribution and full-payload
+  opt-in.
+- `v0.3.34+` makes refresh, compile, build-config compile, and direct test MCP
+  responses compact by default while preserving authoritative post-settle
+  verdict fields and `includeFullPayload=true` recovery.
+- `v0.3.35+` makes `unity_status_summary` compact by default for MCP callers,
+  with `payload_mode` markers and full nested diagnostics available through
+  `includeFullPayload=true`.
 - The old path is kept only as a migration pointer for users pinned to
   `v0.3.11`.
 
@@ -58,6 +69,7 @@ Implemented Unity-side operations:
 - `unity.edm4u.resolve`
 - `unity.sdk.dependency.verify`
 - `unity.console.tail`
+- `unity.console.grep`
 - `unity.scene.snapshot`
 - `unity.scene.assert`
 - `unity.tests.run_editmode`
@@ -68,13 +80,42 @@ Implemented Unity-side operations:
 - `unity.game_view.screenshot`
 - `unity.compile.player_scripts`
 - `unity.compile.matrix`
+- `unity.build_player`
 - `unity.scenario.validate`
 - `unity.scenario.run`
 - `unity.scenario.result`
 
+Implemented Unity-side scenario step families include status, health probe,
+project refresh, console grep, compile, tests, Play Mode, Game View, waits,
+project-defined hooks, poll-until hooks, and catalog-backed `project_action`
+steps.
+
 Implemented host-side MCP tools and helpers:
 
+- `unity_status`
+- `unity_license_capabilities`
 - `unity_status_summary`
+- `unity_capabilities`
+- `unity_health_probe`
+- `unity_console_tail`
+- `unity_console_grep`
+- `unity_loading_timing`
+- `unity_scene_snapshot`
+- `unity_scene_assert`
+- `unity_compile_player_scripts`
+- `unity_compile_matrix`
+- `unity_tests_run_editmode`
+- `unity_tests_run_playmode`
+- `unity_playmode_state`
+- `unity_playmode_set`
+- `unity_build_player`
+- `unity_game_view_configure`
+- `unity_game_view_screenshot`
+- `unity_project_refresh`
+- `unity_build_target_get`
+- `unity_build_target_switch`
+- `unity_edm4u_resolve`
+- `unity_sdk_dependency_verify`
 - `xuunity_setup_plan`
 - `xuunity_setup_apply`
 - `xuunity_setup_validate`
@@ -87,6 +128,10 @@ Implemented host-side MCP tools and helpers:
 - `unity_scenario_result_latest`
 - `unity_scenario_run_and_wait`
 - `unity_compile_build_config_matrix`
+- `unity_project_action_list`
+- `unity_project_action_invoke`
+- `unity_artifact_register`
+- `unity_artifact_write_report`
 - `unity_maintenance_prune`
 - `project-discovery-report`
 - `registry-context-report`
@@ -107,12 +152,20 @@ Implemented host-side MCP tools and helpers:
 - `request-latest-status`
 - `request-cancel`
 - `request-stale-cleanup`
+- `request-console-grep`
+- `request-loading-timing`
+- `request-build-player`
 - `batch-compile`
 - `batch-compile-matrix`
 - `batch-build-config-compile-matrix`
 - `batch-editmode-tests`
 - `batch-test-framework-version-regression`
 - `batch-build-player`
+- `project-action-list`
+- `project-action-invoke`
+- `project-hook-scaffold`
+- `artifact-register`
+- `artifact-write-report`
 - `artifact-probe`
 
 ## Current Validation Evidence
@@ -123,11 +176,12 @@ Latest source validation for `v0.3.35`:
 | --- | --- | --- |
 | Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.35`, `unity=2021.3`, no hard Test Framework dependency |
 | Host Python tests | `python3 -m unittest discover -s tests` | `267` tests passed for `v0.3.35`, with one expected skip |
-| Package self-tests | Clean devmode projects on installed Unity editors | EditMode `6/6`, PlayMode `5/5` on `2021.3.58f1`, `2022.3.62f3`, `2022.3.67f2`, `6000.0.58f2`, `6000.0.61f1`, `6000.2.14f1`, and `6000.3.3f1` after offline optional Test Framework setup. `2021.3.45f2` is classified as `skipped/create_project_license_unavailable` on this host because Unity reports no valid editor license before package import. |
-| Previous Git UPM release smoke | Clean Unity `2021.3.58f1` project pinned to `#v0.3.14` | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package EditMode `6/6` and PlayMode `5/5` passed, and closeout verified `process_exit_verified=true`. |
-| Release prodmode check | Temporary Unity project pinned to `#v0.3.35` | Run after pushing the release tag so `prodmode` can verify the tag on `origin` and write the matching Git UPM dependency before consumer closeout. |
-| Multi-project compile matrix | Private multi-project consumer validation | `9/9` projects, `38/38` lanes, `0` failures |
-| Git tag visibility | Git refs | Release tag `v0.3.35` is prepared locally and must be pushed to `origin` for Git UPM consumers. |
+| Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.35` | Scenario decision verdicts, compact operation summaries, authoritative post-settle compile/test/refresh fields, and compact `unity_status_summary` defaults are documented with `includeFullPayload=true` recovery. |
+| Package self-tests | Clean devmode projects on installed Unity editors | Current release-line source validation passed package EditMode and PlayMode self-test lanes across runnable Unity `2021.3`, `2022.3`, and `6000.x` editor families after optional Test Framework setup. |
+| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed: `39/39` for `v0.3.35`. |
+| Historical Git UPM release smoke | Clean Unity project pinned to an earlier public tag | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package self-tests passed, and closeout verified process exit. |
+| Multi-project compile matrix | Public summary evidence from consumer validation | `9/9` projects, `38/38` compile lanes, `0` failures |
+| Git tag visibility | Remote Git refs | Release tag `v0.3.35` is visible on `origin` for Git UPM consumers. |
 
 Cross-platform status:
 

@@ -24,6 +24,10 @@ release_consistency = load_module(
     "check_release_version_consistency",
     REPO_ROOT / "scripts" / "testing" / "check_release_version_consistency.py",
 )
+release_docs_freshness = load_module(
+    "check_release_docs_freshness",
+    REPO_ROOT / "scripts" / "testing" / "check_release_docs_freshness.py",
+)
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -134,6 +138,13 @@ class ReleaseVersioningTests(unittest.TestCase):
             ),
         )
 
+    def create_minimal_fresh_docs_tree(self, root: Path, version: str = "0.3.16") -> None:
+        write_json(root / "packages" / "com.xuunity.light-mcp" / "package.json", {"version": version})
+        for relative_path in release_docs_freshness.PUBLIC_DOCS:
+            markers = release_docs_freshness.REQUIRED_MARKERS.get(relative_path, ())
+            lines = [marker.format(version=version) for marker in markers]
+            write_text(root / relative_path, "\n".join(lines) + "\n")
+
     def test_sync_release_version_updates_current_refs_without_rewriting_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -188,6 +199,34 @@ class ReleaseVersioningTests(unittest.TestCase):
     def test_release_version_consistency_passes_for_repo(self) -> None:
         errors = release_consistency.check_release_version_consistency(REPO_ROOT)
         self.assertEqual([], errors)
+
+    def test_release_docs_freshness_passes_for_repo(self) -> None:
+        errors = release_docs_freshness.check_release_docs_freshness(REPO_ROOT)
+        self.assertEqual([], errors)
+
+    def test_release_docs_freshness_detects_stale_prepared_tag_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.create_minimal_fresh_docs_tree(root)
+            status_path = root / "docs" / "reference" / "STATUS.md"
+            with status_path.open("a", encoding="utf-8") as handle:
+                handle.write("Release tag `v0.3.16` is prepared locally.\n")
+
+            errors = release_docs_freshness.check_release_docs_freshness(root)
+
+            self.assertTrue(any("prepared" in error for error in errors), errors)
+
+    def test_release_docs_freshness_detects_missing_feature_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.create_minimal_fresh_docs_tree(root)
+            features_path = root / "docs" / "reference" / "FEATURES.md"
+            text = features_path.read_text(encoding="utf-8")
+            features_path.write_text(text.replace("payload_mode=compact_decision\n", ""), encoding="utf-8")
+
+            errors = release_docs_freshness.check_release_docs_freshness(root)
+
+            self.assertTrue(any("payload_mode=compact_decision" in error for error in errors), errors)
 
     def test_release_version_consistency_detects_stale_current_doc_claim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

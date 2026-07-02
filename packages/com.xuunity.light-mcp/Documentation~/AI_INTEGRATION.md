@@ -1,6 +1,6 @@
 # AI Integration Instructions
 
-Date: `2026-05-23`
+Date: `2026-07-01`
 Status: `current for package v0.3.35`
 
 Use this document when an AI agent is integrating this Unity package into a new
@@ -65,8 +65,9 @@ An AI agent should not:
 7. screenshot
 8. scenario validate
 9. scenario run-and-wait compact verdict
-10. raw scenario result only when verbose diagnostics are needed
-11. implement `IXUUnityLightMcpScenarioHook` in `Assets/Editor/` when the project needs local scenario automation not worth promoting upstream yet
+10. raw scenario result only when verbose/full-payload diagnostics are needed
+11. project-action list/invoke when the project publishes `project_actions.yaml`
+12. implement `IXUUnityLightMcpScenarioHook` in `Assets/Editor/` when the project needs local scenario automation not worth promoting upstream yet
 
 ## Upstream Docs
 

@@ -1,6 +1,6 @@
 # Agent Workflows
 
-Date: `2026-05-23`
+Date: `2026-07-01`
 Status: `active public guidance`
 
 ## Purpose
@@ -72,6 +72,8 @@ Use these MCP tools from compatible clients:
 - `unity_capabilities`
 - `unity_health_probe`
 - `unity_console_tail`
+- `unity_console_grep`
+- `unity_loading_timing`
 - `unity_scene_snapshot`
 - `unity_scene_assert`
 - `unity_compile_player_scripts`
@@ -79,6 +81,7 @@ Use these MCP tools from compatible clients:
 - `unity_compile_build_config_matrix`
 - `unity_tests_run_editmode`
 - `unity_tests_run_playmode`
+- `unity_build_player`
 - `unity_playmode_state`
 - `unity_playmode_set`
 - `unity_game_view_configure`
@@ -88,6 +91,10 @@ Use these MCP tools from compatible clients:
 - `unity_scenario_result_summary`
 - `unity_request_final_status`
 - `unity_project_refresh`
+- `unity_project_action_list`
+- `unity_project_action_invoke`
+- `unity_artifact_register`
+- `unity_artifact_write_report`
 - `unity_edm4u_resolve`
 - `unity_sdk_dependency_verify`
 - `xuunity_uninstall_plan`

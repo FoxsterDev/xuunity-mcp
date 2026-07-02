@@ -1,6 +1,6 @@
 # Publishing Checklist
 
-Date: `2026-06-07`
+Date: `2026-07-01`
 Status: `manual follow-up after repo commit`
 
 These items are part of the search/discovery plan but cannot be completed only
@@ -17,6 +17,18 @@ Release is blocked until all of the following are true:
 - `python3 scripts/tools/sync_release_version.py --version <next-version>` has
   been run
 - `python3 scripts/testing/check_release_version_consistency.py` passes
+- `python3 scripts/testing/check_release_docs_freshness.py` passes
+- the freshness audit for the current release has checked `git log
+  --oneline --decorate --since=<last-public-doc-refresh>`, the top
+  `CHANGELOG.md` release section, `README.md`, `docs/reference/FEATURES.md`,
+  `docs/reference/STATUS.md`, `docs/architecture/ROADMAP.md`,
+  `docs/operations/SMOKE_TESTS.md`, agent docs, comparison docs, and package
+  docs under `packages/com.xuunity.light-mcp/Documentation~/`
+- shipped features from the current release are not still described as
+  `planned`, `prepared`, `not yet`, or future-only in public entrypoint docs
+- current public docs use public-safe validation summaries and do not include
+  private project names, host-local paths, local run IDs, screenshots, profile
+  names, or host-private evidence labels
 - `bash init_xuunity_light_unity_mcp.sh --target both --force` from the source
   checkout installs `run_installed_or_refresh_xuunity_mcp.sh`,
   `run_installed_or_refresh_xuunity_mcp.py`,
@@ -38,8 +50,10 @@ Minimum release closeout sequence:
 ```bash
 python3 scripts/tools/sync_release_version.py --version <next-version>
 python3 scripts/testing/check_release_version_consistency.py
+python3 scripts/testing/check_release_docs_freshness.py
 bash init_xuunity_light_unity_mcp.sh --target both --force
 scripts/testing/run_host_python_tests.sh
+scripts/testing/run_site_ui_checks.sh
 git push origin master
 git push origin v<next-version>
 ```

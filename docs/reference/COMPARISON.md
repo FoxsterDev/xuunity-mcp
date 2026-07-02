@@ -1,6 +1,6 @@
 # XUUnity MCP vs Unity MCP Solutions
 
-Date: `2026-05-22`
+Date: `2026-07-01`
 Status: `public comparison snapshot`
 Scope: compare the lightweight `XUUnity Light Unity MCP` approach against the
 main Unity MCP reference options that informed its design
@@ -22,7 +22,7 @@ Use XUUnity Light Unity MCP when you want:
 - disabled-by-default bridge activation
 - no normal player-build footprint by default
 - multi-project same-host routing
-- compact status summaries for AI agents
+- compact status, scenario, and operation summaries for AI agents
 
 Use a broader Unity MCP implementation when you need:
 
@@ -44,9 +44,10 @@ Use a broader Unity MCP implementation when you need:
 
 ## Sources Reviewed
 
-Reviewed on `2026-05-22`:
+External sources reviewed on `2026-05-22`; XUUnity repo-local evidence refreshed
+on `2026-07-01`:
 
-- XUUnity Light Unity MCP repo-local docs: `../../README.md`, `FEATURES.md`, `../../SECURITY.md`, `../../INSTALL.md`, `../agents/AI_INTEGRATION.md`, package metadata, and host tests.
+- XUUnity Light Unity MCP repo-local docs: `../../README.md`, `FEATURES.md`, `STATUS.md`, `../../SECURITY.md`, `../../INSTALL.md`, `../agents/AI_INTEGRATION.md`, package metadata, changelog, and host tests.
 - Unity AI feature page: <https://unity.com/features/ai>
 - Unity AI open beta guide: <https://support.unity.com/hc/en-us/articles/48060149523476-Getting-started-with-Unity-AI-open-beta-user-guide>
 - CoplayDev Unity MCP: <https://github.com/CoplayDev/unity-mcp>
@@ -155,12 +156,15 @@ Current implemented MCP tool surface:
 - `unity_edm4u_resolve`
 - `unity_sdk_dependency_verify`
 - `unity_console_tail`
+- `unity_console_grep`
+- `unity_loading_timing`
 - `unity_scene_snapshot`
 - `unity_scene_assert`
 - `unity_tests_run_editmode`
 - `unity_tests_run_playmode`
 - `unity_playmode_state`
 - `unity_playmode_set`
+- `unity_build_player`
 - `unity_game_view_configure`
 - `unity_game_view_screenshot`
 - `unity_compile_player_scripts`
@@ -173,6 +177,10 @@ Current implemented MCP tool surface:
 - `unity_scenario_results_list`
 - `unity_scenario_result_latest`
 - `unity_scenario_run_and_wait`
+- `unity_project_action_list`
+- `unity_project_action_invoke`
+- `unity_artifact_register`
+- `unity_artifact_write_report`
 - `unity_maintenance_prune`
 
 Host helpers also cover:
@@ -182,13 +190,17 @@ Host helpers also cover:
 - same-host registry context reports
 - ready-state recovery
 - request final-status recovery
+- compact status, scenario, refresh, compile, and test summaries with
+  full-payload opt-in
 - closed-project batch compile
 - closed-project compile matrix
 - build-config-driven compile matrix
 - closed-project EditMode tests
 - Test Framework version regression sweeps
 - plain Unity batch builds
+- catalog-backed project actions
 - artifact probes
+- artifact registry/report helpers
 - local artifact pruning
 
 That means it already covers:
@@ -200,7 +212,8 @@ That means it already covers:
 - deterministic scenario replay with persisted result payloads
 - screenshot capture for verification
 - lifecycle-reset recovery with request-journal follow-up
-- compact bridge stabilization summaries for operator diagnosis
+- compact bridge stabilization, scenario decision, and operation verdict
+  summaries for operator diagnosis
 
 ## Validation Status And Caveats
 
@@ -208,10 +221,11 @@ Release validation status for the current XUUnity Light package:
 
 | Area | Status | Caveat |
 | --- | --- | --- |
-| Current package source | `Release tag prepared` | Source package is `v0.3.35` at `packages/com.xuunity.light-mcp`; push the local release tag to `origin` before using it from Git UPM consumers. OpenUPM publication is still pending. |
-| macOS host tools | `Repo-verified` | Shell syntax checks, JSON/TOML config parsing, and 141 host Python tests passed in the local release environment. |
-| Package self-tests | `Source and previous Git UPM verified` | Clean installed-editor matrix passed package EditMode `6/6` and PlayMode `5/5`; the previous published `v0.3.14` Git UPM tag passed the same package self-tests on Unity `2021.3.58f1`. |
-| Multi-project compile matrix | `Repo-verified` | Private multi-project consumer validation passed `9/9` projects and `38/38` compile lanes after the `v0.3.12` package path update. |
+| Current package source | `Git UPM available` | Source package is `v0.3.35` at `packages/com.xuunity.light-mcp`; release tag `v0.3.35` is visible on `origin`. OpenUPM publication is still pending. |
+| macOS host tools | `Repo-verified` | Host Python unittest suite passed for `v0.3.35`: `267` tests with one expected skip. |
+| Compact MCP envelopes | `Repo-verified` | Scenario decision verdicts, compact operation summaries, authoritative post-settle compile/test/refresh fields, and compact `unity_status_summary` defaults are documented with `includeFullPayload=true` recovery. |
+| Package self-tests | `Source verified` | Current release-line source validation passed package EditMode and PlayMode self-test lanes across runnable Unity `2021.3`, `2022.3`, and `6000.x` editor families after optional Test Framework setup. |
+| Multi-project compile matrix | `Repo-verified summary` | Public summary evidence records `9/9` projects and `38/38` compile lanes passing after the registry-native package path update. |
 | Linux host tools | `Template provided` / portable path | Unix launcher is bash-compatible and avoids zsh-only expansion, but should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs plus `run.cmd` and `run.ps1` are included and statically validated; native Windows MCP connection still needs host smoke validation. |
 | Game View operations | `Reflection-gated` | Screenshot and resolution control rely on Unity Editor internals and must be trusted only after capability probing. |
