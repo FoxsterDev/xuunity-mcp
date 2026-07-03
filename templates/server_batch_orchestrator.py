@@ -284,7 +284,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.36",
+    "version": "0.3.37",
 }
 
 # === Block A: Registry & Discovery Helpers ===

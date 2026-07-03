@@ -89,6 +89,7 @@ def summarize_scenario_step(step: dict[str, Any] | None) -> dict[str, Any] | Non
     if not isinstance(step, dict):
         return None
 
+    payload = _parse_step_payload_json(step)
     summary = {
         "step_id": str(step.get("stepId") or ""),
         "kind": str(step.get("kind") or ""),
@@ -103,6 +104,18 @@ def summarize_scenario_step(step: dict[str, Any] | None) -> dict[str, Any] | Non
         summary["error_code"] = error_code
     if error_message:
         summary["error_message"] = truncate_text(error_message, 320)
+
+    playmode_set_summary = _extract_playmode_set_summary(step, payload)
+    if playmode_set_summary:
+        nested_outcome = str(step.get("outcome") or "")
+        payload_outcome = str(playmode_set_summary.get("outcome") or "")
+        if payload_outcome and payload_outcome != nested_outcome:
+            summary["nested_operation_outcome"] = nested_outcome
+            summary["outcome"] = payload_outcome
+        summary["playmode_set_summary"] = playmode_set_summary
+        if bool(playmode_set_summary.get("stale_playmode_state_detected")):
+            summary["stale_playmode_state_detected"] = True
+            summary["recommended_next_action"] = "exit_playmode_then_rerun_if_fresh_start_required"
     return summary
 
 
@@ -522,6 +535,78 @@ def _parse_step_payload_json(step: dict[str, Any]) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _extract_playmode_set_summary(step: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    if str(step.get("kind") or "") != "playmode_set":
+        return {}
+    action = str(payload.get("requested_action") or payload.get("action") or "").strip()
+    outcome = str(payload.get("outcome") or "").strip()
+    playmode_state = str(payload.get("playmode_state") or "").strip()
+    if not action and not outcome and not playmode_state:
+        return {}
+
+    stale_playmode_state_detected = action == "enter" and outcome == "already_playing"
+    summary: dict[str, Any] = {
+        "requested_action": action,
+        "outcome": outcome,
+        "playmode_state": playmode_state,
+        "stale_playmode_state_detected": stale_playmode_state_detected,
+    }
+    for key in (
+        "settle_phase",
+        "settle_target_state",
+        "request_completed_at_utc",
+    ):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            summary[key] = truncate_text(value, 120)
+    if stale_playmode_state_detected:
+        summary["recommended_next_action"] = "exit_playmode_then_rerun_if_fresh_start_required"
+    return summary
+
+
+def build_playmode_guard_summary(steps: list[Any]) -> dict[str, Any]:
+    playmode_steps: list[dict[str, Any]] = []
+    stale_steps: list[dict[str, Any]] = []
+    for raw_step in steps:
+        if not isinstance(raw_step, dict):
+            continue
+        payload = _parse_step_payload_json(raw_step)
+        step_summary = _extract_playmode_set_summary(raw_step, payload)
+        if not step_summary:
+            continue
+        item = {
+            "step_id": str(raw_step.get("stepId") or raw_step.get("step_id") or ""),
+            "status": str(raw_step.get("status") or ""),
+            **step_summary,
+        }
+        playmode_steps.append(item)
+        if bool(step_summary.get("stale_playmode_state_detected")):
+            stale_steps.append(item)
+
+    if not playmode_steps:
+        return {
+            "playmode_set_step_count": 0,
+            "stale_playmode_state_detected": False,
+            "fresh_playmode_entry_proven": False,
+            "steps": [],
+        }
+
+    fresh_entry_proven = any(
+        item.get("requested_action") == "enter" and item.get("outcome") == "enter_requested"
+        for item in playmode_steps
+    )
+    summary = {
+        "playmode_set_step_count": len(playmode_steps),
+        "stale_playmode_state_detected": bool(stale_steps),
+        "fresh_playmode_entry_proven": fresh_entry_proven,
+        "steps": playmode_steps,
+    }
+    if stale_steps:
+        summary["stale_steps"] = stale_steps
+        summary["recommended_next_action"] = "exit_playmode_then_rerun_if_fresh_start_required"
+    return summary
+
+
 def _extract_payload_flags(payload: dict[str, Any]) -> dict[str, bool]:
     result: dict[str, bool] = {}
     for key, value in payload.items():
@@ -871,6 +956,12 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
     if cleanup_summary["cleanup_step_count"] > 0:
         summary["cleanup_summary"] = cleanup_summary
 
+    playmode_guard_summary = build_playmode_guard_summary(step_items)
+    if playmode_guard_summary["playmode_set_step_count"] > 0:
+        summary["playmode_guard_summary"] = playmode_guard_summary
+        if bool(playmode_guard_summary.get("stale_playmode_state_detected")) and "recommended_next_action" not in summary:
+            summary["recommended_next_action"] = str(playmode_guard_summary.get("recommended_next_action") or "")
+
     profile_mutation_summary = build_profile_mutation_summary(step_items)
     if bool(profile_mutation_summary.get("profile_mutation_detected")) or bool(profile_mutation_summary.get("restore_steps")):
         summary["profile_mutation_summary"] = profile_mutation_summary
@@ -949,6 +1040,17 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         failure_class=failure_class,
         trust_class=trust_class,
     )
+    playmode_guard_summary = summary.get("playmode_guard_summary")
+    if (
+        verdict == "passed"
+        and isinstance(playmode_guard_summary, dict)
+        and bool(playmode_guard_summary.get("stale_playmode_state_detected"))
+    ):
+        trust_class = "stale_risk"
+        recommended_next_action = str(
+            playmode_guard_summary.get("recommended_next_action")
+            or "exit_playmode_then_rerun_if_fresh_start_required"
+        )
     first_failure = summary.get("first_failed_step")
     if first_failure is None and isinstance(summary.get("error"), dict):
         first_failure = dict(summary.get("error") or {})
@@ -1029,6 +1131,7 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
     for key in (
         "project_defined_hook_summary",
         "cleanup_summary",
+        "playmode_guard_summary",
         "ui_smoke_summary",
         "path_coverage_summary",
         "profile_mutation_summary",

@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+## 0.3.37
+
+Release tag: `v0.3.37`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.37
+```
+
+### Changed
+
+- Released `v0.3.37` package metadata, server metadata, package manifests, and Git UPM examples.
+- Scenario `playmode_set` steps now preserve the direct
+  `unity.playmode.set` payload outcome in compact summaries, so `enter` calls
+  that resolve as `already_playing` are visible without full payload recovery.
+- `unity_scenario_run_and_wait` compact decision verdicts now include a
+  `playmode_guard_summary`; a passed scenario whose PlayMode entry reused an
+  already-playing editor is marked with `trust_class=stale_risk` and a rerun
+  recommendation when a fresh PlayMode start is required.
+
+### Validation
+
+- Release version consistency and release-doc freshness checks passed for
+  `0.3.37`.
+- Host Python unittest suite: `282` tests passed with `1` expected skip.
+- A Unity 2022.3 consumer-project local package validation passed fast package
+  self-tests: EditMode `12/12` and PlayMode `5/5`, plus a focused
+  already-playing scenario guard probe with `trust_class=stale_risk`.
+- A Unity 6000 consumer-project local package post-change validation passed
+  readiness, compile matrix `6/6`, acceptance scenario `10/10`, contract
+  scenario, PlayMode/lifecycle checks, and cleanup/restore.
+
 ## 0.3.36
 
 Release tag: `v0.3.36`
@@ -136,10 +169,9 @@ https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-m
 - Public site Playwright checks passed: `39/39`.
 - Source checkout helper install refreshed neutral, Codex, and Claude tool
   installs; all reported package metadata version `0.3.34`.
-- Live MCP compact response validation passed on Dev Acceleration System and
-  ApperfunHub, including post-settle compile truth without default lifecycle
-  dumps.
-- Dev Acceleration System package self-test fast lane passed: EditMode `12/12`
+- Live MCP compact response validation passed on two local consumer projects,
+  including post-settle compile truth without default lifecycle dumps.
+- Unity 2022.3 consumer package self-test fast lane passed: EditMode `12/12`
   and PlayMode `5/5`.
 
 ## 0.3.33

@@ -390,6 +390,88 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual("refresh", verdict["first_failure"]["step_id"])
         self.assertEqual("failed", verdict["steps"][0]["status"])
 
+    def test_playmode_set_already_playing_is_compact_stale_state_signal(self) -> None:
+        payload = {
+            "project_root": "/tmp/FakeProject",
+            "run_id": "run-playmode-stale",
+            "scenario_name": "EnterPlayMode",
+            "status": "passed",
+            "terminal": True,
+            "succeeded": True,
+            "steps": [
+                {
+                    "stepId": "enter",
+                    "kind": "playmode_set",
+                    "status": "passed",
+                    "outcome": "operation_succeeded",
+                    "payload_json": json.dumps(
+                        {
+                            "requested_action": "enter",
+                            "outcome": "already_playing",
+                            "settle_phase": "settled",
+                            "settle_target_state": "playing",
+                            "playmode_state": "playing",
+                        }
+                    ),
+                }
+            ],
+        }
+
+        summary = server_summaries.build_scenario_result_summary(payload, {"passed", "failed"})
+
+        step = summary["steps"][0]
+        self.assertEqual("already_playing", step["outcome"])
+        self.assertEqual("operation_succeeded", step["nested_operation_outcome"])
+        self.assertTrue(step["stale_playmode_state_detected"])
+        self.assertEqual(
+            "exit_playmode_then_rerun_if_fresh_start_required",
+            step["recommended_next_action"],
+        )
+        self.assertTrue(summary["playmode_guard_summary"]["stale_playmode_state_detected"])
+        self.assertFalse(summary["playmode_guard_summary"]["fresh_playmode_entry_proven"])
+
+    def test_decision_verdict_marks_passed_already_playing_as_stale_risk(self) -> None:
+        payload = {
+            "project_root": "/tmp/FakeProject",
+            "run_id": "run-playmode-risk",
+            "scenario_name": "EnterAndAssert",
+            "status": "passed",
+            "terminal": True,
+            "succeeded": True,
+            "steps": [
+                {
+                    "stepId": "enter",
+                    "kind": "playmode_set",
+                    "status": "passed",
+                    "outcome": "already_playing",
+                    "payload_json": json.dumps(
+                        {
+                            "requested_action": "enter",
+                            "outcome": "already_playing",
+                            "playmode_state": "playing",
+                        }
+                    ),
+                },
+                {
+                    "stepId": "assert_scene",
+                    "kind": "scene_assert",
+                    "status": "passed",
+                    "outcome": "scene_asserted",
+                },
+            ],
+        }
+
+        verdict = server_summaries.build_scenario_decision_verdict(payload, {"passed", "failed"})
+
+        self.assertEqual("passed", verdict["verdict"])
+        self.assertEqual("stale_risk", verdict["trust_class"])
+        self.assertEqual("none", verdict["failure_class"])
+        self.assertTrue(verdict["playmode_guard_summary"]["stale_playmode_state_detected"])
+        self.assertEqual(
+            "exit_playmode_then_rerun_if_fresh_start_required",
+            verdict["recommended_next_action"],
+        )
+
     def test_refresh_payload_exposes_authoritative_post_settle_compile_truth(self) -> None:
         normalized = server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
             {

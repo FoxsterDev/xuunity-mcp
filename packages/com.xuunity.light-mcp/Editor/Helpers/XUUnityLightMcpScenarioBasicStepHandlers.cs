@@ -179,7 +179,19 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 action = step.action,
             };
 
-            return ProcessNestedOperationStep("unity.playmode.set", JsonUtility.ToJson(args), stepResult);
+            var completed = ProcessNestedOperationStep("unity.playmode.set", JsonUtility.ToJson(args), stepResult);
+            if (!completed || stepResult.status != "passed" || string.IsNullOrWhiteSpace(stepResult.payload_json))
+            {
+                return completed;
+            }
+
+            var payload = JsonUtility.FromJson<XUUnityLightMcpPlayModeSetPayload>(stepResult.payload_json);
+            if (!string.IsNullOrWhiteSpace(payload?.outcome))
+            {
+                stepResult.outcome = payload.outcome;
+            }
+
+            return completed;
         }
 
         public static bool ProcessGameViewScreenshotStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)

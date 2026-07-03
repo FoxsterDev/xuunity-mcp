@@ -66,7 +66,7 @@ survival and more about:
 
 Already implemented:
 
-- standalone public repository and current `v0.3.36` Git UPM package path under
+- standalone public repository and current `v0.3.37` Git UPM package path under
   `packages/com.xuunity.light-mcp`
 - bridge enable/disable lifecycle
 - status and capability probing
@@ -144,7 +144,7 @@ This is enough for:
 - controlled screenshot capture
 - early automation experiments
 - repeatable same-host multi-project routing and recovery
-- production Git UPM consumption through `v0.3.36`
+- production Git UPM consumption through `v0.3.37`
 
 This is not yet enough for:
 

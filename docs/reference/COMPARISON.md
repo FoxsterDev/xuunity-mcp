@@ -221,7 +221,7 @@ Release validation status for the current XUUnity Light package:
 
 | Area | Status | Caveat |
 | --- | --- | --- |
-| Current package source | `Git UPM available` | Source package is `v0.3.36` at `packages/com.xuunity.light-mcp`; release tag `v0.3.36` is visible on `origin`. OpenUPM publication is still pending. |
+| Current package source | `Git UPM available` | Source package is `v0.3.37` at `packages/com.xuunity.light-mcp`; release tag `v0.3.37` is visible on `origin`. OpenUPM publication is still pending. |
 | macOS host tools | `Repo-verified` | Host Python unittest suite passed for `v0.3.36`: `279` tests with one expected skip. |
 | Compact MCP envelopes | `Repo-verified` | Scenario decision verdicts, compact operation summaries, authoritative post-settle compile/test/refresh fields, and compact `unity_status_summary` defaults are documented with `includeFullPayload=true` recovery. |
 | Package self-tests | `Source verified` | Current release-line source validation passed package EditMode and PlayMode self-test lanes across runnable Unity `2021.3`, `2022.3`, and `6000.x` editor families after optional Test Framework setup. |

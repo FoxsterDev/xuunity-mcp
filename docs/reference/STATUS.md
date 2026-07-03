@@ -17,7 +17,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.36
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.37
 ```
 
 Current package path:
@@ -42,7 +42,7 @@ Migration note:
 - `v0.3.34+` makes refresh, compile, build-config compile, and direct test MCP
   responses compact by default while preserving authoritative post-settle
   verdict fields and `includeFullPayload=true` recovery.
-- `v0.3.36+` makes `unity_status_summary` compact by default for MCP callers,
+- `v0.3.37+` makes `unity_status_summary` compact by default for MCP callers,
   with `payload_mode` markers and full nested diagnostics available through
   `includeFullPayload=true`.
 - `v0.3.36+` makes `ensure-ready` compact by default,
@@ -175,18 +175,18 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest source validation for `v0.3.36`:
+Latest source validation for `v0.3.37`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.36`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `python3 -m unittest discover -s tests` | `279` tests passed for `v0.3.36`, with one expected skip |
-| Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.36` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, and scenario step-payload opt-ins are documented with full-payload recovery. |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.37`, `unity=2021.3`, no hard Test Framework dependency |
+| Host Python tests | `python3 -m unittest discover -s tests` | `282` tests passed for `v0.3.37`, with one expected skip |
+| Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.37` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, and PlayMode already-playing stale-risk summaries are documented with full-payload recovery. |
 | Package self-tests | Clean devmode projects on installed Unity editors | Current release-line source validation passed package EditMode and PlayMode self-test lanes across runnable Unity `2021.3`, `2022.3`, and `6000.x` editor families after optional Test Framework setup. |
-| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed: `39/39` for `v0.3.36`. |
+| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed: `39/39` for `v0.3.37`. |
 | Historical Git UPM release smoke | Clean Unity project pinned to an earlier public tag | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package self-tests passed, and closeout verified process exit. |
 | Multi-project compile matrix | Public summary evidence from consumer validation | `9/9` projects, `38/38` compile lanes, `0` failures |
-| Git tag visibility | Remote Git refs | Release tag `v0.3.36` is visible on `origin` for Git UPM consumers. |
+| Git tag visibility | Remote Git refs | Release tag `v0.3.37` is visible on `origin` for Git UPM consumers. |
 
 Cross-platform status:
 
@@ -206,7 +206,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.36"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.37"
   }
 }
 ```
@@ -232,7 +232,7 @@ Rules:
 
 - `devmode` points a Unity project at the local package working tree.
 - `prodmode` pins the Unity project to the published release tag that matches
-  the package version, for example `#v0.3.36`.
+  the package version, for example `#v0.3.37`.
 - `prodmode` refuses to pin when that release tag is not visible on `origin`.
 - both modes remove the package lock entry so Unity re-resolves honestly.
 

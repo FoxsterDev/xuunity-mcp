@@ -59,11 +59,42 @@ native Windows Python, cmd, or PowerShell will read later, write a host-native
 path with `cygpath -w` or make the reader explicitly convert MSYS paths.
 Persisted text is not converted by the MSYS process-launch layer.
 
-## 8. Never Compare Full Path Strings in Tests
+## 8. Shell-Facing Command Strings Use POSIX Paths
+
+Any command string printed for a human, agent, log, JSON payload, recovery
+hint, or copy/paste shell invocation must be stable for Git Bash. Do not embed a
+`Path` object or `str(path)` directly in a command template; on Windows that can
+produce backslashes like `\tmp\Project`, which Git Bash treats differently from
+the intended `/tmp/Project`.
+
+```python
+# INCORRECT (Windows can render backslashes in shell-facing text)
+f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor"
+
+# CORRECT (stable for macOS, Linux, and Windows Git Bash)
+f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --open-editor"
+```
+
+This applies to recovery commands, `full_payload_command`, `*_recovery_command`,
+docs examples generated from code, and any structured payload field whose value
+is intended to be pasted into `bash`. Add a regression test with
+`PureWindowsPath("C:/tmp/FakeProject")` for helpers that format shell-facing
+commands. The test should assert that the command contains `C:/tmp/FakeProject`
+and does not contain `\`.
+
+If the durable value will be consumed by native Windows tools instead of Git
+Bash, follow rule 7 and persist a host-native path explicitly. Make the target
+consumer obvious in the function name or test.
+
+## 9. Never Compare Full Path Strings in Tests
 
 MSYS `/tmp/...`, `C:\Users\RUNNER~1\...` (8.3 short name), and `C:/Users/runneradmin/...` can all be the same directory. Compare separator-normalized suffixes or resolved `Path` equality.
 
-## 9. Bound Every Spawned Process in Tests
+When testing shell-facing commands, do not merely normalize the assertion with
+`.replace("\\", "/")`; that can hide a real command-rendering bug. Normalize
+only when the value is not itself intended to be copied into a shell.
+
+## 10. Bound Every Spawned Process in Tests
 
 Use `tests/bash_support.py:run_with_timeout()` instead of bare `subprocess.run` for anything that spawns bash: timeout + process-tree kill (`taskkill /T /F` / `killpg`) + partial stdout/stderr dumped to stderr **at the moment the timeout fires**, plus `skip_if_prior_subprocess_timeout` in `setUp` so one hang does not cascade. `tests/test_bash_spawn_canary.py` runs first in the suite as the end-to-end regression guard.
 
