@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 import re
+import sys
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -8,6 +11,11 @@ FRESH_HEARTBEAT_MAX_AGE_SECONDS = 5.0
 STALE_HEARTBEAT_MAX_AGE_SECONDS = 15.0
 ANR_SUSPECTED_HEARTBEAT_MAX_AGE_SECONDS = 30.0
 DEFAULT_LOG_TAIL_MAX_CHARS = 40000
+EDITOR_LOG_GREP_MAX_CHARS = 500000
+EDITOR_LOG_CONSOLE_CAVEAT = (
+    "Unity Console grep can be a false negative after console clear-on-play or "
+    "ring-buffer eviction; source=editor_log searches the path-backed Editor.log tail."
+)
 
 
 def truncate_text(value: Any, max_length: int = 240) -> str:
@@ -29,6 +37,218 @@ def read_editor_log_tail(log_path: Path, max_chars: int = DEFAULT_LOG_TAIL_MAX_C
     if len(text) > max_chars:
         return text[-max_chars:]
     return text
+
+
+def _mtime_utc(value: float) -> str:
+    if value <= 0.0:
+        return ""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(value))
+
+
+def _file_info(path: Path) -> dict[str, Any]:
+    info = {
+        "path": str(path),
+        "exists": False,
+        "size_bytes": 0,
+        "mtime_utc": "",
+        "mtime_unix": 0.0,
+    }
+    try:
+        stat_result = path.stat()
+    except OSError:
+        return info
+    info.update(
+        {
+            "exists": True,
+            "size_bytes": int(stat_result.st_size or 0),
+            "mtime_utc": _mtime_utc(float(stat_result.st_mtime or 0.0)),
+            "mtime_unix": float(stat_result.st_mtime or 0.0),
+        }
+    )
+    return info
+
+
+def _same_path(left: Path, right: Path) -> bool:
+    try:
+        return left.resolve() == right.resolve() or left.samefile(right)
+    except OSError:
+        return left.expanduser().resolve() == right.expanduser().resolve()
+
+
+def platform_editor_log_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    home = Path.home()
+    if sys.platform == "darwin":
+        candidates.append(home / "Library" / "Logs" / "Unity" / "Editor.log")
+    elif sys.platform.startswith("win"):
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(Path(local_app_data) / "Unity" / "Editor" / "Editor.log")
+    else:
+        candidates.append(home / ".config" / "unity3d" / "Editor.log")
+    return candidates
+
+
+def _project_path_markers(project_root: Path) -> list[str]:
+    markers = {
+        str(project_root),
+        project_root.as_posix(),
+        str(project_root).replace("\\", "/"),
+    }
+    try:
+        resolved = project_root.resolve()
+        markers.add(str(resolved))
+        markers.add(resolved.as_posix())
+    except OSError:
+        pass
+    return [marker for marker in markers if marker]
+
+
+def _log_mentions_project(log_text: str, project_root: Path) -> bool:
+    normalized = log_text.replace("\\", "/")
+    return any(marker.replace("\\", "/") in normalized for marker in _project_path_markers(project_root))
+
+
+def build_editor_log_identity(
+    project_root: Path,
+    active_log_path: Path,
+    *,
+    bridge_state: dict[str, Any] | None = None,
+    host_session_state: dict[str, Any] | None = None,
+    max_probe_chars: int = DEFAULT_LOG_TAIL_MAX_CHARS,
+) -> dict[str, Any]:
+    bridge_state = dict(bridge_state or {})
+    host_session_state = dict(host_session_state or {})
+    active_log_path = active_log_path.expanduser().resolve()
+    active_info = _file_info(active_log_path)
+
+    reported_paths: list[Path] = []
+    for key in ("editor_log_path", "console_log_path"):
+        value = bridge_state.get(key)
+        if isinstance(value, str) and value.strip():
+            reported_paths.append(Path(value).expanduser())
+    host_log = host_session_state.get("editor_log_path")
+    if isinstance(host_log, str) and host_log.strip():
+        reported_paths.append(Path(host_log).expanduser())
+
+    candidate_paths: list[Path] = []
+    for candidate in [*reported_paths, *platform_editor_log_candidates()]:
+        try:
+            resolved = candidate.expanduser().resolve()
+        except OSError:
+            resolved = candidate.expanduser()
+        if _same_path(resolved, active_log_path):
+            continue
+        if any(_same_path(resolved, existing) for existing in candidate_paths):
+            continue
+        candidate_paths.append(resolved)
+
+    active_mtime = float(active_info.get("mtime_unix") or 0.0)
+    candidates: list[dict[str, Any]] = []
+    newer_foreign_logs: list[dict[str, Any]] = []
+    for candidate in candidate_paths:
+        info = _file_info(candidate)
+        exists = bool(info.get("exists"))
+        text = read_editor_log_tail(candidate, max_chars=max_probe_chars) if exists else ""
+        same_project_evidence = _log_mentions_project(text, project_root) if text else False
+        candidate_mtime = float(info.get("mtime_unix") or 0.0)
+        newer_than_active = exists and (active_mtime <= 0.0 or candidate_mtime > active_mtime + 1.0)
+        candidate_info = {
+            "path": str(candidate),
+            "exists": exists,
+            "mtime_utc": str(info.get("mtime_utc") or ""),
+            "size_bytes": int(info.get("size_bytes") or 0),
+            "newer_than_active_log": newer_than_active,
+            "same_project_evidence": same_project_evidence,
+            "evidence": "project_root_in_log_tail" if same_project_evidence else "",
+        }
+        candidates.append(candidate_info)
+        if newer_than_active and same_project_evidence:
+            newer_foreign_logs.append(candidate_info)
+
+    return {
+        "active_editor_log_path": str(active_log_path),
+        "active_editor_log": {
+            "path": str(active_log_path),
+            "exists": bool(active_info.get("exists")),
+            "mtime_utc": str(active_info.get("mtime_utc") or ""),
+            "size_bytes": int(active_info.get("size_bytes") or 0),
+            "source": "host_expected_editor_log",
+        },
+        "unity_reported_editor_log_path": str(bridge_state.get("editor_log_path") or ""),
+        "host_session_editor_log_path": str(host_session_state.get("editor_log_path") or ""),
+        "foreign_editor_log_candidates": candidates,
+        "newer_foreign_editor_logs": newer_foreign_logs,
+        "newer_foreign_editor_log_count": len(newer_foreign_logs),
+        "newer_foreign_editor_log_detected": bool(newer_foreign_logs),
+        "console_grep_caveat": EDITOR_LOG_CONSOLE_CAVEAT,
+    }
+
+
+def grep_editor_log_payload(
+    project_root: Path,
+    log_path: Path,
+    *,
+    pattern: str,
+    regex: bool = False,
+    ignore_case: bool = True,
+    include_stack_traces: bool = False,
+    limit: int = 20,
+    max_chars: int = EDITOR_LOG_GREP_MAX_CHARS,
+) -> dict[str, Any]:
+    pattern = str(pattern or "").strip()
+    if not pattern:
+        raise ValueError("editor_log grep requires a non-empty pattern.")
+
+    options = re.IGNORECASE if ignore_case else 0
+    compiled = None
+    if regex:
+        try:
+            compiled = re.compile(pattern, options)
+        except re.error as exc:
+            raise ValueError(f"editor_log regex pattern is invalid: {exc}") from exc
+
+    text = read_editor_log_tail(log_path, max_chars=max_chars)
+    matches: list[dict[str, Any]] = []
+    for line_number, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.rstrip("\n")
+        if compiled is not None:
+            matched = compiled.search(line) is not None
+        elif ignore_case:
+            matched = pattern.lower() in line.lower()
+        else:
+            matched = pattern in line
+        if not matched:
+            continue
+        matches.append(
+            {
+                "type": "editor_log",
+                "message": line,
+                "timestamp": "",
+                "stack_trace": "" if not include_stack_traces else "",
+                "line": line_number,
+            }
+        )
+
+    limit = max(1, int(limit or 20))
+    truncated = len(matches) > limit
+    visible_matches = matches[-limit:] if truncated else matches
+    return {
+        "backend_id": "xuunity.light_unity_mcp",
+        "project_root": str(project_root),
+        "source": "editor_log",
+        "editor_log_path": str(log_path),
+        "pattern": pattern,
+        "regex": bool(regex),
+        "ignore_case": bool(ignore_case),
+        "include_stack_traces": bool(include_stack_traces),
+        "match_count": len(matches),
+        "items": visible_matches,
+        "truncated": truncated,
+        "searched_tail_chars": max_chars,
+        "console_grep_caveat": EDITOR_LOG_CONSOLE_CAVEAT,
+        "validation_evidence": "unity_editor_log",
+    }
 
 
 def read_editor_log_scope(

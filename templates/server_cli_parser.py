@@ -213,9 +213,11 @@ def build_parser() -> argparse.ArgumentParser:
     scene_assert_cmd.add_argument("--timeout-ms", type=int, default=5000)
     scene_assert_cmd.set_defaults(func_name="cmd_request_scene_assert")
 
-    console_grep_cmd = sub.add_parser("request-console-grep", help="Search recent Unity console messages through the active bridge transport.")
+    console_grep_cmd = sub.add_parser("request-console-grep", help="Search recent Unity console messages or the path-backed Editor.log tail.")
     console_grep_cmd.add_argument("--project-root", required=True)
     console_grep_cmd.add_argument("--pattern", required=True)
+    console_grep_cmd.add_argument("--source", choices=["console", "editor_log"], default="console")
+    console_grep_cmd.add_argument("--editor-log-path")
     console_grep_cmd.add_argument("--regex", action="store_true")
     console_grep_cmd.add_argument("--ignore-case", dest="ignore_case", action=argparse.BooleanOptionalAction, default=True)
     console_grep_cmd.add_argument("--include-stack-traces", action="store_true")
@@ -421,6 +423,7 @@ def build_parser() -> argparse.ArgumentParser:
     scenario_run_wait_cmd.add_argument("--poll-interval-ms", type=int, default=1000)
     scenario_run_wait_cmd.add_argument("--verbose", action="store_true")
     scenario_run_wait_cmd.add_argument("--include-full-payload", action="store_true")
+    scenario_run_wait_cmd.add_argument("--include-step-payloads", action="store_true")
     scenario_run_wait_cmd.set_defaults(func_name="cmd_request_scenario_run_and_wait")
 
     scenario_result_cmd = sub.add_parser("request-scenario-result", help="Read the current or completed result of a Unity scenario run.")
@@ -469,6 +472,7 @@ def build_parser() -> argparse.ArgumentParser:
     ensure_ready_cmd.add_argument("--background-open", action="store_true")
     ensure_ready_cmd.add_argument("--timeout-ms", type=int, default=120000)
     ensure_ready_cmd.add_argument("--heartbeat-max-age-seconds", type=int, default=10)
+    ensure_ready_cmd.add_argument("--include-full-payload", action="store_true")
     ensure_ready_cmd.add_argument(
         "--startup-policy",
         default="fail_fast_on_interactive_compile_block",

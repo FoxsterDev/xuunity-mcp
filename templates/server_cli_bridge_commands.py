@@ -347,8 +347,33 @@ def cmd_request_scene_assert(args):
 
 
 def cmd_request_console_grep(args):
+    project_root = ensure_project_root(args.project_root)
+    source = str(getattr(args, "source", "console") or "console")
+    if source == "editor_log":
+        log_path = resolve_editor_log_path(project_root, getattr(args, "editor_log_path", None))
+        try:
+            payload = grep_editor_log_payload(
+                project_root,
+                log_path,
+                pattern=args.pattern,
+                regex=bool(args.regex),
+                ignore_case=bool(args.ignore_case),
+                include_stack_traces=bool(args.include_stack_traces),
+                limit=max(1, int(args.limit or 20)),
+            )
+        except ValueError as exc:
+            raise ToolInvocationError("invalid_editor_log_grep", str(exc)) from exc
+        print_json(
+            {
+                "status": "ok",
+                "payload_type": "unity.console.grep",
+                "payload_json": json.dumps(payload, ensure_ascii=True),
+            }
+        )
+        return
+
     response = invoke_bridge(
-        args.project_root,
+        str(project_root),
         "unity.console.grep",
         {
             "pattern": args.pattern,
@@ -712,7 +737,13 @@ def cmd_ensure_ready(args):
     payload["package_dependency"] = inspect_package_dependency_alignment(project_root)
     payload["package_import_state"] = inspect_light_mcp_import_state(project_root)
     payload["package_import_state_after_ready"] = payload["package_import_state"]
-    print_json(payload)
+    print_json(
+        build_ensure_ready_summary(
+            project_root,
+            payload,
+            include_full_payload=bool(getattr(args, "include_full_payload", False)),
+        )
+    )
 
 
 def cmd_restore_editor_state(args):

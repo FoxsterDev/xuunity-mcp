@@ -10,6 +10,7 @@ from typing import Any
 from server_core import ToolInvocationError, read_json, write_json
 from server_specs import STARTUP_POLICIES, SCENARIO_TERMINAL_STATUSES
 from server_health import FRESH_HEARTBEAT_MAX_AGE_SECONDS
+from server_readiness_summary import build_ensure_ready_summary
 
 from server_batch_orchestrator import (
     run_batch_operation,
@@ -425,6 +426,7 @@ def cmd_ensure_ready(args):
     update_host_editor_session_pid_fn = _compat_dep("update_host_editor_session_pid")
     refresh_project_context_fn = _compat_dep("refresh_project_context")
     inspect_package_dependency_alignment_fn = _compat_dep("inspect_package_dependency_alignment")
+    build_ensure_ready_summary_fn = _compat_dep("build_ensure_ready_summary")
     print_json_fn = _compat_dep("print_json")
 
     project_root = ensure_project_root_fn(args.project_root)
@@ -511,7 +513,13 @@ def cmd_ensure_ready(args):
     payload["package_dependency"] = inspect_package_dependency_alignment_fn(project_root)
     payload["package_import_state"] = inspect_light_mcp_import_state_fn(project_root)
     payload["package_import_state_after_ready"] = payload["package_import_state"]
-    print_json_fn(payload)
+    print_json_fn(
+        build_ensure_ready_summary_fn(
+            project_root,
+            payload,
+            include_full_payload=bool(getattr(args, "include_full_payload", False)),
+        )
+    )
 
 
 def cmd_restore_editor_state(args):

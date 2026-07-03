@@ -151,6 +151,19 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
                     }
                 ],
             }
+            run_payload = {
+                "project_root": str(project_root),
+                "run_id": "run-full",
+                "scenario_name": "DecisionSmoke",
+                "status": "queued",
+                "steps": [
+                    {
+                        "stepId": "hook",
+                        "kind": "project_defined_hook",
+                        "payload_json": json.dumps({"large": heavy_payload}),
+                    }
+                ],
+            }
 
             with (
                 mock.patch.object(server, "ensure_project_root", return_value=project_root),
@@ -160,14 +173,7 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
                     return_value={
                         "status": "ok",
                         "payload_type": "unity.scenario.run",
-                        "payload_json": json.dumps(
-                            {
-                                "project_root": str(project_root),
-                                "run_id": "run-full",
-                                "scenario_name": "DecisionSmoke",
-                                "status": "queued",
-                            }
-                        ),
+                        "payload_json": json.dumps(run_payload),
                     },
                 ),
                 mock.patch.object(server, "wait_for_scenario_result", return_value=dict(result_payload)),
@@ -178,7 +184,66 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         structured = response["result"]["structuredContent"]
         self.assertEqual("passed", structured["status"])
         self.assertIn("run_start", structured)
+        self.assertNotIn("steps", structured["run_start"])
+        self.assertTrue(structured["run_start"]["steps_omitted"])
+        self.assertEqual("omitted_duplicate_run_start_steps", structured["run_start"]["steps_payload_mode"])
         self.assertEqual(json.dumps({"large": heavy_payload}), structured["steps"][0]["payload_json"])
+
+    def test_run_and_wait_include_step_payloads_preserves_run_start_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir)
+            run_payload = {
+                "project_root": str(project_root),
+                "run_id": "run-step-opt-in",
+                "scenario_name": "DecisionSmoke",
+                "status": "queued",
+                "steps": [
+                    {
+                        "stepId": "launch_step",
+                        "kind": "project_defined_hook",
+                        "payload_json": json.dumps({"phase": "launch"}),
+                    }
+                ],
+            }
+            result_payload = {
+                "project_root": str(project_root),
+                "run_id": "run-step-opt-in",
+                "scenario_name": "DecisionSmoke",
+                "status": "passed",
+                "terminal": True,
+                "succeeded": True,
+                "steps": [
+                    {
+                        "stepId": "terminal_step",
+                        "kind": "project_defined_hook",
+                        "status": "passed",
+                        "payload_json": json.dumps({"phase": "terminal"}),
+                    }
+                ],
+            }
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(
+                    server,
+                    "invoke_bridge",
+                    return_value={
+                        "status": "ok",
+                        "payload_type": "unity.scenario.run",
+                        "payload_json": json.dumps(run_payload),
+                    },
+                ),
+                mock.patch.object(server, "wait_for_scenario_result", return_value=dict(result_payload)),
+            ):
+                response = self._call_run_and_wait(
+                    project_root,
+                    {"includeFullPayload": True, "includeStepPayloads": True},
+                )
+
+        self.assertFalse(response["result"]["isError"])
+        structured = response["result"]["structuredContent"]
+        self.assertEqual("launch_step", structured["run_start"]["steps"][0]["stepId"])
+        self.assertEqual("terminal_step", structured["steps"][0]["stepId"])
 
     def test_run_and_wait_failed_default_returns_compact_error_verdict(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

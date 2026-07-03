@@ -455,12 +455,22 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_console_grep": {
         "bridgeOperation": "unity.console.grep",
-        "description": "Return compact Unity console items whose message, and optionally stack trace, matches a string or regex pattern.",
+        "description": "Return compact Unity console items or path-backed Editor.log lines whose message, and optionally stack trace, matches a string or regex pattern.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
                 "pattern": {"type": "string"},
+                "source": {
+                    "type": "string",
+                    "enum": ["console", "editor_log"],
+                    "default": "console",
+                    "description": "console searches Unity's in-memory console buffer; editor_log searches the path-backed Editor.log tail and avoids console clear/ring-buffer false negatives.",
+                },
+                "editorLogPath": {
+                    "type": "string",
+                    "description": "Optional Editor.log path when source=editor_log. Defaults to the host-managed project log path.",
+                },
                 "regex": {"type": "boolean", "default": False},
                 "ignoreCase": {"type": "boolean", "default": True},
                 "includeStackTraces": {"type": "boolean", "default": False},
@@ -864,7 +874,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "unity_scenario_run_and_wait": {
-        "description": "Start a Unity automation scenario and wait until it reaches a terminal state. By default returns a compact decision envelope; set includeFullPayload=true when asserting raw per-step payload_json, hook_name, or parity fixture fields.",
+        "description": "Start a Unity automation scenario and wait until it reaches a terminal state. By default returns a compact decision envelope; set includeFullPayload=true when asserting raw per-step payload_json, hook_name, or parity fixture fields. Full payload mode omits duplicated run_start.steps unless includeStepPayloads=true.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -877,6 +887,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "type": "boolean",
                     "default": False,
                     "description": "Return the raw scenario result including full steps and payload_json. Required for smoke helpers that assert per-step payload_json, hook_name, or exact raw step fields.",
+                },
+                "includeStepPayloads": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true with verbose/includeFullPayload, preserve the run_start.steps launch-time copy. By default it is omitted because the terminal result already carries step payloads.",
                 },
             },
             "required": ["projectRoot", "scenario"],

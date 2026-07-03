@@ -9,7 +9,7 @@ from typing import Any
 
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.35",
+    "version": "0.3.36",
 }
 PROTOCOL_VERSION = "2025-06-18"
 
@@ -103,6 +103,7 @@ from server_batch_orchestrator import (
     call_unity_compile_build_config_matrix_tool,
     call_unity_scenario_run_and_wait_tool,
     call_unity_scenario_validate_tool,
+    call_unity_console_grep_tool,
     call_unity_loading_timing_tool,
     call_unity_scenario_run_tool,
     call_unity_status_summary_tool,

@@ -1,0 +1,139 @@
+using System;
+using System.Reflection;
+using UnityEditor;
+using UnityEngine;
+using XUUnity.LightMcp.Editor.ScenarioHooks;
+
+namespace Example.Project.Editor
+{
+    public sealed class ConfigApplyingBuildActionHook : IXUUnityLightMcpScenarioHook
+    {
+        public string HookName => "example.config_applying_build";
+
+        [Serializable]
+        sealed class BuildPayload
+        {
+            public string action = "";
+            public string target = "";
+            public string profile = "";
+            public string artifactPath = "";
+            public string applyConfigMenuPath = "";
+            public string buildStaticMethod = "";
+            public string buildMenuPath = "";
+        }
+
+        [Serializable]
+        sealed class BuildSummary
+        {
+            public string action = "";
+            public string target = "";
+            public string profile = "";
+            public string artifactPath = "";
+            public bool configApplied;
+            public bool buildInvoked;
+            public string invocation = "";
+        }
+
+        public XUUnityLightMcpScenarioHookResult Execute(string payloadJson)
+        {
+            var payload = JsonUtility.FromJson<BuildPayload>(payloadJson ?? "{}") ?? new BuildPayload();
+            if (!string.Equals(payload.action, "build.dev_android", StringComparison.Ordinal))
+            {
+                return Error("unsupported_action", $"Unsupported action: {payload.action}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(payload.applyConfigMenuPath))
+            {
+                if (!EditorApplication.ExecuteMenuItem(payload.applyConfigMenuPath))
+                {
+                    return Error("config_apply_menu_not_found", $"Could not execute menu item: {payload.applyConfigMenuPath}");
+                }
+            }
+
+            var invocation = "";
+            if (!string.IsNullOrWhiteSpace(payload.buildStaticMethod))
+            {
+                InvokeStaticMethod(payload.buildStaticMethod);
+                invocation = $"static:{payload.buildStaticMethod}";
+            }
+            else if (!string.IsNullOrWhiteSpace(payload.buildMenuPath))
+            {
+                if (!EditorApplication.ExecuteMenuItem(payload.buildMenuPath))
+                {
+                    return Error("build_menu_not_found", $"Could not execute menu item: {payload.buildMenuPath}");
+                }
+                invocation = $"menu:{payload.buildMenuPath}";
+            }
+            else
+            {
+                return Error("build_invocation_missing", "Set buildStaticMethod or buildMenuPath in the project action payload.");
+            }
+
+            var summary = new BuildSummary
+            {
+                action = payload.action,
+                target = payload.target,
+                profile = payload.profile,
+                artifactPath = payload.artifactPath,
+                configApplied = !string.IsNullOrWhiteSpace(payload.applyConfigMenuPath),
+                buildInvoked = true,
+                invocation = invocation
+            };
+
+            return new XUUnityLightMcpScenarioHookResult
+            {
+                success = true,
+                outcome = "config_applying_build_invoked",
+                payload_json = JsonUtility.ToJson(summary)
+            };
+        }
+
+        static void InvokeStaticMethod(string qualifiedMethodName)
+        {
+            var lastDot = qualifiedMethodName.LastIndexOf('.');
+            if (lastDot <= 0 || lastDot >= qualifiedMethodName.Length - 1)
+            {
+                throw new InvalidOperationException($"Invalid static method name: {qualifiedMethodName}");
+            }
+
+            var typeName = qualifiedMethodName.Substring(0, lastDot);
+            var methodName = qualifiedMethodName.Substring(lastDot + 1);
+            var type = Type.GetType(typeName);
+            if (type == null)
+            {
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    type = assembly.GetType(typeName);
+                    if (type != null)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            if (type == null)
+            {
+                throw new InvalidOperationException($"Build type not found: {typeName}");
+            }
+
+            var method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            if (method == null || method.GetParameters().Length != 0)
+            {
+                throw new InvalidOperationException($"Build method must be a zero-argument static method: {qualifiedMethodName}");
+            }
+
+            method.Invoke(null, null);
+        }
+
+        static XUUnityLightMcpScenarioHookResult Error(string code, string message)
+        {
+            return new XUUnityLightMcpScenarioHookResult
+            {
+                success = false,
+                outcome = "config_applying_build_failed",
+                error_code = code,
+                error_message = message
+            };
+        }
+    }
+}

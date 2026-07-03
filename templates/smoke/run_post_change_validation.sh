@@ -19,6 +19,7 @@ CONTRACT_SCENARIO_TIMEOUT_MS="180000"
 TMP_DIR=""
 LAST_OUTPUT_FILE=""
 SUITE_STARTED_UNIX=""
+HEARTBEAT_INTERVAL_SECONDS=15
 
 usage() {
   cat <<'EOF'
@@ -127,11 +128,59 @@ fi
 
 TMP_DIR="$(mktemp -d)"
 
+emit_phase() {
+  local phase_name="$1"
+  local status="$2"
+  local detail="${3:-}"
+  if [[ -n "$detail" ]]; then
+    echo "[phase] $phase_name status=$status $detail"
+  else
+    echo "[phase] $phase_name status=$status"
+  fi
+}
+
+emit_heartbeat() {
+  local phase_name="$1"
+  local detail="${2:-}"
+  if [[ -n "$detail" ]]; then
+    echo "[heartbeat] phase=$phase_name $detail"
+  else
+    echo "[heartbeat] phase=$phase_name"
+  fi
+}
+
+run_restore_with_heartbeat() {
+  local output_file="$TMP_DIR/cleanup_restore.json"
+  local error_file="$TMP_DIR/cleanup_restore.stderr"
+  local started_seconds="$SECONDS"
+  local restore_pid=""
+
+  "$WRAPPER" restore-editor-state \
+    --project-root "$PROJECT_ROOT" \
+    --timeout-ms 30000 >"$output_file" 2>"$error_file" &
+  restore_pid="$!"
+
+  while kill -0 "$restore_pid" >/dev/null 2>&1; do
+    sleep "$HEARTBEAT_INTERVAL_SECONDS"
+    if kill -0 "$restore_pid" >/dev/null 2>&1; then
+      emit_heartbeat "cleanup_restore" "elapsed_seconds=$((SECONDS - started_seconds)) waiting_for=restore-editor-state"
+    fi
+  done
+
+  if wait "$restore_pid"; then
+    emit_phase "cleanup/restore" "passed"
+  else
+    local restore_rc="$?"
+    emit_phase "cleanup/restore" "warn" "restore_rc=$restore_rc"
+  fi
+}
+
 cleanup() {
   if [[ "$RESTORE_EDITOR_STATE" == "true" ]]; then
-    "$WRAPPER" restore-editor-state \
-      --project-root "$PROJECT_ROOT" \
-      --timeout-ms 30000 >/dev/null 2>&1 || true
+    emit_phase "cleanup/restore" "running"
+    run_restore_with_heartbeat || true
+  else
+    emit_phase "cleanup/restore" "skipped"
   fi
   rm -rf "$TMP_DIR"
 }
@@ -241,17 +290,34 @@ final_generation = int(final.get("bridge_generation") or 0)
 generation_delta = final_generation - initial_generation if initial_generation and final_generation else 0
 stale_request_count = int(((final.get("stale_request_artifacts") or {}).get("candidate_count")) or 0)
 unrecovered_abandoned = sorted(abandoned_request_ids - recovered_request_ids)
+final_health = str(final.get("health_status") or "")
+final_playmode = str(final.get("playmode_state") or "")
+compiler_errors = int(final.get("compiler_error_count") or 0)
+terminal_passed = verdict == "passed"
+
+churn_classification = "none"
+if generation_delta > 5:
+    churn_classification = (
+        "non_blocking_churn"
+        if (
+            terminal_passed
+            and final_health == "healthy"
+            and compiler_errors == 0
+            and not unrecovered_abandoned
+        )
+        else "actionable_churn"
+    )
 
 warning_codes = []
-if generation_delta > 5:
-    warning_codes.append("high_bridge_generation_churn")
+if churn_classification == "actionable_churn":
+    warning_codes.append("actionable_churn")
 if unrecovered_abandoned:
     warning_codes.append("unrecovered_request_abandoned")
-if final.get("health_status") != "healthy":
+if final_health != "healthy":
     warning_codes.append("final_health_not_healthy")
-if final.get("playmode_state") != "edit":
+if final_playmode != "edit":
     warning_codes.append("final_playmode_not_edit")
-if int(final.get("compiler_error_count") or 0) != 0:
+if compiler_errors != 0:
     warning_codes.append("compiler_errors_present")
 if stale_request_count != 0:
     warning_codes.append("stale_requests_present")
@@ -269,10 +335,11 @@ print(
     f"abandoned={event_counts['request_abandoned']} "
     f"unrecovered_abandoned={len(unrecovered_abandoned)} "
     f"terminal_verdict={verdict} "
-    f"final_health={final.get('health_status') or '-'} "
-    f"final_playmode={final.get('playmode_state') or '-'} "
-    f"compiler_errors={int(final.get('compiler_error_count') or 0)} "
+    f"final_health={final_health or '-'} "
+    f"final_playmode={final_playmode or '-'} "
+    f"compiler_errors={compiler_errors} "
     f"stale_requests={stale_request_count} "
+    f"churn_classification={churn_classification} "
     f"warning_codes={','.join(warning_codes) if warning_codes else 'none'}"
 )
 PY
@@ -324,6 +391,7 @@ if [[ "$OPEN_EDITOR" == "true" ]]; then
   maybe_reuse_healthy_editor
 fi
 
+emit_phase "readiness" "running"
 ensure_ready_cmd=(
   "$WRAPPER" ensure-ready
   --project-root "$PROJECT_ROOT"
@@ -356,8 +424,10 @@ summarize_json \
   "health-probe" \
   "$TMP_DIR/health_probe.json" \
   "\"status=%s supported_ops=%s\" % ((lambda report: (report.get('status'), len(report.get('supported_operations') or [])))(__import__('json').loads(data['payload_json']).get('report') or {}))"
+emit_phase "readiness" "passed"
 
 if [[ "$COMPILE_MODE" == "build-config-matrix" ]]; then
+  emit_phase "compile matrix" "running"
   run_step compile_matrix \
     "$WRAPPER" request-build-config-compile-matrix \
     --project-root "$PROJECT_ROOT" \
@@ -366,10 +436,13 @@ if [[ "$COMPILE_MODE" == "build-config-matrix" ]]; then
     "compile-matrix" \
     "$TMP_DIR/compile_matrix.json" \
     "\"status=%s passed=%s/%s basis=%s duration=%.3fs\" % ((lambda matrix: (matrix.get('status'), matrix.get('passed'), matrix.get('total'), matrix.get('completion_basis'), float(matrix.get('duration_seconds') or 0.0)))(__import__('json').loads(data['bridge_response']['payload_json'])))"
+  emit_phase "compile matrix" "passed"
 else
+  emit_phase "compile matrix" "skipped" "compile_mode=none"
   echo "[skip] compile-matrix compile_mode=none"
 fi
 
+emit_phase "acceptance scenario" "running"
 run_step acceptance_scenario \
   "$WRAPPER" request-scenario-run-and-wait \
   --project-root "$PROJECT_ROOT" \
@@ -381,7 +454,9 @@ summarize_json \
   "acceptance-scenario" \
   "$TMP_DIR/acceptance_scenario.json" \
   "\"status=%s steps=%s/%s duration=%.3fs\" % ((lambda payload, steps: (payload.get('status') or payload.get('terminal_status') or ((payload.get('run_start') or {}).get('status')), payload.get('passed_steps') if payload.get('passed_steps') is not None else sum(1 for step in steps if step.get('status') == 'passed'), payload.get('total_steps') if payload.get('total_steps') is not None else len(steps), float(payload.get('duration_seconds') or 0.0)))(data, (data.get('steps') or ((data.get('run_start') or {}).get('steps')) or [])))"
+emit_phase "acceptance scenario" "passed"
 
+emit_phase "contract scenario" "running"
 run_step contract_scenario \
   "$WRAPPER" request-scenario-run-and-wait \
   --project-root "$PROJECT_ROOT" \
@@ -393,8 +468,10 @@ summarize_json \
   "contract-scenario" \
   "$TMP_DIR/contract_scenario.json" \
   "\"status=%s refresh=%s compile=%s duration=%.3fs\" % ((data.get('status') or data.get('terminal_status') or ((data.get('run_start') or {}).get('status'))), next((__import__('json').loads(step.get('payload_json') or '{}').get('outcome') for step in ((data.get('steps') or ((data.get('run_start') or {}).get('steps')) or [])) if step.get('stepId') == 'refresh'), 'unknown'), next((__import__('json').loads(step.get('payload_json') or '{}').get('completion_basis') for step in ((data.get('steps') or ((data.get('run_start') or {}).get('steps')) or [])) if step.get('stepId') == 'compile'), 'unknown'), float(data.get('duration_seconds') or 0.0))"
+emit_phase "contract scenario" "passed"
 
 if [[ -n "$PLAYMODE_REGRESSION_ASSEMBLY_NAME" ]]; then
+  emit_phase "PlayMode/lifecycle checks" "running"
   run_step playmode_settled_state_regression \
     "$SCRIPT_DIR/run_playmode_settled_state_regression.sh" \
     --project-root "$PROJECT_ROOT" \
@@ -412,12 +489,20 @@ if [[ -n "$PLAYMODE_REGRESSION_ASSEMBLY_NAME" ]]; then
     --no-open-editor \
     --no-restore-editor-state
   echo "[pass] playmode-lifecycle-retry-smoke"
+  emit_phase "PlayMode/lifecycle checks" "passed"
+else
+  emit_phase "PlayMode/lifecycle checks" "skipped" "playmode_regression_args=absent"
 fi
 
+emit_phase "main proof" "passed" "auxiliary_checks=running"
+emit_phase "auxiliary consistency checks" "running"
+emit_heartbeat "auxiliary_consistency_checks" "waiting_for=request-status-summary"
 run_step final_status \
   "$WRAPPER" request-status-summary \
   --project-root "$PROJECT_ROOT" \
   --timeout-ms 15000
 print_lifecycle_summary "$TMP_DIR/ensure_ready.json" "$TMP_DIR/final_status.json" "passed"
+emit_phase "auxiliary consistency checks" "passed"
 
+emit_phase "suite" "passed"
 echo "[pass] suite overall"

@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-07-01`
-Status: `current for v0.3.35`
+Status: `current for v0.3.36`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.35`: `267` tests passed, with one expected skip
+- host Python tests for `v0.3.36`: `267` tests passed, with one expected skip
 - source package self-tests for the current release line: EditMode and PlayMode
   self-test lanes passed on runnable installed Unity `2021.3`, `2022.3`, and
   `6000.x` editors after offline optional Test Framework setup
@@ -81,9 +81,22 @@ Pass criteria:
   `includeFullPayload=true`; ordinary pass/fail gates should stay on the compact
   default and read `status`, counts, `post_settle_compile`, `settle_phase`, and
   `completion_basis`.
+- If new `.cs` files were created outside the Unity editor and direct compile
+  reports missing namespaces or types, run `request-project-refresh` once and
+  retry before treating the result as a code failure.
 - if the compile gate is blocked because the same project editor is open, the
   batch summary reports `unity_outcome: not_started` and surfaces a concrete
   recovery command before any heavier validation is attempted
+
+Log-presence checks:
+
+- `unity.console.grep` / `request-console-grep --source console` searches the
+  Unity Console buffer, which can be cleared on Play Mode entry and can evict
+  early or high-volume logs.
+- An empty console grep is not definitive proof that a log did not happen.
+- Use `unity_console_grep` with `source=editor_log` or
+  `request-console-grep --source editor_log` for path-backed Editor.log grep
+  when log presence is the validation claim.
 
 ### 3. Interactive Acceptance Scenario
 
@@ -416,6 +429,22 @@ Current generic compile modes:
 
 - `build-config-matrix`
 - `none`
+
+Required durable phase lines:
+
+- readiness
+- compile matrix
+- acceptance scenario
+- contract scenario
+- PlayMode/lifecycle checks
+- auxiliary consistency checks
+- cleanup/restore
+
+Long auxiliary or cleanup phases should emit quiet heartbeat lines naming the
+phase and next terminal condition. Bridge generation churn should be
+`non_blocking_churn` when the terminal verdict passed, final health is healthy,
+compiler errors are zero, and unrecovered abandoned requests are zero;
+otherwise classify it as `actionable_churn`.
 
 Optional post-change parity inputs:
 

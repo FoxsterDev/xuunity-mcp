@@ -25,6 +25,21 @@ def tool_error_result(
     }
 
 
+def compact_run_start_payload(run_payload: dict[str, Any], *, include_step_payloads: bool) -> dict[str, Any]:
+    if include_step_payloads:
+        return dict(run_payload or {})
+
+    compact = dict(run_payload or {})
+    steps = compact.get("steps")
+    if isinstance(steps, list):
+        compact["step_count"] = len(steps)
+        compact["steps_payload_mode"] = "omitted_duplicate_run_start_steps"
+        compact["steps_omitted"] = True
+        compact["include_step_payloads_tool_arguments"] = {"includeStepPayloads": True}
+        compact.pop("steps", None)
+    return compact
+
+
 def call_unity_compile_build_config_matrix_tool(
     arguments: dict[str, Any],
     *,
@@ -139,10 +154,13 @@ def call_unity_scenario_run_and_wait_tool(
 
     verbose = arguments.get("verbose", False)
     include_full_payload = arguments.get("includeFullPayload", False)
+    include_step_payloads = arguments.get("includeStepPayloads", False)
     if not isinstance(verbose, bool):
         raise JsonRpcError(-32602, "verbose must be a boolean when provided.")
     if not isinstance(include_full_payload, bool):
         raise JsonRpcError(-32602, "includeFullPayload must be a boolean when provided.")
+    if not isinstance(include_step_payloads, bool):
+        raise JsonRpcError(-32602, "includeStepPayloads must be a boolean when provided.")
     full_payload_mode = verbose or include_full_payload
 
     try:
@@ -169,7 +187,10 @@ def call_unity_scenario_run_and_wait_tool(
     except tool_invocation_error_type as exc:
         return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
 
-    result_payload["run_start"] = run_payload
+    result_payload["run_start"] = compact_run_start_payload(
+        run_payload,
+        include_step_payloads=include_step_payloads,
+    )
     if not full_payload_mode:
         verdict_payload = build_scenario_decision_verdict(result_payload, scenario_terminal_statuses)
         if not bool(result_payload.get("succeeded")):

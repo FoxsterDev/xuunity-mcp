@@ -168,6 +168,7 @@ def build_status_summary(
     discovery = dict(discovery_details or {})
     if discovery:
         host_prerequisites = dict(discovery.get("host_prerequisites") or {})
+        editor_log_identity = dict(discovery.get("editor_log_identity") or {})
         summary.update(
             {
                 "host_health_classification": str(discovery.get("host_health_classification") or ""),
@@ -189,6 +190,22 @@ def build_status_summary(
                 "host_prerequisites_ready": bool(host_prerequisites.get("ready", False)),
                 "host_prerequisite_blocking_codes": list(host_prerequisites.get("blocking_codes") or []),
                 "host_prerequisite_warning_codes": list(host_prerequisites.get("warning_codes") or []),
+                "active_editor_log_path": str(
+                    editor_log_identity.get("active_editor_log_path")
+                    or discovery.get("active_editor_log_path")
+                    or effective.get("editor_log_path")
+                    or ""
+                ),
+                "newer_foreign_editor_log_detected": bool(
+                    editor_log_identity.get("newer_foreign_editor_log_detected")
+                    or discovery.get("newer_foreign_editor_log_detected")
+                ),
+                "newer_foreign_editor_log_count": int(
+                    editor_log_identity.get("newer_foreign_editor_log_count")
+                    or discovery.get("newer_foreign_editor_log_count")
+                    or 0
+                ),
+                "console_grep_caveat": str(editor_log_identity.get("console_grep_caveat") or ""),
             }
         )
         if include_full_payload:
@@ -200,6 +217,7 @@ def build_status_summary(
                     "reconciliation_reason": str(discovery.get("reconciliation_reason") or ""),
                     "editor_log_diagnosis": dict(discovery.get("editor_log_diagnosis") or {}),
                     "editor_log_scope": dict(discovery.get("editor_log_scope") or {}),
+                    "editor_log_identity": editor_log_identity,
                     "stale_request_artifacts": dict(discovery.get("stale_request_artifacts") or {}),
                     "host_prerequisites": host_prerequisites,
                     "transport_state": dict(discovery.get("transport_state") or {}),

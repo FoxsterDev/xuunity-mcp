@@ -30,8 +30,10 @@ from server_specs import (
 )
 from server_health import (
     FRESH_HEARTBEAT_MAX_AGE_SECONDS,
+    build_editor_log_identity,
     build_editor_log_diagnosis,
     classify_project_health,
+    grep_editor_log_payload,
 )
 from server_license import (
     build_license_capabilities,
@@ -55,6 +57,7 @@ from server_mcp_tools import (
     call_unity_scenario_run_and_wait_tool as call_unity_scenario_run_and_wait_tool_base,
     call_unity_status_summary_tool as call_unity_status_summary_tool_base,
 )
+from server_readiness_summary import build_ensure_ready_summary
 from server_bridge_payloads import (
     bridge_response_to_tool_result as bridge_response_to_tool_result_data,
     normalize_response_payload_from_lifecycle as normalize_response_payload_from_lifecycle_data,
@@ -281,7 +284,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.35",
+    "version": "0.3.36",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -560,15 +563,53 @@ def current_project_context_host_session_state(project_root: Path) -> dict[str, 
     return dict(context.last_host_editor_session_state or {})
 
 
+def _attach_editor_log_identity(
+    project_root: Path,
+    context: ProjectContext,
+    discovery: dict[str, Any],
+) -> dict[str, Any]:
+    def dict_or_empty(value: Any) -> dict[str, Any]:
+        return dict(value) if isinstance(value, dict) else {}
+
+    enriched = dict(discovery or {})
+    bridge_state = dict_or_empty(getattr(context, "last_bridge_state", None))
+    host_session_state = dict_or_empty(getattr(context, "last_host_editor_session_state", None))
+    active_log_value = (
+        bridge_state.get("editor_log_path")
+        or bridge_state.get("console_log_path")
+        or host_session_state.get("editor_log_path")
+        or default_editor_log_path(project_root)
+    )
+    try:
+        active_log_path = Path(str(active_log_value)).expanduser().resolve()
+    except OSError:
+        active_log_path = default_editor_log_path(project_root)
+    identity = build_editor_log_identity(
+        project_root,
+        active_log_path,
+        bridge_state=bridge_state,
+        host_session_state=host_session_state,
+    )
+    enriched["editor_log_identity"] = identity
+    enriched["active_editor_log_path"] = str(identity.get("active_editor_log_path") or "")
+    enriched["newer_foreign_editor_log_detected"] = bool(identity.get("newer_foreign_editor_log_detected"))
+    enriched["newer_foreign_editor_log_count"] = int(identity.get("newer_foreign_editor_log_count") or 0)
+    return enriched
+
+
 def current_project_context_discovery_details(project_root: Path) -> dict[str, Any]:
     context = refresh_project_context(project_root)
     details = context.discovery_details if isinstance(getattr(context, "discovery_details", None), dict) else {}
-    return dict(details or {})
+    return _attach_editor_log_identity(project_root, context, dict(details or {}))
 
 
 def build_project_discovery_report(project_root: Path) -> dict[str, Any]:
     context = refresh_project_context(project_root)
-    discovery = current_project_context_discovery_details(project_root)
+    discovery = _attach_editor_log_identity(
+        project_root,
+        context,
+        context.discovery_details if isinstance(getattr(context, "discovery_details", None), dict) else {},
+    )
     return build_project_discovery_report_data(
         project_root,
         context=context,
@@ -1353,6 +1394,78 @@ def call_unity_loading_timing_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     return mcp_json_result(summary, is_error=not bool(summary.get("succeeded")))
 
 
+def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    pattern = arguments.get("pattern")
+    if not isinstance(pattern, str) or not pattern.strip():
+        raise JsonRpcError(-32602, "pattern is required.")
+
+    source = arguments.get("source", "console")
+    if source not in {"console", "editor_log"}:
+        raise JsonRpcError(-32602, "source must be console or editor_log.")
+
+    timeout_ms = arguments.get("timeoutMs", 5000)
+    if not isinstance(timeout_ms, int):
+        raise JsonRpcError(-32602, "timeoutMs must be an integer.")
+
+    limit = arguments.get("limit", 20)
+    if not isinstance(limit, int):
+        raise JsonRpcError(-32602, "limit must be an integer.")
+
+    regex = arguments.get("regex", False)
+    ignore_case = arguments.get("ignoreCase", True)
+    include_stack_traces = arguments.get("includeStackTraces", False)
+    if not isinstance(regex, bool):
+        raise JsonRpcError(-32602, "regex must be a boolean.")
+    if not isinstance(ignore_case, bool):
+        raise JsonRpcError(-32602, "ignoreCase must be a boolean.")
+    if not isinstance(include_stack_traces, bool):
+        raise JsonRpcError(-32602, "includeStackTraces must be a boolean.")
+
+    include_types = _optional_string_list_argument(arguments, "includeTypes")
+    project_root = ensure_project_root(project_root_value)
+
+    if source == "editor_log":
+        editor_log_path = arguments.get("editorLogPath")
+        if editor_log_path is not None and not isinstance(editor_log_path, str):
+            raise JsonRpcError(-32602, "editorLogPath must be a string when provided.")
+        log_path = resolve_editor_log_path(project_root, editor_log_path)
+        try:
+            payload = grep_editor_log_payload(
+                project_root,
+                log_path,
+                pattern=pattern,
+                regex=regex,
+                ignore_case=ignore_case,
+                include_stack_traces=include_stack_traces,
+                limit=max(1, limit),
+            )
+        except ValueError as exc:
+            raise JsonRpcError(-32602, str(exc)) from exc
+        return mcp_json_result(payload)
+
+    try:
+        response = invoke_bridge(
+            str(project_root),
+            "unity.console.grep",
+            {
+                "pattern": pattern,
+                "regex": regex,
+                "ignoreCase": ignore_case,
+                "includeStackTraces": include_stack_traces,
+                "limit": max(1, limit),
+                "includeTypes": include_types or None,
+            },
+            timeout_ms,
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return bridge_response_to_tool_result(response)
+
+
 def call_unity_scenario_run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     try:
         arguments = normalize_scenario_tool_arguments(arguments)
@@ -1917,6 +2030,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_scenario_validate": call_unity_scenario_validate_tool,
             "unity_scenario_run": call_unity_scenario_run_tool,
             "unity_scenario_run_and_wait": call_unity_scenario_run_and_wait_tool,
+            "unity_console_grep": call_unity_console_grep_tool,
             "unity_loading_timing": call_unity_loading_timing_tool,
             "unity_project_action_list": call_unity_project_action_list_tool,
             "unity_project_action_invoke": call_unity_project_action_invoke_tool,
@@ -2247,6 +2361,7 @@ wrap_globals_with_proxies(globals(), [
     "call_unity_compile_build_config_matrix_tool",
     "call_unity_scenario_run_and_wait_tool",
     "call_unity_scenario_validate_tool",
+    "call_unity_console_grep_tool",
     "call_unity_loading_timing_tool",
     "call_unity_scenario_run_tool",
     "call_unity_status_summary_tool",

@@ -242,6 +242,18 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
             self.assertEqual("project_action", scenario["steps"][0]["kind"])
             self.assertIn("run_project_action_list", result["activation_order"])
 
+    def test_config_applying_build_project_action_template_is_generic(self) -> None:
+        template_dir = Path(__file__).resolve().parents[1] / "templates" / "project_actions"
+        catalog = (template_dir / "config_applying_build.project_actions.yaml").read_text(encoding="utf-8")
+        hook = (template_dir / "ConfigApplyingBuildActionHook.cs.template").read_text(encoding="utf-8")
+
+        self.assertIn("build.dev_android", catalog)
+        self.assertIn("buildStaticMethod", catalog)
+        self.assertIn("ConfigApplyingBuildActionHook", hook)
+        for private_marker in ("Apperfun", "JoyfulJam", "SlideBall", "Facebook"):
+            self.assertNotIn(private_marker, catalog)
+            self.assertNotIn(private_marker, hook)
+
     def test_parser_contains_artifact_probe_command(self) -> None:
         self.assertIn("artifact-probe", get_subparser_choices(server.build_parser()))
 

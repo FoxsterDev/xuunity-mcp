@@ -81,6 +81,7 @@ namespace XUUnity.LightMcp.Editor.Operations
                 last_completed_operation_duration_seconds = XUUnityLightMcpBridgeRuntimeState.LastCompletedOperationDurationSeconds,
                 request_journal_directory = XUUnityLightMcpFileIpcPaths.RequestJournalDirectory,
                 request_journal_head = XUUnityLightMcpBridgeRuntimeState.RequestJournalHead,
+                editor_log_path = Application.consoleLogPath ?? "",
                 health_status = report.status,
                 supported_operations = report.supported_operations ?? new System.Collections.Generic.List<string>(),
                 disabled_operations = report.disabled_operations ?? new System.Collections.Generic.List<string>()

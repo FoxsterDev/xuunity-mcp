@@ -91,6 +91,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public double last_completed_operation_duration_seconds;
             public string request_journal_directory = "";
             public string request_journal_head = "";
+            public string editor_log_path = "";
             public string last_error = "";
             public string health_status = "";
             public int supported_operation_count;
@@ -194,6 +195,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public double last_completed_operation_duration_seconds;
             public string request_journal_directory = "";
             public string request_journal_head = "";
+            public string editor_log_path = "";
             public string health_status = "";
             public List<string> supported_operations = new();
             public List<string> disabled_operations = new();

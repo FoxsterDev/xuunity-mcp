@@ -107,6 +107,48 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("includeFullPayload", status_tool["inputSchema"]["properties"])
         compile_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_compile_player_scripts")
         self.assertIn("includeFullPayload", compile_tool["inputSchema"]["properties"])
+        console_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_console_grep")
+        self.assertIn("source", console_tool["inputSchema"]["properties"])
+        scenario_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_scenario_run_and_wait")
+        self.assertIn("includeStepPayloads", scenario_tool["inputSchema"]["properties"])
+
+    def test_unity_console_grep_source_editor_log_reads_path_backed_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir) / "FakeProject"
+            project_root.mkdir()
+            log_path = project_root / "Library" / "XUUnityLightMcp" / "logs" / "unity_editor.log"
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text(
+                "ordinary line\n[Boot] Early marker fired\nanother line\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(server, "ensure_project_root", return_value=project_root):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 26,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_console_grep",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "source": "editor_log",
+                                "editorLogPath": str(log_path),
+                                "pattern": "early marker",
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        result = response["result"]
+        self.assertFalse(result["isError"])
+        structured = result["structuredContent"]
+        self.assertEqual("editor_log", structured["source"])
+        self.assertEqual(1, structured["match_count"])
+        self.assertEqual("[Boot] Early marker fired", structured["items"][0]["message"])
+        self.assertIn("false negative", structured["console_grep_caveat"])
 
     def test_compile_tool_returns_compact_payload_by_default(self) -> None:
         invoke_calls: list[tuple[str, dict[str, object], int]] = []
@@ -1363,6 +1405,116 @@ actions:
         payload = emitted_payloads[0]
         self.assertEqual("recovered", payload["recovery_classification"])
         self.assertEqual({"project_root": "/tmp/FakeProject"}, payload["ensure_ready"])
+
+    def test_ensure_ready_success_defaults_to_compact_summary(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            open_editor=False,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+            include_full_payload=False,
+        )
+        state = {
+            "bridge_version": 9,
+            "bridge_generation": 42,
+            "bridge_session_id": "session-1",
+            "editor_pid": 123,
+            "unity_version": "6000.0.1f1",
+            "health_status": "healthy",
+            "playmode_state": "edit",
+            "transport": "tcp_loopback",
+            "compiler_error_count": 0,
+            "pending_request_count": 0,
+            "last_processed_request_id": "req-ready",
+            "editor_log_path": "/tmp/FakeProject/Library/XUUnityLightMcp/logs/unity_editor.log",
+        }
+        import_state = {
+            "import_state": "imported_or_bridge_state_present",
+            "dependency_declared": True,
+            "lock_entry_present": True,
+            "package_cache_present": True,
+            "bridge_state_present": True,
+        }
+        discovery = {
+            "editor_log_identity": {
+                "active_editor_log_path": state["editor_log_path"],
+                "newer_foreign_editor_log_detected": False,
+                "newer_foreign_editor_log_count": 0,
+            }
+        }
+        emitted_payloads: list[dict[str, object]] = []
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "resolve_editor_log_path", return_value=Path(state["editor_log_path"])),
+            mock.patch.object(server, "inspect_light_mcp_import_state", return_value=import_state),
+            mock.patch.object(server, "build_project_discovery_report", return_value=discovery),
+            mock.patch.object(server, "maybe_fail_fast_offline_ensure_ready_without_open"),
+            mock.patch.object(server, "current_project_context_bridge_state", return_value=state),
+            mock.patch.object(server, "wait_for_ready", return_value=state),
+            mock.patch.object(server, "refresh_project_context"),
+            mock.patch.object(server, "inspect_package_dependency_alignment", return_value={"alignment": "file_local"}),
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_ensure_ready(args)
+
+        self.assertEqual(1, len(emitted_payloads))
+        payload = emitted_payloads[0]
+        self.assertEqual("compact_ensure_ready", payload["payload_mode"])
+        self.assertEqual("ready", payload["verdict"])
+        self.assertEqual("healthy", payload["health"]["status"])
+        self.assertEqual(42, payload["bridge"]["generation"])
+        self.assertEqual("session-1", payload["bridge"]["session_id"])
+        self.assertEqual("imported_or_bridge_state_present", payload["package_import_state"]["import_state"])
+        self.assertEqual("none", payload["recommended_next_action"])
+        self.assertIn("--include-full-payload", payload["full_payload_command"])
+        self.assertNotIn("discovery", payload)
+        self.assertIn("bridge_state", payload)
+
+    def test_ensure_ready_success_can_return_full_payload(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            open_editor=False,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+            include_full_payload=True,
+        )
+        state = {
+            "bridge_generation": 7,
+            "bridge_session_id": "session-full",
+            "health_status": "healthy",
+            "playmode_state": "edit",
+        }
+        import_state = {"import_state": "imported_or_bridge_state_present"}
+        emitted_payloads: list[dict[str, object]] = []
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "resolve_editor_log_path", return_value=Path("/tmp/editor.log")),
+            mock.patch.object(server, "inspect_light_mcp_import_state", return_value=import_state),
+            mock.patch.object(server, "build_project_discovery_report", return_value={"nested": {"large": True}}),
+            mock.patch.object(server, "maybe_fail_fast_offline_ensure_ready_without_open"),
+            mock.patch.object(server, "current_project_context_bridge_state", return_value=state),
+            mock.patch.object(server, "wait_for_ready", return_value=state),
+            mock.patch.object(server, "refresh_project_context"),
+            mock.patch.object(server, "inspect_package_dependency_alignment", return_value={"alignment": "file_local"}),
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_ensure_ready(args)
+
+        payload = emitted_payloads[0]
+        self.assertIn("discovery", payload)
+        self.assertIn("discovery_after_ready", payload)
+        self.assertEqual(state, payload["bridge_state"])
+        self.assertNotEqual("compact_ensure_ready", payload.get("payload_mode"))
 
     def test_ensure_ready_without_open_editor_fails_fast_when_project_is_offline(self) -> None:
         args = argparse.Namespace(

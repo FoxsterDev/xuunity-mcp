@@ -1,0 +1,22 @@
+schemaVersion: xuunity.project-actions.v1
+project: ExampleProject
+hookName: example.config_applying_build
+actions:
+  build.dev_android:
+    aliases:
+      - dev_android_build
+    payload:
+      target: Android
+      profile: dev_android
+      artifactPath: Builds/Android/dev.apk
+      applyConfigMenuPath: Tools/Example/Build/Apply Dev Android Config
+      buildStaticMethod: Example.Project.Editor.ConfigApplyingBuildActions.DevAndroid
+    mutates:
+      - ProjectSettings/**
+      - Builds/**
+    evidence:
+      - config_applied
+      - artifact_path
+      - build_report_path
+    validationModes:
+      - config_applying_build

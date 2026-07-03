@@ -92,6 +92,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 last_completed_operation_duration_seconds = XUUnityLightMcpBridgeRuntimeState.LastCompletedOperationDurationSeconds,
                 request_journal_directory = XUUnityLightMcpFileIpcPaths.RequestJournalDirectory,
                 request_journal_head = XUUnityLightMcpBridgeRuntimeState.RequestJournalHead,
+                editor_log_path = ResolveEditorLogPath(),
                 last_error = lastError ?? "",
                 health_status = report.status,
                 supported_operation_count = report.supported_operations?.Count ?? 0,
@@ -111,6 +112,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
             }
 
             return EditorUtility.scriptCompilationFailed ? "script_compilation_failed_flag" : "";
+        }
+
+        static string ResolveEditorLogPath()
+        {
+            return Application.consoleLogPath ?? "";
         }
 
         static string ResolveBusyReason()

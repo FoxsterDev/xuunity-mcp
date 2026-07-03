@@ -514,7 +514,15 @@ class ServerProjectHelperTests(unittest.TestCase):
                 mock.patch.object(
                     server,
                     "current_project_context_discovery_details",
-                    return_value={"host_prerequisites": host_prerequisites},
+                    return_value={
+                        "host_prerequisites": host_prerequisites,
+                        "editor_log_identity": {
+                            "active_editor_log_path": "/tmp/FakeProject/Library/XUUnityLightMcp/logs/unity_editor.log",
+                            "newer_foreign_editor_log_detected": True,
+                            "newer_foreign_editor_log_count": 1,
+                            "console_grep_caveat": "console may be cleared",
+                        },
+                    },
                 ),
                 mock.patch.object(
                     server,
@@ -590,6 +598,12 @@ class ServerProjectHelperTests(unittest.TestCase):
             self.assertTrue(compact_status_summary["host_prerequisites_ready"])
             self.assertEqual([], compact_status_summary["host_prerequisite_blocking_codes"])
             self.assertEqual([], compact_status_summary["host_prerequisite_warning_codes"])
+            self.assertEqual(
+                "/tmp/FakeProject/Library/XUUnityLightMcp/logs/unity_editor.log",
+                compact_status_summary["active_editor_log_path"],
+            )
+            self.assertTrue(compact_status_summary["newer_foreign_editor_log_detected"])
+            self.assertEqual(1, compact_status_summary["newer_foreign_editor_log_count"])
             self.assertEqual({"includeFullPayload": True}, compact_status_summary["full_payload_tool_arguments"])
             self.assertEqual(structured_timing, scenario_summary["structured_timing"])
             self.assertEqual(artifact_manifest, scenario_summary["artifact_manifest"])

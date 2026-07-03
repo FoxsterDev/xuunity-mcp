@@ -95,6 +95,9 @@
       ],
       [
         "--include-full-payload"
+      ],
+      [
+        "--include-step-payloads"
       ]
     ],
     "request_status_summary_options": [
@@ -184,7 +187,7 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "77b7f43ecc96ebf7696d959ed5c72d71f91f78933e434b459d1dd6661a743378",
+  "sha256": "fbad78e3a7fa9e436e44963c0963f4790f9a7c35c8f973999fd818e10948392a",
     "tool_count": 44,
     "tool_names": [
       "xuunity_setup_plan",

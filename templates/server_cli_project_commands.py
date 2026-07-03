@@ -144,6 +144,7 @@ def cmd_request_scenario_run_and_wait(args):
             "pollIntervalMs": args.poll_interval_ms,
             "verbose": bool(args.verbose),
             "includeFullPayload": bool(args.include_full_payload),
+            "includeStepPayloads": bool(args.include_step_payloads),
         }
     )
     print_json(result.get("structuredContent") or {})

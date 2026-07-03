@@ -2,14 +2,59 @@
 
 ## Unreleased
 
+## 0.3.36
+
+Release tag: `v0.3.36`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.36
+```
+
 ### Changed
 
+- Released `v0.3.36` package metadata, server metadata, package manifests, and Git UPM examples.
 - `transport_response_missing` errors now embed a compact final-status
   projection instead of the full final-status/artifact payload, while preserving
   the `request-final-status` command for full evidence recovery.
 - Discovery-enriched stale-session transport failures now replace generic retry
   recovery commands with the actionable `ensure-ready --open-editor` command
   when host/session evidence proves recovery is needed before retrying.
+- `ensure-ready` now defaults to a compact readiness envelope with verdict,
+  health, bridge identity, package import summary, editor-log identity,
+  recovery commands, and Play Mode exit hints. Use `--include-full-payload` for
+  the previous nested discovery/package/import/lifecycle payload.
+- `unity.status`, bridge heartbeat state, and compact status summaries now
+  surface the active editor log path. Status summaries also flag newer
+  project-matching foreign Editor.log candidates when practical.
+- `unity_console_grep` and `request-console-grep` now support
+  `source=editor_log` / `--source editor_log` for path-backed Editor.log grep,
+  and docs call out Unity Console clear-on-play and ring-buffer eviction false
+  negatives.
+- `unity_scenario_run_and_wait` full-payload mode now omits duplicated
+  `run_start.steps` by default; pass `includeStepPayloads=true` or
+  `--include-step-payloads` to preserve that launch-time step copy.
+- `templates/smoke/run_post_change_validation.sh` now emits durable phase lines,
+  quiet-tail cleanup/auxiliary heartbeats, and classifies bridge churn as
+  `non_blocking_churn` or `actionable_churn`.
+- Added public-safe config-applying project-action build templates under
+  `templates/project_actions/` for projects whose representative build lane
+  must call project-owned config/apply/build methods instead of raw
+  `unity_build_player`.
+
+### Validation
+
+- Release version consistency and release-doc freshness checks passed for
+  `0.3.36`.
+- Source checkout helper install refreshed neutral, Codex, and Claude tool
+  installs; all reported package metadata version `0.3.36`.
+- Host Python unittest suite: `279` tests passed with `1` expected skip.
+- Public site Playwright checks passed: `39/39`.
+- Same-host Unity validation passed readiness, status-summary, and health-probe
+  checks across two consumer projects, plus a project-local post-change route
+  with compile matrix, acceptance scenario, contract scenario, lifecycle checks,
+  and project-action catalog consistency.
 
 ## 0.3.35
 

@@ -66,12 +66,17 @@ survival and more about:
 
 Already implemented:
 
-- standalone public repository and current `v0.3.35` Git UPM package path under
+- standalone public repository and current `v0.3.36` Git UPM package path under
   `packages/com.xuunity.light-mcp`
 - bridge enable/disable lifecycle
 - status and capability probing
 - compact MCP status summaries with bridge stabilization fields and
   `includeFullPayload=true` full-payload opt-in
+- compact `ensure-ready` readiness summaries with `--include-full-payload`
+  recovery for nested discovery/package/launch evidence
+- active editor-log identity in status/readiness surfaces and path-backed
+  `editor_log` grep for definitive log-presence checks when the Unity Console
+  buffer may be cleared or evicted
 - additive request-scoped `structured_timing` and `artifact_manifest` on
   successful same-host editor responses and `request-final-status`
 - console tail
@@ -88,9 +93,15 @@ Already implemented:
   - `unity.scenario.result`
 - compact `unity_scenario_run_and_wait` decision verdicts with trust class,
   failure class, recommended next action, compact step summaries, and lifecycle
-  relaunch attribution
+  relaunch attribution; full terminal scenario payloads omit duplicated
+  `run_start.steps` unless `includeStepPayloads=true`
 - project-defined hook poll-until steps and catalog-backed project-action steps
+- public config-applying project-action build templates for projects whose
+  representative build must call project-owned apply/build methods instead of
+  raw `unity_build_player`
 - public reusable smoke runners for compact and JSON-heavy validation routes
+  with durable post-change phase lines, quiet-tail heartbeats, and actionable
+  versus non-blocking bridge-churn classification
 - host-side editor session restore for host-opened validation runs
 - lifecycle-reset finalization recovery by `request_id`
 - `request-final-status` for operator follow-up after transport churn
@@ -133,7 +144,7 @@ This is enough for:
 - controlled screenshot capture
 - early automation experiments
 - repeatable same-host multi-project routing and recovery
-- production Git UPM consumption through `v0.3.35`
+- production Git UPM consumption through `v0.3.36`
 
 This is not yet enough for:
 
@@ -184,7 +195,7 @@ Most valuable next milestone:
 
 Why this is next:
 
-- `v0.3.12` moved the package to the registry-native path and `v0.3.35` is the
+- `v0.3.12` moved the package to the registry-native path and `v0.3.36` is the
   current public Git UPM line
 - macOS validation is strong enough for current same-host use
 - Linux and Windows claims should remain conservative until executed on those hosts

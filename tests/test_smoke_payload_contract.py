@@ -45,6 +45,28 @@ class SmokePayloadContractTests(unittest.TestCase):
         ]:
             self._assert_block_has_full_payload(filename, start, end)
 
+    def test_post_change_validation_emits_durable_phase_lines(self) -> None:
+        text = (SMOKE_DIR / "run_post_change_validation.sh").read_text(encoding="utf-8")
+        for phase in [
+            "readiness",
+            "compile matrix",
+            "acceptance scenario",
+            "contract scenario",
+            "PlayMode/lifecycle checks",
+            "auxiliary consistency checks",
+            "cleanup/restore",
+        ]:
+            self.assertIn(f'emit_phase "{phase}"', text)
+        self.assertIn('emit_heartbeat "cleanup_restore"', text)
+        self.assertIn('emit_heartbeat "auxiliary_consistency_checks"', text)
+
+    def test_post_change_validation_classifies_bridge_churn(self) -> None:
+        text = (SMOKE_DIR / "run_post_change_validation.sh").read_text(encoding="utf-8")
+        self.assertIn("non_blocking_churn", text)
+        self.assertIn("actionable_churn", text)
+        self.assertIn("churn_classification=", text)
+        self.assertNotIn("high_bridge_generation_churn", text)
+
 
 if __name__ == "__main__":
     unittest.main()

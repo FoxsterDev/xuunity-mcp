@@ -1,7 +1,7 @@
 # Build Automation Surface
 
 Date: `2026-05-26`
-Status: `current for v0.3.35-dev`
+Status: `current for v0.3.36-dev`
 
 This document defines the public-safe build automation surface for the
 standalone `xuunity-mcp` repository.
@@ -265,6 +265,35 @@ python3 templates/server.py \
   --build-target Android \
   --output-path Builds/Android/MyGame.apk
 ```
+
+Important limitation:
+- `unity_build_player`, `request-build-player`, and `batch-build-player` are
+  plain Unity `BuildPipeline` lanes. They may be non-representative for
+  projects whose real build requires a project BuildTool, profile application,
+  signing setup, dependency generation, or custom pre/postprocessors.
+- For those projects, expose a project-owned action such as `build.dev_android`
+  that calls the same menu item or static build method the project uses for
+  configured builds.
+
+Generic config-applying project-action template:
+
+```bash
+python3 templates/server.py \
+  project-action-invoke \
+  --project-root /path/to/UnityProject \
+  --action-id build.dev_android \
+  --allow-mutating \
+  --timeout-ms 600000
+```
+
+Starter files:
+- `templates/project_actions/config_applying_build.project_actions.yaml`
+- `templates/project_actions/ConfigApplyingBuildActionHook.cs.template`
+
+The project should replace placeholder hook names, menu paths, static method
+names, profile labels, artifact paths, and mutation/evidence lists with its own
+public-safe contract. Keep generated artifacts and private signing/provider
+details out of the public template.
 
 Batch helpers emit compact progress events as JSON lines and write the same
 events to:
