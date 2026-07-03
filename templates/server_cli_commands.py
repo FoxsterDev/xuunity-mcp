@@ -290,6 +290,7 @@ from server_cli_bridge_commands import (
     cmd_request_playmode_tests,
     cmd_request_project_refresh,
     cmd_request_scene_assert,
+    cmd_request_scene_open,
     cmd_request_sdk_dependency_verify,
     cmd_request_stale_cleanup,
     cmd_request_status,

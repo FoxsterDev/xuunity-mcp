@@ -8,13 +8,13 @@ XUUnity MCP package installation and validation completed successfully, but test
 - Date: 2026-06-09  
 - Host OS: Windows  
 - Working shell: Windows PowerShell + WSL bash  
-- Repo path: D:\Development\Unity\_mtr\HumanFactory  
+- Repo path: `D:\path\to\UnityProject`
 - Unity version: 6000.3.2f1 (ProjectSettings/ProjectVersion.txt)  
-- MCP host artifacts: both /home/matro/.local/share/xuunity-mcp and /home/matro/.codex-tools/xuunity-mcp (WSL), plus Windows mirror under /mnt/c/Users/matro/.local/share/xuunity-mcp and /mnt/c/Users/matro/.codex-tools/xuunity-mcp  
-- Unity installs found: D:\ProgramFiles\UnityHub\Editor\6000.3.2f1\Editor\Unity.exe (present and running in another PID)
+- MCP host artifacts: both `/home/<username>/.local/share/xuunity-mcp` and `/home/<username>/.codex-tools/xuunity-mcp` (WSL), plus Windows mirror paths under `/mnt/c/Users/<username>/...`.
+- Unity installs found: `%ProgramFiles%\Unity\Hub\Editor\6000.3.2f1\Editor\Unity.exe` (present and running in another PID)
 
 ## 4) Project topology
-Single-project scope only: /Development/Unity/_mtr/HumanFactory
+Single-project scope only: `<project-root>`
 
 ## 5) Installation route attempted
 README flow (Git UPM + helper + wizard):
@@ -45,7 +45,7 @@ ensure-ready (post-setup) in WSL host context.
 
 ## 9) Timeline of attempted actions
 1. Cloned xuunity-mcp helper and ran installer.
-2. Ran setup-plan --project-root D:/.../HumanFactory  
+2. Ran `setup-plan --project-root <project-root>`
 3. Ran setup-apply and validate-setup successfully.
 4. Ran ensure-ready --project-root ... --open-editor from WSL wrapper.
 5. Received unity_app_not_found (could not auto-detect Unity).
@@ -83,7 +83,7 @@ ensure-ready (post-setup) in WSL host context.
 - Simultaneous Unity process already owning the project, preventing batchmode parallel execution
 
 ## 15) Smallest reproduction steps
-1. In a Windows machine with Unity installed under D:\ProgramFiles\UnityHub\Editor\6000.3.2f1\Editor\Unity.exe, run:
+1. In a Windows machine with Unity installed under `%ProgramFiles%\Unity\Hub\Editor\6000.3.2f1\Editor\Unity.exe`, run:
    - setup-plan --project-root <project>
    - setup-apply --plan-file ... --project-root <project> --yes
    - validate-setup --project-root <project>

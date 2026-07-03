@@ -11,7 +11,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
 {
     internal static class XUUnityLightMcpHealthProbe
     {
-        const int ProbeVersion = 1;
+        const int ProbeVersion = 2;
         static readonly BindingFlags StaticBindings = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static;
         static XUUnityLightMcpCapabilitiesReport _cachedReport;
 
@@ -214,6 +214,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     "unity.sdk.dependency.verify",
                     "unity.console.tail",
                     "unity.scene.snapshot",
+                    "unity.scene.open",
                     "unity.scene.assert",
                     "unity.scenario.validate",
                     "unity.scenario.run",

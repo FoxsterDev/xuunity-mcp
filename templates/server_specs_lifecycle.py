@@ -74,6 +74,15 @@ OPERATION_LIFECYCLE_POLICIES: dict[str, dict[str, Any]] = {
         "retry_on_transport_response_missing": True,
         "retry_on_transport_connect_failed": True,
     },
+    "unity.scene.open": {
+        "activate_unity": True,
+        "wait_for_idle_before": True,
+        "wait_for_idle_after": True,
+        "idle_stable_cycles_after": 2,
+        "retry_on_lifecycle_reset": True,
+        "retry_on_transport_response_missing": True,
+        "retry_on_transport_connect_failed": True,
+    },
     "unity.scene.assert": {
         "retry_on_lifecycle_reset": True,
         "retry_on_transport_response_missing": True,

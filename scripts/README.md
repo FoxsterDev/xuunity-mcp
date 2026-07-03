@@ -16,6 +16,7 @@ Use the package manifest as the version source of truth:
 python3 scripts/tools/sync_release_version.py --version 0.3.17
 python3 scripts/testing/check_release_version_consistency.py
 python3 scripts/testing/check_release_docs_freshness.py
+python3 scripts/testing/check_public_release_safety.py
 scripts/testing/run_host_python_tests.sh
 ```
 
@@ -24,8 +25,11 @@ manifest templates, the GitHub Pages site surfaces, listing metadata, and
 current release-facing docs without rewriting historical changelog or migration
 references. The host test suite runs `check_release_version_consistency.py` and
 `check_release_docs_freshness.py` first so stale current-version references and
-known stale public-doc claims fail before tagging. Treat the public site and
-public entrypoint docs as part of the release surface: if they are stale, the
+known stale public-doc claims fail before tagging. The public-safety check also
+fails release-facing docs that contain host-local paths or local denylist tokens
+from `.xuunity-public-safety-denylist` or
+`XUUNITY_PUBLIC_SAFETY_DENYLIST`. Treat the public site and public entrypoint
+docs as part of the release surface: if they are stale or not public-safe, the
 MCP release is not ready to tag.
 
 Root-level setup wrappers remain at the repo root:

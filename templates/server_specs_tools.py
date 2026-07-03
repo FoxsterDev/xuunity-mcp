@@ -525,6 +525,27 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["projectRoot"]
         }
     },
+    "unity_scene_open": {
+        "bridgeOperation": "unity.scene.open",
+        "description": "Open a project-relative Assets/... scene in Edit Mode so scenario and boot-flow validation starts from a deterministic scene.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "scenePath": {
+                    "type": "string",
+                    "description": "Project-relative Assets/... path to a Unity scene asset."
+                },
+                "allowDirtySceneDiscard": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, allow the operation to discard unsaved changes in currently open scenes."
+                },
+                "timeoutMs": {"type": "integer", "default": 10000, "minimum": 1000}
+            },
+            "required": ["projectRoot", "scenePath"]
+        }
+    },
     "unity_scene_assert": {
         "bridgeOperation": "unity.scene.assert",
         "description": "Assert the active Unity scene name, path, root objects, or dirty state and return a pass/fail payload.",

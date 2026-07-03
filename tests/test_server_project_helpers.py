@@ -612,6 +612,7 @@ class ServerProjectHelperTests(unittest.TestCase):
     def test_bridge_operation_requires_request_lock_matches_mutation_policy(self) -> None:
         self.assertTrue(server.bridge_operation_requires_request_lock("unity.project.refresh"))
         self.assertTrue(server.bridge_operation_requires_request_lock("unity.compile.matrix"))
+        self.assertTrue(server.bridge_operation_requires_request_lock("unity.scene.open"))
         self.assertTrue(server.bridge_operation_requires_request_lock("unity.editor.quit"))
         self.assertFalse(server.bridge_operation_requires_request_lock("unity.status"))
         self.assertFalse(server.bridge_operation_requires_request_lock("unity.health.probe"))

@@ -667,9 +667,9 @@ What to change:
 - no hidden transport complexity
 - no dependence on external relay/server binaries
 
-## Valuable Pattern To Keep From DevAccelerationSystem
+## Valuable Pattern To Keep From Validation-Oriented Unity Projects
 
-The most valuable compile-validation idea from `FoxsterDev/DevAccelerationSystem` is:
+The most valuable compile-validation idea from mature validation-oriented Unity projects is:
 
 - use `PlayerBuildInterface.CompilePlayerScripts`
 - pass explicit `ScriptCompilationSettings`

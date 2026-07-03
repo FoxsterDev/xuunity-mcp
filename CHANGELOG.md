@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+## 0.3.38
+
+Release tag: `v0.3.38`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38
+```
+
+### Changed
+
+- Released `v0.3.38` package metadata, server metadata, package manifests, and Git UPM examples.
+- Added a release-facing public-safety guard that fails when public docs contain
+  host-local paths or locally configured denylist tokens before release tagging.
+- Added `unity_scene_open`, `request-scene-open`, and scenario `scene_open`
+  steps for deterministic Edit Mode scene setup before Play Mode and boot-flow
+  validation. Scene opens fail closed during Play Mode, on missing scene paths,
+  and on dirty open scenes unless `allowDirtySceneDiscard=true` is explicit.
+
+### Validation
+
+- Release version consistency, release-doc freshness, and public-release safety
+  checks passed for `0.3.38`.
+- Host Python unittest suite: `288` tests passed with `1` expected skip.
+- Unity 2022.3 and Unity 6000 consumer-project local package validation passed
+  package EditMode and PlayMode self-test lanes with the new scene-open tests.
+- A Unity 6000 consumer-project project-local smoke suite passed readiness,
+  acceptance and contract scenarios, compile matrix `6/6`, and a live health
+  probe reporting `unity.scene.open` in `24` supported operations.
+
 ## 0.3.37
 
 Release tag: `v0.3.37`

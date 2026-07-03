@@ -284,7 +284,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.37",
+    "version": "0.3.38",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -298,6 +298,7 @@ MUTATING_BRIDGE_OPERATIONS = frozenset(
         "unity.package.install_test_framework",
         "unity.build_player",
         "unity.playmode.set",
+        "unity.scene.open",
         "unity.build_target.switch",
         "unity.editor.quit",
     }

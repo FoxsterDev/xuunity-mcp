@@ -70,6 +70,29 @@ namespace XUUnity.LightMcp.Editor.Core
         }
 
         [Serializable]
+        internal sealed class XUUnityLightMcpSceneOpenArgs
+        {
+            public string scenePath = "";
+            public bool allowDirtySceneDiscard;
+        }
+
+        [Serializable]
+        internal sealed class XUUnityLightMcpSceneOpenPayload
+        {
+            public string backend_id = "xuunity.light_unity_mcp";
+            public string project_root = "";
+            public string status = "failed";
+            public bool opened;
+            public string outcome = "";
+            public string requested_scene_path = "";
+            public bool allow_dirty_scene_discard;
+            public XUUnityLightMcpSceneData previous_scene = new();
+            public XUUnityLightMcpSceneData active_scene = new();
+            public string failure_reason = "";
+            public string validation_evidence = "unity_mcp";
+        }
+
+        [Serializable]
         internal sealed class XUUnityLightMcpSceneAssertArgs
         {
             public string expectedName = "";

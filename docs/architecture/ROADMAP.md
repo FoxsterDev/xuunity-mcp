@@ -66,7 +66,7 @@ survival and more about:
 
 Already implemented:
 
-- standalone public repository and current `v0.3.37` Git UPM package path under
+- standalone public repository and current `v0.3.38` Git UPM package path under
   `packages/com.xuunity.light-mcp`
 - bridge enable/disable lifecycle
 - status and capability probing
@@ -81,6 +81,7 @@ Already implemented:
   successful same-host editor responses and `request-final-status`
 - console tail
 - scene snapshot
+- deterministic Edit Mode scene open for boot-flow and scenario setup
 - edit-mode tests
 - compile validation without active platform switch
 - authoritative post-settle refresh, compile, and test verdict fields in
@@ -95,6 +96,8 @@ Already implemented:
   failure class, recommended next action, compact step summaries, and lifecycle
   relaunch attribution; full terminal scenario payloads omit duplicated
   `run_start.steps` unless `includeStepPayloads=true`
+- scenario `scene_open` steps and direct `unity_scene_open` / `request-scene-open`
+  for deterministic boot-flow validation before Play Mode entry
 - project-defined hook poll-until steps and catalog-backed project-action steps
 - public config-applying project-action build templates for projects whose
   representative build must call project-owned apply/build methods instead of
@@ -144,7 +147,7 @@ This is enough for:
 - controlled screenshot capture
 - early automation experiments
 - repeatable same-host multi-project routing and recovery
-- production Git UPM consumption through `v0.3.37`
+- production Git UPM consumption through `v0.3.38`
 
 This is not yet enough for:
 
@@ -195,7 +198,7 @@ Most valuable next milestone:
 
 Why this is next:
 
-- `v0.3.12` moved the package to the registry-native path and `v0.3.36` is the
+- `v0.3.12` moved the package to the registry-native path and `v0.3.38` is the
   current public Git UPM line
 - macOS validation is strong enough for current same-host use
 - Linux and Windows claims should remain conservative until executed on those hosts

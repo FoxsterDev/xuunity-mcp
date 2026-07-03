@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using UnityEditor;
+using UnityEditor.SceneManagement;
 using NUnit.Framework;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
@@ -97,6 +99,63 @@ namespace XUUnity.LightMcp.Tests.EditMode
             Assert.That(
                 payload.root_objects.Exists(root => root.name == "XUUnityMcp_EditModeSnapshotRoot"),
                 Is.True);
+        }
+
+        [Test]
+        [Category("XUUnity.MCP.Scene")]
+        public void SceneOpenOperation_OpensProjectRelativeScene()
+        {
+            var testDir = "Assets/XUUnityLightMcpGenerated/SceneOpenSelfTest";
+            var scenePath = $"{testDir}/SceneOpenSelfTest.unity";
+            Directory.CreateDirectory(testDir);
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            Assert.That(EditorSceneManager.SaveScene(scene, scenePath), Is.True);
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            try
+            {
+                var args = JsonUtility.ToJson(new XUUnityLightMcpSceneOpenArgs
+                {
+                    scenePath = scenePath,
+                    allowDirtySceneDiscard = true
+                });
+
+                var response = new XUUnityLightMcpSceneOpenOperation().Execute(new XUUnityLightMcpRequest
+                {
+                    request_id = "scene-open-selftest",
+                    operation = "unity.scene.open",
+                    args_json = args
+                });
+                var payload = JsonUtility.FromJson<XUUnityLightMcpSceneOpenPayload>(response.payload_json);
+
+                Assert.That(response.status, Is.EqualTo("ok"));
+                Assert.That(payload.status, Is.EqualTo("passed"));
+                Assert.That(payload.opened, Is.True);
+                Assert.That(payload.active_scene.path, Is.EqualTo(scenePath));
+            }
+            finally
+            {
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                AssetDatabase.DeleteAsset(scenePath);
+                AssetDatabase.DeleteAsset(testDir);
+            }
+        }
+
+        [Test]
+        [Category("XUUnity.MCP.Scene")]
+        public void SceneOpenOperation_RequiresScenePath()
+        {
+            var response = new XUUnityLightMcpSceneOpenOperation().Execute(new XUUnityLightMcpRequest
+            {
+                request_id = "scene-open-missing-path-selftest",
+                operation = "unity.scene.open",
+                args_json = "{}"
+            });
+            var payload = JsonUtility.FromJson<XUUnityLightMcpSceneOpenPayload>(response.payload_json);
+
+            Assert.That(response.status, Is.EqualTo("ok"));
+            Assert.That(payload.status, Is.EqualTo("failed"));
+            Assert.That(payload.failure_reason, Does.Contain("scenePath"));
         }
 
         [Test]

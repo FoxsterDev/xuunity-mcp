@@ -78,6 +78,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 case "scene_snapshot":
                 case "project_refresh":
                     break;
+                case "scene_open":
+                    if (string.IsNullOrWhiteSpace(step.scenePath))
+                    {
+                        AddIssue(payload, "error", "missing_scene_path", "scene_open requires scenePath.", stepId, index);
+                    }
+                    break;
                 case "assert_scene":
                     if (string.IsNullOrWhiteSpace(step.expectedName)
                         && string.IsNullOrWhiteSpace(step.expectedPath)

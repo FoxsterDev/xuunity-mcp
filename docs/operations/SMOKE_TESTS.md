@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-07-01`
-Status: `current for v0.3.37`
+Status: `current for v0.3.38`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.37`: `267` tests passed, with one expected skip
+- host Python tests for `v0.3.38`: `267` tests passed, with one expected skip
 - source package self-tests for the current release line: EditMode and PlayMode
   self-test lanes passed on runnable installed Unity `2021.3`, `2022.3`, and
   `6000.x` editors after offline optional Test Framework setup
@@ -105,6 +105,8 @@ Minimum generic scenario steps:
 - `status`
 - `health_probe`
 - `project_refresh`
+- optional `scene_open` for boot-flow or scene-normalization smokes that must
+  start from a specific scene
 - `playmode_set enter`
 - `wait_for_playmode_state playing`
 - `assert_playmode_state playing`
@@ -123,6 +125,8 @@ Pass criteria:
 
 - scenario reaches terminal `passed`
 - refresh step settles successfully
+- if `scene_open` is used, the payload reports `status=passed` and the expected
+  `active_scene.path` before Play Mode entry
 - play mode transitions reach explicit target states
 
 ### 4. Refresh Contract Smoke

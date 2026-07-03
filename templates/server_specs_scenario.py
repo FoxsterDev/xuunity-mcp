@@ -14,6 +14,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
                 "status",
                 "health_probe",
                 "scene_snapshot",
+                "scene_open",
                 "assert_scene",
                 "project_refresh",
                 "console_tail",
@@ -39,6 +40,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
                 "status",
                 "health_probe",
                 "scene_snapshot",
+                "scene_open",
                 "assert_scene",
                 "project_refresh",
                 "console_tail",
@@ -80,6 +82,15 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
         "expectedPlaymodeState": {
             "type": "string",
             "enum": ["edit", "playing", "paused", "transitioning"],
+        },
+        "scenePath": {
+            "type": "string",
+            "description": "Project-relative Assets/... scene path to open before subsequent validation steps.",
+        },
+        "allowDirtySceneDiscard": {
+            "type": "boolean",
+            "default": False,
+            "description": "When true, allow unity.scene.open to discard unsaved open-scene changes.",
         },
         "expectedName": {"type": "string"},
         "expectedPath": {"type": "string"},

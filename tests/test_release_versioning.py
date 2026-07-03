@@ -28,6 +28,10 @@ release_docs_freshness = load_module(
     "check_release_docs_freshness",
     REPO_ROOT / "scripts" / "testing" / "check_release_docs_freshness.py",
 )
+public_release_safety = load_module(
+    "check_public_release_safety",
+    REPO_ROOT / "scripts" / "testing" / "check_public_release_safety.py",
+)
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -203,6 +207,39 @@ class ReleaseVersioningTests(unittest.TestCase):
     def test_release_docs_freshness_passes_for_repo(self) -> None:
         errors = release_docs_freshness.check_release_docs_freshness(REPO_ROOT)
         self.assertEqual([], errors)
+
+    def test_public_release_safety_passes_for_repo(self) -> None:
+        errors = public_release_safety.check_public_release_safety(REPO_ROOT)
+        self.assertEqual([], errors)
+
+    def test_public_release_safety_detects_host_local_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_text(root / "CHANGELOG.md", "Validated from /Users/privateuser/Projects/SecretProject.\n")
+
+            errors = public_release_safety.check_public_release_safety(root)
+
+            self.assertTrue(any("host_home_path" in error for error in errors), errors)
+
+    def test_public_release_safety_detects_windows_worktree_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_text(root / "CHANGELOG.md", "Validated from D:\\Development\\Unity\\PrivateProject.\n")
+
+            errors = public_release_safety.check_public_release_safety(root)
+
+            self.assertTrue(any("windows_work_tree_path" in error for error in errors), errors)
+
+    def test_public_release_safety_detects_local_denylist_token_without_committing_token(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            denylist_path = root / "denylist.txt"
+            write_text(denylist_path, "PrivateProjectName\n")
+            write_text(root / "CHANGELOG.md", "Validation passed on PrivateProjectName.\n")
+
+            errors = public_release_safety.check_public_release_safety(root, [denylist_path])
+
+            self.assertTrue(any("local_denylist_token" in error for error in errors), errors)
 
     def test_release_docs_freshness_detects_stale_prepared_tag_claim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

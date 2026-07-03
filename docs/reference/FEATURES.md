@@ -1,7 +1,7 @@
 # Features
 
 Date: `2026-07-01`
-Status: `current for v0.3.37`
+Status: `current for v0.3.38`
 
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
 automation: status, compile, tests, scene checks, Game View evidence, scenario
@@ -71,6 +71,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Console | `unity_console_grep` | `Core` | Returns compact console or Editor.log matches by string or regex without stack traces by default; use `source=editor_log` for path-backed log-presence checks. |
 | Console | `unity_loading_timing` | `Core` | Returns compact loading/startup timing evidence through `unity.console.grep`. |
 | Scene | `unity_scene_snapshot` | `Core` | Lightweight active-scene snapshot. |
+| Scene | `unity_scene_open` | `Core` | Opens a project-relative `Assets/...` scene in Edit Mode for deterministic boot-flow or scenario setup; dirty open scenes require explicit discard approval. |
 | Scene | `unity_scene_assert` | `Core` | Asserts scene name, path, root objects, or dirty state. |
 | Tests | `unity_tests_run_editmode` | `Core` | Runs EditMode tests with normalized result accounting. |
 | Tests | `unity_tests_run_playmode` | `Supported` | Runs PlayMode tests with normalized result accounting; usefulness depends on project test coverage. |
@@ -140,7 +141,7 @@ Unity MCP implementations when the user wants safe production validation.
 
 | Target | Status | Validation notes |
 | --- | --- | --- |
-| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.37`; old `templates/unity-package#v0.3.11` is migration-only. |
+| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.38`; old `templates/unity-package#v0.3.11` is migration-only. |
 | macOS host tools | `Validated in this release environment` | Host Python unittest suite passed for `v0.3.36`: `279` tests with one expected skip. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |

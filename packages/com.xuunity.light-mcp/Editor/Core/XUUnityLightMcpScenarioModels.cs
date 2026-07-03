@@ -25,6 +25,8 @@ namespace XUUnity.LightMcp.Editor.Core
             public double durationSeconds;
             public double timeoutSeconds = 10.0d;
             public string expectedPlaymodeState = "";
+            public string scenePath = "";
+            public bool allowDirtySceneDiscard;
             public string expectedName = "";
             public string expectedPath = "";
             public string[] requiredRootNames = null;

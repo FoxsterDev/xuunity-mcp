@@ -4,7 +4,7 @@ Date: `2026-07-03`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
-for MCP-capable AI agents. The current released source line is `v0.3.36`.
+for MCP-capable AI agents. The current released source line is `v0.3.38`.
 
 ## Current Package
 
@@ -17,7 +17,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.37
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38
 ```
 
 Current package path:
@@ -42,7 +42,7 @@ Migration note:
 - `v0.3.34+` makes refresh, compile, build-config compile, and direct test MCP
   responses compact by default while preserving authoritative post-settle
   verdict fields and `includeFullPayload=true` recovery.
-- `v0.3.37+` makes `unity_status_summary` compact by default for MCP callers,
+- `v0.3.38+` makes `unity_status_summary` compact by default for MCP callers,
   with `payload_mode` markers and full nested diagnostics available through
   `includeFullPayload=true`.
 - `v0.3.36+` makes `ensure-ready` compact by default,
@@ -76,6 +76,7 @@ Implemented Unity-side operations:
 - `unity.console.tail`
 - `unity.console.grep`
 - `unity.scene.snapshot`
+- `unity.scene.open`
 - `unity.scene.assert`
 - `unity.tests.run_editmode`
 - `unity.tests.run_playmode`
@@ -91,9 +92,9 @@ Implemented Unity-side operations:
 - `unity.scenario.result`
 
 Implemented Unity-side scenario step families include status, health probe,
-project refresh, console grep, compile, tests, Play Mode, Game View, waits,
-project-defined hooks, poll-until hooks, and catalog-backed `project_action`
-steps.
+project refresh, scene open/snapshot/assert, console grep, compile, tests, Play
+Mode, Game View, waits, project-defined hooks, poll-until hooks, and
+catalog-backed `project_action` steps.
 
 Implemented host-side MCP tools and helpers:
 
@@ -106,6 +107,7 @@ Implemented host-side MCP tools and helpers:
 - `unity_console_grep`
 - `unity_loading_timing`
 - `unity_scene_snapshot`
+- `unity_scene_open`
 - `unity_scene_assert`
 - `unity_compile_player_scripts`
 - `unity_compile_matrix`
@@ -175,18 +177,18 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest source validation for `v0.3.37`:
+Latest source validation for `v0.3.38`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.37`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `python3 -m unittest discover -s tests` | `282` tests passed for `v0.3.37`, with one expected skip |
-| Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.37` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, and PlayMode already-playing stale-risk summaries are documented with full-payload recovery. |
-| Package self-tests | Clean devmode projects on installed Unity editors | Current release-line source validation passed package EditMode and PlayMode self-test lanes across runnable Unity `2021.3`, `2022.3`, and `6000.x` editor families after optional Test Framework setup. |
-| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed: `39/39` for `v0.3.37`. |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.38`, `unity=2021.3`, no hard Test Framework dependency |
+| Host Python tests | `python3 -m unittest discover -s tests` | `288` tests passed for `v0.3.38`, with one expected skip |
+| Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.38` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, PlayMode already-playing stale-risk summaries, and deterministic scene-open setup are documented with full-payload recovery. |
+| Package self-tests | Clean devmode projects on installed Unity editors | Current release-line source validation passed package EditMode and PlayMode self-test lanes across Unity `2022.3` and `6000.x` consumer projects, including deterministic scene-open self-tests. |
+| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.38`. |
 | Historical Git UPM release smoke | Clean Unity project pinned to an earlier public tag | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package self-tests passed, and closeout verified process exit. |
 | Multi-project compile matrix | Public summary evidence from consumer validation | `9/9` projects, `38/38` compile lanes, `0` failures |
-| Git tag visibility | Remote Git refs | Release tag `v0.3.37` is visible on `origin` for Git UPM consumers. |
+| Git tag visibility | Remote Git refs | Release tag `v0.3.38` is the current Git UPM release target; remote publication requires an authenticated push. |
 
 Cross-platform status:
 
@@ -206,7 +208,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.37"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38"
   }
 }
 ```
@@ -232,7 +234,7 @@ Rules:
 
 - `devmode` points a Unity project at the local package working tree.
 - `prodmode` pins the Unity project to the published release tag that matches
-  the package version, for example `#v0.3.37`.
+  the package version, for example `#v0.3.38`.
 - `prodmode` refuses to pin when that release tag is not visible on `origin`.
 - both modes remove the package lock entry so Unity re-resolves honestly.
 

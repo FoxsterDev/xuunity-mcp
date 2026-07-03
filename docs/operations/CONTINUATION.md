@@ -79,6 +79,7 @@ Unity bridge:
 - edit-mode test execution
 - console tail
 - scene snapshot
+- scene open for deterministic Edit Mode scene setup
 - play mode control
 - Game View configure and screenshot
 - scenario validation
@@ -86,6 +87,7 @@ Unity bridge:
 - persisted scenario results
 
 Scenario second-wave steps:
+- `scene_open`
 - `compile_player_scripts`
 - `tests_run_editmode`
 - `game_view_configure`

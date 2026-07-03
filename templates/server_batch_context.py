@@ -48,6 +48,7 @@ MUTATING_BRIDGE_OPERATIONS = frozenset(
         "unity.package.install_test_framework",
         "unity.build_player",
         "unity.playmode.set",
+        "unity.scene.open",
         "unity.build_target.switch",
         "unity.editor.quit",
     }

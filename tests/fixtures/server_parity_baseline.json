@@ -118,7 +118,7 @@
       "request-scenario-run-and-wait",
       "batch-compile"
     ],
-    "root_command_count": 64,
+    "root_command_count": 65,
     "root_commands": [
       "setup-plan",
       "setup-apply",
@@ -142,6 +142,7 @@
       "request-build-target-switch",
       "request-build-player",
       "request-scene-assert",
+      "request-scene-open",
       "request-console-grep",
       "request-loading-timing",
       "request-editor-quit",
@@ -187,8 +188,8 @@
     ]
   },
   "mcp_tools_list": {
-  "sha256": "fbad78e3a7fa9e436e44963c0963f4790f9a7c35c8f973999fd818e10948392a",
-    "tool_count": 44,
+  "sha256": "bae0f330532c0d901aceaac5c7f5b5e4ebde2b9bd1b2d9eb592cf147f94500f8",
+    "tool_count": 45,
     "tool_names": [
       "xuunity_setup_plan",
       "xuunity_setup_apply",
@@ -215,6 +216,7 @@
       "unity_console_grep",
       "unity_loading_timing",
       "unity_scene_snapshot",
+      "unity_scene_open",
       "unity_scene_assert",
       "unity_tests_run_editmode",
       "unity_tests_run_playmode",

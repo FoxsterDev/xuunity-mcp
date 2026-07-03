@@ -40,6 +40,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     return ProcessNestedOperationStep("unity.health.probe", "{}", stepResult);
                 case "scene_snapshot":
                     return ProcessNestedOperationStep("unity.scene.snapshot", "{}", stepResult);
+                case "scene_open":
+                    return ProcessSceneOpenStep(step, stepResult);
                 case "assert_scene":
                     return ProcessAssertSceneStep(step, stepResult);
                 case "project_refresh":

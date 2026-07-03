@@ -346,6 +346,19 @@ def cmd_request_scene_assert(args):
     print_json(response)
 
 
+def cmd_request_scene_open(args):
+    response = invoke_bridge(
+        args.project_root,
+        "unity.scene.open",
+        {
+            "scenePath": args.scene_path or "",
+            "allowDirtySceneDiscard": args.allow_dirty_scene_discard,
+        },
+        args.timeout_ms,
+    )
+    print_json(response)
+
+
 def cmd_request_console_grep(args):
     project_root = ensure_project_root(args.project_root)
     source = str(getattr(args, "source", "console") or "console")

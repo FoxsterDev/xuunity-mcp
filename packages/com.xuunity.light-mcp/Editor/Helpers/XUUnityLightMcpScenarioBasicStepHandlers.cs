@@ -108,6 +108,42 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return true;
         }
 
+        public static bool ProcessSceneOpenStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
+        {
+            var args = new XUUnityLightMcpSceneOpenArgs
+            {
+                scenePath = step.scenePath,
+                allowDirtySceneDiscard = step.allowDirtySceneDiscard,
+            };
+
+            var response = ExecuteNestedOperation("unity.scene.open", JsonUtility.ToJson(args));
+            ApplyNestedResponse(stepResult, response, DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+            if (response == null || response.status != "ok")
+            {
+                return true;
+            }
+
+            var payload = string.IsNullOrWhiteSpace(response.payload_json)
+                ? null
+                : JsonUtility.FromJson<XUUnityLightMcpSceneOpenPayload>(response.payload_json);
+
+            stepResult.payload_json = response.payload_json ?? "";
+            if (payload != null && string.Equals(payload.status, "passed", StringComparison.OrdinalIgnoreCase))
+            {
+                stepResult.status = "passed";
+                stepResult.outcome = payload.outcome;
+                return true;
+            }
+
+            stepResult.status = "failed";
+            stepResult.error_code = "scene_open_failed";
+            stepResult.error_message = string.IsNullOrWhiteSpace(payload?.failure_reason)
+                ? "Scene open failed."
+                : payload.failure_reason;
+            stepResult.outcome = string.IsNullOrWhiteSpace(payload?.outcome) ? "scene_open_failed" : payload.outcome;
+            return true;
+        }
+
         public static bool ProcessConsoleTailStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
         {
             var args = new XUUnityLightMcpConsoleTailArgs

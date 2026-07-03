@@ -213,6 +213,13 @@ def build_parser() -> argparse.ArgumentParser:
     scene_assert_cmd.add_argument("--timeout-ms", type=int, default=5000)
     scene_assert_cmd.set_defaults(func_name="cmd_request_scene_assert")
 
+    scene_open_cmd = sub.add_parser("request-scene-open", help="Open a project-relative Assets/... Unity scene through the active bridge transport.")
+    scene_open_cmd.add_argument("--project-root", required=True)
+    scene_open_cmd.add_argument("--scene-path", required=True)
+    scene_open_cmd.add_argument("--allow-dirty-scene-discard", action="store_true")
+    scene_open_cmd.add_argument("--timeout-ms", type=int, default=10000)
+    scene_open_cmd.set_defaults(func_name="cmd_request_scene_open")
+
     console_grep_cmd = sub.add_parser("request-console-grep", help="Search recent Unity console messages or the path-backed Editor.log tail.")
     console_grep_cmd.add_argument("--project-root", required=True)
     console_grep_cmd.add_argument("--pattern", required=True)

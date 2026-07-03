@@ -454,7 +454,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.37
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -462,7 +462,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.37"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38"
   }
 }
 ```
@@ -662,7 +662,7 @@ Popular MCP tools:
 `unity_license_capabilities` |
 `unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
 `unity_console_tail` | `unity_console_grep` | `unity_loading_timing` |
-`unity_scene_snapshot` | `unity_scene_assert` |
+`unity_scene_snapshot` | `unity_scene_open` | `unity_scene_assert` |
 `unity_compile_player_scripts` | `unity_compile_matrix` |
 `unity_compile_build_config_matrix` | `unity_tests_run_editmode` |
 `unity_tests_run_playmode` | `unity_playmode_state` | `unity_playmode_set` |
@@ -682,14 +682,17 @@ Host helper commands include `setup-plan`, `setup-apply`, `uninstall-plan`,
 `recover-editor-session`, `batch-compile`, `batch-compile-matrix`,
 `batch-editmode-tests`, `batch-build-config-compile-matrix`,
 `batch-build-player`, `project-action-list`, `project-action-invoke`,
-`project-hook-scaffold`, `request-console-grep`, `request-loading-timing`,
-`artifact-register`,
+`project-hook-scaffold`, `request-scene-open`, `request-console-grep`,
+`request-loading-timing`, `artifact-register`,
 `artifact-write-report`, `artifact-probe`, `devmode`, and `prodmode`.
 
 Scenario JSON may use Unity-native `project_action` steps for catalog-backed
 project actions. Unity resolves `project_actions.yaml`, enforces mutation
 approval, and executes the matching `project_defined_hook`; the host wrapper
 also performs the same normalization before dispatch as an early diagnostic.
+Scenario JSON may also use `scene_open` with `scenePath` to make boot-flow and
+scene-normalization validation independent of the editor's currently open
+scene; dirty scene discard must be requested explicitly.
 `unity_scenario_run_and_wait` returns a compact decision envelope by default;
 use `includeFullPayload=true` or the emitted `full_payload_tool_arguments` when
 asserting raw per-step `payload_json`, `hook_name`, or parity-fixture fields.

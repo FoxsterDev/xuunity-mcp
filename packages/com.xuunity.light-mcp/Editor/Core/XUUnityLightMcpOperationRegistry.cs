@@ -27,6 +27,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.console.tail", new XUUnityLightMcpConsoleTailOperation() },
             { "unity.console.grep", new XUUnityLightMcpConsoleGrepOperation() },
             { "unity.scene.snapshot", new XUUnityLightMcpSceneSnapshotOperation() },
+            { "unity.scene.open", new XUUnityLightMcpSceneOpenOperation() },
             { "unity.scene.assert", new XUUnityLightMcpSceneAssertOperation() },
             { "unity.playmode.state", new XUUnityLightMcpPlayModeStateOperation() },
             { "unity.playmode.set", new XUUnityLightMcpPlayModeSetOperation() },

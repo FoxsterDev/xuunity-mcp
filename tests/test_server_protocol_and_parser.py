@@ -62,6 +62,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "request-compile",
                 "request-build-player",
                 "request-editmode-tests",
+                "request-scene-open",
                 "ensure-ready",
                 "recover-editor-session",
                 "batch-compile",
@@ -96,6 +97,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_sdk_dependency_verify", tool_names)
         self.assertIn("unity_console_grep", tool_names)
         self.assertIn("unity_loading_timing", tool_names)
+        self.assertIn("unity_scene_open", tool_names)
         self.assertIn("unity_scenario_run_and_wait", tool_names)
         self.assertIn("unity_scenario_results_list", tool_names)
         self.assertIn("unity_scenario_result_latest", tool_names)
@@ -109,8 +111,66 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("includeFullPayload", compile_tool["inputSchema"]["properties"])
         console_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_console_grep")
         self.assertIn("source", console_tool["inputSchema"]["properties"])
+        scene_open_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_scene_open")
+        self.assertIn("scenePath", scene_open_tool["inputSchema"]["properties"])
+        self.assertIn("allowDirtySceneDiscard", scene_open_tool["inputSchema"]["properties"])
         scenario_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_scenario_run_and_wait")
         self.assertIn("includeStepPayloads", scenario_tool["inputSchema"]["properties"])
+
+    def test_scene_open_tool_invokes_bridge_with_scene_args(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir) / "FakeProject"
+            project_root.mkdir()
+            calls: list[tuple[str, str, dict[str, object], int]] = []
+
+            def fake_invoke_bridge(
+                project_root_value: str,
+                operation: str,
+                operation_args: dict[str, object],
+                timeout_ms: int,
+            ) -> dict[str, object]:
+                calls.append((project_root_value, operation, dict(operation_args), timeout_ms))
+                return {
+                    "status": "ok",
+                    "payload_type": "unity.scene.open",
+                    "payload_json": json.dumps(
+                        {
+                            "status": "passed",
+                            "opened": True,
+                            "requested_scene_path": "Assets/Scenes/Splash.unity",
+                        }
+                    ),
+                }
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+            ):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 42,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_scene_open",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "scenePath": "Assets/Scenes/Splash.unity",
+                                "allowDirtySceneDiscard": True,
+                                "timeoutMs": 10000,
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual(1, len(calls))
+        _, operation, args, timeout_ms = calls[0]
+        self.assertEqual("unity.scene.open", operation)
+        self.assertEqual("Assets/Scenes/Splash.unity", args["scenePath"])
+        self.assertTrue(args["allowDirtySceneDiscard"])
+        self.assertEqual(10000, timeout_ms)
 
     def test_unity_console_grep_source_editor_log_reads_path_backed_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

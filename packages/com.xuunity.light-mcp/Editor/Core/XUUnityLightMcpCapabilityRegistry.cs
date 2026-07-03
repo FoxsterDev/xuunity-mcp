@@ -41,6 +41,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.console.tail", CoreCapability },
             { "unity.console.grep", CoreCapability },
             { "unity.scene.snapshot", CoreCapability },
+            { "unity.scene.open", CoreCapability },
             { "unity.scene.assert", CoreCapability },
             { "unity.scenario.validate", CoreCapability },
             { "unity.scenario.run", CoreCapability },

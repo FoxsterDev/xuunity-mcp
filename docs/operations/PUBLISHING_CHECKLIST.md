@@ -18,6 +18,9 @@ Release is blocked until all of the following are true:
   been run
 - `python3 scripts/testing/check_release_version_consistency.py` passes
 - `python3 scripts/testing/check_release_docs_freshness.py` passes
+- `python3 scripts/testing/check_public_release_safety.py` passes, with any
+  host-local project names listed only in a gitignored local denylist or in
+  `XUUNITY_PUBLIC_SAFETY_DENYLIST`
 - the freshness audit for the current release has checked `git log
   --oneline --decorate --since=<last-public-doc-refresh>`, the top
   `CHANGELOG.md` release section, `README.md`, `docs/reference/FEATURES.md`,
@@ -51,6 +54,7 @@ Minimum release closeout sequence:
 python3 scripts/tools/sync_release_version.py --version <next-version>
 python3 scripts/testing/check_release_version_consistency.py
 python3 scripts/testing/check_release_docs_freshness.py
+python3 scripts/testing/check_public_release_safety.py
 bash init_xuunity_light_unity_mcp.sh --target both --force
 scripts/testing/run_host_python_tests.sh
 scripts/testing/run_site_ui_checks.sh

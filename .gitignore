@@ -115,4 +115,6 @@ InitTestScene*.unity*
 # XUUnity Light MCP setup plans (may contain private paths)
 xuunity-setup-plan.json
 *-setup-plan.json
+.xuunity-public-safety-denylist
+.public-safety-denylist
 .idea
