@@ -102,7 +102,7 @@ def build_ensure_ready_summary(
             "--include-full-payload",
         ],
         "full_payload_command": (
-            f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --include-full-payload"
+            f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --include-full-payload"
         ),
         "verdict": "ready" if health_status == "healthy" else "degraded",
         "succeeded": health_status == "healthy",
@@ -136,7 +136,7 @@ def build_ensure_ready_summary(
             "--include-full-payload",
         ],
         "full_payload_recovery_command": (
-            f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} "
+            f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} "
             "--open-editor --include-full-payload"
         ),
     }
@@ -156,13 +156,19 @@ def build_ensure_ready_summary(
         summary["playmode_hint"] = {
             "state": playmode_state,
             "message": "Editor is currently in Play Mode; exit Play Mode before edit/build work.",
-            "command": f"xuunity_light_unity_mcp.sh request-playmode-set --project-root {project_root} --action exit",
+            "command": (
+                f"xuunity_light_unity_mcp.sh request-playmode-set "
+                f"--project-root {project_root.as_posix()} --action exit"
+            ),
         }
     elif playmode_state == "playing":
         summary["playmode_hint"] = {
             "state": playmode_state,
             "message": "Editor is currently in Play Mode.",
-            "command": f"xuunity_light_unity_mcp.sh request-playmode-set --project-root {project_root} --action exit",
+            "command": (
+                f"xuunity_light_unity_mcp.sh request-playmode-set "
+                f"--project-root {project_root.as_posix()} --action exit"
+            ),
         }
 
     if next_action and next_action != "none":
@@ -170,7 +176,7 @@ def build_ensure_ready_summary(
             summary["recovery_command"] = summary["playmode_hint"]["command"]
         else:
             summary["recovery_command"] = (
-                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor"
+                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --open-editor"
             )
 
     return summary

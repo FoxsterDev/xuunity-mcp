@@ -5,7 +5,7 @@ import types
 import sys
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest import mock
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
@@ -1057,6 +1057,15 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertEqual("ensure_ready_or_recover_bridge", details["recommended_next_action"])
         self.assertIn("ensure-ready --project-root /tmp/FakeProject --open-editor", details["recommended_recovery_command"])
         self.assertNotIn("request-final-status", details["recommended_recovery_command"])
+
+    def test_recommended_recovery_command_uses_posix_path_separators_for_shell(self) -> None:
+        command = server.recommended_recovery_command_for_project(
+            PureWindowsPath("C:/tmp/FakeProject"),
+            "ensure_ready_or_recover_bridge",
+        )
+
+        self.assertIn("ensure-ready --project-root C:/tmp/FakeProject --open-editor", command)
+        self.assertNotIn("\\", command)
 
     def test_recover_project_bridge_for_reconciliation_raises_guided_bridge_disabled_error(self) -> None:
         context = types.SimpleNamespace(

@@ -641,7 +641,7 @@ def recommended_recovery_command_for_project(project_root: Path, next_action: st
     template = DISCOVERY_NEXT_ACTION_COMMANDS.get(str(next_action or "").strip())
     if not template:
         return ""
-    return template.format(project_root=str(project_root))
+    return template.format(project_root=project_root.as_posix())
 
 
 def enrich_error_details_with_discovery(project_root: Path, details: dict[str, Any] | None = None) -> dict[str, Any]:

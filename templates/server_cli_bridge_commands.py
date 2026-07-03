@@ -721,7 +721,7 @@ def cmd_ensure_ready(args):
             details["recommended_next_action"] = "reopen_project_for_clean_resolve"
             details["next_distinct_action"] = "close_and_reopen_unity_to_resolve_package"
             details["recommended_recovery_command"] = (
-                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor"
+                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --open-editor"
             )
             details["live_project_editor_pids"] = live_editor_pids
         raise enrich_tool_invocation_error_with_discovery(
