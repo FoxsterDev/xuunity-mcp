@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- `transport_response_missing` errors now embed a compact final-status
+  projection instead of the full final-status/artifact payload, while preserving
+  the `request-final-status` command for full evidence recovery.
+- Discovery-enriched stale-session transport failures now replace generic retry
+  recovery commands with the actionable `ensure-ready --open-editor` command
+  when host/session evidence proves recovery is needed before retrying.
+
 ## 0.3.35
 
 Release tag: `v0.3.35`

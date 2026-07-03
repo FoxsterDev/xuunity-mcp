@@ -1179,6 +1179,52 @@ class BridgeRuntimeTests(unittest.TestCase):
             self.assertEqual("wrapper_failed_unity_unproven", error.details["request_final_status"]["result_trust_class"])
             self.assertEqual(1, error.details["safe_retry_budget_total"])
 
+    def test_transport_response_missing_embeds_compact_final_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir)
+            request_id = "req-transport-missing"
+            journal_dir = project_root / "Library" / "XUUnityLightMcp" / "journal" / "requests"
+            write_json(
+                journal_dir / "01_request_submitted.json",
+                {
+                    "event_id": "01",
+                    "event_type": "request_submitted",
+                    "event_at_utc": "2026-07-02T10:00:00Z",
+                    "request_id": request_id,
+                    "operation": "unity.status",
+                    "transport": "tcp_loopback",
+                    "bridge_generation": 12,
+                    "bridge_session_id": "session-a",
+                },
+            )
+
+            error = server_bridge_runtime.build_transport_response_missing_tool_error(
+                project_root,
+                request_id=request_id,
+                operation="unity.status",
+                transport="tcp_loopback",
+                current_state={
+                    "bridge_generation": 12,
+                    "bridge_session_id": "session-a",
+                    "transport": "tcp_loopback",
+                    "transport_listener_state": "listening",
+                    "health_status": "healthy",
+                    "pending_request_count": 0,
+                },
+            )
+
+            self.assertEqual("transport_response_missing", error.code)
+            self.assertEqual("compact_transport_failure", error.details["request_final_status_payload_mode"])
+            self.assertTrue(error.details["full_payload_available"])
+            self.assertIn("request-final-status", error.details["full_payload_recovery_command"])
+            final_status = error.details["request_final_status"]
+            self.assertEqual("compact_final_status", final_status["payload_mode"])
+            self.assertEqual(request_id, final_status["request_id"])
+            self.assertFalse(final_status["request_observed_in_unity_journal"])
+            self.assertEqual("request_not_observed", final_status["result_trust_class"])
+            self.assertNotIn("journal_event_paths", final_status)
+            self.assertNotIn("artifact_manifest", final_status)
+
 
 if __name__ == "__main__":
     unittest.main()

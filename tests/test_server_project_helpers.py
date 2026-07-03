@@ -1010,6 +1010,40 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertIn("init_xuunity_light_unity_mcp.sh", details["recommended_recovery_command"])
         self.assertEqual(["bridge_disabled"], details["host_prerequisites"]["blocking_codes"])
 
+    def test_enrich_error_details_replaces_stale_final_status_command_with_ensure_ready(self) -> None:
+        context = types.SimpleNamespace(
+            discovery_details={
+                "host_health_classification": "stale",
+                "host_health_reason": "heartbeat_stale_without_progress_evidence",
+                "host_health_recommended_next_action": "ensure_ready_or_recover_bridge",
+                "discovery_classification": "host_session_live",
+                "discovery_reason": "live_editor_without_live_bridge_state",
+                "authoritative_state_source": "host_editor_session",
+                "reconciliation_case": "stale_bridge_and_host_session",
+                "reconciliation_status": "degraded",
+                "reconciliation_reason": "stale_host_session_with_unobserved_request",
+                "reconciliation_recommended_next_action": "recover_editor_session",
+                "detected_editor_count": 1,
+                "detected_editor_pids": [1234],
+            }
+        )
+        registry = types.SimpleNamespace(refresh_context=lambda _: context)
+
+        with mock.patch.object(server, "_BRIDGE_REGISTRY", registry):
+            details = server.enrich_error_details_with_discovery(
+                Path("/tmp/FakeProject"),
+                {
+                    "recommended_next_action": "retry_request",
+                    "recommended_recovery_command": (
+                        "request-final-status --project-root /tmp/FakeProject --request-id req-1"
+                    ),
+                },
+            )
+
+        self.assertEqual("ensure_ready_or_recover_bridge", details["recommended_next_action"])
+        self.assertIn("ensure-ready --project-root /tmp/FakeProject --open-editor", details["recommended_recovery_command"])
+        self.assertNotIn("request-final-status", details["recommended_recovery_command"])
+
     def test_recover_project_bridge_for_reconciliation_raises_guided_bridge_disabled_error(self) -> None:
         context = types.SimpleNamespace(
             discovery_details={

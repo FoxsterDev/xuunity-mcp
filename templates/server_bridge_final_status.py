@@ -193,6 +193,51 @@ def build_operator_verdict(
     }
 
 
+def build_compact_final_status_projection(final_status: dict[str, Any]) -> dict[str, Any]:
+    stabilization = dict(final_status.get("bridge_stabilization") or {})
+    operator_verdict = dict(final_status.get("operator_verdict") or {})
+    compact: dict[str, Any] = {
+        "payload_mode": "compact_final_status",
+        "request_id": str(final_status.get("request_id") or ""),
+        "operation": str(final_status.get("operation") or ""),
+        "request_submitted": bool(final_status.get("request_submitted")),
+        "request_started": bool(final_status.get("request_started")),
+        "request_completed": bool(final_status.get("request_completed")),
+        "request_observed_in_unity_journal": bool(final_status.get("request_observed_in_unity_journal")),
+        "operation_outcome": str(final_status.get("operation_outcome") or ""),
+        "result_trust_class": str(final_status.get("result_trust_class") or ""),
+        "recommended_next_action": str(final_status.get("recommended_next_action") or ""),
+        "retryable": bool(final_status.get("retryable")),
+        "bridge_changed_since_submission": bool(final_status.get("bridge_changed_since_submission")),
+        "recovery_gap_detected": bool(final_status.get("recovery_gap_detected")),
+        "journal_event_count": int(final_status.get("journal_event_count") or 0),
+        "last_event_type": str(final_status.get("last_event_type") or ""),
+        "last_event_at_utc": str(final_status.get("last_event_at_utc") or ""),
+        "safe_retry_budget_total": int(final_status.get("safe_retry_budget_total") or 0),
+        "safe_retry_budget_remaining": int(final_status.get("safe_retry_budget_remaining") or 0),
+        "safe_retry_budget_exhausted": bool(final_status.get("safe_retry_budget_exhausted")),
+        "safe_retry_budget_blocked": bool(final_status.get("safe_retry_budget_blocked")),
+        "bridge_stabilization": {
+            "bridge_generation": int(stabilization.get("bridge_generation") or 0),
+            "bridge_session_id": str(stabilization.get("bridge_session_id") or ""),
+            "transport": str(stabilization.get("transport") or ""),
+            "health_status": str(stabilization.get("health_status") or ""),
+            "transport_listener_state": str(stabilization.get("transport_listener_state") or ""),
+            "request_flow_state": str(stabilization.get("request_flow_state") or ""),
+            "stabilized": bool(stabilization.get("stabilized")),
+            "safe_to_retry": bool(stabilization.get("safe_to_retry")),
+            "blocking_reasons": list(stabilization.get("blocking_reasons") or []),
+        },
+    }
+    if operator_verdict:
+        compact["operator_verdict"] = {
+            "status": str(operator_verdict.get("status") or ""),
+            "should_retry": bool(operator_verdict.get("should_retry")),
+            "next_action": str(operator_verdict.get("next_action") or ""),
+        }
+    return compact
+
+
 def build_request_final_status(
     project_root: Path,
     request_id: str,
@@ -860,6 +905,7 @@ def build_transport_response_missing_tool_error(
         current_state=current_state,
         poll_timeout_ms=poll_timeout_ms,
     )
+    compact_final_status = build_compact_final_status_projection(final_status)
     stabilization = final_status.get("bridge_stabilization") or {}
     operation_outcome = str(final_status.get("operation_outcome") or "unknown")
     result_trust_class = str(final_status.get("result_trust_class") or "")
@@ -900,7 +946,10 @@ def build_transport_response_missing_tool_error(
         "recommended_recovery_command": recommended_recovery_command,
         "retryable": bool(final_status.get("retryable")) if request_processed else True,
         "request_processed": request_processed,
-        "request_final_status": final_status,
+        "request_final_status": compact_final_status,
+        "request_final_status_payload_mode": "compact_transport_failure",
+        "full_payload_available": True,
+        "full_payload_recovery_command": recommended_recovery_command,
         "bridge_stabilization": stabilization,
         "safe_retry_budget_total": int(final_status.get("safe_retry_budget_total") or 0),
         "safe_retry_budget_remaining": int(final_status.get("safe_retry_budget_remaining") or 0),

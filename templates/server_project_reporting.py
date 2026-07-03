@@ -273,7 +273,10 @@ def enrich_error_details_with_discovery_data(
         enriched["recommended_next_action"] = preferred_next_action
 
     next_action = str(enriched.get("recommended_next_action") or "")
-    if next_action and not str(enriched.get("recommended_recovery_command") or ""):
+    if next_action and (
+        not str(enriched.get("recommended_recovery_command") or "")
+        or (preferred_next_action and next_action != current_next_action)
+    ):
         command = recommended_recovery_command_for_project(project_root, next_action)
         if command:
             enriched["recommended_recovery_command"] = command
