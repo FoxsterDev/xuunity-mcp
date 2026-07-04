@@ -10,6 +10,8 @@ from typing import Any
 PACKAGE_NAME = "com.xuunity.light-mcp"
 VERSION_RE = re.compile(r"\b(?:v)?(\d+\.\d+\.\d+)\b")
 
+ROOT_PACKAGE_JSON = Path("package.json")
+ROOT_PACKAGE_LOCK = Path("package-lock.json")
 PACKAGE_JSON = Path("packages") / PACKAGE_NAME / "package.json"
 PACKAGE_MANIFESTS = (
     Path("templates") / "package-manifests" / "unity-package-2021_2022.json",
@@ -70,6 +72,20 @@ def server_info_version(source_root: Path, relative_path: Path) -> str:
 
 def check_metadata_versions(source_root: Path, version: str) -> list[str]:
     errors: list[str] = []
+    root_package_path = source_root / ROOT_PACKAGE_JSON
+    if root_package_path.is_file():
+        root_version = str(read_json(root_package_path).get("version") or "").strip()
+        if root_version != version:
+            errors.append(f"{ROOT_PACKAGE_JSON}: version is {root_version!r}, expected {version!r}")
+    root_lock_path = source_root / ROOT_PACKAGE_LOCK
+    if root_lock_path.is_file():
+        lock_payload = read_json(root_lock_path)
+        lock_version = str(lock_payload.get("version") or "").strip()
+        if lock_version != version:
+            errors.append(f"{ROOT_PACKAGE_LOCK}: version is {lock_version!r}, expected {version!r}")
+        lock_root_version = str(((lock_payload.get("packages") or {}).get("") or {}).get("version") or "").strip()
+        if lock_root_version != version:
+            errors.append(f"{ROOT_PACKAGE_LOCK}: packages[''].version is {lock_root_version!r}, expected {version!r}")
     for relative_path in SERVER_INFO_TEMPLATES:
         if not (source_root / relative_path).is_file():
             continue

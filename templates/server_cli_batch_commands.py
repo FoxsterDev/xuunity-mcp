@@ -77,6 +77,7 @@ def cmd_batch_build_player(args):
         progress_stdout=progress_stdout_enabled(args),
         batch_fallback_mode=getattr(args, "batch_fallback_mode", "auto"),
         refresh_license=bool(getattr(args, "refresh_license", False)),
+        output_mode=getattr(args, "output", "full"),
         gui_operation="unity.build_player",
         gui_operation_args={
             "buildTarget": build_target,

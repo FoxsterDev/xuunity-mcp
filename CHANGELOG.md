@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## 0.3.39
+
+Release tag: `v0.3.39`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.39
+```
+
+### Changed
+
+- Released `v0.3.39` package metadata, server metadata, package manifests, and Git UPM examples.
+- Added `--output compact|full` to batch helper CLI commands, including
+  `batch-compile`, `batch-compile-matrix`,
+  `batch-build-config-compile-matrix`, `batch-editmode-tests`, and
+  `batch-build-player`. The default remains `full`; compact output emits the
+  decision summary and artifact pointers without the full command vector or
+  nested batch payload.
+
+### Validation
+
+- Release version consistency, release-doc freshness, and public-release safety
+  checks passed for `0.3.39`.
+- Host Python unittest suite: `291` tests passed with `1` expected skip.
+- Public site Playwright checks passed: `39/39`.
+- Compact batch helper dry-run output was validated against two local consumer
+  projects, and full dry-run output still preserved the legacy command vector.
+
 ## 0.3.38
 
 Release tag: `v0.3.38`

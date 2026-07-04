@@ -828,6 +828,7 @@ def cmd_batch_compile(args):
         progress_stdout=progress_stdout_enabled(args),
         batch_fallback_mode=getattr(args, "batch_fallback_mode", "auto"),
         refresh_license=bool(getattr(args, "refresh_license", False)),
+        output_mode=getattr(args, "output", "full"),
         gui_operation="unity.compile.player_scripts",
         gui_operation_args={
             "name": args.name,
@@ -892,6 +893,7 @@ def cmd_batch_compile_matrix(args):
         progress_stdout=progress_stdout_enabled(args),
         batch_fallback_mode=getattr(args, "batch_fallback_mode", "auto"),
         refresh_license=bool(getattr(args, "refresh_license", False)),
+        output_mode=getattr(args, "output", "full"),
         gui_operation="unity.compile.matrix",
         gui_operation_args=load_json_file(str(config_file), "compile_matrix_config_invalid"),
     )
@@ -969,6 +971,7 @@ def cmd_batch_build_config_compile_matrix(args):
             progress_stdout=progress_stdout_enabled(args),
             batch_fallback_mode=getattr(args, "batch_fallback_mode", "auto"),
             refresh_license=bool(getattr(args, "refresh_license", False)),
+            output_mode=getattr(args, "output", "full"),
             gui_operation="unity.compile.matrix",
             gui_operation_args=compile_plan["matrixArgs"],
         )
@@ -1041,6 +1044,7 @@ def cmd_batch_editmode_tests(args):
         progress_stdout=progress_stdout_enabled(args),
         batch_fallback_mode=getattr(args, "batch_fallback_mode", "auto"),
         refresh_license=bool(getattr(args, "refresh_license", False)),
+        output_mode=getattr(args, "output", "full"),
         gui_operation="unity.tests.run_editmode",
         gui_operation_args={
             "testNames": list(args.test_names or []) or None,

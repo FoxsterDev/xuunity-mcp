@@ -66,7 +66,7 @@ survival and more about:
 
 Already implemented:
 
-- standalone public repository and current `v0.3.38` Git UPM package path under
+- standalone public repository and current `v0.3.39` Git UPM package path under
   `packages/com.xuunity.light-mcp`
 - bridge enable/disable lifecycle
 - status and capability probing
@@ -147,7 +147,7 @@ This is enough for:
 - controlled screenshot capture
 - early automation experiments
 - repeatable same-host multi-project routing and recovery
-- production Git UPM consumption through `v0.3.38`
+- production Git UPM consumption through `v0.3.39`
 
 This is not yet enough for:
 
@@ -198,7 +198,7 @@ Most valuable next milestone:
 
 Why this is next:
 
-- `v0.3.12` moved the package to the registry-native path and `v0.3.38` is the
+- `v0.3.12` moved the package to the registry-native path and `v0.3.39` is the
   current public Git UPM line
 - macOS validation is strong enough for current same-host use
 - Linux and Windows claims should remain conservative until executed on those hosts
@@ -277,12 +277,13 @@ Current progress:
   progress JSONL sidecars, generic artifact probe summaries, tracked workspace
   side-effect accounting, project-defined hook summary promotion, and
   `operator_verdict` final-status wording
+- `v0.3.39` adds opt-in compact batch helper CLI output through
+  `--output compact`, preserving full output as the default compatibility mode
 - compact-by-default scenario, refresh, compile, build-config compile, direct
   test, and MCP status-summary envelopes are now shipped with full-payload
   recovery paths
-- remaining value in this phase is summary polish for batch/multi-project
-  ceilings, broader proof, and surfacing evidence consistently across more
-  operator flows
+- remaining value in this phase is summary polish for multi-project ceilings,
+  broader proof, and surfacing evidence consistently across more operator flows
 
 Exit criteria:
 - a failed or timed-out run leaves enough structured evidence for a new chat to continue without journal archaeology

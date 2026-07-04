@@ -20,9 +20,13 @@ Partially implemented after this retro:
 - `unity_status_summary` now defaults to a compact MCP polling summary and
   keeps nested discovery, transport, state-group, timing, and artifact details
   behind `includeFullPayload=true`.
+- Batch helper CLI commands now accept `--output compact|full`. The default
+  remains `full` for compatibility, while compact mode emits the batch decision
+  summary and artifact pointers without the full command vector or nested batch
+  payload.
 
-Remaining backlog: add compact ceilings for batch/multi-project summaries, add
-a token ledger, and define fast-path profiles.
+Remaining backlog: add compact ceilings for multi-project summaries, add a
+token ledger, and define fast-path profiles.
 
 ## 1. Executive summary
 

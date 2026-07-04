@@ -36,7 +36,7 @@ REQUIRED_MARKERS: dict[Path, tuple[str, ...]] = {
         "run.ps1",
     ),
     Path("docs") / "reference" / "STATUS.md": (
-        "v{version}+` makes `unity_status_summary` compact",
+        "unity_status_summary` compact",
         "unity_project_action_invoke",
         "unity_artifact_write_report",
         "Remote Git refs",
@@ -68,7 +68,7 @@ REQUIRED_MARKERS: dict[Path, tuple[str, ...]] = {
         "XUUnity repo-local evidence refreshed",
         "Git UPM available",
         "Compact MCP envelopes",
-        "279` tests",
+        "291` tests",
     ),
     Path("packages") / "com.xuunity.light-mcp" / "Documentation~" / "README.md": (
         "catalog-backed `project_action`",

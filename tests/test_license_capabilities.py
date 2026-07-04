@@ -12,6 +12,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server
+import server_batch_reporting
 import server_license
 
 
@@ -162,6 +163,68 @@ class LicenseCapabilitiesTests(unittest.TestCase):
             gui_fallback.assert_called_once()
             self.assertEqual("gui", payload["effective_execution_lane"])
             self.assertEqual("no_valid_editor_license", payload["lane_fallback_reason"])
+
+    def test_run_batch_operation_compact_dry_run_omits_command_vector(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir)
+            payload = {
+                "action": "batch_compile_player_scripts",
+                "project_root": str(project_root),
+                "build_target": "Android",
+                "result_file": str(project_root / "result.json"),
+                "log_path": str(project_root / "batch.log"),
+                "command": ["/Applications/Unity.app/Contents/MacOS/Unity", "-projectPath", str(project_root)],
+                "dry_run": True,
+            }
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                server.run_batch_operation(
+                    project_root=project_root,
+                    unity_app=Path("/Applications/FakeUnity.app"),
+                    command=list(payload["command"]),
+                    payload=payload,
+                    log_path=project_root / "batch.log",
+                    result_path=project_root / "result.json",
+                    dry_run=True,
+                    timeout_ms=30000,
+                    progress_stdout=False,
+                    batch_fallback_mode="auto",
+                    output_mode="compact",
+                )
+
+            compact = json.loads(stdout.getvalue())
+            self.assertEqual("compact_batch_cli", compact["payload_mode"])
+            self.assertEqual("batch_compile_player_scripts", compact["action"])
+            self.assertEqual("batch", compact["effective_execution_lane"])
+            self.assertEqual("Android", compact["build_target"])
+            self.assertTrue(compact["dry_run"])
+            self.assertNotIn("command", compact)
+
+    def test_compact_batch_cli_output_prefers_result_summary(self) -> None:
+        payload = {
+            "action": "batch_compile_matrix",
+            "succeeded": True,
+            "command": ["Unity", "-batchmode"],
+            "summary_file": "/tmp/summary.json",
+            "result_summary": {
+                "action": "batch_compile_matrix",
+                "transport_outcome": "batch_process_exited_cleanly",
+                "unity_outcome": "passed",
+                "succeeded": True,
+                "batch_exit_code": 0,
+                "matrix": {"status": "passed", "total": 2, "passed": 2, "failed": 0},
+                "result_file": "/tmp/result.json",
+                "raw_log_path": "/tmp/editor.log",
+            },
+        }
+
+        compact = server_batch_reporting.batch_cli_output_payload(payload, "compact")
+
+        self.assertEqual("compact_batch_cli", compact["payload_mode"])
+        self.assertEqual("passed", compact["unity_outcome"])
+        self.assertEqual({"status": "passed", "total": 2, "passed": 2, "failed": 0}, compact["matrix"])
+        self.assertEqual("/tmp/summary.json", compact["summary_file"])
+        self.assertNotIn("command", compact)
 
     def test_build_license_capabilities_cache_records_probe_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

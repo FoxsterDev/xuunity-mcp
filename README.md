@@ -454,7 +454,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.39
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -462,7 +462,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.39"
   }
 }
 ```
@@ -754,6 +754,9 @@ Troubleshooting:
   stayed in Unity batchmode.
   Use `--batch-fallback-mode require-batch` when a CI or release lane must fail
   unless real Unity batchmode is proven.
+  Use `--output compact` when an operator only needs the batch decision summary
+  and artifact pointers; the default `--output full` keeps the legacy command
+  vector and nested payload for deep debugging.
 - Long operation timed out: recover with `request-final-status`.
 - Closed-project batch refused because the editor is open: run
   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`,

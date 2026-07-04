@@ -10,6 +10,8 @@ from typing import Any
 PACKAGE_NAME = "com.xuunity.light-mcp"
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
+ROOT_PACKAGE_JSON = Path("package.json")
+ROOT_PACKAGE_LOCK = Path("package-lock.json")
 PACKAGE_JSON = Path("packages") / PACKAGE_NAME / "package.json"
 PACKAGE_MANIFESTS = (
     Path("templates") / "package-manifests" / "unity-package-2021_2022.json",
@@ -78,7 +80,7 @@ def validate_version(value: str) -> str:
 
 def update_package_metadata(source_root: Path, version: str) -> list[Path]:
     changed: list[Path] = []
-    for relative_path in (PACKAGE_JSON, *PACKAGE_MANIFESTS):
+    for relative_path in (ROOT_PACKAGE_JSON, PACKAGE_JSON, *PACKAGE_MANIFESTS):
         path = source_root / relative_path
         if not path.is_file():
             continue
@@ -86,6 +88,15 @@ def update_package_metadata(source_root: Path, version: str) -> list[Path]:
         payload["version"] = version
         if write_json(path, payload):
             changed.append(relative_path)
+    lock_path = source_root / ROOT_PACKAGE_LOCK
+    if lock_path.is_file():
+        payload = read_json(lock_path)
+        payload["version"] = version
+        root_package = payload.get("packages", {}).get("")
+        if isinstance(root_package, dict):
+            root_package["version"] = version
+        if write_json(lock_path, payload):
+            changed.append(ROOT_PACKAGE_LOCK)
     return changed
 
 

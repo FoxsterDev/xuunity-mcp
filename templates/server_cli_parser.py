@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import argparse
-from server_batch_reporting import DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS
+from server_batch_reporting import BATCH_OUTPUT_MODES, DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS
 from server_specs import STARTUP_POLICIES
 
 TEST_FRAMEWORK_REGRESSION_COMPILE_TARGET = "active"
@@ -16,6 +16,7 @@ def add_batch_operator_arguments(command_parser: argparse.ArgumentParser) -> Non
     command_parser.add_argument("--side-effect-mode", choices=["git", "off"], default="git")
     command_parser.add_argument("--side-effect-allow-file")
     command_parser.add_argument("--batch-fallback-mode", choices=["auto", "off", "require-batch"], default="auto")
+    command_parser.add_argument("--output", choices=BATCH_OUTPUT_MODES, default="full")
     command_parser.add_argument("--refresh-license", action="store_true")
     command_parser.add_argument(
         "--progress-interval-seconds",

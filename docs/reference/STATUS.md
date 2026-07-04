@@ -1,10 +1,10 @@
 # Status
 
-Date: `2026-07-03`
+Date: `2026-07-04`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
-for MCP-capable AI agents. The current released source line is `v0.3.38`.
+for MCP-capable AI agents. The current released source line is `v0.3.39`.
 
 ## Current Package
 
@@ -17,7 +17,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.39
 ```
 
 Current package path:
@@ -45,6 +45,8 @@ Migration note:
 - `v0.3.38+` makes `unity_status_summary` compact by default for MCP callers,
   with `payload_mode` markers and full nested diagnostics available through
   `includeFullPayload=true`.
+- `v0.3.39+` adds opt-in compact output for batch helper CLI commands through
+  `--output compact`, while preserving `--output full` as the default.
 - `v0.3.36+` makes `ensure-ready` compact by default,
   adds active editor-log identity and path-backed `editor_log` grep, removes
   duplicated scenario `run_start.steps` unless `includeStepPayloads=true`,
@@ -177,18 +179,18 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest source validation for `v0.3.38`:
+Latest source validation for `v0.3.39`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.38`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `python3 -m unittest discover -s tests` | `288` tests passed for `v0.3.38`, with one expected skip |
-| Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.38` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, PlayMode already-playing stale-risk summaries, and deterministic scene-open setup are documented with full-payload recovery. |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.39`, `unity=2021.3`, no hard Test Framework dependency |
+| Host Python tests | `python3 -m unittest discover -s tests` | `291` tests passed for `v0.3.39`, with one expected skip |
+| Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.39` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, PlayMode already-playing stale-risk summaries, deterministic scene-open setup, and opt-in compact batch helper output are documented with full-payload recovery. |
 | Package self-tests | Clean devmode projects on installed Unity editors | Current release-line source validation passed package EditMode and PlayMode self-test lanes across Unity `2022.3` and `6000.x` consumer projects, including deterministic scene-open self-tests. |
-| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.38`. |
+| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.39`. |
 | Historical Git UPM release smoke | Clean Unity project pinned to an earlier public tag | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package self-tests passed, and closeout verified process exit. |
 | Multi-project compile matrix | Public summary evidence from consumer validation | `9/9` projects, `38/38` compile lanes, `0` failures |
-| Git tag visibility | Remote Git refs | Release tag `v0.3.38` is the current Git UPM release target; remote publication requires an authenticated push. |
+| Git tag visibility | Remote Git refs | Release tag `v0.3.39` is the current Git UPM release target; remote publication requires an authenticated push. |
 
 Cross-platform status:
 
@@ -208,7 +210,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.38"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.39"
   }
 }
 ```
@@ -234,7 +236,7 @@ Rules:
 
 - `devmode` points a Unity project at the local package working tree.
 - `prodmode` pins the Unity project to the published release tag that matches
-  the package version, for example `#v0.3.38`.
+  the package version, for example `#v0.3.39`.
 - `prodmode` refuses to pin when that release tag is not visible on `origin`.
 - both modes remove the package lock entry so Unity re-resolves honestly.
 

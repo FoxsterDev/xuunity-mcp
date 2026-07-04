@@ -205,6 +205,7 @@ from server_batch_reporting import (
     DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS,
     BatchProgressReporter,
     attach_batch_summary_to_error,
+    batch_cli_output_payload,
     batch_summary_artifact_path,
     build_batch_execution_summary,
     build_batch_prepare_failure_summary,
@@ -284,7 +285,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.38",
+    "version": "0.3.39",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -2180,6 +2181,7 @@ def run_gui_fallback_operation(
     artifact_probe_config: dict[str, Any] | None = None,
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
+    output_mode: str = "full",
 ) -> None:
     return run_gui_fallback_operation_data(
         project_root=project_root,
@@ -2198,6 +2200,7 @@ def run_gui_fallback_operation(
         artifact_probe_config=artifact_probe_config,
         artifact_probe_path_override=artifact_probe_path_override,
         artifact_probe_warn_only=artifact_probe_warn_only,
+        output_mode=output_mode,
         batch_start_editor_state=batch_start_editor_state,
         gui_fallback_busy_reasons=gui_fallback_busy_reasons,
         ToolInvocationError=ToolInvocationError,
@@ -2221,6 +2224,7 @@ def run_gui_fallback_operation(
         build_batch_execution_summary=build_batch_execution_summary,
         attach_batch_lane_fields_to_summary=attach_batch_lane_fields_to_summary,
         write_batch_summary_artifact=write_batch_summary_artifact,
+        batch_cli_output_payload=batch_cli_output_payload,
         print_json=print_json,
     )
 
@@ -2259,6 +2263,7 @@ def run_batch_operation(
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
     last_known_output_path: str = "",
+    output_mode: str = "full",
 ) -> None:
     return run_batch_operation_data(
         project_root=project_root,
@@ -2282,6 +2287,7 @@ def run_batch_operation(
         artifact_probe_path_override=artifact_probe_path_override,
         artifact_probe_warn_only=artifact_probe_warn_only,
         last_known_output_path=last_known_output_path,
+        output_mode=output_mode,
         normalize_batch_fallback_mode=normalize_batch_fallback_mode,
         print_json=print_json,
         batch_summary_artifact_path=batch_summary_artifact_path,
@@ -2306,6 +2312,7 @@ def run_batch_operation(
         run_artifact_probe=run_artifact_probe,
         read_recent_editor_log=read_recent_editor_log,
         build_batch_execution_summary=build_batch_execution_summary,
+        batch_cli_output_payload=batch_cli_output_payload,
         clear_stale_bridge_state=clear_stale_bridge_state,
         time_time=time.time,
     )

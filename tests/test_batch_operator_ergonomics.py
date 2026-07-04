@@ -355,6 +355,20 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
                 parsed = parser.parse_args([*command, "--batch-fallback-mode", "require-batch"])
                 self.assertEqual("require-batch", parsed.batch_fallback_mode)
 
+    def test_batch_commands_accept_compact_output_mode(self) -> None:
+        parser = server.build_parser()
+        commands = (
+            ["batch-compile", "--project-root", "/tmp/FakeProject", "--target", "Android"],
+            ["batch-compile-matrix", "--project-root", "/tmp/FakeProject", "--config-file", "/tmp/config.json"],
+            ["batch-build-config-compile-matrix", "--project-root", "/tmp/FakeProject"],
+            ["batch-editmode-tests", "--project-root", "/tmp/FakeProject"],
+            ["batch-build-player", "--project-root", "/tmp/FakeProject", "--build-target", "Android"],
+        )
+        for command in commands:
+            with self.subTest(command=command[0]):
+                parsed = parser.parse_args([*command, "--output", "compact"])
+                self.assertEqual("compact", parsed.output)
+
 
 if __name__ == "__main__":
     unittest.main()

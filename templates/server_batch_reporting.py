@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 
 DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS = 30.0
+BATCH_OUTPUT_MODES = ("full", "compact")
 
 
 def first_non_empty_line(
@@ -36,6 +37,56 @@ def write_batch_summary_artifact(summary_path: Path, summary: dict[str, Any]) ->
     with summary_path.open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2, ensure_ascii=True)
         handle.write("\n")
+
+
+def build_compact_batch_cli_output(payload: dict[str, Any]) -> dict[str, Any]:
+    summary = payload.get("result_summary")
+    compact: dict[str, Any] = {
+        "payload_mode": "compact_batch_cli",
+        "action": payload.get("action"),
+        "succeeded": bool(payload.get("succeeded", False)),
+        "requested_execution_lane": payload.get("requested_execution_lane"),
+        "effective_execution_lane": payload.get("effective_execution_lane"),
+        "batch_fallback_mode": payload.get("batch_fallback_mode"),
+    }
+    if isinstance(summary, dict) and summary:
+        compact.update(summary)
+        compact["payload_mode"] = "compact_batch_cli"
+    else:
+        for key in (
+            "project_root",
+            "build_target",
+            "compile_name",
+            "config_file",
+            "build_config_asset",
+            "profiles",
+            "dry_run",
+            "timeout_ms",
+            "result_file",
+            "summary_file",
+            "log_path",
+            "raw_log_path",
+            "run_id",
+            "progress_file",
+        ):
+            if key in payload:
+                compact[key] = payload[key]
+
+    if "summary_file" in payload:
+        compact["summary_file"] = payload["summary_file"]
+    if "top_actionable_error" in payload:
+        compact["top_actionable_error"] = payload["top_actionable_error"]
+    if "next_distinct_action" in payload:
+        compact["next_distinct_action"] = payload["next_distinct_action"]
+    if "recommended_next_action" in payload:
+        compact["recommended_next_action"] = payload["recommended_next_action"]
+    return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
+
+
+def batch_cli_output_payload(payload: dict[str, Any], output_mode: str) -> dict[str, Any]:
+    if output_mode == "compact":
+        return build_compact_batch_cli_output(payload)
+    return payload
 
 
 def _slug(value: str) -> str:

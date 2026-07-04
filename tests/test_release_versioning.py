@@ -52,6 +52,16 @@ class ReleaseVersioningTests(unittest.TestCase):
             "version": "0.3.16",
             "unity": "2021.3",
         }
+        write_json(root / "package.json", {"name": "xuunity-mcp-site-checks", "version": "0.3.16"})
+        write_json(
+            root / "package-lock.json",
+            {
+                "name": "xuunity-mcp-site-checks",
+                "version": "0.3.16",
+                "lockfileVersion": 3,
+                "packages": {"": {"name": "xuunity-mcp-site-checks", "version": "0.3.16"}},
+            },
+        )
         write_json(root / "packages" / "com.xuunity.light-mcp" / "package.json", package_payload)
         write_json(root / "templates" / "package-manifests" / "unity-package-2021_2022.json", package_payload)
         unity_6000_payload = dict(package_payload)
@@ -156,9 +166,18 @@ class ReleaseVersioningTests(unittest.TestCase):
 
             changed = sync_release_version.sync_release_version(root, "0.3.17")
 
+            self.assertIn(Path("package.json"), changed)
+            self.assertIn(Path("package-lock.json"), changed)
             self.assertIn(Path("packages/com.xuunity.light-mcp/package.json"), changed)
             self.assertIn(Path("templates/server.py"), changed)
             self.assertIn(Path("templates/server_batch_orchestrator.py"), changed)
+            self.assertEqual(
+                "0.3.17",
+                json.loads((root / "package.json").read_text())["version"],
+            )
+            package_lock = json.loads((root / "package-lock.json").read_text())
+            self.assertEqual("0.3.17", package_lock["version"])
+            self.assertEqual("0.3.17", package_lock["packages"][""]["version"])
             self.assertEqual(
                 "0.3.17",
                 json.loads((root / "packages" / "com.xuunity.light-mcp" / "package.json").read_text())["version"],

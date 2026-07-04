@@ -293,6 +293,7 @@ def run_gui_fallback_operation_data(
     artifact_probe_config: dict[str, Any] | None = None,
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
+    output_mode: str = "full",
     batch_start_editor_state: Callable[[Path], dict[str, Any]],
     gui_fallback_busy_reasons: Callable[[Path, dict[str, Any]], list[str]],
     ToolInvocationError: Any,
@@ -316,6 +317,7 @@ def run_gui_fallback_operation_data(
     build_batch_execution_summary: Callable[..., dict[str, Any]],
     attach_batch_lane_fields_to_summary: Callable[[dict[str, Any], dict[str, Any]], None],
     write_batch_summary_artifact: Callable[[Path, dict[str, Any]], None],
+    batch_cli_output_payload: Callable[[dict[str, Any], str], dict[str, Any]],
     print_json: Callable[[Any], None],
 ) -> None:
     start_state = dict(payload.get("start_editor_state") or batch_start_editor_state(project_root))
@@ -473,7 +475,7 @@ def run_gui_fallback_operation_data(
         payload["succeeded"] = False
         payload["top_actionable_error"] = "GUI fallback completed but editor closeout was not verified."
 
-    print_json(payload)
+    print_json(batch_cli_output_payload(payload, output_mode))
     if not bool(payload.get("succeeded")):
         raise SystemExit(1)
 
@@ -545,6 +547,7 @@ def run_batch_operation_data(
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
     last_known_output_path: str = "",
+    output_mode: str = "full",
     normalize_batch_fallback_mode: Callable[[Any], str],
     print_json: Callable[[Any], None],
     batch_summary_artifact_path: Callable[[Path], Path],
@@ -569,6 +572,7 @@ def run_batch_operation_data(
     run_artifact_probe: Callable[..., dict[str, Any]],
     read_recent_editor_log: Callable[[Path, float], list[str]],
     build_batch_execution_summary: Callable[..., dict[str, Any]],
+    batch_cli_output_payload: Callable[[dict[str, Any], str], dict[str, Any]],
     clear_stale_bridge_state: Callable[[Path], dict[str, Any]],
     time_time: Callable[[], float],
 ) -> None:
@@ -578,9 +582,10 @@ def run_batch_operation_data(
     payload["requested_execution_lane"] = "batch"
     payload["effective_execution_lane"] = "batch"
     payload["batch_fallback_mode"] = normalize_batch_fallback_mode(batch_fallback_mode)
+    output_mode = "compact" if output_mode == "compact" else "full"
 
     if dry_run:
-        print_json(payload)
+        print_json(batch_cli_output_payload(payload, output_mode))
         return
 
     summary_path = batch_summary_artifact_path(result_path)
@@ -645,6 +650,7 @@ def run_batch_operation_data(
                 artifact_probe_config=artifact_probe_config,
                 artifact_probe_path_override=artifact_probe_path_override,
                 artifact_probe_warn_only=artifact_probe_warn_only,
+                output_mode=output_mode,
             )
             return
     except ToolInvocationError as exc:
@@ -779,6 +785,6 @@ def run_batch_operation_data(
     if "top_actionable_error" in result_summary:
         payload["top_actionable_error"] = result_summary["top_actionable_error"]
 
-    print_json(payload)
+    print_json(batch_cli_output_payload(payload, output_mode))
     if batch_exit_code != 0 or not bool(payload.get("succeeded")):
         raise SystemExit(1)
