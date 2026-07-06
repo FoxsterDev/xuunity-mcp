@@ -98,6 +98,18 @@ only when the value is not itself intended to be copied into a shell.
 
 Use `tests/bash_support.py:run_with_timeout()` instead of bare `subprocess.run` for anything that spawns bash: timeout + process-tree kill (`taskkill /T /F` / `killpg`) + partial stdout/stderr dumped to stderr **at the moment the timeout fires**, plus `skip_if_prior_subprocess_timeout` in `setUp` so one hang does not cascade. `tests/test_bash_spawn_canary.py` runs first in the suite as the end-to-end regression guard.
 
+## 11. Do Not Assume a Home Directory Exists in CI
+
+GitHub Windows runners can execute tests with `HOME`/`USERPROFILE` cleared or
+unresolvable. `Path.home()` can raise `RuntimeError("Could not determine home
+directory.")`. Code that only builds plans, helper targets, optional client
+config review paths, or recovery hints must degrade with a safe fallback instead
+of crashing.
+
+Add a regression for this class by clearing `os.environ` and mocking
+`Path.home()` to raise `RuntimeError`. Use explicit env overrides in tests when
+the exact user config path matters.
+
 ---
 
 ## Bisecting a Hang That Only Reproduces in CI

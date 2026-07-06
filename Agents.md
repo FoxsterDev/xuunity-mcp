@@ -44,6 +44,7 @@ this router plus the local docs as the source of truth.
 ## Routing Rules
 - For any task involving process management (process listing, checking liveness, or terminating processes/editors), load the safe process management skill: [SKILL.md](skills/safe_process_management/SKILL.md).
 - For any task that writes or edits bash scripts, the shell wrapper, `templates/run.sh`, `scripts/testing/*.sh`, CI workflows, or tests that spawn shell processes — and for any failure that reproduces only on the Windows CI leg or only in CI — load the cross-platform shell skill: [SKILL.md](skills/cross_platform_shell/SKILL.md). Windows Git Bash support is a hard compatibility requirement for every shell change.
+- For any release, version bump, tag creation, GitHub Actions failure, or follow-up fix after CI catches a platform-only regression, load the release CI guardrails skill: [SKILL.md](skills/release_ci_guardrails/SKILL.md).
 - MCP `.sh` entrypoints must stay maximally thin. They may resolve the script directory, choose the Python interpreter, set launcher metadata, and `exec` Python. Do not put version parsing, source-root discovery, install refresh, process management, project traversal, JSON editing, or retry policy in bash; move that behavior into Python and cover it with tests.
 - For client setup tasks, load `docs/clients/Agents.md` when it exists, then the requested client guide.
 - For AI integration or workflow tasks, load `docs/agents/AI_INTEGRATION.md` or `docs/agents/AGENT_WORKFLOWS.md` as appropriate.
