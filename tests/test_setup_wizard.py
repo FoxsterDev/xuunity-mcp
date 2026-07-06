@@ -11,6 +11,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server
+import server_setup_common
 import server_setup_wizard as wizard
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "packages" / "com.xuunity.light-mcp"
@@ -235,6 +236,16 @@ class SetupWizardTests(unittest.TestCase):
         self.assertIn("separate client wiring review", review["client_wiring_review"]["reason"])
         self.assertIn("Planned client config review targets", review["preferred_review_summary"])
         self.assertNotIn("user-level client config changes before applying setup", review["preferred_review_summary"])
+
+    def test_setup_home_fallback_survives_missing_host_home_directory(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(
+            server_setup_common.Path,
+            "home",
+            side_effect=RuntimeError("Could not determine home directory."),
+        ):
+            targets = server_setup_common.helper_install_targets()
+
+        self.assertIn("codex", {target["client_id"] for target in targets})
 
     def test_setup_apply_requires_approval_and_mutates_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

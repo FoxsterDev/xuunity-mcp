@@ -5,6 +5,7 @@ import os
 import platform
 import re
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,21 @@ SUPPORTED_USER_CLIENTS = {"codex", "claude_code", "cursor", "windsurf", "claude_
 
 def normalize_uninstall_mode(mode: str) -> str:
     return UNINSTALL_MODE_ALIASES.get(mode, mode)
+
+
+def user_home_fallback() -> Path:
+    for key in ("HOME", "USERPROFILE"):
+        value = os.environ.get(key)
+        if value:
+            return Path(value)
+    drive = os.environ.get("HOMEDRIVE")
+    path = os.environ.get("HOMEPATH")
+    if drive and path:
+        return Path(drive + path)
+    try:
+        return Path.home()
+    except RuntimeError:
+        return Path(tempfile.gettempdir()) / "xuunity-home-unavailable"
 
 
 def parse_unity_version(project_root: Path) -> str:
@@ -337,7 +353,7 @@ def get_neutral_install_dir() -> Path:
     if override:
         return Path(override)
 
-    home = Path.home()
+    home = user_home_fallback()
     system = platform.system().lower()
     if system == "windows":
         appdata = os.environ.get("APPDATA")
@@ -356,7 +372,7 @@ def get_neutral_install_dir() -> Path:
 
 
 def helper_install_targets() -> list[dict[str, Any]]:
-    home = Path.home()
+    home = user_home_fallback()
     codex_tools_home = Path(os.environ.get("CODEX_TOOLS_HOME") or home / ".codex-tools")
     claude_tools_home = Path(os.environ.get("CLAUDE_TOOLS_HOME") or home / ".claude-tools")
     neutral_tools_home = get_neutral_install_dir()
@@ -420,7 +436,7 @@ def json_contains_server_block(path: Path) -> bool:
 
 
 def build_client_config_targets(primary_project_root: Path | None) -> list[dict[str, Any]]:
-    home = Path.home()
+    home = user_home_fallback()
     current_platform = platform_kind()
     detected_client = detect_current_host_client()
     codex_home = Path(os.environ.get("CODEX_HOME") or home / ".codex")

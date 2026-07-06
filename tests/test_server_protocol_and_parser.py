@@ -1685,7 +1685,7 @@ actions:
         self.assertEqual("project", mutation["scope"])
         self.assertEqual("write_bridge_config", mutation["kind"])
         self.assertFalse(mutation["user_level_client_config_mutated"])
-        self.assertIn("Library/XUUnityLightMcp/config/bridge_config.json", mutation["path"])
+        self.assertIn("Library/XUUnityLightMcp/config/bridge_config.json", mutation["path"].replace("\\", "/"))
 
     def test_ensure_ready_success_can_return_full_payload(self) -> None:
         args = argparse.Namespace(
