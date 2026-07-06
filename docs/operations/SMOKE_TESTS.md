@@ -110,6 +110,25 @@ First open after a Unity version upgrade:
   missing or disabled, but package declaration alone still does not prove a live
   bridge heartbeat.
 
+Compile gate scope limit (green compile is not "editor clean"):
+
+- A green compile gate proves scripts COMPILE. It does not prove the GUI editor
+  is free of editor-startup runtime errors. A `-batchmode` run and
+  `unity.compile.player_scripts` do not execute `[InitializeOnLoad]`,
+  `RuntimeInitializeOnLoadMethod`, `EditorApplication.update`, or editor startup
+  reconcilers, and player-scripts compile excludes editor and test assemblies.
+- A project whose package/infra graph pulls in an `[InitializeOnLoad]` editor
+  reconciler that hard-requires a `Resources`-loaded config (for example a
+  settings sync or first-load validator that calls `Resources.LoadAll<T>(path)`
+  and expects exactly one hit) can compile green in batchmode while the GUI editor
+  throws that reconciler's exception on every editor-update frame.
+- When infra adds editor-startup hooks, add an editor-startup-clean gate AFTER the
+  compile gate: open the GUI editor (`ensure-ready --open-editor`), then
+  `unity_console_grep source=editor_log` for `Exception` / `error` (the console
+  buffer can be evicted — see Log-presence checks; on `editor_log` prefer
+  error-anchored patterns over entity names). Do not treat a green batchmode
+  compile as "editor clean."
+
 ### 3. Interactive Acceptance Scenario
 
 Minimum generic scenario steps:
