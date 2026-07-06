@@ -12,6 +12,34 @@ from typing import Any, Callable
 DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS = 30.0
 BATCH_OUTPUT_MODES = ("full", "compact")
 
+COMPACT_BATCH_SUMMARY_KEYS = (
+    "action",
+    "phase",
+    "transport_outcome",
+    "unity_outcome",
+    "succeeded",
+    "batch_exit_code",
+    "requested_execution_lane",
+    "effective_execution_lane",
+    "batch_fallback_mode",
+    "lane_fallback_reason",
+    "license_batchmode_supported",
+    "license_blocker_code",
+    "operator_verdict",
+    "top_actionable_error",
+    "recommended_next_action",
+    "next_distinct_action",
+    "recommended_recovery_command",
+    "result_file",
+    "summary_file",
+)
+
+COMPACT_BATCH_NESTED_SUMMARY_KEYS = {
+    "matrix": ("status", "total", "passed", "failed", "skipped"),
+    "compile": ("status", "compiled_assembly_count", "error_count", "warning_count"),
+    "tests": ("status", "total", "passed", "failed", "skipped"),
+}
+
 
 def first_non_empty_line(
     text: str,
@@ -50,8 +78,17 @@ def build_compact_batch_cli_output(payload: dict[str, Any]) -> dict[str, Any]:
         "batch_fallback_mode": payload.get("batch_fallback_mode"),
     }
     if isinstance(summary, dict) and summary:
-        compact.update(summary)
-        compact["payload_mode"] = "compact_batch_cli"
+        for key in COMPACT_BATCH_SUMMARY_KEYS:
+            if key in summary:
+                compact[key] = summary[key]
+        for key, nested_keys in COMPACT_BATCH_NESTED_SUMMARY_KEYS.items():
+            nested = summary.get(key)
+            if isinstance(nested, dict):
+                compact[key] = {
+                    nested_key: nested.get(nested_key)
+                    for nested_key in nested_keys
+                    if nested.get(nested_key) not in (None, "")
+                }
     else:
         for key in (
             "project_root",
@@ -80,6 +117,9 @@ def build_compact_batch_cli_output(payload: dict[str, Any]) -> dict[str, Any]:
         compact["next_distinct_action"] = payload["next_distinct_action"]
     if "recommended_next_action" in payload:
         compact["recommended_next_action"] = payload["recommended_next_action"]
+    if "recommended_recovery_command" in payload:
+        compact["recommended_recovery_command"] = payload["recommended_recovery_command"]
+    compact["payload_mode"] = "compact_batch_cli"
     return {key: value for key, value in compact.items() if value not in (None, "", [], {})}
 
 

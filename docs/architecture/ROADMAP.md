@@ -279,10 +279,12 @@ Current progress:
   `operator_verdict` final-status wording
 - `v0.3.39` adds opt-in compact batch helper CLI output through
   `--output compact`, preserving full output as the default compatibility mode
+- unreleased source bounds compact batch helper output to whitelisted decision
+  fields plus artifact pointers, with a successful-summary byte-budget guard
 - compact-by-default scenario, refresh, compile, build-config compile, direct
   test, and MCP status-summary envelopes are now shipped with full-payload
   recovery paths
-- remaining value in this phase is summary polish for multi-project ceilings,
+- remaining value in this phase is broader multi-project compact ceilings,
   broader proof, and surfacing evidence consistently across more operator flows
 
 Exit criteria:

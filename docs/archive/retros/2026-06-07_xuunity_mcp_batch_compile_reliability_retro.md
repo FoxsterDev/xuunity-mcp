@@ -5,6 +5,25 @@ Scope: multi-project MCP compile validation after upgrading a consumer Unity
 package dependency to a newer XUUnity Light Unity MCP version.
 Artifact root: sanitized host-local run artifacts.
 
+## Resolution Update
+
+Implemented after this retro:
+
+- fallback-aware aggregate success logic for GUI fallback compile success;
+- normalized `operator_verdict` values in multi-project status artifacts and
+  final summaries;
+- requested/effective lane, fallback mode, fallback reason, and license blocker
+  surfacing in compact summary lines;
+- bridge-disabled prepare blockers with direct recovery commands;
+- opt-in `--output compact` for batch helper CLI commands;
+- compact batch CLI projection tightened to decision fields plus artifact
+  pointers, with successful summaries guarded under a 500-byte per-project
+  budget.
+
+Remaining follow-up is low priority: consider exposing a stable bridge-state
+artifact marker in batch evidence when available. The P0/P1 operator-verdict and
+fallback-truth work is implemented.
+
 ## 1. Executive Summary
 
 The primary failure was not Unity-side compile breakage across the portfolio.

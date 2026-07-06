@@ -24,9 +24,12 @@ Partially implemented after this retro:
   remains `full` for compatibility, while compact mode emits the batch decision
   summary and artifact pointers without the full command vector or nested batch
   payload.
+- Unreleased source tightens compact batch CLI output to a whitelisted decision
+  projection and adds a 500-byte per-project regression guard for successful
+  compact summaries.
 
-Remaining backlog: add compact ceilings for multi-project summaries, add a
-token ledger, and define fast-path profiles.
+Remaining backlog: add broader compact ceilings for multi-project summaries, add
+a token ledger, and define fast-path profiles.
 
 ## 1. Executive summary
 

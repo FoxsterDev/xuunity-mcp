@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Changed
+
+- Tightened `--output compact` batch helper CLI output so compact mode
+  whitelists decision fields, normalized lane/verdict fields, and artifact
+  pointers instead of copying the full batch result summary. Full output remains
+  unchanged for deep debugging.
+
+### Validation
+
+- Added regression coverage that keeps successful compact batch summaries under
+  a 500-byte per-project budget and prevents raw log, probe-log, command, and
+  workspace side-effect details from re-entering compact output.
+
 ## 0.3.39
 
 Release tag: `v0.3.39`

@@ -215,6 +215,9 @@ class LicenseCapabilitiesTests(unittest.TestCase):
                 "matrix": {"status": "passed", "total": 2, "passed": 2, "failed": 0},
                 "result_file": "/tmp/result.json",
                 "raw_log_path": "/tmp/editor.log",
+                "log_excerpt_hint": "warning line\n" * 100,
+                "batchmode_probe_log_path": "/tmp/license-probe.log",
+                "workspace_side_effects": {"paths": [f"/tmp/path-{index}" for index in range(100)]},
             },
         }
 
@@ -225,6 +228,12 @@ class LicenseCapabilitiesTests(unittest.TestCase):
         self.assertEqual({"status": "passed", "total": 2, "passed": 2, "failed": 0}, compact["matrix"])
         self.assertEqual("/tmp/summary.json", compact["summary_file"])
         self.assertNotIn("command", compact)
+        self.assertNotIn("raw_log_path", compact)
+        self.assertNotIn("log_excerpt_hint", compact)
+        self.assertNotIn("batchmode_probe_log_path", compact)
+        self.assertNotIn("workspace_side_effects", compact)
+        encoded = json.dumps(compact, ensure_ascii=True, separators=(",", ":"))
+        self.assertLessEqual(len(encoded.encode("utf-8")), 500)
 
     def test_build_license_capabilities_cache_records_probe_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

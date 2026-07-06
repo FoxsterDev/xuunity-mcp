@@ -37,8 +37,8 @@ host-local registry.
 | 2026-05-14 | `2026-05-14_sdk_rollout_mcp_portfolio_retro.md` | SDK rollout MCP portfolio retro | needs triage | Contains P0/P1 rollout, resolver, generated diff, process pool, and closeout-contract improvements. |
 | 2026-05-21 | `2026-05-21_project_hook_batch_build_operator_retro.md` | project hook batch build operator retro | needs triage / partially superseded | Contains priority improvements; some may now be covered by current project-action and batch-summary work but the file has not been fully re-triaged. |
 | 2026-05-23 | `2026-05-23_devmode_batch_lifecycle_retro.md` | devmode batch lifecycle retro | needs triage | Contains process-visibility and lifecycle priority improvements. |
-| 2026-06-02 | `2026-06-02_token_efficiency_response_envelope_retro.md` | token efficiency response envelope retro | partially implemented; follow-up remains | Scenario verdict compacting shipped in `v0.3.32`; compact-by-default MCP tool summaries shipped for refresh, compile, build-config compile, direct test responses, and `unity_status_summary` with `includeFullPayload=true` full-payload opt-in. `v0.3.36` also makes `ensure-ready` compact by default and de-duplicates scenario `run_start.steps` unless step payloads are explicitly requested. `v0.3.39` adds opt-in `--output compact` for batch helper CLI responses. Remaining response-envelope work: multi-project compact ceilings, token ledger, and fast-path profiles. |
-| 2026-06-07 | `2026-06-07_xuunity_mcp_batch_compile_reliability_retro.md` | batch compile reliability retro | needs triage | Contains P0/P1/P2 reliability and compact summary improvements; some may be implemented, but status is not yet split. |
+| 2026-06-02 | `2026-06-02_token_efficiency_response_envelope_retro.md` | token efficiency response envelope retro | partially implemented; follow-up remains | Scenario verdict compacting shipped in `v0.3.32`; compact-by-default MCP tool summaries shipped for refresh, compile, build-config compile, direct test responses, and `unity_status_summary` with `includeFullPayload=true` full-payload opt-in. `v0.3.36` also makes `ensure-ready` compact by default and de-duplicates scenario `run_start.steps` unless step payloads are explicitly requested. `v0.3.39` adds opt-in `--output compact` for batch helper CLI responses, and unreleased source now bounds compact batch summaries with a 500-byte per-project regression guard. Remaining response-envelope work: broader multi-project compact ceilings, token ledger, and fast-path profiles. |
+| 2026-06-07 | `2026-06-07_xuunity_mcp_batch_compile_reliability_retro.md` | batch compile reliability retro | core implemented; low-priority follow-up deferred | Implemented fallback-aware aggregate success logic, normalized `operator_verdict` values, lane/license truth surfacing, bridge-disabled recovery commands, compact batch CLI output, and a compact-output byte-budget guard. Remaining low-priority consideration: clearer stable bridge-state artifact reporting in batch evidence when available. |
 | undated | `xuunity_mcp_chat_retro.md` | general MCP chat retro | legacy needs triage | Legacy retro has priority improvements that should be checked for implemented/superseded status. |
 | undated | `xuunity_mcp_install_retro.md` | general MCP install retro | legacy hygiene/status triage | Legacy install retro should be reviewed for current public-safety and implemented/superseded status. |
 
@@ -53,8 +53,10 @@ host-local registry.
 > discovery/transport/state-group/timing/artifact payloads by default, and
 > `v0.3.36` compacts `ensure-ready` plus de-duplicates scenario
 > `run_start.steps`, and `v0.3.39` adds opt-in compact output for batch helper
-> CLI responses. Multi-project compact ceilings, token ledger, and
-> fast-path profiles remain active backlog.
+> CLI responses. Unreleased source now whitelists compact batch decision fields
+> and guards successful compact summaries under a 500-byte per-project budget.
+> Broader multi-project compact ceilings, token ledger, and fast-path profiles
+> remain active backlog.
 
 ## Completed Public History
 
