@@ -11,6 +11,7 @@ from server_core import ToolInvocationError, read_json, write_json
 from server_specs import STARTUP_POLICIES, SCENARIO_TERMINAL_STATUSES
 from server_health import (
     FRESH_HEARTBEAT_MAX_AGE_SECONDS,
+    annotate_console_grep_false_empty,
     build_editor_log_identity,
     grep_editor_log_payload,
 )

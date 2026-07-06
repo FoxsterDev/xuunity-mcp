@@ -177,7 +177,7 @@ For production consumers, use the current Git UPM release path:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.39"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.40"
   }
 }
 ```
@@ -359,29 +359,40 @@ After integration, the agent should record:
 
 For a new consumer project, the recommended first pass is:
 
-1. `unity.status`
-2. `request-status-summary`
-3. `unity.capabilities.get`
-4. `unity.health.probe`
-5. `unity.console.tail`
-6. `unity.scene.snapshot`
-7. `unity.compile.player_scripts`
-8. `unity.tests.run_editmode`
+Before calling bridge tools, run `ensure-ready --open-editor` for the target
+project. Declaring `com.xuunity.light-mcp` in `Packages/manifest.json` is not
+itself bridge enablement; the project-local `bridge_config.json` must be enabled
+so the editor can publish a heartbeat.
+
+If the project was just moved to a newer Unity version, run a non-interactive
+compile/import gate first with `-batchmode -quit -accept-apiupdate`, then reopen
+the GUI for Play Mode validation. This avoids the interactive API Update
+Required dialog blocking the editor main thread on first open.
+
+1. `ensure-ready --open-editor`
+2. `unity.status`
+3. `request-status-summary`
+4. `unity.capabilities.get`
+5. `unity.health.probe`
+6. `unity.console.tail`
+7. `unity.scene.snapshot`
+8. `unity.compile.player_scripts`
+9. `unity.tests.run_editmode`
 
 Only after that:
 
-9. `unity.playmode.state`
-10. `unity.playmode.set`
-11. `unity.game_view.screenshot`
-12. `unity.scenario.validate`
-13. `unity.scenario.run`
-14. `unity.scenario.result`
+10. `unity.playmode.state`
+11. `unity.playmode.set`
+12. `unity.game_view.screenshot`
+13. `unity.scenario.validate`
+14. `unity.scenario.run`
+15. `unity.scenario.result`
 
 Scenario extension route:
 
-15. list/invoke catalog-backed project actions when the consumer publishes
+16. list/invoke catalog-backed project actions when the consumer publishes
     `project_actions.yaml`
-16. implement `IXUUnityLightMcpScenarioHook` in a project `Assets/Editor/` assembly when the consumer needs project-local automation not worth promoting into the shared package yet
+17. implement `IXUUnityLightMcpScenarioHook` in a project `Assets/Editor/` assembly when the consumer needs project-local automation not worth promoting into the shared package yet
 
 ## Where To Extend
 

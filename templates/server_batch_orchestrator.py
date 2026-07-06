@@ -30,6 +30,7 @@ from server_specs import (
 )
 from server_health import (
     FRESH_HEARTBEAT_MAX_AGE_SECONDS,
+    annotate_console_grep_false_empty,
     build_editor_log_identity,
     build_editor_log_diagnosis,
     classify_project_health,
@@ -285,7 +286,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.39",
+    "version": "0.3.40",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -1405,7 +1406,7 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(pattern, str) or not pattern.strip():
         raise JsonRpcError(-32602, "pattern is required.")
 
-    source = arguments.get("source", "console")
+    source = arguments.get("source", "editor_log")
     if source not in {"console", "editor_log"}:
         raise JsonRpcError(-32602, "source must be console or editor_log.")
 
@@ -1465,6 +1466,15 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         )
     except ToolInvocationError as exc:
         return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    if response.get("status") == "ok":
+        try:
+            payload = json.loads(str(response.get("payload_json") or "{}"))
+        except json.JSONDecodeError:
+            payload = {}
+        if isinstance(payload, dict):
+            payload = annotate_console_grep_false_empty(payload, include_types or [])
+            response = dict(response)
+            response["payload_json"] = json.dumps(payload, ensure_ascii=True)
     return bridge_response_to_tool_result(response)
 
 

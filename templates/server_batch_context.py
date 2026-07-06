@@ -396,6 +396,7 @@ DISCOVERY_NEXT_ACTION_COMMANDS = {
     "inspect_editor_log": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
     "inspect_editor_log_and_observe": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
     "inspect_editor_log_and_consider_graceful_restart": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
+    "relaunch_noninteractive_accept_apiupdate": "Unity -batchmode -quit -accept-apiupdate -projectPath {project_root} -logFile {project_root}/Library/XUUnityLightMcp/logs/unity_apiupdate.log",
     "restore_host_process_visibility": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
 }
 

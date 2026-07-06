@@ -1068,6 +1068,15 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertIn("ensure-ready --project-root C:/tmp/FakeProject --open-editor", command)
         self.assertNotIn("\\", command)
 
+    def test_recommended_recovery_command_for_apiupdate_relaunch(self) -> None:
+        command = server.recommended_recovery_command_for_project(
+            Path("/tmp/FakeProject"),
+            "relaunch_noninteractive_accept_apiupdate",
+        )
+
+        self.assertIn("-batchmode -quit -accept-apiupdate", command)
+        self.assertIn("-projectPath /tmp/FakeProject", command)
+
     def test_recover_project_bridge_for_reconciliation_raises_guided_bridge_disabled_error(self) -> None:
         context = types.SimpleNamespace(
             discovery_details={

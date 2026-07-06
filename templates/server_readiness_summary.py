@@ -145,6 +145,18 @@ def build_ensure_ready_summary(
     if launch:
         summary["launch"] = launch
 
+    bridge_config_mutation = dict(payload.get("project_bridge_config_mutation") or {})
+    if bridge_config_mutation:
+        summary["project_bridge_config_mutation"] = {
+            "scope": str(bridge_config_mutation.get("scope") or "project"),
+            "kind": str(bridge_config_mutation.get("kind") or ""),
+            "reason": str(bridge_config_mutation.get("reason") or ""),
+            "path": str(bridge_config_mutation.get("path") or ""),
+            "user_level_client_config_mutated": bool(
+                bridge_config_mutation.get("user_level_client_config_mutated")
+            ),
+        }
+
     editor_log_identity = dict(discovery.get("editor_log_identity") or {})
     if editor_log_identity:
         summary["editor_log_identity"] = editor_log_identity

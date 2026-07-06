@@ -200,6 +200,42 @@ class SetupWizardTests(unittest.TestCase):
         self.assertEqual([str(target_project.resolve())], plan["preflight_review"]["selected_project_roots"])
         self.assertEqual("explicit_project_root", plan["projects"][0]["selection_state"])
 
+    def test_setup_plan_does_not_plan_user_level_client_config_mutations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_root = create_unity_project(
+                root / "Project",
+                unity_version="6000.0.58f2",
+                dependencies={"com.xuunity.light-mcp": "git-url"},
+            )
+            claude_config = root / ".claude.json"
+            claude_config.write_text("{}", encoding="utf-8")
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "CLAUDECODE": "1",
+                    "CLAUDE_CONFIG_PATH": str(claude_config),
+                },
+                clear=True,
+            ):
+                plan = wizard.build_setup_plan(
+                    workspace_root=None,
+                    project_roots=[str(project_root)],
+                    recursive=False,
+                    include_test_framework="auto",
+                    package_source="git",
+                    package_version="0.3.39",
+                    local_package_source="/tmp/light-mcp",
+                )
+
+        review = plan["preflight_review"]
+        self.assertEqual([], review["planned_user_level_config_changes"])
+        self.assertIn("Review planned project manifest and bridge changes", review["notes"][0])
+        self.assertIn("separate client wiring review", review["client_wiring_review"]["reason"])
+        self.assertIn("Planned client config review targets", review["preferred_review_summary"])
+        self.assertNotIn("user-level client config changes before applying setup", review["preferred_review_summary"])
+
     def test_setup_apply_requires_approval_and_mutates_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = create_unity_project(Path(tmp) / "Project", unity_version="2021.3.45f1")

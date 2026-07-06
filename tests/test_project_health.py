@@ -138,6 +138,74 @@ class ProjectHealthTests(unittest.TestCase):
         self.assertEqual("lifecycle_activity_observed", diagnosis["code"])
         self.assertEqual("info", diagnosis["severity"])
 
+    def test_build_editor_log_diagnosis_detects_api_updater_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            log_path = Path(tmp_dir) / "api_updater.log"
+            log_path.write_text(
+                "Assets/Vendor/Foo.cs(8,9): warning CS0618: PhysicMaterial is obsolete (UnityUpgradable) -> PhysicsMaterial\n"
+                "[API Updater] Updated Files: Assets/Vendor/Foo.cs\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = build_editor_log_diagnosis(
+                log_path,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                classify_editor_log=classify_editor_log,
+            )
+
+        self.assertEqual("api_updater_activity_observed", diagnosis["code"])
+        self.assertEqual("warning", diagnosis["severity"])
+
+    def test_build_editor_log_diagnosis_detects_unity_version_upgrade_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            log_path = Path(tmp_dir) / "version_upgrade.log"
+            log_path.write_text(
+                "This project was last opened with a different version of Unity.\n"
+                "Upgrading project to 6000.0.58f2\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = build_editor_log_diagnosis(
+                log_path,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                classify_editor_log=classify_editor_log,
+            )
+
+        self.assertEqual("unity_version_upgrade_activity_observed", diagnosis["code"])
+        self.assertEqual("warning", diagnosis["severity"])
+
+    def test_classify_project_health_names_possible_apiupdate_modal_block(self) -> None:
+        result = classify_project_health(
+            bridge_state={
+                "editor_pid": 101,
+                "heartbeat_utc": heartbeat_utc(60),
+                "health_status": "healthy",
+                "package_operation_in_progress": True,
+                "refresh_settle_pending": True,
+            },
+            discovery={
+                "bridge_state_live": True,
+                "host_session_live": True,
+                "bridge_enabled": True,
+                "detected_editor_count": 1,
+                "bridge_pid_alive": True,
+                "host_session_pid_alive": True,
+                "reconciliation_recommended_next_action": "ensure_ready_or_recover_bridge",
+            },
+            editor_log_diagnosis={
+                "code": "api_updater_activity_observed",
+                "severity": "warning",
+                "summary": "API Updater markers observed.",
+            },
+            heartbeat_age_seconds=heartbeat_age_seconds,
+            derive_busy_reason=derive_busy_reason,
+        )
+
+        self.assertEqual("stale", result["host_health_classification"])
+        self.assertEqual("possible_interactive_dialog_block", result["host_health_reason"])
+        self.assertEqual("relaunch_noninteractive_accept_apiupdate", result["host_health_recommended_next_action"])
+        self.assertEqual("observe_only", result["host_health_termination_policy"])
+
     def test_build_editor_log_diagnosis_uses_session_scope_when_offset_is_available(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             log_path = Path(tmp_dir) / "scoped_compile_blocker.log"

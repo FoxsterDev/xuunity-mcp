@@ -141,12 +141,14 @@ from server_setup_wizard import (
     apply_setup_plan,
     build_uninstall_plan,
     build_setup_plan,
+    bridge_config_state,
     classify_test_framework_state,
     install_test_framework,
     normalize_project_root as normalize_setup_project_root,
     parse_unity_version,
     validate_setup,
     require_test_framework_capability_for_batch,
+    write_bridge_config,
 )
 from server_scenario_results import (
     latest_persisted_scenario_result_summary,
@@ -422,6 +424,8 @@ def cmd_ensure_ready(args):
     bridge_state_is_ready_fn = _compat_dep("bridge_state_is_ready")
     detect_unity_app_path_for_project_fn = _compat_dep("detect_unity_app_path_for_project")
     open_unity_editor_fn = _compat_dep("open_unity_editor")
+    bridge_config_state_fn = _compat_dep("bridge_config_state")
+    write_bridge_config_fn = _compat_dep("write_bridge_config")
     wait_for_ready_fn = _compat_dep("wait_for_ready")
     enrich_tool_invocation_error_with_discovery_fn = _compat_dep("enrich_tool_invocation_error_with_discovery")
     update_host_editor_session_pid_fn = _compat_dep("update_host_editor_session_pid")
@@ -449,6 +453,26 @@ def cmd_ensure_ready(args):
                 project_root,
                 payload["discovery"],
             )
+        elif args.open_editor:
+            bridge_config_before = bridge_config_state_fn(project_root)
+            if not bool(bridge_config_before.get("enabled")):
+                write_bridge_config_fn(project_root)
+                bridge_config_after = bridge_config_state_fn(project_root)
+                payload["project_bridge_config_mutation"] = {
+                    "scope": "project",
+                    "kind": "write_bridge_config",
+                    "reason": "ensure_ready_open_editor_auto_enable",
+                    "path": str(
+                        project_root
+                        / "Library"
+                        / "XUUnityLightMcp"
+                        / "config"
+                        / "bridge_config.json"
+                    ),
+                    "state_before": bridge_config_before,
+                    "state_after": bridge_config_after,
+                    "user_level_client_config_mutated": False,
+                }
         current_state = current_project_context_bridge_state_fn(project_root)
 
         if args.open_editor and bridge_state_is_ready_fn(current_state, args.heartbeat_max_age_seconds):

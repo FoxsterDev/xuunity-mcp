@@ -464,7 +464,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "source": {
                     "type": "string",
                     "enum": ["console", "editor_log"],
-                    "default": "console",
+                    "default": "editor_log",
                     "description": "console searches Unity's in-memory console buffer; editor_log searches the path-backed Editor.log tail and avoids console clear/ring-buffer false negatives.",
                 },
                 "editorLogPath": {

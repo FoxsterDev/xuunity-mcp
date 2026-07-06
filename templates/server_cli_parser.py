@@ -224,7 +224,7 @@ def build_parser() -> argparse.ArgumentParser:
     console_grep_cmd = sub.add_parser("request-console-grep", help="Search recent Unity console messages or the path-backed Editor.log tail.")
     console_grep_cmd.add_argument("--project-root", required=True)
     console_grep_cmd.add_argument("--pattern", required=True)
-    console_grep_cmd.add_argument("--source", choices=["console", "editor_log"], default="console")
+    console_grep_cmd.add_argument("--source", choices=["console", "editor_log"], default="editor_log")
     console_grep_cmd.add_argument("--editor-log-path")
     console_grep_cmd.add_argument("--regex", action="store_true")
     console_grep_cmd.add_argument("--ignore-case", dest="ignore_case", action=argparse.BooleanOptionalAction, default=True)

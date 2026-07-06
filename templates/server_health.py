@@ -16,6 +16,8 @@ EDITOR_LOG_CONSOLE_CAVEAT = (
     "Unity Console grep can be a false negative after console clear-on-play or "
     "ring-buffer eviction; source=editor_log searches the path-backed Editor.log tail."
 )
+CONSOLE_FALSE_EMPTY_WARNING = "console_buffer_may_be_stale_use_source_editor_log"
+API_UPDATER_RECOMMENDED_ACTION = "relaunch_noninteractive_accept_apiupdate"
 
 
 def truncate_text(value: Any, max_length: int = 240) -> str:
@@ -251,6 +253,34 @@ def grep_editor_log_payload(
     }
 
 
+def console_grep_false_empty_applies(payload: dict[str, Any], include_types: list[str] | None) -> bool:
+    try:
+        match_count = int(payload.get("match_count") or 0)
+    except (TypeError, ValueError):
+        match_count = 0
+    if match_count != 0:
+        return False
+    normalized = {str(value or "").strip().lower() for value in include_types or [] if str(value or "").strip()}
+    if not normalized:
+        normalized = {"error", "warning", "log", "exception"}
+    return bool(normalized.intersection({"error", "exception"}))
+
+
+def annotate_console_grep_false_empty(payload: dict[str, Any], include_types: list[str] | None) -> dict[str, Any]:
+    annotated = dict(payload or {})
+    annotated.setdefault("source", "console")
+    if not console_grep_false_empty_applies(annotated, include_types):
+        return annotated
+    warnings = list(annotated.get("warnings") or [])
+    if CONSOLE_FALSE_EMPTY_WARNING not in warnings:
+        warnings.append(CONSOLE_FALSE_EMPTY_WARNING)
+    annotated["warnings"] = warnings
+    annotated["console_grep_caveat"] = EDITOR_LOG_CONSOLE_CAVEAT
+    annotated["result_trust_class"] = "console_buffer_may_be_stale"
+    annotated["recommended_next_action"] = "retry_with_source_editor_log"
+    return annotated
+
+
 def read_editor_log_scope(
     log_path: Path,
     *,
@@ -353,6 +383,44 @@ def build_editor_log_diagnosis(
     )
     if not log_text:
         return {}
+
+    api_updater_lines = _matching_log_lines(
+        log_text,
+        [
+            "API Update Required",
+            "[ApiUpdater]",
+            "[API Updater]",
+            "UnityUpgradable",
+            "-accept-apiupdate",
+        ],
+    )
+    if api_updater_lines:
+        return {
+            "code": "api_updater_activity_observed",
+            "severity": "warning",
+            "summary": "Editor.log contains API Updater markers; an interactive first-open may be blocked on the API Update Required dialog.",
+            "evidence_lines": api_updater_lines,
+            "scope": log_scope,
+        }
+
+    version_upgrade_lines = _matching_log_lines(
+        log_text,
+        [
+            "Upgrading project",
+            "Project was created with",
+            "This project was last opened with",
+            "ProjectVersion.txt",
+            "m_EditorVersion",
+        ],
+    )
+    if version_upgrade_lines:
+        return {
+            "code": "unity_version_upgrade_activity_observed",
+            "severity": "warning",
+            "summary": "Editor.log contains Unity version-upgrade markers; a first-open package/import stall may be blocked on an interactive upgrade dialog.",
+            "evidence_lines": version_upgrade_lines,
+            "scope": log_scope,
+        }
 
     classified = classify_editor_log(log_text, startup_policy)
     if classified is not None:
@@ -574,6 +642,16 @@ def classify_project_health(
 
     if editor_log_diagnosis and classification in {"stale", "anr_suspected", "anr"}:
         diagnosis_code = str(editor_log_diagnosis.get("code") or "")
+        if diagnosis_code in {
+            "api_updater_activity_observed",
+            "unity_version_upgrade_activity_observed",
+        } and busy_reason in {"package_operation", "refresh_settle", "asset_import", "compiling", "updating"}:
+            reason = "possible_interactive_dialog_block"
+            recommended_next_action = API_UPDATER_RECOMMENDED_ACTION
+            termination_policy = "observe_only"
+            if classification == "anr":
+                classification = "stale"
+                anr_classification = "none"
         if diagnosis_code in {
             "package_resolution_failed",
             "interactive_compile_block_detected",

@@ -225,6 +225,7 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
                     str(project_root),
                     "-logFile",
                     str(log_path),
+                    "-accept-apiupdate",
                 ]
             )
             try:
@@ -279,6 +280,7 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
                 project_path_str,
                 "-logFile",
                 log_path_str,
+                "-accept-apiupdate",
             ]
             popen_kwargs: dict[str, Any] = {
                 "stdout": subprocess.DEVNULL,
@@ -345,6 +347,7 @@ def build_plain_batch_build_command(
         str(unity_binary),
         "-batchmode",
         "-quit",
+        "-accept-apiupdate",
         "-projectPath",
         project_path_str,
         "-buildTarget",
@@ -390,6 +393,7 @@ def build_batch_validation_command(
     command = [
         str(unity_binary),
         "-batchmode",
+        "-accept-apiupdate",
         "-projectPath",
         project_path_str,
         "-logFile",

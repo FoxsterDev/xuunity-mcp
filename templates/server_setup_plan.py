@@ -55,7 +55,7 @@ def render_preferred_review_summary(
         lines.append("- Planned client config review targets: none")
 
     lines.append(
-        "- Restart or refresh required after mutation: "
+        "- Restart or refresh required after separate client config mutation: "
         + (", ".join(restart_or_refresh_required) if restart_or_refresh_required else "none")
     )
     lines.append(f"- Recommended next step after approval: {recommended_next_step}")
@@ -230,7 +230,7 @@ def build_setup_plan(
         }
     )
     review_notes: list[str] = [
-        "Review planned manifest, bridge, and user-level client config changes before applying setup."
+        "Review planned project manifest and bridge changes before applying setup."
     ]
     review_notes.append(
         "setup-plan covers project-level MCP package and bridge mutations only; review client wiring separately with the matching client guide."
@@ -252,17 +252,11 @@ def build_setup_plan(
         "selected_project_roots": [item["project_root"] for item in result["projects"]],
         "mutating_actions_require_approval": True,
         "planned_project_file_changes": aggregate_project_file_changes,
-        "planned_user_level_config_changes": [
-            item["path"]
-            for item in client_config_targets
-            if item["scope"] == "user"
-            and item["selected_by_default"]
-            and item["config_action"] != "verify_existing_server_block"
-        ],
+        "planned_user_level_config_changes": [],
         "planned_client_config_targets": client_config_targets,
         "client_wiring_review": {
             "status": "required_separate_check",
-            "reason": "setup-plan reports likely client config targets, but client wiring still requires an explicit merge-safe review.",
+            "reason": "setup-plan reports likely client config targets for a separate client wiring review; setup-apply does not mutate them.",
             "detected_client": result["detected_client"],
             "detection_basis": result["detection_basis"],
             "client_context_confidence": result["client_context_confidence"],

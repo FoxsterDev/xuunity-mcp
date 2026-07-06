@@ -72,6 +72,20 @@ class ServerProtocolAndParserTests(unittest.TestCase):
             }.issubset(choices)
         )
 
+    def test_request_console_grep_defaults_to_editor_log_source(self) -> None:
+        parser = server.build_parser()
+        args = parser.parse_args(
+            [
+                "request-console-grep",
+                "--project-root",
+                "/tmp/FakeProject",
+                "--pattern",
+                "CS[0-9]",
+            ]
+        )
+
+        self.assertEqual("editor_log", args.source)
+
     def test_tools_list_includes_required_tool_surfaces(self) -> None:
         response = server.handle_json_rpc_message(
             {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
@@ -111,6 +125,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("includeFullPayload", compile_tool["inputSchema"]["properties"])
         console_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_console_grep")
         self.assertIn("source", console_tool["inputSchema"]["properties"])
+        self.assertEqual("editor_log", console_tool["inputSchema"]["properties"]["source"]["default"])
         scene_open_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_scene_open")
         self.assertIn("scenePath", scene_open_tool["inputSchema"]["properties"])
         self.assertIn("allowDirtySceneDiscard", scene_open_tool["inputSchema"]["properties"])
@@ -209,6 +224,84 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertEqual(1, structured["match_count"])
         self.assertEqual("[Boot] Early marker fired", structured["items"][0]["message"])
         self.assertIn("false negative", structured["console_grep_caveat"])
+
+    def test_unity_console_grep_defaults_to_editor_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir) / "FakeProject"
+            project_root.mkdir()
+            log_path = project_root / "Library" / "XUUnityLightMcp" / "logs" / "unity_editor.log"
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text("Assets/Foo.cs(1,1): error CS1002: ; expected\n", encoding="utf-8")
+
+            with mock.patch.object(server, "ensure_project_root", return_value=project_root):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 27,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_console_grep",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "editorLogPath": str(log_path),
+                                "pattern": "CS1002",
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        structured = response["result"]["structuredContent"]
+        self.assertEqual("editor_log", structured["source"])
+        self.assertEqual(1, structured["match_count"])
+
+    def test_unity_console_grep_explicit_console_false_empty_warns(self) -> None:
+        invoke_calls: list[tuple[str, dict[str, object], int]] = []
+
+        def fake_invoke_bridge(project_root_value: str, operation: str, operation_args: dict[str, object], timeout_ms: int) -> dict[str, object]:
+            invoke_calls.append((operation, dict(operation_args), timeout_ms))
+            return {
+                "status": "ok",
+                "payload_type": "unity.console.grep",
+                "payload_json": json.dumps(
+                    {
+                        "project_root": project_root_value,
+                        "pattern": "CS[0-9]",
+                        "match_count": 0,
+                        "items": [],
+                        "truncated": False,
+                    }
+                ),
+            }
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+        ):
+            response = server.handle_json_rpc_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 28,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "unity_console_grep",
+                        "arguments": {
+                            "projectRoot": "/tmp/FakeProject",
+                            "source": "console",
+                            "pattern": "CS[0-9]",
+                            "includeTypes": ["error"],
+                        },
+                    },
+                },
+                {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+            )
+
+        self.assertEqual(1, len(invoke_calls))
+        self.assertEqual("unity.console.grep", invoke_calls[0][0])
+        structured = response["result"]["structuredContent"]
+        self.assertEqual("console", structured["source"])
+        self.assertEqual("console_buffer_may_be_stale", structured["result_trust_class"])
+        self.assertIn("console_buffer_may_be_stale_use_source_editor_log", structured["warnings"])
 
     def test_compile_tool_returns_compact_payload_by_default(self) -> None:
         invoke_calls: list[tuple[str, dict[str, object], int]] = []
@@ -1534,6 +1627,65 @@ actions:
         self.assertIn("--include-full-payload", payload["full_payload_command"])
         self.assertNotIn("discovery", payload)
         self.assertIn("bridge_state", payload)
+
+    def test_ensure_ready_open_editor_auto_enables_project_bridge_config(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            open_editor=True,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+            include_full_payload=False,
+        )
+        state = {
+            "bridge_generation": 11,
+            "bridge_session_id": "session-auto-enable",
+            "editor_pid": 123,
+            "health_status": "healthy",
+            "playmode_state": "edit",
+            "compiler_error_count": 0,
+        }
+        bridge_config_before = {
+            "path": "/tmp/FakeProject/Library/XUUnityLightMcp/config/bridge_config.json",
+            "enabled": False,
+            "state": "missing",
+        }
+        bridge_config_after = {
+            "path": bridge_config_before["path"],
+            "enabled": True,
+            "state": "enabled",
+        }
+        emitted_payloads: list[dict[str, object]] = []
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "resolve_editor_log_path", return_value=Path("/tmp/editor.log")),
+            mock.patch.object(server, "inspect_light_mcp_import_state", return_value={"import_state": "declared_not_resolved"}),
+            mock.patch.object(server, "build_project_discovery_report", return_value={}),
+            mock.patch.object(server, "bridge_config_state", side_effect=[bridge_config_before, bridge_config_after]),
+            mock.patch.object(server, "write_bridge_config") as write_bridge_config_mock,
+            mock.patch.object(server, "current_project_context_bridge_state", return_value={}),
+            mock.patch.object(server, "bridge_state_is_ready", return_value=False),
+            mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/Applications/Unity.app")),
+            mock.patch.object(server, "open_unity_editor", return_value={"opened_by_host": True, "editor_pid": 123}),
+            mock.patch.object(server, "wait_for_ready", return_value=state),
+            mock.patch.object(server, "update_host_editor_session_pid"),
+            mock.patch.object(server, "refresh_project_context"),
+            mock.patch.object(server, "inspect_package_dependency_alignment", return_value={"alignment": "git"}),
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_ensure_ready(args)
+
+        write_bridge_config_mock.assert_called_once_with(Path("/tmp/FakeProject"))
+        payload = emitted_payloads[0]
+        mutation = payload["project_bridge_config_mutation"]
+        self.assertEqual("project", mutation["scope"])
+        self.assertEqual("write_bridge_config", mutation["kind"])
+        self.assertFalse(mutation["user_level_client_config_mutated"])
+        self.assertIn("Library/XUUnityLightMcp/config/bridge_config.json", mutation["path"])
 
     def test_ensure_ready_success_can_return_full_payload(self) -> None:
         args = argparse.Namespace(

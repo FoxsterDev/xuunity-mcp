@@ -2,18 +2,48 @@
 
 ## Unreleased
 
+## 0.3.40
+
+Release tag: `v0.3.40`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.40
+```
+
 ### Changed
 
+- Released `v0.3.40` package metadata, server metadata, package manifests, and Git UPM examples.
 - Tightened `--output compact` batch helper CLI output so compact mode
   whitelists decision fields, normalized lane/verdict fields, and artifact
   pointers instead of copying the full batch result summary. Full output remains
   unchanged for deep debugging.
+- Made `ensure-ready --open-editor` auto-enable the project-scoped bridge
+  configuration when it is missing or disabled, without mutating user-level MCP
+  client configs.
+- Changed host-facing console grep defaults to path-backed `Editor.log` and
+  added stale-console-buffer warnings for explicit empty Console error searches.
+- Added first-open Unity upgrade/API-Updater modal-block diagnosis with
+  `relaunch_noninteractive_accept_apiupdate` recovery guidance, and pass
+  `-accept-apiupdate` through host-opened Unity launch and batch validation
+  paths.
+- Clarified setup-plan review output so client config paths are separate wiring
+  review targets, not planned setup mutations.
 
 ### Validation
 
 - Added regression coverage that keeps successful compact batch summaries under
   a 500-byte per-project budget and prevents raw log, probe-log, command, and
   workspace side-effect details from re-entering compact output.
+- Added regression coverage for first-open project bridge auto-enable,
+  `Editor.log` console grep defaults, stale Console false-empty warnings,
+  API-Updater modal-block health classification, and project-only setup-plan
+  review output.
+- Release version consistency, release-doc freshness, and public-release safety
+  checks passed for `0.3.40`.
+- Host Python unittest suite: `300` tests passed with `1` expected skip.
+- Public site Playwright checks passed: `39/39`.
 
 ## 0.3.39
 

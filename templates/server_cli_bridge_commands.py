@@ -361,7 +361,7 @@ def cmd_request_scene_open(args):
 
 def cmd_request_console_grep(args):
     project_root = ensure_project_root(args.project_root)
-    source = str(getattr(args, "source", "console") or "console")
+    source = str(getattr(args, "source", "editor_log") or "editor_log")
     if source == "editor_log":
         log_path = resolve_editor_log_path(project_root, getattr(args, "editor_log_path", None))
         try:
@@ -398,6 +398,15 @@ def cmd_request_console_grep(args):
         },
         args.timeout_ms,
     )
+    if response.get("status") == "ok":
+        try:
+            payload = json.loads(str(response.get("payload_json") or "{}"))
+        except json.JSONDecodeError:
+            payload = {}
+        if isinstance(payload, dict):
+            payload = annotate_console_grep_false_empty(payload, args.include_type or [])
+            response = dict(response)
+            response["payload_json"] = json.dumps(payload, ensure_ascii=True)
     print_json(response)
 
 

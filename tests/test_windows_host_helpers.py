@@ -406,6 +406,7 @@ class WindowsHostHelperTests(unittest.TestCase):
         self.assertIn("WIN:/mnt/d/Project", command)
         self.assertIn("WIN:/mnt/d/Project/Library/XUUnityLightMcp/logs/batch.log", command)
         self.assertIn("WIN:/mnt/d/Project/Library/XUUnityLightMcp/results/editmode.json", command)
+        self.assertIn("-accept-apiupdate", command)
 
     def test_read_json_on_invalid_utf8_raises_json_decode_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

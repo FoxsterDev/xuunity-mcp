@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-07-01`
-Status: `current for v0.3.39`
+Status: `current for v0.3.40`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.39`: `291` tests passed, with one expected skip
+- host Python tests for `v0.3.40`: `291` tests passed, with one expected skip
 - source package self-tests for the current release line: EditMode and PlayMode
   self-test lanes passed on runnable installed Unity `2021.3`, `2022.3`, and
   `6000.x` editors after offline optional Test Framework setup
@@ -90,13 +90,25 @@ Pass criteria:
 
 Log-presence checks:
 
-- `unity.console.grep` / `request-console-grep --source console` searches the
-  Unity Console buffer, which can be cleared on Play Mode entry and can evict
-  early or high-volume logs.
+- `unity.console.grep` / `request-console-grep` default to `source=editor_log`
+  for path-backed `Editor.log` checks.
+- Explicit `source=console` searches the Unity Console buffer, which can be
+  cleared on Play Mode entry and can evict early or high-volume logs.
 - An empty console grep is not definitive proof that a log did not happen.
 - Use `unity_console_grep` with `source=editor_log` or
   `request-console-grep --source editor_log` for path-backed Editor.log grep
   when log presence is the validation claim.
+
+First open after a Unity version upgrade:
+
+- Prefer a closed-editor batch pass using `-batchmode -quit -accept-apiupdate`
+  before opening the GUI.
+- If health output reports `possible_interactive_dialog_block`, keep the editor
+  under `observe_only` policy and relaunch non-interactively with
+  `-accept-apiupdate`; do not assume the transport or bridge crashed.
+- `ensure-ready --open-editor` enables the project bridge config when it is
+  missing or disabled, but package declaration alone still does not prove a live
+  bridge heartbeat.
 
 ### 3. Interactive Acceptance Scenario
 
