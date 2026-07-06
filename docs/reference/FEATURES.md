@@ -1,7 +1,7 @@
 # Features
 
-Date: `2026-07-01`
-Status: `current for v0.3.40`
+Date: `2026-07-06`
+Status: `current for v0.3.41`
 
 XUUnity Light Unity MCP is optimized for validation-first Unity Editor
 automation: status, compile, tests, scene checks, Game View evidence, scenario
@@ -40,13 +40,13 @@ Unity MCP implementations when the user wants safe production validation.
 | Compile checks without active platform switch | `Core` | `unity_compile_player_scripts` compiles target/options/defines combinations without switching active Unity build target. | Lets agents validate Android/iOS/profile cases without mutating project-wide target state. |
 | Compile matrix across targets and defines | `Core` | `unity_compile_matrix` runs a sequence of target/options/defines compile checks. | Covers release-profile validation loops in one workflow. |
 | Request journal final accounting | `Core` | `unity_request_final_status`, `request-final-status`, and request journals recover terminal state after reloads or wrapper timeouts. | Separates transport churn from actual Unity operation results. |
-| Compact low-token summaries | `Core` | `ensure-ready` defaults to `payload_mode=compact_ensure_ready`; `unity_status_summary` defaults to `payload_mode=compact_status_summary`; `unity_scenario_run_and_wait` defaults to `payload_mode=compact_decision`; refresh, compile, build-config compile, and direct EditMode/PlayMode test MCP tools default to compact operation summaries. | Agents get actionable evidence without dumping logs; `--include-full-payload`, `includeFullPayload=true`, verbose scenario mode, or emitted full-payload recovery arguments remain available for deep debug. |
+| Compact low-token summaries | `Core` | `ensure-ready` defaults to `payload_mode=compact_ensure_ready`; `unity_status_summary` defaults to `payload_mode=compact_status_summary`; `unity_scenario_run_and_wait` defaults to `payload_mode=compact_decision`; refresh, compile, build-config compile, direct EditMode/PlayMode test MCP tools, and common timeout/transport failure envelopes default to compact decision fields. | Agents get actionable evidence without dumping logs; `--include-full-payload`, `includeFullPayload=true`, verbose scenario mode, or emitted full-payload recovery arguments remain available for deep debug. |
 | Same-host multi-project routing | `Core` | Host-side project context registry maps requests to concrete Unity project/editor state. | Supports multiple Unity projects on one workstation. |
 | License-aware batch lane selection | `Host helper` | `license-capabilities`, `unity_license_capabilities`, and `--batch-fallback-mode auto|off|require-batch`. | Lets agents prefer real batchmode when proven, use safe GUI fallback when batchmode is blocked, and fail closed when restore safety is unknown. |
 | Closed-project batch validation lanes | `Host helper` | `batch-compile`, `batch-compile-matrix`, `batch-build-config-compile-matrix`, `batch-editmode-tests`, and `batch-build-player`. | Lets agents validate closed projects through non-interactive Unity batchmode or safe GUI fallback when needed. |
 | Build-config-driven compile matrix | `Project-dependent` | `unity_compile_build_config_matrix` and `batch-build-config-compile-matrix` resolve project build-config assets. | Strong fit for projects with named Android/iOS build profiles. |
 | Bounded scenario workflows | `Project-dependent` | `unity_scenario_validate`, `unity_scenario_run`, `unity_scenario_run_and_wait`, poll-until hooks, project-action steps, result summaries, and persisted scenario artifacts. | Supports repeatable validation recipes and project-local hooks without opening arbitrary mutation; full payload mode omits duplicated `run_start.steps` unless `includeStepPayloads=true`. |
-| Editor-log identity and grep | `Core` | `unity.status`, bridge state, `unity_status_summary`, `request-status-summary`, and `ensure-ready` surface active Editor.log identity; `unity_console_grep` / `request-console-grep` support `source=editor_log`. | Lets agents distinguish console-buffer false negatives from path-backed Editor.log evidence. |
+| Editor-log identity, grep, and tail | `Core` | `unity.status`, bridge state, `unity_status_summary`, `request-status-summary`, and `ensure-ready` surface active Editor.log identity; `unity_console_grep` / `request-console-grep` and `unity_console_tail` / `request-console-tail` support `source=editor_log`. | Lets agents distinguish console-buffer false negatives from path-backed Editor.log evidence. |
 | Game View screenshot and resolution control | `Reflection-gated` | `unity_game_view_configure` and `unity_game_view_screenshot` are capability-probed editor features. | Provides visual evidence while acknowledging Unity-version sensitivity. |
 | SDK/EDM4U validation helpers | `Project-dependent` | `unity_edm4u_resolve`, `unity_sdk_dependency_verify`, and artifact expectation checks. | Useful for mobile SDK dependency restore/export/build workflows. |
 | Cross-platform client templates | `Template provided` | Linux/macOS configs use shell launchers; native Windows configs use `.cmd`; PowerShell `.ps1` launchers are also shipped for environments that allow them. | Covers common MCP clients without relying on one OS shell model. |
@@ -67,7 +67,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Project refresh | `unity_project_refresh` | `Supported` | Refreshes AssetDatabase and can request package resolve or health re-probe; compact default preserves settled refresh fields and full payload is opt-in. |
 | EDM4U | `unity_edm4u_resolve` | `Project-dependent` | Requires External Dependency Manager for Unity and whitelisted resolver menu availability. |
 | SDK validation | `unity_sdk_dependency_verify` | `Project-dependent` | Requires explicit generated-artifact expectations. |
-| Console | `unity_console_tail` | `Core` | Returns recent Unity console items in normalized form. |
+| Console | `unity_console_tail` | `Core` | Returns recent path-backed Editor.log lines by default; explicit `source=console` returns normalized in-memory Console-buffer items with stale-buffer caveats. |
 | Console | `unity_console_grep` | `Core` | Returns compact console or Editor.log matches by string or regex without stack traces by default; use `source=editor_log` for path-backed log-presence checks. |
 | Console | `unity_loading_timing` | `Core` | Returns compact loading/startup timing evidence through `unity.console.grep`. |
 | Scene | `unity_scene_snapshot` | `Core` | Lightweight active-scene snapshot. |
@@ -141,8 +141,8 @@ Unity MCP implementations when the user wants safe production validation.
 
 | Target | Status | Validation notes |
 | --- | --- | --- |
-| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.40`; old `templates/unity-package#v0.3.11` is migration-only. |
-| macOS host tools | `Validated in this release environment` | Host Python unittest suite passed for `v0.3.40`: `300` tests with one expected skip. |
+| Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.41`; old `templates/unity-package#v0.3.11` is migration-only. |
+| macOS host tools | `Validated in this release environment` | Host Python unittest suite passed for `v0.3.41`: `309` tests with one expected skip. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |
 | Claude Code | `Template provided` | Project `.mcp.json`, Windows `.mcp.windows.json`, and user-scope installer path are documented. |

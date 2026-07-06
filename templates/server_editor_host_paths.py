@@ -226,22 +226,43 @@ def classify_editor_log(log_text: str, startup_policy: str) -> tuple[str, str] |
             "Unity could not clone a git package dependency. Inspect Editor.log for the failing dependency URL or commit hash.",
         )
 
-    if "error CS" in log_text or "AssetDatabase: script compilation time:" in log_text and "error CS" in log_text:
+    safe_mode_marker_present = any(
+        marker in log_text
+        for marker in (
+            "Safe Mode",
+            "safe mode",
+            "Enter Safe Mode",
+            "Opening project in Safe Mode",
+        )
+    )
+    compile_error_present = "error CS" in log_text
+    if compile_error_present:
+        if safe_mode_marker_present:
+            return (
+                "interactive_compile_block_with_safe_mode_dialog",
+                "Compilation errors were detected during startup and Editor.log includes Safe Mode markers. "
+                "This wrapper will not click Safe Mode dialogs; run the batch compile gate and fix compile "
+                "errors or open Safe Mode manually.",
+            )
+
         if startup_policy == "batch_compile_lane":
             return (
                 "interactive_compile_block_detected",
-                "Interactive Unity startup is blocked by compilation errors. Use the batch compile lane for compile-only validation or fix the compile errors first.",
+                "Interactive Unity startup is blocked by compilation errors. Use the batch compile lane for "
+                "compile-only validation or fix the compile errors first.",
             )
 
         if startup_policy == "auto_enter_safe_mode_preferred":
             return (
                 "safe_mode_manual_required",
-                "Compilation errors were detected during startup. This host-side wrapper cannot click the Safe Mode dialog. Prefer auto-enter Safe Mode in Unity preferences or reopen manually into Safe Mode.",
+                "Compilation errors were detected during startup. This host-side wrapper cannot click the Safe "
+                "Mode dialog. Prefer auto-enter Safe Mode in Unity preferences or reopen manually into Safe Mode.",
             )
 
         return (
             "interactive_compile_block_detected",
-            "Compilation errors were detected during interactive startup. This wrapper is failing fast instead of waiting for a bridge heartbeat that cannot become healthy.",
+            "Compilation errors were detected during interactive startup. This wrapper is failing fast instead "
+            "of waiting for a bridge heartbeat that cannot become healthy.",
         )
 
     return None

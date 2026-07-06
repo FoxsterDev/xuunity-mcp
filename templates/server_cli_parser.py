@@ -131,6 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
     status_summary_cmd = sub.add_parser("request-status-summary", help="Send unity.status and print a compact summary suitable for polling.")
     status_summary_cmd.add_argument("--project-root", required=True)
     status_summary_cmd.add_argument("--timeout-ms", type=int, default=5000)
+    status_summary_cmd.add_argument("--include-full-payload", action="store_true")
     status_summary_cmd.set_defaults(func_name="cmd_request_status_summary")
 
     latest_status_cmd = sub.add_parser(
@@ -233,6 +234,15 @@ def build_parser() -> argparse.ArgumentParser:
     console_grep_cmd.add_argument("--limit", type=int, default=20)
     console_grep_cmd.add_argument("--timeout-ms", type=int, default=5000)
     console_grep_cmd.set_defaults(func_name="cmd_request_console_grep")
+
+    console_tail_cmd = sub.add_parser("request-console-tail", help="Return recent Unity console messages or the path-backed Editor.log tail.")
+    console_tail_cmd.add_argument("--project-root", required=True)
+    console_tail_cmd.add_argument("--source", choices=["console", "editor_log"], default="editor_log")
+    console_tail_cmd.add_argument("--editor-log-path")
+    console_tail_cmd.add_argument("--include-type", action="append", default=[])
+    console_tail_cmd.add_argument("--limit", type=int, default=50)
+    console_tail_cmd.add_argument("--timeout-ms", type=int, default=5000)
+    console_tail_cmd.set_defaults(func_name="cmd_request_console_tail")
 
     loading_timing_cmd = sub.add_parser("request-loading-timing", help="Return compact loading/startup timing console evidence using unity.console.grep.")
     loading_timing_cmd.add_argument("--project-root", required=True)

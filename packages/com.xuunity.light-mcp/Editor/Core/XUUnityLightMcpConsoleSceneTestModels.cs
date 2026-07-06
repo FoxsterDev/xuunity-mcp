@@ -8,6 +8,7 @@ namespace XUUnity.LightMcp.Editor.Core
         {
             public int limit = 50;
             public string[] includeTypes = null;
+            public string source = "console";
         }
 
         [Serializable]
@@ -35,12 +36,16 @@ namespace XUUnity.LightMcp.Editor.Core
         {
             public string backend_id = "xuunity.light_unity_mcp";
             public string project_root = "";
+            public string source = "console";
             public string pattern = "";
             public bool regex;
             public bool ignore_case;
             public int match_count;
             public List<XUUnityLightMcpConsoleItem> items = new();
             public bool truncated;
+            public string result_trust_class = "";
+            public string console_tail_caveat = "";
+            public string recommended_next_action = "";
             public string validation_evidence = "unity_mcp";
         }
 

@@ -1077,6 +1077,15 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertIn("-batchmode -quit -accept-apiupdate", command)
         self.assertIn("-projectPath /tmp/FakeProject", command)
 
+    def test_recommended_recovery_command_for_safe_mode_compile_gate(self) -> None:
+        command = server.recommended_recovery_command_for_project(
+            Path("/tmp/FakeProject"),
+            "run_batch_compile_gate_and_fix_errors",
+        )
+
+        self.assertIn("batch-build-config-compile-matrix --project-root /tmp/FakeProject", command)
+        self.assertNotIn("-accept-apiupdate", command)
+
     def test_recover_project_bridge_for_reconciliation_raises_guided_bridge_disabled_error(self) -> None:
         context = types.SimpleNamespace(
             discovery_details={

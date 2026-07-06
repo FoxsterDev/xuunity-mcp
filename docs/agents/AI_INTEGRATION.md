@@ -99,6 +99,13 @@ bash xuunity_light_unity_mcp.sh validate-setup \
 Do not globally apply one dependency version across a mixed-version hub. The
 plan computes per-project actions.
 
+Manual `Packages/manifest.json` edits are package declaration only. They may
+make Unity import `com.xuunity.light-mcp`, but they do not enable local editor
+control by themselves. The supported first-open paths are `setup-apply` or
+`ensure-ready --open-editor`, which write the project-scoped bridge config. They
+do not require user-level client config mutation for clients that are already
+connected to this server.
+
 UI auto-review, sandbox approval, or tool-level approval is not a replacement
 for a user-visible preflight review. Before `setup-apply`, installer mutation,
 or user-level client config changes, show the user:
@@ -177,7 +184,7 @@ For production consumers, use the current Git UPM release path:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.40"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.41"
   }
 }
 ```
@@ -294,7 +301,11 @@ When xuunity-mcp is available, use MCP commands. Fallback to Unity CLI if MCP un
 - Use when MCP bridge unavailable or not installed
 
 ### Bridge Health Requirements
-Always run `ensure-ready` before MCP requests. Check `unity.status` if issues occur. Use `project-discovery-report` for diagnostics. Use `recover-editor-session` for stale state.
+Always run `ensure-ready` before MCP requests. Check `unity.status` if issues
+occur. Use `project-discovery-report` for diagnostics. Use
+`recover-editor-session` for stale state. If health reports
+`editor_log_diagnosis.freshness_class=prior_session_or_unverified`, verify with a
+fresh editor session before treating the diagnosis as current compile truth.
 
 ### Test Framework Installation
 MCP offline: `install-test-framework --yes --project-root <path>` (edits manifest.json before Unity opens)
@@ -329,6 +340,8 @@ Alternative policies:
 Important limitation:
 - this service does not auto-click the Unity Safe Mode dialog
 - use Unity preferences to auto-enter Safe Mode if that is the team default
+- if health reports a compile/Safe Mode dialog blocker, run the batch compile
+  gate and fix compile errors, or open Safe Mode manually
 - use `--background-open` when the host should avoid Unity stealing focus on macOS
 
 When the host opened Unity only to run validation, prefer the paired closeout:
@@ -362,7 +375,8 @@ For a new consumer project, the recommended first pass is:
 Before calling bridge tools, run `ensure-ready --open-editor` for the target
 project. Declaring `com.xuunity.light-mcp` in `Packages/manifest.json` is not
 itself bridge enablement; the project-local `bridge_config.json` must be enabled
-so the editor can publish a heartbeat.
+so the editor can publish a heartbeat. A manual Unity open after a manifest edit
+can still return `bridge_disabled` until that project config is enabled.
 
 If the project was just moved to a newer Unity version, run a non-interactive
 compile/import gate first with `-batchmode -quit -accept-apiupdate`, then reopen
@@ -374,7 +388,8 @@ Required dialog blocking the editor main thread on first open.
 3. `request-status-summary`
 4. `unity.capabilities.get`
 5. `unity.health.probe`
-6. `unity.console.tail`
+6. `unity.console.tail` (defaults to `source=editor_log`; use
+   `source=console` only when the in-memory Console buffer is explicitly needed)
 7. `unity.scene.snapshot`
 8. `unity.compile.player_scripts`
 9. `unity.tests.run_editmode`

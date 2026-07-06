@@ -6,7 +6,11 @@ import time
 from pathlib import Path
 from typing import Any
 
-from server_bridge_constants import DEFAULT_BRIDGE_TRANSPORT, DEFAULT_IDLE_STABLE_CYCLES, TCP_LOOPBACK_BRIDGE_TRANSPORT
+from server_bridge_constants import (
+    DEFAULT_BRIDGE_TRANSPORT,
+    DEFAULT_IDLE_STABLE_CYCLES,
+    TCP_LOOPBACK_BRIDGE_TRANSPORT,
+)
 from server_bridge_paths import bridge_config_path, bridge_state_path
 from server_core import ToolInvocationError, read_json
 from server_host_platform import current_host_platform_adapter
@@ -160,6 +164,127 @@ def state_is_idle(state: dict[str, Any]) -> bool:
     )
 
 
+def idle_wait_blocking_reasons(
+    state: dict[str, Any] | None,
+    *,
+    heartbeat_max_age_seconds: int,
+    require_healthy_bridge: bool,
+    after_request_id: str | None = None,
+    not_before_unix: float | None = None,
+) -> list[str]:
+    if not state:
+        return ["bridge_state_missing"]
+
+    reasons: list[str] = []
+    age_seconds = heartbeat_age_seconds(state)
+    if age_seconds is None:
+        reasons.append("heartbeat_missing")
+    elif age_seconds > heartbeat_max_age_seconds:
+        reasons.append("heartbeat_stale")
+
+    if require_healthy_bridge and state.get("health_status") != "healthy":
+        reasons.append("health_not_healthy")
+
+    last_processed_request_id = str(state.get("last_processed_request_id") or "")
+    last_pump_unix = parse_utc_timestamp(state.get("last_pump_utc"))
+    request_match = (
+        after_request_id is None
+        or last_processed_request_id == after_request_id
+        or (
+            not_before_unix is not None
+            and last_pump_unix is not None
+            and last_pump_unix >= not_before_unix
+        )
+    )
+    if not request_match:
+        reasons.append("after_request_not_observed")
+
+    if bool(state.get("domain_reload_in_progress")):
+        reasons.append("domain_reload_in_progress")
+    if bool(state.get("package_operation_in_progress")):
+        reasons.append("package_operation_in_progress")
+    if bool(state.get("refresh_settle_pending")):
+        reasons.append("refresh_settle_pending")
+    if bool(state.get("compile_settle_pending")):
+        reasons.append("compile_settle_pending")
+    if bool(state.get("playmode_transition_pending")):
+        reasons.append("playmode_transition_pending")
+    if bool(state.get("is_compiling")):
+        reasons.append("is_compiling")
+    if bool(state.get("script_reload_pending")):
+        reasons.append("script_reload_pending")
+    if bool(state.get("asset_import_in_progress")):
+        reasons.append("asset_import_in_progress")
+    if bool(state.get("is_updating")):
+        reasons.append("is_updating")
+    if str(state.get("active_operation") or ""):
+        reasons.append("active_operation")
+    if (
+        not bool(state.get("is_playing"))
+        and bool(state.get("is_playing_or_will_change_playmode"))
+    ):
+        reasons.append("playmode_transition")
+    if int(state.get("pending_request_count") or 0) > 0:
+        reasons.append("pending_request_in_flight")
+    if not state_is_idle(state) and not reasons:
+        reasons.append("editor_not_idle")
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for reason in reasons:
+        if reason in seen:
+            continue
+        seen.add(reason)
+        deduped.append(reason)
+    return deduped
+
+
+def build_editor_idle_timeout_details(
+    project_root: Path,
+    *,
+    last_state: dict[str, Any] | None,
+    reason: str,
+    timeout_ms: int,
+    heartbeat_max_age_seconds: int,
+    require_healthy_bridge: bool,
+    after_request_id: str | None = None,
+    not_before_unix: float | None = None,
+    elapsed_seconds: float = 0.0,
+) -> dict[str, Any]:
+    age_seconds = heartbeat_age_seconds(last_state) if last_state else None
+    blocking_reasons = idle_wait_blocking_reasons(
+        last_state,
+        heartbeat_max_age_seconds=heartbeat_max_age_seconds,
+        require_healthy_bridge=require_healthy_bridge,
+        after_request_id=after_request_id,
+        not_before_unix=not_before_unix,
+    )
+    return {
+        "classification": "editor_idle_timeout",
+        "result_trust_class": "editor_state_not_idle",
+        "heartbeat_age_seconds": None if age_seconds is None else round(age_seconds, 3),
+        "busy_reason": derive_busy_reason(last_state),
+        "blocking_reasons": blocking_reasons,
+        "safe_to_retry": False,
+        "recommended_next_action": "wait_for_editor_idle_or_inspect_busy_state",
+        "recommended_recovery_command": (
+            f"xuunity_light_unity_mcp.sh request-status-summary --project-root "
+            f"{project_root.as_posix()} --include-full-payload"
+        ),
+        "request_id": str(after_request_id or ""),
+        "operation": str(reason or ""),
+        "idle_wait_reason": str(reason or ""),
+        "timeout_ms": int(timeout_ms or 0),
+        "elapsed_seconds": round(max(0.0, float(elapsed_seconds or 0.0)), 3),
+        "full_payload_available": True,
+        "full_payload_recovery_command": (
+            f"xuunity_light_unity_mcp.sh request-status-summary --project-root "
+            f"{project_root.as_posix()} --include-full-payload"
+        ),
+        "full_payload_tool_arguments": {"includeFullPayload": True},
+    }
+
+
 def derive_busy_reason(state: dict[str, Any] | None) -> str:
     if not state:
         return "bridge_state_missing"
@@ -299,12 +424,32 @@ def wait_for_editor_idle(
     if after_request_id:
         request_summary = f" request_id={after_request_id}."
 
+    details = build_editor_idle_timeout_details(
+        project_root,
+        last_state=last_state,
+        reason=reason,
+        timeout_ms=timeout_ms,
+        heartbeat_max_age_seconds=heartbeat_max_age_seconds,
+        require_healthy_bridge=require_healthy_bridge,
+        after_request_id=after_request_id,
+        not_before_unix=not_before_unix,
+        elapsed_seconds=time.time() - started_at,
+    )
+    heartbeat_summary = (
+        "unknown"
+        if details["heartbeat_age_seconds"] is None
+        else f"{details['heartbeat_age_seconds']}s"
+    )
+    blocking_summary = ",".join(str(item) for item in details.get("blocking_reasons") or []) or "none"
     raise ToolInvocationError(
         "editor_idle_timeout",
         (
             f"Timed out waiting for Unity editor idle ({reason})."
-            f"{request_summary} {summarize_state_for_error(last_state)}"
+            f"{request_summary} busy_reason={details['busy_reason']} "
+            f"heartbeat_age={heartbeat_summary} blocking_reasons={blocking_summary} "
+            f"recommended_next_action={details['recommended_next_action']}"
         ),
+        details,
     )
 
 

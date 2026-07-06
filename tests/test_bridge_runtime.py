@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -11,6 +12,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server_bridge_runtime
+import server_bridge_state
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -1217,6 +1219,12 @@ class BridgeRuntimeTests(unittest.TestCase):
             self.assertEqual("compact_transport_failure", error.details["request_final_status_payload_mode"])
             self.assertTrue(error.details["full_payload_available"])
             self.assertIn("request-final-status", error.details["full_payload_recovery_command"])
+            self.assertEqual("transport_response_missing", error.details["classification"])
+            self.assertEqual("idle", error.details["busy_reason"])
+            self.assertEqual([], error.details["blocking_reasons"])
+            self.assertTrue(error.details["safe_to_retry"])
+            self.assertNotIn("bridge_stabilization", error.details)
+            self.assertNotIn("safe_retry_budget_total", error.details)
             final_status = error.details["request_final_status"]
             self.assertEqual("compact_final_status", final_status["payload_mode"])
             self.assertEqual(request_id, final_status["request_id"])
@@ -1224,6 +1232,43 @@ class BridgeRuntimeTests(unittest.TestCase):
             self.assertEqual("request_not_observed", final_status["result_trust_class"])
             self.assertNotIn("journal_event_paths", final_status)
             self.assertNotIn("artifact_manifest", final_status)
+
+    def test_editor_idle_timeout_uses_compact_structured_details(self) -> None:
+        state = {
+            "editor_pid": 123,
+            "heartbeat_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "health_status": "healthy",
+            "compile_settle_pending": True,
+            "busy_reason": "compile_settle",
+            "last_processed_request_id": "",
+        }
+
+        with (
+            mock.patch.object(server_bridge_state, "try_read_live_editor_state", return_value=state),
+            mock.patch.object(server_bridge_state, "pid_is_alive", return_value=True),
+            mock.patch.object(server_bridge_state.time, "sleep", return_value=None),
+        ):
+            with self.assertRaises(server_bridge_state.ToolInvocationError) as raised:
+                server_bridge_state.wait_for_editor_idle(
+                    Path("/tmp/FakeProject"),
+                    timeout_ms=1,
+                    heartbeat_max_age_seconds=5,
+                    reason="post_request_settle",
+                    after_request_id="req-idle",
+                )
+
+        error = raised.exception
+        self.assertEqual("editor_idle_timeout", error.code)
+        self.assertEqual("editor_idle_timeout", error.details["classification"])
+        self.assertEqual("editor_state_not_idle", error.details["result_trust_class"])
+        self.assertEqual("compile_settle", error.details["busy_reason"])
+        self.assertIn("compile_settle_pending", error.details["blocking_reasons"])
+        self.assertIn("after_request_not_observed", error.details["blocking_reasons"])
+        self.assertFalse(error.details["safe_to_retry"])
+        self.assertEqual("wait_for_editor_idle_or_inspect_busy_state", error.details["recommended_next_action"])
+        self.assertTrue(error.details["full_payload_available"])
+        self.assertIn("request-status-summary", error.details["full_payload_recovery_command"])
+        self.assertNotIn("bridge_state", error.details)
 
 
 if __name__ == "__main__":

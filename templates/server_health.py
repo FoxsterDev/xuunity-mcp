@@ -17,6 +17,14 @@ EDITOR_LOG_CONSOLE_CAVEAT = (
     "ring-buffer eviction; source=editor_log searches the path-backed Editor.log tail."
 )
 CONSOLE_FALSE_EMPTY_WARNING = "console_buffer_may_be_stale_use_source_editor_log"
+CONSOLE_TAIL_CAVEAT = (
+    "Unity Console tail reads the in-memory Console buffer, which may be stale after clear-on-play or "
+    "ring-buffer eviction; use source=editor_log for compile-error validation."
+)
+EDITOR_LOG_TAIL_CAVEAT = (
+    "Editor.log tail is path-backed but untyped; use error-anchored patterns with unity_console_grep "
+    "source=editor_log for compile-error decisions."
+)
 API_UPDATER_RECOMMENDED_ACTION = "relaunch_noninteractive_accept_apiupdate"
 
 
@@ -253,6 +261,45 @@ def grep_editor_log_payload(
     }
 
 
+def tail_editor_log_payload(
+    project_root: Path,
+    log_path: Path,
+    *,
+    limit: int = 50,
+    max_chars: int = EDITOR_LOG_GREP_MAX_CHARS,
+) -> dict[str, Any]:
+    limit = max(1, int(limit or 50))
+    text = read_editor_log_tail(log_path, max_chars=max_chars)
+    lines = [line.rstrip("\n") for line in text.splitlines() if line.strip()]
+    truncated = len(lines) > limit
+    visible_lines = lines[-limit:] if truncated else lines
+    start_line = max(1, len(lines) - len(visible_lines) + 1)
+    items = [
+        {
+            "type": "editor_log",
+            "message": line,
+            "timestamp": "",
+            "stack_trace": "",
+            "line": start_line + index,
+        }
+        for index, line in enumerate(visible_lines)
+    ]
+    return {
+        "backend_id": "xuunity.light_unity_mcp",
+        "project_root": str(project_root),
+        "source": "editor_log",
+        "editor_log_path": str(log_path),
+        "items": items,
+        "truncated": truncated,
+        "tail_count": len(items),
+        "searched_tail_chars": max_chars,
+        "result_trust_class": "editor_log_path_backed_untyped",
+        "console_tail_caveat": EDITOR_LOG_TAIL_CAVEAT,
+        "recommended_next_action": "use_source_editor_log_grep_for_compile_errors",
+        "validation_evidence": "unity_editor_log",
+    }
+
+
 def console_grep_false_empty_applies(payload: dict[str, Any], include_types: list[str] | None) -> bool:
     try:
         match_count = int(payload.get("match_count") or 0)
@@ -278,6 +325,19 @@ def annotate_console_grep_false_empty(payload: dict[str, Any], include_types: li
     annotated["console_grep_caveat"] = EDITOR_LOG_CONSOLE_CAVEAT
     annotated["result_trust_class"] = "console_buffer_may_be_stale"
     annotated["recommended_next_action"] = "retry_with_source_editor_log"
+    return annotated
+
+
+def annotate_console_tail_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    annotated = dict(payload or {})
+    annotated.setdefault("source", "console")
+    annotated["result_trust_class"] = "console_buffer_may_be_stale"
+    annotated["console_tail_caveat"] = CONSOLE_TAIL_CAVEAT
+    annotated["recommended_next_action"] = "use_source_editor_log_for_compile_errors"
+    warnings = list(annotated.get("warnings") or [])
+    if CONSOLE_FALSE_EMPTY_WARNING not in warnings:
+        warnings.append(CONSOLE_FALSE_EMPTY_WARNING)
+    annotated["warnings"] = warnings
     return annotated
 
 
@@ -398,7 +458,10 @@ def build_editor_log_diagnosis(
         return {
             "code": "api_updater_activity_observed",
             "severity": "warning",
-            "summary": "Editor.log contains API Updater markers; an interactive first-open may be blocked on the API Update Required dialog.",
+            "summary": (
+                "Editor.log contains API Updater markers; an interactive first-open may be blocked on the "
+                "API Update Required dialog."
+            ),
             "evidence_lines": api_updater_lines,
             "scope": log_scope,
         }
@@ -417,7 +480,10 @@ def build_editor_log_diagnosis(
         return {
             "code": "unity_version_upgrade_activity_observed",
             "severity": "warning",
-            "summary": "Editor.log contains Unity version-upgrade markers; a first-open package/import stall may be blocked on an interactive upgrade dialog.",
+            "summary": (
+                "Editor.log contains Unity version-upgrade markers; a first-open package/import stall may be "
+                "blocked on an interactive upgrade dialog."
+            ),
             "evidence_lines": version_upgrade_lines,
             "scope": log_scope,
         }
@@ -432,6 +498,9 @@ def build_editor_log_diagnosis(
                 "An error occurred while resolving packages:",
                 "Could not clone [",
                 "error CS",
+                "Safe Mode",
+                "safe mode",
+                "Enter Safe Mode",
             ],
         )
         return {
@@ -556,6 +625,35 @@ def _collect_progress_evidence(
     return deduped
 
 
+def annotate_editor_log_diagnosis_freshness(
+    editor_log_diagnosis: dict[str, Any],
+    *,
+    bridge_state_live: bool,
+    live_editor_present: bool,
+) -> dict[str, Any]:
+    diagnosis = dict(editor_log_diagnosis or {})
+    if not diagnosis or bridge_state_live:
+        return diagnosis
+
+    if live_editor_present:
+        diagnosis["freshness_class"] = "unverified_live_editor_session"
+        diagnosis["derived_from"] = "editor_log_without_live_bridge_confirmation"
+        diagnosis["reflects_current_working_tree"] = False
+        diagnosis["freshness_warning"] = (
+            "Editor.log diagnosis was produced without a live bridge heartbeat; verify against current "
+            "source and a fresh editor session before treating it as current compile truth."
+        )
+    else:
+        diagnosis["freshness_class"] = "prior_session_or_unverified"
+        diagnosis["derived_from"] = "prior_editor_session"
+        diagnosis["reflects_current_working_tree"] = False
+        diagnosis["freshness_warning"] = (
+            "Editor.log diagnosis reflects a prior or unverified editor session because no live editor "
+            "process/bridge heartbeat was proven."
+        )
+    return diagnosis
+
+
 def classify_project_health(
     *,
     bridge_state: dict[str, Any],
@@ -654,8 +752,6 @@ def classify_project_health(
                 anr_classification = "none"
         if diagnosis_code in {
             "package_resolution_failed",
-            "interactive_compile_block_detected",
-            "safe_mode_manual_required",
         }:
             reason = f"{reason}_with_log_blocker"
             recommended_next_action = "inspect_editor_log"
@@ -663,6 +759,23 @@ def classify_project_health(
             if classification == "anr":
                 classification = "stale"
                 anr_classification = "none"
+        if diagnosis_code in {
+            "interactive_compile_block_detected",
+            "interactive_compile_block_with_safe_mode_dialog",
+            "safe_mode_manual_required",
+        }:
+            reason = "possible_safe_mode_dialog_block"
+            recommended_next_action = "run_batch_compile_gate_and_fix_errors"
+            termination_policy = "observe_only"
+            if classification == "anr":
+                classification = "stale"
+                anr_classification = "none"
+
+    annotated_editor_log_diagnosis = annotate_editor_log_diagnosis_freshness(
+        editor_log_diagnosis,
+        bridge_state_live=bridge_state_live,
+        live_editor_present=live_editor_present,
+    )
 
     return {
         "host_health_classification": classification,
@@ -673,6 +786,6 @@ def classify_project_health(
         "host_health_busy_reason": busy_reason,
         "host_health_progress_evidence": progress_evidence,
         "anr_classification": anr_classification,
-        "editor_log_diagnosis": dict(editor_log_diagnosis or {}),
-        "editor_log_scope": dict((editor_log_diagnosis or {}).get("scope") or {}),
+        "editor_log_diagnosis": annotated_editor_log_diagnosis,
+        "editor_log_scope": dict(annotated_editor_log_diagnosis.get("scope") or {}),
     }

@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+## 0.3.41
+
+Release tag: `v0.3.41`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.41
+```
+
+### Changed
+
+- Released `v0.3.41` package metadata, server metadata, package manifests, and Git UPM examples.
+- Made `transport_response_missing` and `editor_idle_timeout` compact by
+  default while preserving full-payload recovery commands and tool arguments.
+- Changed `unity_console_tail` / `request-console-tail` to use path-backed
+  `Editor.log` by default, with explicit stale-buffer caveats when callers opt
+  into the in-memory Unity Console buffer.
+- Added Safe Mode compile-dialog classification for first-open/GUI readiness
+  failures, with observe-only recovery guidance through the batch compile gate
+  or manual Safe Mode handling.
+- Annotated offline or unverified `editor_log_diagnosis` output with freshness
+  fields so prior-session compile blockers are not mistaken for current working
+  tree truth.
+- Documented the manual-manifest/manual-open bridge enablement boundary and the
+  "compile-green is not editor-startup-clean" validation caveat.
+
+### Validation
+
+- Release version consistency, release-doc freshness, and public-release safety
+  checks passed for `0.3.41`.
+- Host Python unittest suite: `309` tests passed with `1` expected skip.
+- Public site Playwright checks passed: `39/39`.
+
 ## 0.3.40
 
 Release tag: `v0.3.40`

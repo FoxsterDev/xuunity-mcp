@@ -410,6 +410,48 @@ def cmd_request_console_grep(args):
     print_json(response)
 
 
+def cmd_request_console_tail(args):
+    project_root = ensure_project_root(args.project_root)
+    source = str(getattr(args, "source", "editor_log") or "editor_log")
+    limit = max(1, int(args.limit or 50))
+    if source == "editor_log":
+        log_path = resolve_editor_log_path(project_root, getattr(args, "editor_log_path", None))
+        payload = tail_editor_log_payload(
+            project_root,
+            log_path,
+            limit=limit,
+        )
+        print_json(
+            {
+                "status": "ok",
+                "payload_type": "unity.console.tail",
+                "payload_json": json.dumps(payload, ensure_ascii=True),
+            }
+        )
+        return
+
+    response = invoke_bridge(
+        str(project_root),
+        "unity.console.tail",
+        {
+            "limit": limit,
+            "includeTypes": args.include_type or None,
+            "source": "console",
+        },
+        args.timeout_ms,
+    )
+    if response.get("status") == "ok":
+        try:
+            payload = json.loads(str(response.get("payload_json") or "{}"))
+        except json.JSONDecodeError:
+            payload = {}
+        if isinstance(payload, dict):
+            payload = annotate_console_tail_payload(payload)
+            response = dict(response)
+            response["payload_json"] = json.dumps(payload, ensure_ascii=True)
+    print_json(response)
+
+
 def cmd_request_loading_timing(args):
     project_root = ensure_project_root(args.project_root)
     summary = request_loading_timing_summary(

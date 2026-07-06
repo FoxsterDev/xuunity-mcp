@@ -437,16 +437,32 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_console_tail": {
         "bridgeOperation": "unity.console.tail",
-        "description": "Return recent Unity console items in normalized form.",
+        "description": (
+            "Return recent path-backed Editor.log lines by default, or explicit Unity in-memory "
+            "Console buffer items with stale-buffer caveats."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
+                "source": {
+                    "type": "string",
+                    "enum": ["console", "editor_log"],
+                    "default": "editor_log",
+                    "description": (
+                        "console tails Unity's in-memory Console buffer and may be stale; "
+                        "editor_log tails the path-backed Editor.log."
+                    ),
+                },
+                "editorLogPath": {
+                    "type": "string",
+                    "description": "Optional Editor.log path when source=editor_log. Defaults to the host-managed project log path.",
+                },
                 "limit": {"type": "integer", "default": 50, "minimum": 1},
                 "includeTypes": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Subset of log, warning, error, exception."
+                    "description": "Subset of log, warning, error, exception for source=console. Editor.log tail is untyped."
                 },
                 "timeoutMs": {"type": "integer", "default": 5000, "minimum": 1000}
             },

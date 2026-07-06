@@ -31,10 +31,12 @@ from server_specs import (
 from server_health import (
     FRESH_HEARTBEAT_MAX_AGE_SECONDS,
     annotate_console_grep_false_empty,
+    annotate_console_tail_payload,
     build_editor_log_identity,
     build_editor_log_diagnosis,
     classify_project_health,
     grep_editor_log_payload,
+    tail_editor_log_payload,
 )
 from server_license import (
     build_license_capabilities,
@@ -286,7 +288,7 @@ from server_batch_recovery import (
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {
     "name": "xuunity-mcp",
-    "version": "0.3.40",
+    "version": "0.3.41",
 }
 
 # === Block A: Registry & Discovery Helpers ===
@@ -410,11 +412,18 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
 
     payload: dict[str, Any] = {"error": error}
     for key in (
+        "classification",
         "request_id",
+        "operation",
         "request_submitted",
         "request_ownership_acquired",
         "transport_outcome",
         "operation_outcome",
+        "result_trust_class",
+        "heartbeat_age_seconds",
+        "busy_reason",
+        "blocking_reasons",
+        "safe_to_retry",
         "recommended_next_action",
         "next_distinct_action",
         "closeout_classification",
@@ -440,8 +449,12 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "request_processed",
         "bridge_stabilization",
         "request_final_status",
+        "request_final_status_payload_mode",
         "journal_event_path",
         "recommended_recovery_command",
+        "full_payload_available",
+        "full_payload_recovery_command",
+        "full_payload_tool_arguments",
         "package_import_state",
         "package_import_diagnosis",
         "live_project_editor_pids",
@@ -1478,6 +1491,64 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     return bridge_response_to_tool_result(response)
 
 
+def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    source = arguments.get("source", "editor_log")
+    if source not in {"console", "editor_log"}:
+        raise JsonRpcError(-32602, "source must be console or editor_log.")
+
+    timeout_ms = arguments.get("timeoutMs", 5000)
+    if not isinstance(timeout_ms, int):
+        raise JsonRpcError(-32602, "timeoutMs must be an integer.")
+
+    limit = arguments.get("limit", 50)
+    if not isinstance(limit, int):
+        raise JsonRpcError(-32602, "limit must be an integer.")
+
+    include_types = _optional_string_list_argument(arguments, "includeTypes")
+    project_root = ensure_project_root(project_root_value)
+
+    if source == "editor_log":
+        editor_log_path = arguments.get("editorLogPath")
+        if editor_log_path is not None and not isinstance(editor_log_path, str):
+            raise JsonRpcError(-32602, "editorLogPath must be a string when provided.")
+        log_path = resolve_editor_log_path(project_root, editor_log_path)
+        return mcp_json_result(
+            tail_editor_log_payload(
+                project_root,
+                log_path,
+                limit=max(1, limit),
+            )
+        )
+
+    try:
+        response = invoke_bridge(
+            str(project_root),
+            "unity.console.tail",
+            {
+                "limit": max(1, limit),
+                "includeTypes": include_types or None,
+                "source": "console",
+            },
+            timeout_ms,
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    if response.get("status") == "ok":
+        try:
+            payload = json.loads(str(response.get("payload_json") or "{}"))
+        except json.JSONDecodeError:
+            payload = {}
+        if isinstance(payload, dict):
+            payload = annotate_console_tail_payload(payload)
+            response = dict(response)
+            response["payload_json"] = json.dumps(payload, ensure_ascii=True)
+    return bridge_response_to_tool_result(response)
+
+
 def call_unity_scenario_run_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     try:
         arguments = normalize_scenario_tool_arguments(arguments)
@@ -2043,6 +2114,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_scenario_run": call_unity_scenario_run_tool,
             "unity_scenario_run_and_wait": call_unity_scenario_run_and_wait_tool,
             "unity_console_grep": call_unity_console_grep_tool,
+            "unity_console_tail": call_unity_console_tail_tool,
             "unity_loading_timing": call_unity_loading_timing_tool,
             "unity_project_action_list": call_unity_project_action_list_tool,
             "unity_project_action_invoke": call_unity_project_action_invoke_tool,
@@ -2380,6 +2452,7 @@ wrap_globals_with_proxies(globals(), [
     "call_unity_scenario_run_and_wait_tool",
     "call_unity_scenario_validate_tool",
     "call_unity_console_grep_tool",
+    "call_unity_console_tail_tool",
     "call_unity_loading_timing_tool",
     "call_unity_scenario_run_tool",
     "call_unity_status_summary_tool",

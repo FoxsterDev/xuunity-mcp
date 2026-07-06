@@ -15,7 +15,12 @@ from server_bridge_journal import (
     write_host_request_journal_event,
 )
 from server_bridge_paths import default_editor_log_path, response_path, test_result_path
-from server_bridge_state import read_best_effort_bridge_state, try_read_bridge_state
+from server_bridge_state import (
+    derive_busy_reason,
+    heartbeat_age_seconds,
+    read_best_effort_bridge_state,
+    try_read_bridge_state,
+)
 from server_core import ToolInvocationError, read_json
 from server_operation_evidence import attach_operation_evidence_to_final_status
 
@@ -386,7 +391,11 @@ def build_request_final_status(
 
         summary = {
             "request_id": request_id,
-            "operation": str((started_event or completed_event or reclassified_event or submitted_event or {}).get("operation") or operation or ""),
+            "operation": str(
+                (started_event or completed_event or reclassified_event or submitted_event or {}).get("operation")
+                or operation
+                or ""
+            ),
             "request_submitted": request_submitted,
             "request_started": request_started,
             "request_completed": request_completed,
@@ -410,8 +419,16 @@ def build_request_final_status(
                 else ""
             ),
             "request_submitted_at_utc": str((submitted_event or {}).get("event_at_utc") or ""),
-            "request_started_at_utc": str((started_event or {}).get("started_at_utc") or (started_event or {}).get("event_at_utc") or ""),
-            "request_completed_at_utc": str((completed_event or {}).get("completed_at_utc") or (completed_event or {}).get("event_at_utc") or ""),
+            "request_started_at_utc": str(
+                (started_event or {}).get("started_at_utc")
+                or (started_event or {}).get("event_at_utc")
+                or ""
+            ),
+            "request_completed_at_utc": str(
+                (completed_event or {}).get("completed_at_utc")
+                or (completed_event or {}).get("event_at_utc")
+                or ""
+            ),
             "last_event_type": str((last_event or {}).get("event_type") or ""),
             "last_event_at_utc": str((last_event or {}).get("event_at_utc") or ""),
             "last_bridge_generation_seen": int((last_event or {}).get("bridge_generation") or active_state.get("bridge_generation") or 0),
@@ -708,9 +725,18 @@ def build_test_verdict_summary(
         recommended_next_action = "inspect_artifacts_before_retry"
         trust_class = "wrapper_failed_unity_unproven"
 
-    runtime_timeout_ms = int((source_payload or {}).get("runtime_timeout_ms") or (source_payload or {}).get("request_timeout_ms") or 0)
+    runtime_timeout_ms = int(
+        (source_payload or {}).get("runtime_timeout_ms")
+        or (source_payload or {}).get("request_timeout_ms")
+        or 0
+    )
     elapsed_runtime_seconds = None
-    baseline_unix = parse_journal_utc_timestamp(str((source_payload or {}).get("last_progress_at_utc") or (source_payload or {}).get("started_at_utc") or ""))
+    baseline_timestamp = str(
+        (source_payload or {}).get("last_progress_at_utc")
+        or (source_payload or {}).get("started_at_utc")
+        or ""
+    )
+    baseline_unix = parse_journal_utc_timestamp(baseline_timestamp)
     if baseline_unix > 0:
         elapsed_runtime_seconds = round(max(0.0, time.time() - baseline_unix), 3)
 
@@ -907,6 +933,7 @@ def build_transport_response_missing_tool_error(
     )
     compact_final_status = build_compact_final_status_projection(final_status)
     stabilization = final_status.get("bridge_stabilization") or {}
+    heartbeat_age = heartbeat_age_seconds(current_state or {}) if current_state else None
     operation_outcome = str(final_status.get("operation_outcome") or "unknown")
     result_trust_class = str(final_status.get("result_trust_class") or "")
     request_processed = bool(final_status.get("request_started") or final_status.get("request_completed"))
@@ -936,6 +963,7 @@ def build_transport_response_missing_tool_error(
         )
 
     details: dict[str, Any] = {
+        "classification": "transport_response_missing",
         "request_id": request_id,
         "operation": operation,
         "transport": transport,
@@ -944,17 +972,17 @@ def build_transport_response_missing_tool_error(
         "recommended_next_action": recommended_next_action,
         "result_trust_class": result_trust_class,
         "recommended_recovery_command": recommended_recovery_command,
+        "heartbeat_age_seconds": None if heartbeat_age is None else round(heartbeat_age, 3),
+        "busy_reason": derive_busy_reason(current_state),
+        "blocking_reasons": list(stabilization.get("blocking_reasons") or []),
+        "safe_to_retry": bool(stabilization.get("safe_to_retry")),
         "retryable": bool(final_status.get("retryable")) if request_processed else True,
         "request_processed": request_processed,
         "request_final_status": compact_final_status,
         "request_final_status_payload_mode": "compact_transport_failure",
         "full_payload_available": True,
         "full_payload_recovery_command": recommended_recovery_command,
-        "bridge_stabilization": stabilization,
-        "safe_retry_budget_total": int(final_status.get("safe_retry_budget_total") or 0),
-        "safe_retry_budget_remaining": int(final_status.get("safe_retry_budget_remaining") or 0),
-        "safe_retry_budget_exhausted": bool(final_status.get("safe_retry_budget_exhausted")),
-        "safe_retry_budget_blocked": bool(final_status.get("safe_retry_budget_blocked")),
+        "full_payload_tool_arguments": {"includeFullPayload": True},
     }
     if transport_host:
         details["host"] = transport_host

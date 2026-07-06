@@ -1,7 +1,7 @@
 # Install XUUnity Light Unity MCP
 
 Date: `2026-05-23`
-Status: `current for v0.3.40`
+Status: `current for v0.3.41`
 
 XUUnity Light Unity MCP has two pieces:
 
@@ -108,7 +108,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.40"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.41"
   }
 }
 ```
@@ -475,7 +475,7 @@ If those checks succeed but a later compile or test run fails, treat that as a
 Unity project or runtime failure unless the error explicitly points back to
 bridge readiness, package import, or unsupported capability.
 
-For package-level verification after upgrading to `v0.3.40`, run:
+For package-level verification after upgrading to `v0.3.41`, run:
 
 ```bash
 templates/smoke/run_package_self_tests.sh \

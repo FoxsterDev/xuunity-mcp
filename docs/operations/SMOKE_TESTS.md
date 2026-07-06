@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-07-01`
-Status: `current for v0.3.40`
+Status: `current for v0.3.41`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.40`: `291` tests passed, with one expected skip
+- host Python tests for `v0.3.41`: `291` tests passed, with one expected skip
 - source package self-tests for the current release line: EditMode and PlayMode
   self-test lanes passed on runnable installed Unity `2021.3`, `2022.3`, and
   `6000.x` editors after offline optional Test Framework setup
@@ -92,12 +92,19 @@ Log-presence checks:
 
 - `unity.console.grep` / `request-console-grep` default to `source=editor_log`
   for path-backed `Editor.log` checks.
+- `unity.console.tail` / `request-console-tail` also default to
+  `source=editor_log`. Explicit `source=console` preserves the in-memory Console
+  buffer tail, but payloads mark it as `console_buffer_may_be_stale`.
 - Explicit `source=console` searches the Unity Console buffer, which can be
   cleared on Play Mode entry and can evict early or high-volume logs.
 - An empty console grep is not definitive proof that a log did not happen.
 - Use `unity_console_grep` with `source=editor_log` or
   `request-console-grep --source editor_log` for path-backed Editor.log grep
   when log presence is the validation claim.
+- When health runs without a live bridge/editor confirmation, treat
+  `editor_log_diagnosis.freshness_class=prior_session_or_unverified` as stale
+  evidence. Verify current source or reopen through `ensure-ready --open-editor`
+  before treating that diagnosis as current compile truth.
 
 First open after a Unity version upgrade:
 
@@ -106,6 +113,10 @@ First open after a Unity version upgrade:
 - If health output reports `possible_interactive_dialog_block`, keep the editor
   under `observe_only` policy and relaunch non-interactively with
   `-accept-apiupdate`; do not assume the transport or bridge crashed.
+- If health output reports `possible_safe_mode_dialog_block`, keep the editor
+  under `observe_only` policy. Do not auto-click Safe Mode. Run the batch compile
+  gate (`batch-build-config-compile-matrix` when available) and fix compile
+  errors, or open Unity Safe Mode manually.
 - `ensure-ready --open-editor` enables the project bridge config when it is
   missing or disabled, but package declaration alone still does not prove a live
   bridge heartbeat.
@@ -150,7 +161,8 @@ Optional project-local additions:
 - `game_view_configure`
 - `game_view_screenshot`
 - `project_defined_hook`
-- `console_tail`
+- `console_tail` (defaults to path-backed `editor_log`; use explicit
+  `source=console` only for in-memory Console-buffer checks)
 
 Pass criteria:
 
@@ -312,6 +324,9 @@ Pass criteria:
   `discovery_classification`
 - summary surfaces return the expected `reconciliation_case`
 - the surfaced `recommended_next_action` is coherent with the detected case
+- `bridge_disabled` guidance distinguishes package declaration from project
+  bridge enablement: manual manifest edits and manual Unity opens may import the
+  package but are not treated as bridge opt-in
 
 ### 13. Health Policy Smoke
 

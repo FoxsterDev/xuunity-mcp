@@ -110,6 +110,9 @@
       ],
       [
         "--timeout-ms"
+      ],
+      [
+        "--include-full-payload"
       ]
     ],
     "root_contains": [
@@ -118,7 +121,7 @@
       "request-scenario-run-and-wait",
       "batch-compile"
     ],
-    "root_command_count": 65,
+    "root_command_count": 66,
     "root_commands": [
       "setup-plan",
       "setup-apply",
@@ -144,6 +147,7 @@
       "request-scene-assert",
       "request-scene-open",
       "request-console-grep",
+      "request-console-tail",
       "request-loading-timing",
       "request-editor-quit",
       "verify-editor-closed",
@@ -188,7 +192,7 @@
     ]
   },
   "mcp_tools_list": {
-  "sha256": "9af9c108ca3d3671cf3c3e86d36c905e0d027366cb7c6a9c3e4178a8ec561413",
+  "sha256": "8ae73c77e82d5df0e9313e378cf1b109173f23b864ac0f7c9247e54239aabbcc",
     "tool_count": 45,
     "tool_names": [
       "xuunity_setup_plan",

@@ -1,7 +1,7 @@
 # Glossary
 
 Date: `2026-05-23`
-Status: `current for v0.3.40`
+Status: `current for v0.3.41`
 
 ## XUUnity
 
@@ -22,7 +22,7 @@ The Unity package is `com.xuunity.light-mcp`. It contains the editor-side bridge
 Current production Git UPM path:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.40
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.41
 ```
 
 ## Git UPM

@@ -45,6 +45,7 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "request-final-status",
                 "request-cancel",
                 "request-stale-cleanup",
+                "request-console-tail",
                 "request-scenario-results-list",
                 "request-scenario-result-latest",
                 "request-project-refresh",
@@ -81,6 +82,18 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                 "/tmp/FakeProject",
                 "--pattern",
                 "CS[0-9]",
+            ]
+        )
+
+        self.assertEqual("editor_log", args.source)
+
+    def test_request_console_tail_defaults_to_editor_log_source(self) -> None:
+        parser = server.build_parser()
+        args = parser.parse_args(
+            [
+                "request-console-tail",
+                "--project-root",
+                "/tmp/FakeProject",
             ]
         )
 
@@ -126,6 +139,9 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         console_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_console_grep")
         self.assertIn("source", console_tool["inputSchema"]["properties"])
         self.assertEqual("editor_log", console_tool["inputSchema"]["properties"]["source"]["default"])
+        console_tail_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_console_tail")
+        self.assertIn("source", console_tail_tool["inputSchema"]["properties"])
+        self.assertEqual("editor_log", console_tail_tool["inputSchema"]["properties"]["source"]["default"])
         scene_open_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_scene_open")
         self.assertIn("scenePath", scene_open_tool["inputSchema"]["properties"])
         self.assertIn("allowDirtySceneDiscard", scene_open_tool["inputSchema"]["properties"])
@@ -301,6 +317,89 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         structured = response["result"]["structuredContent"]
         self.assertEqual("console", structured["source"])
         self.assertEqual("console_buffer_may_be_stale", structured["result_trust_class"])
+        self.assertIn("console_buffer_may_be_stale_use_source_editor_log", structured["warnings"])
+
+    def test_unity_console_tail_defaults_to_editor_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir) / "FakeProject"
+            project_root.mkdir()
+            log_path = project_root / "Library" / "XUUnityLightMcp" / "logs" / "unity_editor.log"
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text("first line\nAssets/Foo.cs(1,1): error CS1002: ; expected\n", encoding="utf-8")
+
+            with (
+                mock.patch.object(server, "ensure_project_root", return_value=project_root),
+                mock.patch.object(server, "invoke_bridge") as invoke_mock,
+            ):
+                response = server.handle_json_rpc_message(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 29,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "unity_console_tail",
+                            "arguments": {
+                                "projectRoot": str(project_root),
+                                "editorLogPath": str(log_path),
+                                "limit": 1,
+                            },
+                        },
+                    },
+                    {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+                )
+
+        invoke_mock.assert_not_called()
+        structured = response["result"]["structuredContent"]
+        self.assertEqual("editor_log", structured["source"])
+        self.assertEqual("editor_log_path_backed_untyped", structured["result_trust_class"])
+        self.assertEqual(1, structured["tail_count"])
+        self.assertIn("CS1002", structured["items"][0]["message"])
+        self.assertIn("untyped", structured["console_tail_caveat"])
+
+    def test_unity_console_tail_explicit_console_warns_about_stale_buffer(self) -> None:
+        invoke_calls: list[tuple[str, dict[str, object], int]] = []
+
+        def fake_invoke_bridge(project_root_value: str, operation: str, operation_args: dict[str, object], timeout_ms: int) -> dict[str, object]:
+            invoke_calls.append((operation, dict(operation_args), timeout_ms))
+            return {
+                "status": "ok",
+                "payload_type": "unity.console.tail",
+                "payload_json": json.dumps(
+                    {
+                        "project_root": project_root_value,
+                        "items": [],
+                        "truncated": False,
+                    }
+                ),
+            }
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "invoke_bridge", side_effect=fake_invoke_bridge),
+        ):
+            response = server.handle_json_rpc_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 30,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "unity_console_tail",
+                        "arguments": {
+                            "projectRoot": "/tmp/FakeProject",
+                            "source": "console",
+                            "includeTypes": ["error"],
+                        },
+                    },
+                },
+                {"initialized": True, "protocolVersion": server.PROTOCOL_VERSION},
+            )
+
+        self.assertEqual(1, len(invoke_calls))
+        self.assertEqual("unity.console.tail", invoke_calls[0][0])
+        structured = response["result"]["structuredContent"]
+        self.assertEqual("console", structured["source"])
+        self.assertEqual("console_buffer_may_be_stale", structured["result_trust_class"])
+        self.assertEqual("use_source_editor_log_for_compile_errors", structured["recommended_next_action"])
         self.assertIn("console_buffer_may_be_stale_use_source_editor_log", structured["warnings"])
 
     def test_compile_tool_returns_compact_payload_by_default(self) -> None:
