@@ -68,7 +68,7 @@ REQUIRED_MARKERS: dict[Path, tuple[str, ...]] = {
         "XUUnity repo-local evidence refreshed",
         "Git UPM available",
         "Compact MCP envelopes",
-        "309` tests",
+        "310` tests",
     ),
     Path("packages") / "com.xuunity.light-mcp" / "Documentation~" / "README.md": (
         "catalog-backed `project_action`",

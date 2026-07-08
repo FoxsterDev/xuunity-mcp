@@ -2,12 +2,34 @@
 
 ## Unreleased
 
+## 0.3.42
+
+Release tag: `v0.3.42`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.42
+```
+
 ### Changed
 
+- Released `v0.3.42` package metadata, server metadata, package manifests, and Git UPM examples.
 - Changed `templates/smoke/run_post_change_validation.sh` to run a
   closed-project `batch-build-config-compile-matrix` preflight before
   `ensure-ready --open-editor` when the runner would otherwise open Unity,
   keeping post-C#-edit compile failures out of GUI Safe Mode startup.
+
+### Validation
+
+- Release version consistency, release-doc freshness, and public-release safety
+  checks passed for `0.3.42`.
+- Host Python unittest suite passed for `0.3.42`: `310` tests with `1`
+  expected skip.
+- Same-host Unity validation passed against two consumer projects: a Unity
+  2022 package self-test lane with EditMode `14/14` and PlayMode `5/5`, and a
+  Unity 6000 post-change route with compile preflight `6/6`, acceptance
+  scenario `10/10`, and contract scenario passed.
 
 ## 0.3.41
 
