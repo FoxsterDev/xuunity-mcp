@@ -323,6 +323,12 @@ Report exact failures and do not hide Unity validation gaps.
 CLI route:
 
 ```bash
+"$WRAPPER" batch-build-config-compile-matrix \
+  --project-root "$PROJECT_ROOT" \
+  --batch-fallback-mode require-batch \
+  --output compact \
+  --timeout-ms 300000
+
 "$WRAPPER" ensure-ready \
   --project-root "$PROJECT_ROOT" \
   --open-editor \
@@ -346,6 +352,11 @@ CLI route:
   --project-root "$PROJECT_ROOT" \
   --timeout-ms 180000
 ```
+
+If a healthy editor is already open and intentionally being reused, run the
+bridge compile matrix before scenarios/tests instead of the closed-project batch
+lane. Do not let `ensure-ready --open-editor` be the first validation command
+after Unity C# edits.
 
 Optional PlayMode lane:
 

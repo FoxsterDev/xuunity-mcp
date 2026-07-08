@@ -482,6 +482,7 @@ Current generic compile modes:
 
 Required durable phase lines:
 
+- compile preflight
 - readiness
 - compile matrix
 - acceptance scenario
@@ -495,6 +496,14 @@ phase and next terminal condition. Bridge generation churn should be
 `non_blocking_churn` when the terminal verdict passed, final health is healthy,
 compiler errors are zero, and unrecovered abandoned requests are zero;
 otherwise classify it as `actionable_churn`.
+
+When `run_post_change_validation.sh` would open Unity and
+`--compile-mode build-config-matrix` is selected, it runs
+`batch-build-config-compile-matrix --batch-fallback-mode require-batch` before
+`ensure-ready --open-editor`. This keeps a script compile failure from becoming
+a GUI Safe Mode startup blocker. If a healthy editor is already being reused, or
+the caller passed `--no-open-editor`, the runner keeps the existing bridge
+compile matrix after readiness.
 
 Optional post-change parity inputs:
 

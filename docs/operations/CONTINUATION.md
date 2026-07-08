@@ -19,7 +19,9 @@ It now has:
 - host-side startup helpers with fail-fast policy for interactive editor startup
 - lifecycle-reset recovery by `request_id`
 - explicit operator-facing split between transport outcome and Unity operation outcome
-- compile-first public post-change validation ordering
+- compile-first public post-change validation ordering, including a
+  closed-project batch compile preflight before `ensure-ready --open-editor`
+  when the reusable post-change runner would otherwise open Unity
 - public retro guidance for operator-facing lifecycle and transport failures
 - summary-first token discipline for high-churn request paths
 - same-project editor launch-in-progress reuse to avoid spawning a second Unity
@@ -379,7 +381,9 @@ For shared protocol integration work:
 - host-opened editor sessions can be restored to the original closed state after validation
 - baseline smoke orchestration can be reused from this public repo's templates while keeping consumer-specific fixtures host-local
 - lifecycle-reset ambiguity can now be resolved from the request journal without manual raw journal digging
-- the reusable post-change validation route now runs compile before heavier scenario work
+- the reusable post-change validation route now runs a compile preflight before
+  opening Unity, then skips the duplicate bridge compile matrix when that
+  preflight already proved the build-config matrix
 - the public operator contract now prefers summary-first recovery over repeated
   raw result polling when compact surfaces exist
 - host-opened editor closeout is now expected to distinguish quit acknowledgement

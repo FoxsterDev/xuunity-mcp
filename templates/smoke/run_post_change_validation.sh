@@ -20,6 +20,7 @@ TMP_DIR=""
 LAST_OUTPUT_FILE=""
 SUITE_STARTED_UNIX=""
 HEARTBEAT_INTERVAL_SECONDS=15
+COMPILE_GATE_SOURCE=""
 
 usage() {
   cat <<'EOF'
@@ -391,6 +392,25 @@ if [[ "$OPEN_EDITOR" == "true" ]]; then
   maybe_reuse_healthy_editor
 fi
 
+if [[ "$COMPILE_MODE" == "build-config-matrix" && "$OPEN_EDITOR" == "true" ]]; then
+  emit_phase "compile preflight" "running" "mode=batch-build-config-compile-matrix"
+  run_step compile_preflight \
+    "$WRAPPER" batch-build-config-compile-matrix \
+    --project-root "$PROJECT_ROOT" \
+    --timeout-ms "$COMPILE_MATRIX_TIMEOUT_MS" \
+    --batch-fallback-mode require-batch \
+    --output compact \
+    --no-progress-stdout
+  summarize_json \
+    "compile-preflight" \
+    "$TMP_DIR/compile_preflight.json" \
+    "\"lane=%s status=%s passed=%s/%s next=%s\" % (data.get('effective_execution_lane') or data.get('requested_execution_lane') or '-', (data.get('matrix') or {}).get('status') or ('passed' if data.get('succeeded') else 'failed'), (data.get('matrix') or {}).get('passed', 0), (data.get('matrix') or {}).get('total', 0), data.get('recommended_next_action') or 'none')"
+  COMPILE_GATE_SOURCE="batch_preflight"
+  emit_phase "compile preflight" "passed" "source=batch-build-config-compile-matrix"
+else
+  emit_phase "compile preflight" "skipped" "reason=healthy-or-managed-editor compile_mode=$COMPILE_MODE"
+fi
+
 emit_phase "readiness" "running"
 ensure_ready_cmd=(
   "$WRAPPER" ensure-ready
@@ -427,16 +447,21 @@ summarize_json \
 emit_phase "readiness" "passed"
 
 if [[ "$COMPILE_MODE" == "build-config-matrix" ]]; then
-  emit_phase "compile matrix" "running"
-  run_step compile_matrix \
-    "$WRAPPER" request-build-config-compile-matrix \
-    --project-root "$PROJECT_ROOT" \
-    --timeout-ms "$COMPILE_MATRIX_TIMEOUT_MS"
-  summarize_json \
-    "compile-matrix" \
-    "$TMP_DIR/compile_matrix.json" \
-    "\"status=%s passed=%s/%s basis=%s duration=%.3fs\" % ((lambda matrix: (matrix.get('status'), matrix.get('passed'), matrix.get('total'), matrix.get('completion_basis'), float(matrix.get('duration_seconds') or 0.0)))(__import__('json').loads(data['bridge_response']['payload_json'])))"
-  emit_phase "compile matrix" "passed"
+  if [[ "$COMPILE_GATE_SOURCE" == "batch_preflight" ]]; then
+    emit_phase "compile matrix" "passed" "source=batch-preflight"
+    echo "[pass] compile-matrix source=batch-preflight"
+  else
+    emit_phase "compile matrix" "running"
+    run_step compile_matrix \
+      "$WRAPPER" request-build-config-compile-matrix \
+      --project-root "$PROJECT_ROOT" \
+      --timeout-ms "$COMPILE_MATRIX_TIMEOUT_MS"
+    summarize_json \
+      "compile-matrix" \
+      "$TMP_DIR/compile_matrix.json" \
+      "\"status=%s passed=%s/%s basis=%s duration=%.3fs\" % ((lambda matrix: (matrix.get('status'), matrix.get('passed'), matrix.get('total'), matrix.get('completion_basis'), float(matrix.get('duration_seconds') or 0.0)))(__import__('json').loads(data['bridge_response']['payload_json'])))"
+    emit_phase "compile matrix" "passed" "source=bridge"
+  fi
 else
   emit_phase "compile matrix" "skipped" "compile_mode=none"
   echo "[skip] compile-matrix compile_mode=none"

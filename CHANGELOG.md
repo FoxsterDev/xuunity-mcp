@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+
+- Changed `templates/smoke/run_post_change_validation.sh` to run a
+  closed-project `batch-build-config-compile-matrix` preflight before
+  `ensure-ready --open-editor` when the runner would otherwise open Unity,
+  keeping post-C#-edit compile failures out of GUI Safe Mode startup.
+
 ## 0.3.41
 
 Release tag: `v0.3.41`

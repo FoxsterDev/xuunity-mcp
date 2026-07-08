@@ -48,6 +48,7 @@ class SmokePayloadContractTests(unittest.TestCase):
     def test_post_change_validation_emits_durable_phase_lines(self) -> None:
         text = (SMOKE_DIR / "run_post_change_validation.sh").read_text(encoding="utf-8")
         for phase in [
+            "compile preflight",
             "readiness",
             "compile matrix",
             "acceptance scenario",
@@ -66,6 +67,17 @@ class SmokePayloadContractTests(unittest.TestCase):
         self.assertIn("actionable_churn", text)
         self.assertIn("churn_classification=", text)
         self.assertNotIn("high_bridge_generation_churn", text)
+
+    def test_post_change_validation_runs_batch_compile_before_editor_open(self) -> None:
+        text = (SMOKE_DIR / "run_post_change_validation.sh").read_text(encoding="utf-8")
+        compile_index = text.find('emit_phase "compile preflight" "running"')
+        readiness_index = text.find('emit_phase "readiness" "running"')
+        self.assertNotEqual(-1, compile_index)
+        self.assertNotEqual(-1, readiness_index)
+        self.assertLess(compile_index, readiness_index)
+        self.assertIn('"$WRAPPER" batch-build-config-compile-matrix', text)
+        self.assertIn("--batch-fallback-mode require-batch", text)
+        self.assertIn("--no-progress-stdout", text)
 
 
 if __name__ == "__main__":
