@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Refresh responses now qualify `playmode_state_after_settle` with an explicit
+  source and trust class. When bridge identity changes during post-request
+  settle, compact and full responses report `stale_risk` plus a
+  `confirm_via_unity_playmode_state` next action instead of presenting the
+  sampled PlayMode value as definitive.
+
 ## 0.3.42
 
 Release tag: `v0.3.42`

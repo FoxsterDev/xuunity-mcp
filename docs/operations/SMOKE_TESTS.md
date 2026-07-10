@@ -183,6 +183,13 @@ Pass criteria:
   - `requested_outcome`
   - `settled_at_utc`
   - `completion_basis`
+- `playmode_state_after_settle_trust_class=confirmed` when bridge identity stayed
+  stable during settle
+- after a bridge identity change, refresh keeps the observed
+  `playmode_state_after_settle` for compatibility but reports
+  `playmode_state_after_settle_trust_class=stale_risk` and
+  `playmode_state_after_settle_recommended_next_action=confirm_via_unity_playmode_state`;
+  use `unity_playmode_state` before gating a PlayMode-sensitive mutation
 - if scenario-driven refresh is used, nested refresh payload should expose the
   same settled contract class rather than only raw `*_requested` transport timing
 

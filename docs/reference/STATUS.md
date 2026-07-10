@@ -1,6 +1,6 @@
 # Status
 
-Date: `2026-07-08`
+Date: `2026-07-10`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
@@ -42,6 +42,9 @@ Migration note:
 - `v0.3.34+` makes refresh, compile, build-config compile, and direct test MCP
   responses compact by default while preserving authoritative post-settle
   verdict fields and `includeFullPayload=true` recovery.
+- Current source qualifies refresh `playmode_state_after_settle` with explicit
+  source/trust metadata; bridge identity churn yields `stale_risk` and directs
+  PlayMode-sensitive callers to confirm via `unity_playmode_state`.
 - `v0.3.38+` makes `unity_status_summary` compact by default for MCP callers,
   with `payload_mode` markers and full nested diagnostics available through
   `includeFullPayload=true`.

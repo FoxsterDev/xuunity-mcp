@@ -84,6 +84,26 @@ def _attach_editor_relaunch_attribution(normalized: dict[str, Any], lifecycle: d
         normalized.update(attribution)
 
 
+def _attach_post_settle_playmode_accounting(
+    normalized: dict[str, Any],
+    idle_wait_after: dict[str, Any],
+    lifecycle: dict[str, Any],
+) -> None:
+    normalized["playmode_state_after_settle"] = str(idle_wait_after.get("playmode_state") or "")
+    normalized["playmode_state_after_settle_source"] = "idle_wait_after"
+
+    transition = lifecycle.get("bridge_identity_transition")
+    if isinstance(transition, dict) and transition:
+        normalized["playmode_state_after_settle_trust_class"] = "stale_risk"
+        normalized["playmode_state_after_settle_note"] = (
+            "bridge identity changed during post-request settle; confirm current Play Mode via unity_playmode_state"
+        )
+        normalized["playmode_state_after_settle_recommended_next_action"] = "confirm_via_unity_playmode_state"
+        return
+
+    normalized["playmode_state_after_settle_trust_class"] = "confirmed"
+
+
 def normalize_refresh_payload_from_lifecycle(payload: dict[str, Any], lifecycle: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
     requested_outcome = str(normalized.get("outcome") or "")
@@ -112,7 +132,7 @@ def normalize_refresh_payload_from_lifecycle(payload: dict[str, Any], lifecycle:
         normalized["settle_phase"] = str(idle_wait_after.get("refresh_settle_phase") or "editor_idle_observed")
     normalized["editor_is_compiling_after_settle"] = bool(idle_wait_after.get("is_compiling"))
     normalized["editor_is_updating_after_settle"] = bool(idle_wait_after.get("is_updating"))
-    normalized["playmode_state_after_settle"] = str(idle_wait_after.get("playmode_state") or "")
+    _attach_post_settle_playmode_accounting(normalized, idle_wait_after, lifecycle)
     _attach_post_settle_compile_truth(
         normalized,
         idle_wait_after,
@@ -321,6 +341,10 @@ def _compact_post_settle_fields(payload: dict[str, Any]) -> dict[str, Any]:
             "editor_is_compiling_after_settle",
             "editor_is_updating_after_settle",
             "playmode_state_after_settle",
+            "playmode_state_after_settle_source",
+            "playmode_state_after_settle_trust_class",
+            "playmode_state_after_settle_note",
+            "playmode_state_after_settle_recommended_next_action",
         ),
     )
     diagnostics = payload.get("post_settle_diagnostics")

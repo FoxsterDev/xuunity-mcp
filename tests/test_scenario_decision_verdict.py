@@ -506,6 +506,51 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual([], normalized["recent_compiler_diagnostics"])
         self.assertEqual("settled", normalized["settle_phase"])
         self.assertEqual("unity_refresh_settle_watcher", normalized["completion_basis"])
+        self.assertEqual("edit", normalized["playmode_state_after_settle"])
+        self.assertEqual("idle_wait_after", normalized["playmode_state_after_settle_source"])
+        self.assertEqual("confirmed", normalized["playmode_state_after_settle_trust_class"])
+
+    def test_refresh_playmode_state_is_qualified_after_lifecycle_reset(self) -> None:
+        normalized = server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
+            {
+                "outcome": "refresh_requested",
+                "package_resolve_requested": False,
+                "settle_request_id": "req-refresh",
+            },
+            {
+                "bridge_identity_transition": {
+                    "reclassified_status": "settled_after_lifecycle_reset",
+                    "previous_bridge_generation": 4,
+                    "current_bridge_generation": 6,
+                },
+                "idle_wait_after": {
+                    "heartbeat_utc": "2026-07-07T10:00:00Z",
+                    "refresh_settle_phase": "settled",
+                    "refresh_settle_request_id": "req-refresh",
+                    "playmode_state": "playing",
+                    "is_compiling": False,
+                    "is_updating": False,
+                    "compiler_error_count": 0,
+                },
+            },
+        )
+
+        self.assertEqual("playing", normalized["playmode_state_after_settle"])
+        self.assertEqual("idle_wait_after", normalized["playmode_state_after_settle_source"])
+        self.assertEqual("stale_risk", normalized["playmode_state_after_settle_trust_class"])
+        self.assertEqual(
+            "confirm_via_unity_playmode_state",
+            normalized["playmode_state_after_settle_recommended_next_action"],
+        )
+        self.assertIn("bridge identity changed", normalized["playmode_state_after_settle_note"])
+
+        compact = server_bridge_payloads.compact_operation_payload(normalized, "unity.project.refresh")
+        self.assertEqual("playing", compact["playmode_state_after_settle"])
+        self.assertEqual("stale_risk", compact["playmode_state_after_settle_trust_class"])
+        self.assertEqual(
+            "confirm_via_unity_playmode_state",
+            compact["playmode_state_after_settle_recommended_next_action"],
+        )
 
     def test_response_payload_promotes_editor_relaunch_attribution_from_lifecycle(self) -> None:
         response = server_bridge_payloads.normalize_response_payload_from_lifecycle(
