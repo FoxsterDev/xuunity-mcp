@@ -38,8 +38,34 @@ class CmdLauncherTextContractTest(unittest.TestCase):
             self.assertNotIn(
                 "%ERRORLEVEL%",
                 text,
-                f"{launcher.name}: use goto flow + `if errorlevel` / bare `exit /b`; "
+                f"{launcher.name}: use goto flow + `if errorlevel` / explicit exit codes; "
                 "%ERRORLEVEL% inside parenthesized blocks expands at parse time",
+            )
+
+    def test_no_bare_exit_b(self):
+        # A top-level batch that terminates via bare `exit /b` makes cmd.exe /c
+        # exit 0 regardless of the prior ERRORLEVEL (caught live by the first
+        # Windows e2e run: ensure-ready failed correctly but the wrapper
+        # reported success). Use explicit codes, or end the script with the
+        # delegated command so its ERRORLEVEL becomes the process exit code.
+        for launcher in CMD_LAUNCHERS:
+            text = launcher.read_text(encoding="utf-8")
+            self.assertNotRegex(
+                text,
+                r"(?m)^\s*exit /b\s*$",
+                f"{launcher.name}: bare `exit /b` swallows the exit code under cmd /c",
+            )
+
+    def test_python_invocation_ends_the_script(self):
+        # The natural-end pattern is what propagates the delegated python exit
+        # code through `cmd /c`; anything after the run line would reset it.
+        for launcher in CMD_LAUNCHERS:
+            text = launcher.read_text(encoding="utf-8").rstrip()
+            last_line = text.splitlines()[-1]
+            self.assertIn(
+                "%XUUNITY_PYTHON_CMD%",
+                last_line,
+                f"{launcher.name}: the delegated python run must be the last executed line",
             )
 
     def test_interpreter_probe_gates_version_and_store_stub(self):
@@ -111,6 +137,20 @@ class CmdLauncherWindowsBehaviorTest(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("usage:", completed.stdout.lower())
+
+    def test_nonzero_python_exit_code_propagates_through_wrapper(self):
+        completed = self.run_wrapper(
+            REPO_ROOT / "xuunity_light_unity_mcp.cmd",
+            ["definitely-not-a-command"],
+            {"PYTHON": sys.executable},
+        )
+        self.assertNotEqual(
+            completed.returncode,
+            0,
+            "python exited nonzero but cmd /c reported success: "
+            f"stdout={completed.stdout[:300]} stderr={completed.stderr[:300]}",
+        )
+        self.assertIn("argv as received", completed.stderr)
 
 
 if __name__ == "__main__":

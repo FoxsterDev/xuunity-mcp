@@ -114,7 +114,8 @@ the exact user config path matters.
 
 The native Windows launchers (`xuunity_light_unity_mcp.cmd`, `run_installed_or_refresh_xuunity_mcp.cmd`, `templates/run.cmd`) have their own trap set, guarded by `tests/test_cmd_launcher_contract.py`:
 
-- **No `%ERRORLEVEL%` token at all.** Inside parenthesized blocks it expands at parse time, so `exit /b %ERRORLEVEL%` returns 0 forever — every wrapper "succeeded" with no Python installed. Use goto flow with `if errorlevel N` and bare `exit /b`.
+- **No `%ERRORLEVEL%` token at all.** Inside parenthesized blocks it expands at parse time, so `exit /b %ERRORLEVEL%` returns 0 forever — every wrapper "succeeded" with no Python installed. Use goto flow with `if errorlevel N` and explicit exit codes.
+- **No bare `exit /b` either.** When the top-level batch under `cmd /c` terminates via `exit /b` with no code, cmd.exe's *process* exit code is 0 regardless of ERRORLEVEL — the first live Windows e2e run caught ensure-ready failing correctly while the wrapper reported success. Either pass an explicit code (`exit /b 9009`), or make the delegated command the final executed line so the script ends naturally and its ERRORLEVEL becomes the process exit code (subroutines go above the run block).
 - **Gate every interpreter candidate through a probe**, not `where python`: the Microsoft-Store WindowsApps stub is found first on fresh machines and cannot run scripts (exit 9009). Probe with `-c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 2)"` before trusting a candidate.
 - **Tolerate a quoted `PYTHON` override**: strip quotes (`set "X=%PYTHON:"=%"`) before use — a quoted value inside an `if` block otherwise breaks batch parsing.
 - **Default `PYTHONUTF8=1`** (`if not defined PYTHONUTF8 ...`) in every flavor.

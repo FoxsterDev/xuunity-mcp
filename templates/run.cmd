@@ -54,10 +54,9 @@ echo Python 3.10 or newer was not found. Install it from https://www.python.org/
 echo Note: on a fresh Windows the "python" command is often the Microsoft Store stub, which cannot run scripts and is rejected by this launcher. 1>&2
 exit /b 9009
 
-:xuunity_run
-%XUUNITY_PYTHON_CMD% "%XUUNITY_LIGHT_UNITY_MCP_SERVER%" %*
-exit /b
-
 :xuunity_probe
 %* -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 2)" >nul 2>nul
 goto :eof
+
+:xuunity_run
+%XUUNITY_PYTHON_CMD% "%XUUNITY_LIGHT_UNITY_MCP_SERVER%" %*

@@ -179,6 +179,8 @@ Suite after this pass: 364/364 green (4 skips).
 
 Wave 3 scope notes: suite now 387/387 green (8 skips: 4 pre-existing native-Windows + 2 `.ps1` policy behavior + 2 native share-mode; all run on the Windows CI leg). `scripts/testing/process_support.run_with_timeout` gained `input_text` (stdin delivery) and explicit UTF-8 decode of child output, per the helper-subprocess discipline. The e2e file needs no CI wiring — `unittest discover` picks it up on all three OS legs.
 
+**First Windows CI e2e run (2026-07-11) immediately caught a live wall — validating the whole Wave-3 premise**: `ensure-ready` failed fast with the correct `unity_app_not_found` payload, but the `.cmd` wrapper reported **exit 0**. Root cause: all three wrappers terminated the run block with a bare `exit /b`; a top-level batch ending that way under `cmd /c` sets the process exit code to 0 regardless of ERRORLEVEL (explicit codes like `exit /b 9009` propagate fine — which is why the Wave-1 broken-PYTHON test stayed green and the gap survived until a test asserted a nonzero *python* exit through the chain — exactly the "exit codes pass vacuously" complicity predicted in §5). Fix: run block moved to the end of each wrapper so the delegated python invocation is the final executed line and its ERRORLEVEL becomes the process exit code; contract test now forbids bare `exit /b` and requires the natural-end shape; a native behavioral test asserts nonzero propagation (`argv as received` visible through the real chain); `skills/cross_platform_shell` §12 corrected — it had recommended the buggy pattern.
+
 ## 6. Recommended fix plan
 
 ### Wave 1 — unblock colleagues (each item unit-testable on the GitHub Windows runner, no Unity needed)
