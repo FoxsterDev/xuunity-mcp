@@ -95,13 +95,16 @@ def detect_unity_app_path(explicit_path: str | None) -> Path:
 
     candidates = discover_unity_installations()
     if not candidates:
+        searched_roots = [str(root) for root in candidate_unity_editor_roots()]
         raise ToolInvocationError(
             "unity_app_not_found",
             (
                 "Could not auto-detect a Unity installation. "
-                f"Check the default Unity Hub install locations for {host_platform_kind()} "
-                f"or set {UNITY_EDITOR_ROOTS_ENV} to one or more custom roots."
+                f"Searched roots: {'; '.join(searched_roots) or '(none)'}. "
+                f"Set {UNITY_EDITOR_ROOTS_ENV} to the Unity Hub editors folder "
+                "(e.g. D:\\UnityEditors), a single version folder, or the Unity executable itself."
             ),
+            details={"searched_roots": searched_roots},
         )
     return candidates[-1][1]
 

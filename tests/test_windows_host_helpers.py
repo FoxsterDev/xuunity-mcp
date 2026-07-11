@@ -204,6 +204,90 @@ class WindowsHostHelperTests(unittest.TestCase):
                 server_editor_host.candidate_unity_editor_roots(),
             )
 
+    def test_windows_editor_roots_env_matches_hub_editors_root_directly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            unity_exe = root / "6000.3.2f1" / "Editor" / "Unity.exe"
+            unity_exe.parent.mkdir(parents=True)
+            unity_exe.write_text("", encoding="utf-8")
+
+            with (
+                mock.patch.object(server_editor_host, "candidate_unity_editor_roots", return_value=[root]),
+                mock.patch.object(server_editor_host, "host_platform_kind", return_value="windows"),
+                mock.patch.object(server_editor_host, "is_wsl", return_value=False),
+            ):
+                discovered = server_editor_host.discover_unity_installations()
+
+        self.assertEqual(["6000.3.2f1"], [version for version, _ in discovered])
+
+    def test_windows_editor_roots_env_matches_single_version_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            version_dir = Path(tmp_dir) / "6000.3.2f1"
+            unity_exe = version_dir / "Editor" / "Unity.exe"
+            unity_exe.parent.mkdir(parents=True)
+            unity_exe.write_text("", encoding="utf-8")
+
+            with (
+                mock.patch.object(server_editor_host, "candidate_unity_editor_roots", return_value=[version_dir]),
+                mock.patch.object(server_editor_host, "host_platform_kind", return_value="windows"),
+                mock.patch.object(server_editor_host, "is_wsl", return_value=False),
+            ):
+                discovered = server_editor_host.discover_unity_installations()
+
+        self.assertEqual(["6000.3.2f1"], [version for version, _ in discovered])
+
+    def test_unity_hub_secondary_install_root_joins_windows_candidate_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            appdata = Path(tmp_dir) / "Roaming"
+            hub_dir = appdata / "UnityHub"
+            hub_dir.mkdir(parents=True)
+            (hub_dir / "secondaryInstallPath.json").write_text(
+                json.dumps(str(Path(tmp_dir) / "UnityEditors")), encoding="utf-8"
+            )
+            program_files = Path(tmp_dir) / "Program Files"
+            program_files.mkdir()
+
+            env = {
+                "APPDATA": str(appdata),
+                "ProgramFiles": str(program_files),
+                "ProgramW6432": str(program_files),
+                "ProgramFiles(x86)": str(program_files),
+            }
+            with (
+                mock.patch.dict(os.environ, env),
+                mock.patch.object(server_editor_host, "configured_unity_editor_roots", return_value=[]),
+                mock.patch.object(server_editor_host, "host_platform_kind", return_value="windows"),
+                mock.patch.object(server_editor_host, "is_wsl", return_value=False),
+            ):
+                roots = server_editor_host.candidate_unity_editor_roots()
+
+        self.assertIn(Path(tmp_dir) / "UnityEditors", roots)
+
+    def test_unity_hub_secondary_install_root_absent_or_empty_is_none(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            appdata = Path(tmp_dir) / "Roaming"
+            hub_dir = appdata / "UnityHub"
+            hub_dir.mkdir(parents=True)
+
+            with mock.patch.dict(os.environ, {"APPDATA": str(appdata)}):
+                self.assertIsNone(server_editor_host.unity_hub_secondary_install_root())
+
+            (hub_dir / "secondaryInstallPath.json").write_text('""', encoding="utf-8")
+            with mock.patch.dict(os.environ, {"APPDATA": str(appdata)}):
+                self.assertIsNone(server_editor_host.unity_hub_secondary_install_root())
+
+    def test_unity_app_not_found_error_reports_searched_roots(self) -> None:
+        searched = [Path("/definitely/missing/roots")]
+        with (
+            mock.patch.object(server_editor_host, "discover_unity_installations", return_value=[]),
+            mock.patch.object(server_editor_host, "candidate_unity_editor_roots", return_value=searched),
+        ):
+            with self.assertRaises(server_core.ToolInvocationError) as raised:
+                server_editor_host.detect_unity_app_path(None)
+
+        self.assertEqual(["/definitely/missing/roots"], raised.exception.details.get("searched_roots"))
+        self.assertIn("/definitely/missing/roots", raised.exception.message)
+
     def test_discover_unity_installations_sorts_versions_and_deduplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

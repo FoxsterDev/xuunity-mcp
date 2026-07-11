@@ -183,6 +183,29 @@ def configured_unity_editor_roots() -> list[Path]:
     return roots
 
 
+def unity_hub_secondary_install_root() -> Path | None:
+    """Unity Hub 'Installs location' when moved off the default drive.
+
+    Stored as a JSON string in %APPDATA%/UnityHub/secondaryInstallPath.json.
+    """
+    appdata = (os.environ.get("APPDATA") or "").strip()
+    base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
+    config_path = base / "UnityHub" / "secondaryInstallPath.json"
+    try:
+        raw = config_path.read_text(encoding="utf-8-sig").strip()
+    except OSError:
+        return None
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        value = raw.strip('"')
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return Path(value.strip()).expanduser()
+
+
 def candidate_unity_editor_roots() -> list[Path]:
     configured = configured_unity_editor_roots()
     if configured:
@@ -208,6 +231,10 @@ def candidate_unity_editor_roots() -> list[Path]:
                     continue
                 seen.add(expanded.lower())
                 roots.append(Path(expanded))
+            secondary_root = unity_hub_secondary_install_root()
+            if secondary_root is not None and str(secondary_root).lower() not in seen:
+                seen.add(str(secondary_root).lower())
+                roots.append(secondary_root)
         else:
             for drive in ("c", "d", "e"):
                 drive_root = Path(f"/mnt/{drive}")
@@ -246,12 +273,16 @@ def iter_candidate_installation_paths_from_root(root: Path) -> list[Path]:
         return candidates
 
     if platform_kind == "windows" or in_wsl:
+        candidates.extend(sorted(root.glob("*/Editor/Unity.exe")))
+        candidates.extend(sorted(root.glob("Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("Unity/Hub/Editor/*/Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("UnityHub/Editor/*/Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("Unity*/Editor/*/Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("Unity*/Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("Unity/Editor/Unity.exe")))
         candidates.extend(sorted(root.glob("Program*/Unity*/Editor/*/Editor/Unity.exe")))
+        candidates.extend(sorted(root.glob("*/Editor/Unity")))
+        candidates.extend(sorted(root.glob("Editor/Unity")))
         candidates.extend(sorted(root.glob("Unity/Hub/Editor/*/Editor/Unity")))
         candidates.extend(sorted(root.glob("UnityHub/Editor/*/Editor/Unity")))
         candidates.extend(sorted(root.glob("Unity*/Editor/*/Editor/Unity")))
