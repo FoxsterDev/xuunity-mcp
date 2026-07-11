@@ -1,7 +1,7 @@
 # Scenario Verdict Retro: Applied Mutation Versus Settle Timeout
 
 Date: `2026-07-10`
-Status: `implemented in unreleased source; release validation pending`
+Status: `host regression passed in unreleased source; live Unity validation pending`
 
 ## Finding
 
@@ -31,4 +31,5 @@ a false pass while making the precise proven/unproven boundary clear.
 The host test fixture covers an `environment_applied` hook payload followed by
 `project_refresh_timeout`, asserting the mutation and settle fields, compact
 first-failure annotation, inconclusive verdict, and non-passing terminal status.
-
+It also guards against overclassification when a non-applied hook outcome or an
+intervening successful step precedes the refresh timeout.

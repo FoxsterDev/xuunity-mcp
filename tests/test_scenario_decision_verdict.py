@@ -430,6 +430,52 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual("set_profile", verdict["first_failure"]["mutation_step_id"])
         self.assertTrue(verdict["first_failure"]["settle_timeout_after_applied_mutation"])
 
+    def test_decision_verdict_does_not_overclassify_non_adjacent_or_unproven_mutations(self) -> None:
+        base_payload = {
+            "project_root": "/tmp/FakeProject",
+            "run_id": "run-no-applied-mutation-settle-timeout",
+            "scenario_name": "ApplyProfileThenRefresh",
+            "status": "failed",
+            "terminal": True,
+            "succeeded": False,
+        }
+        applied_hook = {
+            "stepId": "set_profile",
+            "kind": "project_defined_hook",
+            "status": "passed",
+            "payload_json": json.dumps({"outcome": "environment_applied"}),
+        }
+        refresh_timeout = {
+            "stepId": "settle_profile_change",
+            "kind": "project_refresh",
+            "status": "failed",
+            "error_code": "project_refresh_timeout",
+        }
+
+        for steps in (
+            [
+                applied_hook,
+                {"stepId": "observe", "kind": "status", "status": "passed"},
+                refresh_timeout,
+            ],
+            [
+                {
+                    **applied_hook,
+                    "payload_json": json.dumps({"outcome": "environment_requested"}),
+                },
+                refresh_timeout,
+            ],
+        ):
+            verdict = server_summaries.build_scenario_decision_verdict(
+                {**base_payload, "steps": steps},
+                {"passed", "failed"},
+            )
+
+            self.assertEqual("infrastructure_timeout", verdict["failure_class"])
+            self.assertEqual("infrastructure_timeout", verdict["trust_class"])
+            self.assertNotIn("applied_mutation_settle_summary", verdict)
+            self.assertNotIn("settle_timeout_after_applied_mutation", verdict["first_failure"])
+
     def test_playmode_set_already_playing_is_compact_stale_state_signal(self) -> None:
         payload = {
             "project_root": "/tmp/FakeProject",
