@@ -26,9 +26,12 @@ def run_with_timeout(
     cwd: str | None = None,
     env: dict[str, str] | None = None,
     timeout_seconds: int = 300,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     try:
-        return _run_with_timeout(cmd, cwd=cwd, env=env, timeout_seconds=timeout_seconds)
+        return _run_with_timeout(
+            cmd, cwd=cwd, env=env, timeout_seconds=timeout_seconds, input_text=input_text
+        )
     except subprocess.TimeoutExpired as exc:
         global _first_timeout_cmd
         if _first_timeout_cmd is None:

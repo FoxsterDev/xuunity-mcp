@@ -1,3 +1,6 @@
+# Stock Windows PowerShell 5.1 ships with ExecutionPolicy=Restricted and refuses
+# to run any .ps1 file. Use the .cmd flavor of this launcher instead, or invoke:
+#   powershell -NoProfile -ExecutionPolicy Bypass -File <path-to-this-script> <args>
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

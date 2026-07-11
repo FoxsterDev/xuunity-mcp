@@ -50,24 +50,28 @@ def run_with_timeout(
     cwd: str | None = None,
     env: dict[str, str] | None = None,
     timeout_seconds: int = 300,
+    input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run cmd capturing text output; kill the whole tree on timeout.
 
     Raises subprocess.TimeoutExpired (with partial output attached) after the
-    tree has been killed, so callers never leak a hung child.
+    tree has been killed, so callers never leak a hung child. input_text, when
+    given, is written to the child's stdin (UTF-8) and stdin is closed after.
     """
     proc = subprocess.Popen(
         cmd,
         cwd=cwd,
         env=env,
         text=True,
-        stdin=subprocess.DEVNULL,
+        encoding="utf-8",
+        errors="replace",
+        stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=(os.name != "nt"),
     )
     try:
-        stdout, stderr = proc.communicate(timeout=timeout_seconds)
+        stdout, stderr = proc.communicate(input=input_text, timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
         kill_process_tree(proc)
         try:
