@@ -1,0 +1,67 @@
+name: Feature request
+description: Propose an improvement to XUUnity MCP.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the user problem before prescribing an implementation. Search existing issues and discussions first, and keep all examples public-safe.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions for this request.
+          required: true
+        - label: I removed secrets and private or proprietary project information.
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation or setup
+        - MCP host helper or protocol
+        - Unity Editor package or bridge
+        - Scenario or workflow automation
+        - Client integration
+        - Documentation or website
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What is difficult or impossible today, and who is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe observable behavior and what success looks like.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Optional implementation ideas, API shape, or workflow examples.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: What have you tried, and why is it insufficient?
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and safety considerations
+      description: Note relevant Unity versions, operating systems, MCP clients, permissions, migrations, or breaking-change risks.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add sanitized examples, diagrams, screenshots, or related links.

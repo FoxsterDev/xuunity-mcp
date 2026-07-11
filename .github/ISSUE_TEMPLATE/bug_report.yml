@@ -1,0 +1,93 @@
+name: Bug report
+description: Report a reproducible problem with XUUnity MCP.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve XUUnity MCP. Search existing issues first and remove secrets, private project details, proprietary assets, and unrelated logs. For security vulnerabilities, follow SECURITY.md instead of using this public form.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions for this problem.
+          required: true
+        - label: I removed secrets and private or proprietary project information.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Installation or setup
+        - MCP host helper or protocol
+        - Unity Editor package or bridge
+        - Scenario or workflow automation
+        - Client integration
+        - Documentation or website
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: XUUnity MCP version
+      description: Provide the release tag, package version, or commit SHA.
+      placeholder: v0.3.42
+    validations:
+      required: true
+  - type: input
+    id: unity
+    attributes:
+      label: Unity version
+      description: Write "Not applicable" if Unity is not involved.
+      placeholder: 6000.3.2f1
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and MCP client
+      placeholder: Windows 11, Codex CLI
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem
+      description: Describe what happened and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: List the smallest exact sequence that reproduces the problem.
+      placeholder: |
+        1. Configure ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs or evidence
+      description: Paste concise output, screenshots, or a retro summary. Drag files here if needed.
+      render: shell
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Include project topology, package mode, recent changes, or workarounds if relevant.

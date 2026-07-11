@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and setup help
+    url: https://github.com/FoxsterDev/xuunity-mcp/discussions
+    about: Ask usage questions and discuss setup that is not a confirmed bug.
+  - name: Security vulnerability
+    url: https://github.com/FoxsterDev/xuunity-mcp/security/policy
+    about: Review the private reporting guidance before sharing sensitive details.
