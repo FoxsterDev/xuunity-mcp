@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from server_core import render_launcher_cli
+
 TRANSPORT_METADATA_KEYS = (
     "transport_listener_state",
     "transport_host",
@@ -277,7 +279,7 @@ def _build_host_prerequisites(
             "candidate_count": stale_request_count,
             "classifications": dict(stale_requests.get("classifications") or {}),
             "recommended_cleanup_command": (
-                f"xuunity_light_unity_mcp.sh request-stale-cleanup --project-root {discovery.get('project_root') or ''}"
+                render_launcher_cli("request-stale-cleanup", discovery.get("project_root") or "")
                 if stale_request_count > 0
                 else ""
             ),

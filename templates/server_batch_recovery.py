@@ -370,13 +370,13 @@ def classify_compile_probe_failure(compile_probe: dict[str, Any]) -> tuple[str, 
         return (
             "compile_probe_blocked_by_live_editor",
             "close_same_project_editor_or_use_interactive_lane",
-            "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
+            "{launcher} request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
         )
 
     return (
         "compile_red_confirmed",
         "fix_compile_errors_before_gui_reopen",
-        "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
+        "{launcher} project-discovery-report --project-root {project_root}",
     )
 
 

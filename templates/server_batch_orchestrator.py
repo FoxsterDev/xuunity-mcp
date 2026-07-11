@@ -20,7 +20,7 @@ from server_registry import (
 )
 
 # Core imports
-from server_core import ToolInvocationError, read_json, write_json
+from server_core import ToolInvocationError, launcher_command_name, quoted_shell_path, read_json, write_json
 from server_specs import (
     OPERATION_LIFECYCLE_POLICIES,
     SCENARIO_DEFINITION_SCHEMA,
@@ -657,7 +657,13 @@ def recommended_recovery_command_for_project(project_root: Path, next_action: st
     template = DISCOVERY_NEXT_ACTION_COMMANDS.get(str(next_action or "").strip())
     if not template:
         return ""
-    return template.format(project_root=project_root.as_posix())
+    return template.format(
+        launcher=launcher_command_name(),
+        project_root=quoted_shell_path(project_root),
+        unity_apiupdate_log=quoted_shell_path(
+            project_root / "Library" / "XUUnityLightMcp" / "logs" / "unity_apiupdate.log"
+        ),
+    )
 
 
 def enrich_error_details_with_discovery(project_root: Path, details: dict[str, Any] | None = None) -> dict[str, Any]:

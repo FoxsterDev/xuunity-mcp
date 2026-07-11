@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import threading
 import types
@@ -18,6 +19,7 @@ import server_project_context
 from server_host_platform import HostPlatformAdapter
 from server_project_context import ensure_project_root as ensure_project_root_base
 from server_registry import BridgeRegistry
+import server_core
 from server_core import ToolInvocationError
 
 
@@ -1056,17 +1058,28 @@ class ServerProjectHelperTests(unittest.TestCase):
             )
 
         self.assertEqual("ensure_ready_or_recover_bridge", details["recommended_next_action"])
-        self.assertIn("ensure-ready --project-root /tmp/FakeProject --open-editor", details["recommended_recovery_command"])
+        self.assertIn('ensure-ready --project-root "/tmp/FakeProject" --open-editor', details["recommended_recovery_command"])
         self.assertNotIn("request-final-status", details["recommended_recovery_command"])
 
-    def test_recommended_recovery_command_uses_posix_path_separators_for_shell(self) -> None:
-        command = server.recommended_recovery_command_for_project(
-            PureWindowsPath("C:/tmp/FakeProject"),
-            "ensure_ready_or_recover_bridge",
-        )
+    def test_recommended_recovery_command_quotes_path_and_matches_host_flavor(self) -> None:
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME", None)
+            with mock.patch.object(server_core, "is_windows_like_host", return_value=True):
+                windows_command = server.recommended_recovery_command_for_project(
+                    PureWindowsPath("C:/tmp/Fake Project"),
+                    "ensure_ready_or_recover_bridge",
+                )
+            with mock.patch.object(server_core, "is_windows_like_host", return_value=False):
+                posix_command = server.recommended_recovery_command_for_project(
+                    Path("/tmp/Fake Project"),
+                    "ensure_ready_or_recover_bridge",
+                )
 
-        self.assertIn("ensure-ready --project-root C:/tmp/FakeProject --open-editor", command)
-        self.assertNotIn("\\", command)
+        self.assertTrue(windows_command.startswith("xuunity_light_unity_mcp.cmd "), windows_command)
+        self.assertIn('--project-root "C:\\tmp\\Fake Project"', windows_command)
+        self.assertTrue(posix_command.startswith("xuunity_light_unity_mcp.sh "), posix_command)
+        self.assertIn('--project-root "/tmp/Fake Project"', posix_command)
+        self.assertNotIn("\\", posix_command)
 
     def test_recommended_recovery_command_for_apiupdate_relaunch(self) -> None:
         command = server.recommended_recovery_command_for_project(
@@ -1075,7 +1088,8 @@ class ServerProjectHelperTests(unittest.TestCase):
         )
 
         self.assertIn("-batchmode -quit -accept-apiupdate", command)
-        self.assertIn("-projectPath /tmp/FakeProject", command)
+        self.assertIn('-projectPath "/tmp/FakeProject"', command)
+        self.assertIn("unity_apiupdate.log", command)
 
     def test_recommended_recovery_command_for_safe_mode_compile_gate(self) -> None:
         command = server.recommended_recovery_command_for_project(
@@ -1083,7 +1097,7 @@ class ServerProjectHelperTests(unittest.TestCase):
             "run_batch_compile_gate_and_fix_errors",
         )
 
-        self.assertIn("batch-build-config-compile-matrix --project-root /tmp/FakeProject", command)
+        self.assertIn('batch-build-config-compile-matrix --project-root "/tmp/FakeProject"', command)
         self.assertNotIn("-accept-apiupdate", command)
 
     def test_recover_project_bridge_for_reconciliation_raises_guided_bridge_disabled_error(self) -> None:

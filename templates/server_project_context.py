@@ -8,23 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from server_bridge_runtime import bridge_state_path, parse_journal_utc_timestamp, request_journal_dir
-from server_core import ToolInvocationError, read_json
+from server_core import ToolInvocationError, is_windows_like_host, read_json
 
 LIGHTWEIGHT_PACKAGE_NAME = "com.xuunity.light-mcp"
 LIGHTWEIGHT_PACKAGE_TEMPLATE_MARKERS = (
     Path("packages/com.xuunity.light-mcp/package.json"),
     Path("AIRoot/Operations/XUUnityLightUnityMcp/packages/com.xuunity.light-mcp/package.json"),
 )
-
-
-def is_windows_like_host() -> bool:
-    return (
-        os.name == "nt"
-        or sys.platform.startswith("win")
-        or os.environ.get("OS") == "Windows_NT"
-        or bool(os.environ.get("APPDATA"))
-        or str(os.environ.get("MSYSTEM") or "").upper().startswith(("MINGW", "MSYS", "CYGWIN"))
-    )
 
 
 def project_not_found_error(raw_project_root: str, resolved_root: Path) -> ToolInvocationError:

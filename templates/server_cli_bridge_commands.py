@@ -68,7 +68,10 @@ def cmd_recover_editor_session(args):
             recovery_classification, next_action, recovery_command_template = classify_compile_probe_failure(compile_probe)
             payload["recovery_classification"] = recovery_classification
             payload["recovery_recommended_next_action"] = next_action
-            payload["recommended_recovery_command"] = recovery_command_template.format(project_root=str(project_root))
+            payload["recommended_recovery_command"] = recovery_command_template.format(
+                launcher=launcher_command_name(),
+                project_root=quoted_shell_path(project_root),
+            )
             if recovery_classification == "compile_red_confirmed":
                 payload["reopen_blocked"] = True
                 payload["reopen_block_reason"] = "compile_red_after_batch_restore"
@@ -798,8 +801,8 @@ def cmd_ensure_ready(args):
             details["package_import_diagnosis"] = "package_declared_not_imported"
             details["recommended_next_action"] = "reopen_project_for_clean_resolve"
             details["next_distinct_action"] = "close_and_reopen_unity_to_resolve_package"
-            details["recommended_recovery_command"] = (
-                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --open-editor"
+            details["recommended_recovery_command"] = render_launcher_cli(
+                "ensure-ready", project_root, "--open-editor"
             )
             details["live_project_editor_pids"] = live_editor_pids
         raise enrich_tool_invocation_error_with_discovery(

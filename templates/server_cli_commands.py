@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from server_core import ToolInvocationError, read_json, write_json
+from server_core import ToolInvocationError, read_json, render_launcher_cli, write_json
 from server_specs import STARTUP_POLICIES, SCENARIO_TERMINAL_STATUSES
 from server_health import FRESH_HEARTBEAT_MAX_AGE_SECONDS
 from server_readiness_summary import build_ensure_ready_summary
@@ -538,8 +538,8 @@ def cmd_ensure_ready(args):
             details["package_import_diagnosis"] = "package_declared_not_imported"
             details["recommended_next_action"] = "reopen_project_for_clean_resolve"
             details["next_distinct_action"] = "close_and_reopen_unity_to_resolve_package"
-            details["recommended_recovery_command"] = (
-                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --open-editor"
+            details["recommended_recovery_command"] = render_launcher_cli(
+                "ensure-ready", project_root, "--open-editor"
             )
             details["live_project_editor_pids"] = live_editor_pids
         raise enrich_tool_invocation_error_with_discovery_fn(

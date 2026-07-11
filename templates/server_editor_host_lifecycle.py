@@ -542,8 +542,13 @@ def verify_project_editor_closed(project_root: Path, timeout_ms: int) -> dict[st
         "recommended_next_action": recommended_next_action,
         "next_distinct_action": next_distinct_action,
         "recommended_recovery_command": (
-            f"xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} "
-            "--timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000"
+            render_launcher_cli(
+                "request-editor-quit",
+                project_root,
+                "--timeout-ms", "30000",
+                "--wait-for-exit",
+                "--exit-timeout-ms", "30000",
+            )
             if live_project_pids and process_visibility_available
             else ""
         ),

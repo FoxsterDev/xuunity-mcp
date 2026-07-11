@@ -12,7 +12,7 @@ from server_bridge_constants import (
     TCP_LOOPBACK_BRIDGE_TRANSPORT,
 )
 from server_bridge_paths import bridge_config_path, bridge_state_path
-from server_core import ToolInvocationError, read_json
+from server_core import ToolInvocationError, read_json, render_launcher_cli
 from server_host_platform import current_host_platform_adapter
 
 def bridge_enabled(project_root: Path) -> bool:
@@ -267,9 +267,8 @@ def build_editor_idle_timeout_details(
         "blocking_reasons": blocking_reasons,
         "safe_to_retry": False,
         "recommended_next_action": "wait_for_editor_idle_or_inspect_busy_state",
-        "recommended_recovery_command": (
-            f"xuunity_light_unity_mcp.sh request-status-summary --project-root "
-            f"{project_root.as_posix()} --include-full-payload"
+        "recommended_recovery_command": render_launcher_cli(
+            "request-status-summary", project_root, "--include-full-payload"
         ),
         "request_id": str(after_request_id or ""),
         "operation": str(reason or ""),
@@ -277,9 +276,8 @@ def build_editor_idle_timeout_details(
         "timeout_ms": int(timeout_ms or 0),
         "elapsed_seconds": round(max(0.0, float(elapsed_seconds or 0.0)), 3),
         "full_payload_available": True,
-        "full_payload_recovery_command": (
-            f"xuunity_light_unity_mcp.sh request-status-summary --project-root "
-            f"{project_root.as_posix()} --include-full-payload"
+        "full_payload_recovery_command": render_launcher_cli(
+            "request-status-summary", project_root, "--include-full-payload"
         ),
         "full_payload_tool_arguments": {"includeFullPayload": True},
     }

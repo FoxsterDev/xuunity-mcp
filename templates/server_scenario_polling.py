@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+from server_core import render_launcher_cli
+
 
 TRANSIENT_SCENARIO_POLL_ERROR_CODES = frozenset(
     {
@@ -226,9 +228,9 @@ def wait_for_scenario_result_data(
     if last_payload:
         suffix = f" Last observed status: {last_payload.get('status') or 'unknown'}."
     recovery_command = (
-        f"xuunity_light_unity_mcp.sh request-scenario-result-summary --project-root {project_root} --run-id {run_id}"
+        render_launcher_cli("request-scenario-result-summary", project_root, "--run-id", str(run_id))
         if run_id
-        else f"xuunity_light_unity_mcp.sh request-scenario-result-latest --project-root {project_root} --scenario-name {scenario_name}"
+        else render_launcher_cli("request-scenario-result-latest", project_root, "--scenario-name", str(scenario_name))
     )
     raise enrich_tool_invocation_error_with_discovery(
         project_root,

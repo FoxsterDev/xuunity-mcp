@@ -16,7 +16,7 @@ from server_bridge_runtime import (
     read_best_effort_bridge_state,
     summarize_state_for_error,
 )
-from server_core import ToolInvocationError, read_json
+from server_core import ToolInvocationError, launcher_command_name, quoted_shell_path, read_json
 from server_project_reporting import (
     apply_discovery_to_final_status_summary_data,
     apply_discovery_to_scenario_payload_data,
@@ -385,21 +385,21 @@ SCENARIO_RECOVERY_ERROR_CODES = frozenset(
 
 DISCOVERY_NEXT_ACTION_COMMANDS = {
     "enable_bridge_and_retry": "init_xuunity_light_unity_mcp.sh --project-root {project_root} --enable-project",
-    "open_editor_or_ensure_ready": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "ensure_ready_or_recover_bridge": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "wait_for_bridge_or_recover_editor": "xuunity_light_unity_mcp.sh recover-editor-session --project-root {project_root} --timeout-ms 180000",
-    "recover_editor_session": "xuunity_light_unity_mcp.sh recover-editor-session --project-root {project_root} --timeout-ms 180000",
-    "close_same_project_editor_or_use_interactive_lane": "xuunity_light_unity_mcp.sh request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
-    "start_or_recover_editor": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "clear_stale_host_session_and_retry": "xuunity_light_unity_mcp.sh restore-editor-state --project-root {project_root} --timeout-ms 15000",
-    "refresh_host_session_if_needed": "xuunity_light_unity_mcp.sh request-status-summary --project-root {project_root} --timeout-ms 5000",
-    "inspect_editor_log": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
-    "inspect_editor_log_and_observe": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
-    "inspect_editor_log_and_consider_graceful_restart": "xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root} --open-editor",
-    "run_batch_compile_gate_and_fix_errors": "xuunity_light_unity_mcp.sh batch-build-config-compile-matrix --project-root {project_root}",
+    "open_editor_or_ensure_ready": "{launcher} ensure-ready --project-root {project_root} --open-editor",
+    "ensure_ready_or_recover_bridge": "{launcher} ensure-ready --project-root {project_root} --open-editor",
+    "wait_for_bridge_or_recover_editor": "{launcher} recover-editor-session --project-root {project_root} --timeout-ms 180000",
+    "recover_editor_session": "{launcher} recover-editor-session --project-root {project_root} --timeout-ms 180000",
+    "close_same_project_editor_or_use_interactive_lane": "{launcher} request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
+    "start_or_recover_editor": "{launcher} ensure-ready --project-root {project_root} --open-editor",
+    "clear_stale_host_session_and_retry": "{launcher} restore-editor-state --project-root {project_root} --timeout-ms 15000",
+    "refresh_host_session_if_needed": "{launcher} request-status-summary --project-root {project_root} --timeout-ms 5000",
+    "inspect_editor_log": "{launcher} project-discovery-report --project-root {project_root}",
+    "inspect_editor_log_and_observe": "{launcher} project-discovery-report --project-root {project_root}",
+    "inspect_editor_log_and_consider_graceful_restart": "{launcher} ensure-ready --project-root {project_root} --open-editor",
+    "run_batch_compile_gate_and_fix_errors": "{launcher} batch-build-config-compile-matrix --project-root {project_root}",
     "open_safe_mode_manually": "Open the Unity project manually and enter Safe Mode; do not use automated dialog clicking.",
-    "relaunch_noninteractive_accept_apiupdate": "Unity -batchmode -quit -accept-apiupdate -projectPath {project_root} -logFile {project_root}/Library/XUUnityLightMcp/logs/unity_apiupdate.log",
-    "restore_host_process_visibility": "xuunity_light_unity_mcp.sh project-discovery-report --project-root {project_root}",
+    "relaunch_noninteractive_accept_apiupdate": "Unity -batchmode -quit -accept-apiupdate -projectPath {project_root} -logFile {unity_apiupdate_log}",
+    "restore_host_process_visibility": "{launcher} project-discovery-report --project-root {project_root}",
 }
 
 
@@ -407,7 +407,13 @@ def recommended_recovery_command_for_project(project_root: Path, next_action: st
     template = DISCOVERY_NEXT_ACTION_COMMANDS.get(str(next_action or "").strip())
     if not template:
         return ""
-    return template.format(project_root=project_root.as_posix())
+    return template.format(
+        launcher=launcher_command_name(),
+        project_root=quoted_shell_path(project_root),
+        unity_apiupdate_log=quoted_shell_path(
+            project_root / "Library" / "XUUnityLightMcp" / "logs" / "unity_apiupdate.log"
+        ),
+    )
 
 
 def enrich_error_details_with_discovery(project_root: Path, details: dict[str, Any] | None = None) -> dict[str, Any]:

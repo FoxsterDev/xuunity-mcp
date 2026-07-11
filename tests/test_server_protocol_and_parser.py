@@ -1613,10 +1613,10 @@ actions:
         payload = emitted_payloads[0]
         self.assertEqual("compile_probe_blocked_by_live_editor", payload["recovery_classification"])
         self.assertEqual("close_same_project_editor_or_use_interactive_lane", payload["recovery_recommended_next_action"])
-        self.assertEqual(
-            "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
-            payload["recommended_recovery_command"].replace('\\', '/'),
-        )
+        recovery_command = payload["recommended_recovery_command"].replace('\\', '/')
+        self.assertIn("request-editor-quit", recovery_command)
+        self.assertIn('--project-root "/tmp/FakeProject"', recovery_command)
+        self.assertIn("--timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000", recovery_command)
         self.assertNotIn("reopen_block_reason", payload)
         self.assertFalse(bool(payload.get("reopen_blocked")))
 
@@ -1863,10 +1863,9 @@ actions:
             ctx.exception.details["fail_fast_reason"],
         )
         self.assertEqual("open_editor_or_ensure_ready", ctx.exception.details["recommended_next_action"])
-        self.assertEqual(
-            "xuunity_light_unity_mcp.sh ensure-ready --project-root /tmp/FakeProject --open-editor",
-            ctx.exception.details["recommended_recovery_command"].replace('\\', '/'),
-        )
+        offline_recovery = ctx.exception.details["recommended_recovery_command"].replace('\\', '/')
+        self.assertIn("ensure-ready", offline_recovery)
+        self.assertIn('--project-root "/tmp/FakeProject" --open-editor', offline_recovery)
         wait_mock.assert_not_called()
 
     def test_ensure_ready_timeout_reports_unresolved_package_import_state(self) -> None:
@@ -2069,10 +2068,10 @@ actions:
             "close_same_project_editor_or_use_interactive_lane",
             exc.details["recommended_next_action"],
         )
-        self.assertEqual(
-            "xuunity_light_unity_mcp.sh request-editor-quit --project-root /tmp/FakeProject --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
-            exc.details["recommended_recovery_command"].replace('\\', '/'),
-        )
+        conflict_recovery = exc.details["recommended_recovery_command"].replace('\\', '/')
+        self.assertIn("request-editor-quit", conflict_recovery)
+        self.assertIn('--project-root "/tmp/FakeProject"', conflict_recovery)
+        self.assertIn("--timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000", conflict_recovery)
         self.assertFalse(exc.details["same_project_editor_closed"])
         self.assertFalse(exc.details["process_exit_verified"])
         self.assertEqual("editor_still_running", exc.details["closeout_classification"])

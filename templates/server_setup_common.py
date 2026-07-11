@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from server_core import ToolInvocationError, read_json, write_json
+from server_core import ToolInvocationError, read_json, render_launcher_cli, write_json
 from server_project_context import inspect_light_mcp_import_state, project_not_found_error
 
 LIGHT_MCP_PACKAGE_NAME = "com.xuunity.light-mcp"

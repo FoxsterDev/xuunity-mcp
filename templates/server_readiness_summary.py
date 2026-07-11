@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from server_core import render_launcher_cli
+
 
 def _int_or_zero(value: Any) -> int:
     try:
@@ -101,8 +103,8 @@ def build_ensure_ready_summary(
             str(project_root),
             "--include-full-payload",
         ],
-        "full_payload_command": (
-            f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --include-full-payload"
+        "full_payload_command": render_launcher_cli(
+            "ensure-ready", project_root, "--include-full-payload"
         ),
         "verdict": "ready" if health_status == "healthy" else "degraded",
         "succeeded": health_status == "healthy",
@@ -135,9 +137,8 @@ def build_ensure_ready_summary(
             "--open-editor",
             "--include-full-payload",
         ],
-        "full_payload_recovery_command": (
-            f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} "
-            "--open-editor --include-full-payload"
+        "full_payload_recovery_command": render_launcher_cli(
+            "ensure-ready", project_root, "--open-editor", "--include-full-payload"
         ),
     }
 
@@ -168,27 +169,21 @@ def build_ensure_ready_summary(
         summary["playmode_hint"] = {
             "state": playmode_state,
             "message": "Editor is currently in Play Mode; exit Play Mode before edit/build work.",
-            "command": (
-                f"xuunity_light_unity_mcp.sh request-playmode-set "
-                f"--project-root {project_root.as_posix()} --action exit"
-            ),
+            "command": render_launcher_cli("request-playmode-set", project_root, "--action", "exit"),
         }
     elif playmode_state == "playing":
         summary["playmode_hint"] = {
             "state": playmode_state,
             "message": "Editor is currently in Play Mode.",
-            "command": (
-                f"xuunity_light_unity_mcp.sh request-playmode-set "
-                f"--project-root {project_root.as_posix()} --action exit"
-            ),
+            "command": render_launcher_cli("request-playmode-set", project_root, "--action", "exit"),
         }
 
     if next_action and next_action != "none":
         if next_action == "exit_playmode_before_editing":
             summary["recovery_command"] = summary["playmode_hint"]["command"]
         else:
-            summary["recovery_command"] = (
-                f"xuunity_light_unity_mcp.sh ensure-ready --project-root {project_root.as_posix()} --open-editor"
+            summary["recovery_command"] = render_launcher_cli(
+                "ensure-ready", project_root, "--open-editor"
             )
 
     return summary

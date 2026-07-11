@@ -98,6 +98,44 @@ import functools
 import sys
 
 
+def is_windows_like_host() -> bool:
+    import os
+
+    return (
+        os.name == "nt"
+        or sys.platform.startswith("win")
+        or os.environ.get("OS") == "Windows_NT"
+        or bool(os.environ.get("APPDATA"))
+        or str(os.environ.get("MSYSTEM") or "").upper().startswith(("MINGW", "MSYS", "CYGWIN"))
+    )
+
+
+def launcher_command_name() -> str:
+    """Launcher name for copy-paste recovery commands, matched to the host."""
+    import os
+
+    configured = str(os.environ.get("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME") or "").strip()
+    if configured:
+        return configured
+    return "xuunity_light_unity_mcp.cmd" if is_windows_like_host() else "xuunity_light_unity_mcp.sh"
+
+
+def quoted_shell_path(path: Any) -> str:
+    """Space-safe path literal: native form on Windows-like hosts, POSIX elsewhere."""
+    from pathlib import PurePath
+
+    value = path if isinstance(path, PurePath) else Path(path)
+    rendered = str(value) if is_windows_like_host() else value.as_posix()
+    return f'"{rendered}"'
+
+
+def render_launcher_cli(subcommand: str, project_root: Any, *extra: str) -> str:
+    """Copy-paste-safe recovery command: host-matched launcher, quoted path."""
+    parts = [launcher_command_name(), subcommand, "--project-root", quoted_shell_path(project_root)]
+    parts.extend(extra)
+    return " ".join(parts)
+
+
 def reconfigure_stdio_utf8() -> None:
     """Force UTF-8 stdio regardless of host locale.
 

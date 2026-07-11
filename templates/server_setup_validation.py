@@ -104,10 +104,11 @@ def require_test_framework_capability_for_batch(project_root: Path) -> dict[str,
         return state
 
     recommended_version = str(state.get("recommended_dependency_version") or "")
-    install_command = (
-        "xuunity_light_unity_mcp.sh install-test-framework "
-        f"--project-root {project_root} --yes"
-        + (f" --version {recommended_version}" if recommended_version else "")
+    install_command = render_launcher_cli(
+        "install-test-framework",
+        project_root,
+        "--yes",
+        *(("--version", recommended_version) if recommended_version else ()),
     )
     status = str(state.get("status") or "error")
     if status == "unsupported":

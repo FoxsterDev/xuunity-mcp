@@ -178,7 +178,7 @@ def build_setup_plan(
             manual_actions.append(
                 {
                     "kind": "optional_test_framework_upgrade",
-                    "recommended_command": f"xuunity_light_unity_mcp.sh install-test-framework --project-root {project_root} --yes --version {tf_state['recommended_dependency_version']}",
+                    "recommended_command": render_launcher_cli("install-test-framework", project_root, "--yes", "--version", str(tf_state["recommended_dependency_version"])),
                     "current_version": tf_state["installed_dependency_version"],
                     "recommended_version": tf_state["recommended_dependency_version"],
                     "reason": tf_state["dependency_action"],
@@ -189,7 +189,7 @@ def build_setup_plan(
             manual_actions.append(
                 {
                     "kind": "optional_test_framework_install",
-                    "recommended_command": f"xuunity_light_unity_mcp.sh install-test-framework --project-root {project_root} --yes",
+                    "recommended_command": render_launcher_cli("install-test-framework", project_root, "--yes"),
                     "recommended_version": tf_state["recommended_dependency_version"],
                     "reason": "enable_optional_test_capability",
                     "requires_approval": True,
