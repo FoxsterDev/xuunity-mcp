@@ -76,13 +76,21 @@ Windows config:
       "args": [
         "/d",
         "/c",
-        "if defined CLAUDE_TOOLS_HOME (call \"%CLAUDE_TOOLS_HOME%\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd\") else (call \"%USERPROFILE%\\.claude-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd\")"
+        "call",
+        "C:\\Users\\<YOUR_USERNAME>\\.claude-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd"
       ],
       "timeout": 600000
     }
   }
 }
 ```
+
+Replace `<YOUR_USERNAME>` with your Windows user name (or run
+`bash init_xuunity_light_unity_mcp.sh --install-claude-config`, which writes
+the resolved path for you). Keep every `args` entry free of embedded quotes
+and parentheses: MCP clients quote argv with the C-runtime rules, which
+escape embedded quotes as `\"` — cmd.exe misparses that and the server never
+starts.
 
 Claude Code asks each user to approve project-scoped MCP servers on first use.
 
@@ -106,7 +114,7 @@ claude mcp add --scope local --transport stdio xuunity_light_unity \
 Native Windows equivalent:
 
 ```powershell
-claude mcp add --scope local --transport stdio xuunity_light_unity -- cmd.exe /d /c "if defined CLAUDE_TOOLS_HOME (call ""%CLAUDE_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd"") else (call ""%USERPROFILE%\.claude-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd"")"
+claude mcp add --scope local --transport stdio xuunity_light_unity -- cmd.exe /d /c call "C:\Users\<YOUR_USERNAME>\.claude-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd"
 ```
 
 ## Verify

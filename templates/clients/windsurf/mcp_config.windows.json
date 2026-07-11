@@ -5,7 +5,8 @@
       "args": [
         "/d",
         "/c",
-        "if defined CODEX_TOOLS_HOME (call \"%CODEX_TOOLS_HOME%\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd\") else (call \"%USERPROFILE%\\.codex-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd\")"
+        "call",
+        "C:\\Users\\<YOUR_USERNAME>\\.codex-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd"
       ]
     }
   }

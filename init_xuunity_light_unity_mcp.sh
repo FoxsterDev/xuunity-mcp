@@ -116,6 +116,16 @@ source_root_marker_path() {
   printf '%s\n' "$source_path"
 }
 
+# Values persisted for native Windows readers (cmd.exe client configs) must be
+# host-native paths, not MSYS forms; see skills/cross_platform_shell rule 7.
+native_windows_path() {
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$1"
+    return 0
+  fi
+  printf '%s\n' "$1"
+}
+
 source_root_marker="$(source_root_marker_path "$script_dir")"
 templates_dir="$script_dir/templates"
 package_metadata_source="$script_dir/packages/com.xuunity.light-mcp/package.json"
@@ -294,19 +304,20 @@ file_mcp_block_contains_regex() {
 append_codex_block_if_missing() {
   local block
   local codex_run_path_val="$codex_refresh_run_path"
-  local windows_cmd_args
+  local codex_windows_launcher_dir="$codex_install_dir"
   if [[ "$target" == "neutral" ]]; then
     codex_run_path_val="$neutral_refresh_run_path"
+    codex_windows_launcher_dir="$neutral_install_dir"
   fi
   block=$'[mcp_servers.xuunity_light_unity]\n'
   if is_windows_like_host; then
+    # Client argv quoting (libuv/list2cmdline) escapes embedded quotes as \",
+    # which cmd.exe misparses — conditional one-liners with quoted paths never
+    # spawn. Persist the install-time-resolved launcher path as its own arg.
+    local windows_launcher_path
+    windows_launcher_path="$(native_windows_path "$codex_windows_launcher_dir")\\run_installed_or_refresh_xuunity_mcp.cmd"
     block+=$'command = "cmd.exe"\n'
-    if [[ "$target" == "neutral" ]]; then
-      windows_cmd_args='if defined XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR (call "%XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR%\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%APPDATA%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")'
-    else
-      windows_cmd_args='if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")'
-    fi
-    block+="args = ['/d', '/c', '$windows_cmd_args']"$'\n'
+    block+="args = [\"/d\", \"/c\", \"call\", \"${windows_launcher_path//\\/\\\\}\"]"$'\n'
   else
     block+=$'command = "bash"\n'
     block+="args = [\"-lc\", \"exec \\\"$codex_run_path_val\\\"\"]"$'\n'
@@ -341,13 +352,17 @@ append_codex_block_if_missing() {
 
 append_claude_block_if_missing() {
   local claude_run_path_val="$claude_refresh_run_path"
+  local claude_windows_launcher_dir="$claude_install_dir"
   if [[ "$target" == "neutral" ]]; then
     claude_run_path_val="$neutral_refresh_run_path"
+    claude_windows_launcher_dir="$neutral_install_dir"
   fi
 
   local host_flavor="unix"
+  local windows_launcher_dir=""
   if is_windows_like_host; then
     host_flavor="windows"
+    windows_launcher_dir="$(native_windows_path "$claude_windows_launcher_dir")"
   fi
 
   if [[ $dry_run -eq 1 ]]; then
@@ -357,15 +372,15 @@ append_claude_block_if_missing() {
 
   mkdir -p "$(dirname "$claude_config_path")"
 
-  python3 - "$claude_config_path" "$claude_run_path_val" "$host_flavor" "$target" <<'PY'
+  python3 - "$claude_config_path" "$claude_run_path_val" "$host_flavor" "$windows_launcher_dir" <<'PY'
 import json
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 config_path = Path(sys.argv[1])
 run_path = sys.argv[2]
 host_flavor = sys.argv[3]
-install_target = sys.argv[4]
+windows_launcher_dir = sys.argv[4]
 
 if config_path.exists() and config_path.stat().st_size > 0:
     try:
@@ -384,22 +399,17 @@ servers = data.setdefault("mcpServers", {})
 existing = servers.get("xuunity_light_unity")
 
 if host_flavor == "windows":
-    if install_target == "neutral":
-        windows_call = (
-            'if defined XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR '
-            '(call "%XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR%\\run_installed_or_refresh_xuunity_mcp.cmd") '
-            'else (call "%APPDATA%\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd")'
-        )
-    else:
-        windows_call = (
-            'if defined CLAUDE_TOOLS_HOME '
-            '(call "%CLAUDE_TOOLS_HOME%\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd") '
-            'else (call "%USERPROFILE%\\.claude-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd")'
-        )
+    # Client argv quoting (libuv/list2cmdline) escapes embedded quotes as \",
+    # which cmd.exe misparses — conditional one-liners with quoted paths never
+    # spawn. Keep every arg quote-free: the launcher path resolved at install
+    # time rides as its own argv entry and survives standard quoting.
+    windows_launcher = str(
+        PureWindowsPath(windows_launcher_dir) / "run_installed_or_refresh_xuunity_mcp.cmd"
+    )
     desired = {
         "type": "stdio",
         "command": "cmd.exe",
-        "args": ["/d", "/c", windows_call],
+        "args": ["/d", "/c", "call", windows_launcher],
     }
 else:
     portable_run_command = f'exec "{run_path}"'

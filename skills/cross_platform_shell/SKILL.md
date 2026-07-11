@@ -122,6 +122,28 @@ The native Windows launchers (`xuunity_light_unity_mcp.cmd`, `run_installed_or_r
 - **CRLF end to end** — enforced by `.gitattributes` and the contract test; after editing a `.cmd` from a POSIX host, re-normalize (`perl -pi -e 's/\r?\n/\r\n/'`).
 - Keep `.cmd` flavors as thin as the `.sh` ones (rule 6); behavior lives in Python.
 
+## 13. Windows Client-Config argv Entries Must Be Quote-Free
+
+MCP clients (Node libuv, Python `list2cmdline`) quote argv with the C-runtime
+rules: an arg containing spaces or quotes gets wrapped, and embedded quotes
+become `\"`. cmd.exe does not understand `\"`, so a persisted config arg like
+`if defined X (call "%X%\run.cmd") else (call "...")` can never spawn — the
+first live config-to-connection e2e caught it as
+`'\"C:\...\run_installed_or_refresh_xuunity_mcp.cmd\"' is not recognized`.
+Persist the install-time-resolved launcher path as its own argv entry:
+
+```json
+"command": "cmd.exe",
+"args": ["/d", "/c", "call", "C:\\Users\\me\\.claude-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd"]
+```
+
+Never embed quotes, parentheses, or env-var conditionals in a Windows
+client-config arg (an unquoted `%VAR%` also breaks on expansion when the
+value contains spaces). POSIX configs may keep `bash -lc 'exec "..."'` —
+POSIX spawn passes argv verbatim. Guarded by
+`tests/test_windows_client_config_contract.py` and the config-to-connection
+e2e in `tests/test_installed_delegate_e2e.py`.
+
 ---
 
 ## Bisecting a Hang That Only Reproduces in CI

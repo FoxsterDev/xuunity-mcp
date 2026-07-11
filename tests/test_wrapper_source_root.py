@@ -494,9 +494,23 @@ class WrapperSourceRootTests(unittest.TestCase):
             config = json.loads(claude_config.read_text(encoding="utf-8"))
             server_entry = config["mcpServers"]["xuunity_light_unity"]
             self.assertEqual("cmd.exe", server_entry["command"])
-            self.assertEqual(["/d", "/c"], server_entry["args"][:2])
-            self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", server_entry["args"][2])
-            self.assertIn("CLAUDE_TOOLS_HOME", server_entry["args"][2])
+            self.assertEqual(["/d", "/c", "call"], server_entry["args"][:3])
+            launcher_arg = server_entry["args"][3]
+            self.assertTrue(
+                launcher_arg.endswith("run_installed_or_refresh_xuunity_mcp.cmd"), launcher_arg
+            )
+            self.assertIn(
+                "claude-tools",
+                launcher_arg,
+                "claude target must resolve the CLAUDE_TOOLS_HOME install dir at write time",
+            )
+            for arg in server_entry["args"]:
+                self.assertNotRegex(
+                    arg,
+                    r'["()]',
+                    "client argv quoting escapes embedded quotes as \\\" — "
+                    f"config args must stay quote-free: {arg!r}",
+                )
 
     def test_init_replaces_windows_bash_claude_config_with_cmd_launcher(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

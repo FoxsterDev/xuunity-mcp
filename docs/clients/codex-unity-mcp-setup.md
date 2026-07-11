@@ -35,9 +35,15 @@ On native Windows, use these values instead:
 | Command to launch | `cmd.exe` |
 | Argument 1 | `/d` |
 | Argument 2 | `/c` |
-| Argument 3 | `if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")` |
-| Environment variable | `CODEX_TOOLS_HOME=C:\path\to\.codex-tools` if you do not want the default `%USERPROFILE%\.codex-tools` |
+| Argument 3 | `call` |
+| Argument 4 | `C:\Users\<YOUR_USERNAME>\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd` |
 | Working directory | `C:\path\to\trusted\workspace` |
+
+Replace `<YOUR_USERNAME>` with your Windows user name (with a custom
+`CODEX_TOOLS_HOME`, point argument 4 at `<CODEX_TOOLS_HOME>\xuunity-mcp\...`
+instead). Keep every argument free of embedded quotes and parentheses:
+clients quote argv with the C-runtime rules, which escape embedded quotes as
+`\"` — cmd.exe misparses that and the server never starts.
 
 Prefer the `.cmd` launcher for native Windows. PowerShell `.ps1` wrappers can
 be blocked by ExecutionPolicy, and Git Bash is not the recommended setup route

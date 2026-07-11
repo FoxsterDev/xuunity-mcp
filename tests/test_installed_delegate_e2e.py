@@ -191,10 +191,22 @@ class ClaudeConfigToConnectionTest(unittest.TestCase):
             configured_argv = [server_entry["command"], *server_entry["args"]]
             if os.name == "nt":
                 self.assertEqual("cmd.exe", server_entry["command"], server_entry)
-                self.assertIn(
-                    "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR",
-                    " ".join(server_entry["args"]),
-                    "neutral-target Windows config must resolve the install dir via env",
+                for arg in server_entry["args"]:
+                    self.assertNotRegex(
+                        arg,
+                        r'["()]',
+                        "client argv quoting escapes embedded quotes as \\\" and "
+                        f"cmd.exe misparses them — config args must stay quote-free: {arg!r}",
+                    )
+                launcher_arg = server_entry["args"][-1]
+                self.assertTrue(
+                    launcher_arg.endswith("run_installed_or_refresh_xuunity_mcp.cmd"),
+                    launcher_arg,
+                )
+                self.assertEqual(
+                    install_dir.resolve(),
+                    Path(launcher_arg).parent.resolve(),
+                    "config must carry the install-time-resolved launcher path",
                 )
             else:
                 self.assertEqual("bash", server_entry["command"], server_entry)

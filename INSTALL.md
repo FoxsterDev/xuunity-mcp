@@ -365,9 +365,15 @@ Windows template:
 ```toml
 [mcp_servers.xuunity_light_unity]
 command = "cmd.exe"
-args = ['/d', '/c', 'if defined CODEX_TOOLS_HOME (call "%CODEX_TOOLS_HOME%\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd") else (call "%USERPROFILE%\.codex-tools\xuunity-mcp\run_installed_or_refresh_xuunity_mcp.cmd")']
+args = ["/d", "/c", "call", "C:\\Users\\<YOUR_USERNAME>\\.codex-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd"]
 required = false
 ```
+
+Replace `<YOUR_USERNAME>` with your Windows user name, or let
+`--install-codex-config` / `--install-claude-config` write the resolved path.
+Keep every `args` entry free of embedded quotes and parentheses: clients
+quote argv with the C-runtime rules, which escape embedded quotes as `\"` —
+cmd.exe misparses that and the server never starts.
 
 ## Connect Claude Code
 

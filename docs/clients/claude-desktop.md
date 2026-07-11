@@ -74,12 +74,18 @@ Production config:
       "args": [
         "/d",
         "/c",
-        "if defined CLAUDE_TOOLS_HOME (call \"%CLAUDE_TOOLS_HOME%\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd\") else (call \"%USERPROFILE%\\.claude-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd\")"
+        "call",
+        "C:\\Users\\<YOUR_USERNAME>\\.claude-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd"
       ]
     }
   }
 }
 ```
+
+Replace `<YOUR_USERNAME>` with your Windows user name. Keep every `args`
+entry free of embedded quotes and parentheses: MCP clients quote argv with
+the C-runtime rules, which escape embedded quotes as `\"` — cmd.exe
+misparses that and the server never starts.
 
 Install it:
 
