@@ -45,6 +45,9 @@ Migration note:
 - Current source qualifies refresh `playmode_state_after_settle` with explicit
   source/trust metadata; bridge identity churn yields `stale_risk` and directs
   PlayMode-sensitive callers to confirm via `unity_playmode_state`.
+- Current source also keeps a terminal scenario inconclusive when a confirmed
+  project-hook `*_applied` mutation is followed by a refresh-settle timeout,
+  while explicitly separating the applied mutation from the unproven settle.
 - `v0.3.38+` makes `unity_status_summary` compact by default for MCP callers,
   with `payload_mode` markers and full nested diagnostics available through
   `includeFullPayload=true`.

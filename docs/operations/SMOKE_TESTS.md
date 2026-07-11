@@ -192,6 +192,13 @@ Pass criteria:
   use `unity_playmode_state` before gating a PlayMode-sensitive mutation
 - if scenario-driven refresh is used, nested refresh payload should expose the
   same settled contract class rather than only raw `*_requested` transport timing
+- if a passed `project_defined_hook` reports an `*_applied` mutation and the
+  immediately following `project_refresh` times out, the compact scenario
+  verdict remains `inconclusive`/`failed` at scenario level but reports
+  `failure_class=applied_mutation_settle_timeout`,
+  `trust_class=mutation_applied_unsettled`, and
+  `applied_mutation_settle_summary`. Treat the mutation as applied and the
+  settle as unproven; verify the editor is settled before the next mutation.
 
 ### 5. PlayMode Result Parity Smoke
 

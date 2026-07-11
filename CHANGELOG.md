@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Scenario decision verdicts now distinguish a project-hook mutation that was
+  confirmed as applied from an immediately following refresh-settle timeout.
+  Such runs remain inconclusive rather than passing, but expose
+  `applied_mutation_settle_timeout`, `mutation_applied_unsettled`, and a compact
+  mutation/settle summary so the hook is not misread as failed.
 - Refresh responses now qualify `playmode_state_after_settle` with an explicit
   source and trust class. When bridge identity changes during post-request
   settle, compact and full responses report `stale_risk` plus a

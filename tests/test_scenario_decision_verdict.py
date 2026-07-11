@@ -390,6 +390,46 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual("refresh", verdict["first_failure"]["step_id"])
         self.assertEqual("failed", verdict["steps"][0]["status"])
 
+    def test_decision_verdict_separates_applied_hook_mutation_from_refresh_settle_timeout(self) -> None:
+        payload = {
+            "project_root": "/tmp/FakeProject",
+            "run_id": "run-applied-mutation-settle-timeout",
+            "scenario_name": "ApplyProfileThenRefresh",
+            "status": "failed",
+            "terminal": True,
+            "succeeded": False,
+            "steps": [
+                {
+                    "stepId": "set_profile",
+                    "kind": "project_defined_hook",
+                    "status": "passed",
+                    "outcome": "operation_succeeded",
+                    "payload_json": json.dumps({"outcome": "environment_applied", "environment": "development"}),
+                },
+                {
+                    "stepId": "settle_profile_change",
+                    "kind": "project_refresh",
+                    "status": "failed",
+                    "outcome": "refresh_timeout",
+                    "error_code": "project_refresh_timeout",
+                    "error_message": "Timed out waiting for refresh settle.",
+                },
+            ],
+        }
+
+        verdict = server_summaries.build_scenario_decision_verdict(payload, {"passed", "failed"})
+
+        self.assertEqual("inconclusive", verdict["verdict"])
+        self.assertEqual("applied_mutation_settle_timeout", verdict["failure_class"])
+        self.assertEqual("mutation_applied_unsettled", verdict["trust_class"])
+        self.assertEqual("failed", verdict["scenario_status"])
+        self.assertEqual("verify_editor_settled_before_next_mutation", verdict["recommended_next_action"])
+        self.assertEqual("applied", verdict["applied_mutation_settle_summary"]["mutation_status"])
+        self.assertEqual("environment_applied", verdict["applied_mutation_settle_summary"]["mutation_outcome"])
+        self.assertEqual("timed_out", verdict["applied_mutation_settle_summary"]["settle_status"])
+        self.assertEqual("set_profile", verdict["first_failure"]["mutation_step_id"])
+        self.assertTrue(verdict["first_failure"]["settle_timeout_after_applied_mutation"])
+
     def test_playmode_set_already_playing_is_compact_stale_state_signal(self) -> None:
         payload = {
             "project_root": "/tmp/FakeProject",

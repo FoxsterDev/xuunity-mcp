@@ -36,6 +36,7 @@ SCENARIO_FAILURE_CLASSES = {
     "precondition",
     "blocking_popup",
     "infrastructure_timeout",
+    "applied_mutation_settle_timeout",
     "cleanup",
     "unity_unproven",
 }
@@ -694,6 +695,55 @@ def _step_error_text(step: dict[str, Any] | None) -> str:
     return " ".join(part for part in parts if part).lower()
 
 
+def build_applied_mutation_settle_summary(steps: list[Any], cleanup_start_index: Any) -> dict[str, Any]:
+    """Surface an applied project-hook mutation separately from its settle timeout.
+
+    A project-defined hook can apply a profile or environment change that causes
+    a domain reload.  If the immediately following refresh times out, the
+    scenario remains failed/inconclusive: the editor has not been proven settled.
+    It must not, however, imply that the preceding hook mutation failed.
+    """
+    first_failed_index, first_failed = _first_failed_raw_step(steps)
+    if first_failed is None or first_failed_index <= 0:
+        return {}
+
+    try:
+        cleanup_start = int(cleanup_start_index)
+    except (TypeError, ValueError):
+        cleanup_start = -1
+    if cleanup_start >= 0 and first_failed_index >= cleanup_start:
+        return {}
+
+    failed_kind = str(first_failed.get("kind") or "")
+    failed_error_code = str(first_failed.get("error_code") or "")
+    if failed_kind != "project_refresh" or failed_error_code != "project_refresh_timeout":
+        return {}
+
+    mutation_step = steps[first_failed_index - 1]
+    if not isinstance(mutation_step, dict):
+        return {}
+    if str(mutation_step.get("kind") or "") != "project_defined_hook" or str(mutation_step.get("status") or "") != "passed":
+        return {}
+
+    mutation_payload = _parse_step_payload_json(mutation_step)
+    mutation_outcome = str(mutation_payload.get("outcome") or mutation_step.get("outcome") or "")
+    if not mutation_outcome.endswith("_applied"):
+        return {}
+
+    return {
+        "mutation_status": "applied",
+        "mutation_step_id": str(mutation_step.get("stepId") or mutation_step.get("step_id") or ""),
+        "mutation_kind": str(mutation_step.get("kind") or ""),
+        "mutation_outcome": truncate_text(mutation_outcome, 120),
+        "settle_status": "timed_out",
+        "settle_step_id": str(first_failed.get("stepId") or first_failed.get("step_id") or ""),
+        "settle_kind": failed_kind,
+        "settle_error_code": failed_error_code,
+        "settle_completion": "unproven",
+        "recommended_next_action": "verify_editor_settled_before_next_mutation",
+    }
+
+
 def classify_scenario_failure(
     normalized: dict[str, Any],
     step_items: list[Any],
@@ -717,6 +767,9 @@ def classify_scenario_failure(
         cleanup_start_index = -1
     if cleanup_start_index >= 0 and first_failed_index >= cleanup_start_index:
         return "cleanup"
+
+    if build_applied_mutation_settle_summary(step_items, cleanup_start_index):
+        return "applied_mutation_settle_timeout"
 
     payload = _parse_step_payload_json(first_failed)
     for value in (
@@ -758,7 +811,7 @@ def classify_scenario_failure(
 def scenario_verdict_for_failure_class(status: str, failure_class: str) -> str:
     if status == "passed":
         return "passed"
-    if failure_class in {"infrastructure_timeout", "unity_unproven"}:
+    if failure_class in {"infrastructure_timeout", "applied_mutation_settle_timeout", "unity_unproven"}:
         return "inconclusive"
     if status == "failed":
         return "failed"
@@ -778,6 +831,8 @@ def scenario_trust_class(
         return "stale_risk"
     if failure_class == "infrastructure_timeout":
         return "infrastructure_timeout"
+    if failure_class == "applied_mutation_settle_timeout":
+        return "mutation_applied_unsettled"
     if failure_class == "unity_unproven":
         return "unity_unproven"
     return "authoritative"
@@ -799,6 +854,8 @@ def recommended_next_action_for_scenario(
         return "rerun_scenario_or_query_by_run_id"
     if failure_class == "infrastructure_timeout":
         return "verify_editor_settled_then_retry_or_increase_timeout"
+    if failure_class == "applied_mutation_settle_timeout":
+        return "verify_editor_settled_before_next_mutation"
     if failure_class == "cleanup":
         return "inspect_cleanup_failure_and_restore_state"
     if failure_class == "blocking_popup":
@@ -968,6 +1025,17 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
         if bool(profile_mutation_summary.get("profile_restore_required")) and "recommended_next_action" not in summary:
             summary["recommended_next_action"] = str(profile_mutation_summary.get("recommended_next_action") or "")
 
+    applied_mutation_settle_summary = build_applied_mutation_settle_summary(
+        step_items,
+        normalized.get("cleanup_start_index"),
+    )
+    if applied_mutation_settle_summary:
+        summary["applied_mutation_settle_summary"] = applied_mutation_settle_summary
+        if isinstance(first_failed_step, dict):
+            first_failed_step["settle_timeout_after_applied_mutation"] = True
+            first_failed_step["mutation_step_id"] = str(applied_mutation_settle_summary.get("mutation_step_id") or "")
+            first_failed_step["mutation_outcome"] = str(applied_mutation_settle_summary.get("mutation_outcome") or "")
+
     for key in (
         "host_health_classification",
         "host_health_reason",
@@ -1135,6 +1203,7 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         "ui_smoke_summary",
         "path_coverage_summary",
         "profile_mutation_summary",
+        "applied_mutation_settle_summary",
         "structured_timing",
         "artifact_manifest",
     ):
