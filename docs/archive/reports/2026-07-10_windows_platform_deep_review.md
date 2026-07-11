@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP — Windows Platform Deep Review
 
 Date: 2026-07-10 (implementation status updated 2026-07-11)
-Status: review complete; Waves 1–2 implemented on `master` (unreleased); Wave 3 open
+Status: review complete; Waves 1–3 implemented on `master` (unreleased); Wave 3 item 12 (live colleague-host session) remains the only open item
 Scope: why colleagues on plain Windows machines cannot set up and use the MCP that works flawlessly on macOS
 Source reviewed: this repo @ `e49334e` (post-v0.3.42)
 Method: 4 parallel audit lanes (retro/fix history, install surface, server templates, CI coverage) + manual review of the Unity C# bridge and repo routers. All `file:line` refs are relative to the MCP repo root.
@@ -139,7 +139,7 @@ Wave 1 complete: full suite 339/339 green (4 native-Windows tests skip on macOS 
 | W2-9 helper subprocess timeouts + `CREATE_NO_WINDOW` (tasklist 10 s, PS/ps listing 30 s w/ new `process_listing_timeout` code — `TimeoutExpired` previously escaped `except OSError`; lsof 10 s, wslpath 10 s, taskkill 15 s, macOS `open` 30 s, launcher git 30/60 s, workspace git 30 s, refresh native 120 s / bash 300 s; `server_core.hidden_window_subprocess_kwargs()` on all Windows-facing spawns) | done + tests (`tests/test_subprocess_timeout_contract.py`: 8 — AST sweep over `templates/*.py` + refresh with explicit no-timeout allowlist for server/batch self-runs, taskkill `/F /T` argv contract, timeout-classification behavior) | `e61f575` |
 | Bonus: latent Wave-1 `NameError` fix — `verify_project_editor_closed` used `render_launcher_cli` without an import in the lifecycle module (only reachable when live project editors exist + process visibility available; caught by the new kill-identity test) | done | `e61f575` |
 
-Wave 2 scope notes: suite now 363/363 green (4 skips). New C# file syntax-checked with mono `mcs`; consumer projects pin the released git tag (`v0.3.42`), so local package edits are exercised only at the next release tag or a Wave-3 live session. Deferred from the original Wave-2 list (item 10 + parts of 9): Windows lock-owner probe (lsof-only stub), raw-argv echo on argparse failure, fail-fast `unity_version_mismatch` — folded into Wave 3 follow-ups.
+Wave 2 scope notes: suite now 363/363 green (4 skips). New C# file syntax-checked with mono `mcs`; consumer projects pin the released git tag (`v0.3.42`), so local package edits are exercised only at the next release tag or a Wave-3 live session. Deferred from the original Wave-2 list (item 10 + parts of 9): Windows lock-owner probe (lsof-only stub), raw-argv echo on argparse failure, fail-fast `unity_version_mismatch` — folded into Wave 3 follow-ups and implemented there (see §5e).
 
 ## 5d. Editor main-thread load review (2026-07-11)
 
@@ -165,6 +165,20 @@ Known remaining (documented, allowlisted, on-demand only — not per-tick): `XUU
 
 Suite after this pass: 364/364 green (4 skips).
 
+## 5e. Wave 3 implementation status (2026-07-11, MCP repo `master`)
+
+| Item | Status |
+| --- | --- |
+| W3-11 e2e stdio smoke (`tests/test_mcp_stdio_e2e.py`: the real launcher process — bash+`.sh` on POSIX, cmd.exe+`.cmd` on Windows — driven through MCP `initialize` → `tools/list` → `tools/call xuunity_setup_plan` → `ping`; first executable coverage of `serve_stdio` on any OS; exit-code propagation through the wrapper chain; Cyrillic+spaces project-path round-trip with the ASCII-frame contract; protocol errors survive the session; `ensure-ready --open-editor` with `XUUNITY_UNITY_EDITOR_ROOTS` at an empty dir fails in seconds with `unity_app_not_found` + searched roots instead of the 120 s wait) | done + tests (5) |
+| W3-11b `.ps1` under stock ExecutionPolicy (`tests/test_ps1_execution_policy_contract.py`: Restricted policy fails loudly — non-zero exit, no usage output — and the documented Bypass invocation works, per installed PS host; both `.ps1` wrappers now carry in-file Restricted/Bypass/.cmd-fallback guidance, CRLF-pinned) | done + tests (4) |
+| W3-9 leftover: Windows lock-owner probe (`windows_lock_open_denied` share-mode probe in `server_editor_host_processes.py`; denied open marks the lock held even without pid attribution, attribution falls back to `list_live_project_editor_pids`, held locks are never deleted — `project_already_open_without_bridge` now reachable on Windows; native share-mode test via ctypes CreateFileW) | done + tests (7) |
+| W3-10 leftover: raw-argv echo on argparse failure (`server.py` echoes repr of received argv to stderr on parse error, help exits stay clean — the historical truncation class is now diagnosable at the failure point) | done + tests (3) |
+| W3-10 leftover: fail-fast `unity_version_mismatch` (`detect_unity_app_path_for_project` raises with project version, installed versions, and searched roots instead of silently opening the newest install into Unity's upgrade dialog; explicit `--unity-app` still overrides; unknown project version keeps the newest-install fallback) | done + tests (4) |
+| W3-13 docs pass (README: native-Windows Python precheck, PowerShell-first quickstart with `.\` + `$env:TEMP` ahead of the cmd.exe variant, `.ps1` Bypass invocation, Windows uninstall variant, bash-only smoke-runner honesty note, Windows-aware Agent Setup Prompt platform rule, stale `v0.3.21` → "latest tagged release"; `Agents.md` public entrypoints now list the `.cmd`/`.ps1` flavors) | done |
+| W3-12 live colleague-machine session via `docs/archive/retros/INSTALL_RETRO_PROMPT.md` | **open — external input; the only remaining Wave-3 item.** `STATUS.md` cross-platform row updated to "templates provided; CI-exercised"; the live-host claim stays conservative until a green session |
+
+Wave 3 scope notes: suite now 387/387 green (8 skips: 4 pre-existing native-Windows + 2 `.ps1` policy behavior + 2 native share-mode; all run on the Windows CI leg). `scripts/testing/process_support.run_with_timeout` gained `input_text` (stdin delivery) and explicit UTF-8 decode of child output, per the helper-subprocess discipline. The e2e file needs no CI wiring — `unittest discover` picks it up on all three OS legs.
+
 ## 6. Recommended fix plan
 
 ### Wave 1 — unblock colleagues (each item unit-testable on the GitHub Windows runner, no Unity needed)
@@ -182,9 +196,9 @@ Suite after this pass: 364/364 green (4 skips).
 10. devmode cross-drive fallback + forward-slash `file:` deps; raw-argv echo on argparse failure; fail-fast `unity_version_mismatch` instead of newest-install fallback.
 
 ### Wave 3 — close the loop (process)
-11. **Windows CI e2e smoke without Unity**: spawn the server via `xuunity_light_unity_mcp.cmd` as a real process, drive `initialize`/`tools/list` over stdio (this also gives `serve_stdio` its first test anywhere), assert exit codes; add a Cyrillic+spaces project-path fixture; run one `.ps1` leg under stock Windows PowerShell 5.1 default policy; assert `ensure-ready` fails fast (< 5 s) with no Unity installed.
-12. **One live validation session on a colleague's real Windows machine** using `docs/archive/retros/INSTALL_RETRO_PROMPT.md` to capture evidence — this is the explicitly deferred item from 2026-06-17 and the only thing that converts "templates provided" into "supported". Repeat after Wave 1 lands; update `STATUS.md:207` only on green.
-13. Docs pass: PowerShell-first Windows quickstart (with `.\` and `$env:TEMP`), native prerequisites check, Windows variants for verify/uninstall/smoke, `.cmd`/`.ps1` added to `Agents.md` "Public shell entrypoints", Windows-aware Agent Setup Prompt.
+11. **[done 2026-07-11, §5e]** **Windows CI e2e smoke without Unity**: spawn the server via `xuunity_light_unity_mcp.cmd` as a real process, drive `initialize`/`tools/list` over stdio (this also gives `serve_stdio` its first test anywhere), assert exit codes; add a Cyrillic+spaces project-path fixture; run one `.ps1` leg under stock Windows PowerShell 5.1 default policy; assert `ensure-ready` fails fast with no Unity installed.
+12. **[open — the last Wave-3 item]** **One live validation session on a colleague's real Windows machine** using `docs/archive/retros/INSTALL_RETRO_PROMPT.md` to capture evidence — this is the explicitly deferred item from 2026-06-17 and the only thing that converts "templates provided" into "supported". Repeat after Wave 1 lands; upgrade `STATUS.md:207` to live-host proof only on green.
+13. **[done 2026-07-11, §5e]** Docs pass: PowerShell-first Windows quickstart (with `.\` and `$env:TEMP`), native prerequisites check, Windows variants for verify/uninstall/smoke, `.cmd`/`.ps1` added to `Agents.md` "Public shell entrypoints", Windows-aware Agent Setup Prompt.
 
 ---
 

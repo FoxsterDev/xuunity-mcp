@@ -88,6 +88,18 @@ If your default `python3` is older than `3.10`, set `PYTHON` explicitly before
 running `run_installed_or_refresh_xuunity_mcp.sh`, `run.sh`, or
 `xuunity_light_unity_mcp.sh`.
 
+On native Windows (PowerShell or cmd.exe):
+
+```powershell
+py -3 --version
+# or: python --version
+```
+
+The `.cmd` and `.ps1` launcher flavors probe `py`, then `python`, then
+`python3`, reject the Microsoft Store stub interpreter, and require Python
+3.10+. Set `PYTHON` to a full `python.exe` path when the probe picks the wrong
+interpreter.
+
 Important:
 
 - UI auto-review, sandbox auto-approval, or tool-level approval is not the same
@@ -234,8 +246,19 @@ bash xuunity_light_unity_mcp.sh validate-setup \
   --project-root /path/to/UnityProject
 ```
 
-Native Windows quickstart from `cmd.exe` uses the `.cmd` launcher and quoted
-project paths:
+Native Windows quickstart from PowerShell uses the `.cmd` launcher (immune to
+ExecutionPolicy) with `.\` and `$env:TEMP`:
+
+```powershell
+.\xuunity_light_unity_mcp.cmd setup-plan --project-root "C:\path with spaces\UnityProject" > "$env:TEMP\xuunity-setup-plan.json"
+
+# Stop here. Review the plan with the user before continuing.
+.\xuunity_light_unity_mcp.cmd setup-apply --plan-file "$env:TEMP\xuunity-setup-plan.json" --project-root "C:\path with spaces\UnityProject" --yes
+.\xuunity_light_unity_mcp.cmd validate-setup --project-root "C:\path with spaces\UnityProject"
+.\xuunity_light_unity_mcp.cmd ensure-ready --project-root "C:\path with spaces\UnityProject" --open-editor
+```
+
+The same commands from `cmd.exe` drop the `.\` prefix and use `%TEMP%`:
 
 ```bat
 xuunity_light_unity_mcp.cmd setup-plan --project-root "C:\path with spaces\UnityProject" > "%TEMP%\xuunity-setup-plan.json"
@@ -247,9 +270,12 @@ xuunity_light_unity_mcp.cmd ensure-ready --project-root "C:\path with spaces\Uni
 ```
 
 On native Windows, prefer `.cmd` for setup commands. PowerShell `.ps1` wrappers
-can be blocked by ExecutionPolicy, and Git Bash is not the recommended setup
-route because native Windows paths with spaces can cross an extra shell
-argument boundary before Python receives them.
+can be blocked by ExecutionPolicy — stock Windows PowerShell 5.1 defaults to
+`Restricted`, so run the `.ps1` flavor as
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\xuunity_light_unity_mcp.ps1 <command> ...`
+when you need it directly. Git Bash is not the recommended setup route because
+native Windows paths with spaces can cross an extra shell argument boundary
+before Python receives them.
 
 For flat hubs, mixed-version hubs, or nested repositories, scan the workspace
 first and require an explicit target selection before `setup-apply`:
@@ -322,6 +348,16 @@ bash xuunity_light_unity_mcp.sh uninstall-apply \
   --yes
 ```
 
+On native Windows run the same uninstall commands through the `.cmd` launcher
+with `$env:TEMP` (PowerShell) or `%TEMP%` (cmd.exe) plan paths:
+
+```powershell
+.\xuunity_light_unity_mcp.cmd uninstall-plan --mode project-only-cleanup --project-root "C:\path with spaces\UnityProject" > "$env:TEMP\xuunity-uninstall-plan.json"
+
+# Stop here. Review the plan with the user before continuing.
+.\xuunity_light_unity_mcp.cmd uninstall-apply --plan-file "$env:TEMP\xuunity-uninstall-plan.json" --yes
+```
+
 Use `--client codex|claude_code|cursor|windsurf|claude_desktop` when the
 current client cannot be detected. Full reset removes only the
 `xuunity_light_unity` block from the selected user config file; it does not
@@ -369,10 +405,16 @@ Inputs:
 Rules:
 - Read README.md, INSTALL.md, and the matching docs/clients/* guide before
   editing files.
+- On native Windows, run every `bash xuunity_light_unity_mcp.sh ...` command
+  below as `.\xuunity_light_unity_mcp.cmd ...` from PowerShell (or
+  `xuunity_light_unity_mcp.cmd ...` from cmd.exe), write plan files to
+  "$env:TEMP\xuunity-setup-plan.json" instead of /tmp, keep every project path
+  quoted, and replace `bash init_xuunity_light_unity_mcp.sh` with
+  `run_installed_or_refresh_xuunity_mcp.cmd`.
 - Use the current host client that is running this request as the default MCP
   wiring target unless the user explicitly requests another client.
-- Prefer Git UPM release v0.3.21 unless the user explicitly requests local
-  package development.
+- Prefer the latest tagged Git UPM release unless the user explicitly requests
+  local package development.
 - Reuse an existing installed host helper if one is already present locally.
   Clone the repo only when the helper is missing or local MCP development is
   explicitly requested.
@@ -631,6 +673,11 @@ lane explicitly:
 ```bash
 templates/smoke/run_clean_project_android_apk_smoke.sh --allow-no-android
 ```
+
+The clean-project smoke runner is bash-only today (macOS, Linux, or Windows Git
+Bash). On native Windows, use the Guided Setup Wizard `.cmd` flow plus
+`validate-setup` and `ensure-ready --open-editor` as the equivalent readiness
+evidence.
 
 ---
 

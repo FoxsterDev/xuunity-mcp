@@ -15,7 +15,7 @@ Use it when a session starts from this MCP repo, or when a host repo task target
 - Agent workflow docs: `docs/agents/`
 - Templates: `templates/`
 - AI/public discovery files: `llms.txt`, `mcp-server.json`
-- Public shell entrypoints: `init_xuunity_light_unity_mcp.sh`, `xuunity_light_unity_mcp.sh`, `run_installed_or_refresh_xuunity_mcp.sh`
+- Public shell entrypoints: `init_xuunity_light_unity_mcp.sh`, `xuunity_light_unity_mcp.sh`, `run_installed_or_refresh_xuunity_mcp.sh`; native Windows flavors: `xuunity_light_unity_mcp.cmd`, `xuunity_light_unity_mcp.ps1`, `run_installed_or_refresh_xuunity_mcp.cmd`, `templates/run.cmd`, `templates/run.ps1`
 
 ## Mode Detection
 - Standalone mode: `../../../Agents.md` is absent or does not describe the active workspace. Use this file and local repo docs as the full routing contract.
