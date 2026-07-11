@@ -1,6 +1,6 @@
 ---
 name: cross-platform-shell
-description: Rules for bash scripts, wrappers, and CI steps in this repo that must run identically on macOS, Linux, and Windows Git Bash (MSYS), plus the bisection workflow for hangs that reproduce only in CI.
+description: Rules for bash scripts, wrappers, and CI steps in this repo that must run identically on macOS, Linux, and Windows Git Bash (MSYS), plus native cmd launcher flavor rules and the bisection workflow for hangs that reproduce only in CI.
 ---
 
 # Cross-Platform Shell Guidelines
@@ -109,6 +109,17 @@ of crashing.
 Add a regression for this class by clearing `os.environ` and mocking
 `Path.home()` to raise `RuntimeError`. Use explicit env overrides in tests when
 the exact user config path matters.
+
+## 12. cmd Launcher Flavor Rules (`*.cmd`)
+
+The native Windows launchers (`xuunity_light_unity_mcp.cmd`, `run_installed_or_refresh_xuunity_mcp.cmd`, `templates/run.cmd`) have their own trap set, guarded by `tests/test_cmd_launcher_contract.py`:
+
+- **No `%ERRORLEVEL%` token at all.** Inside parenthesized blocks it expands at parse time, so `exit /b %ERRORLEVEL%` returns 0 forever — every wrapper "succeeded" with no Python installed. Use goto flow with `if errorlevel N` and bare `exit /b`.
+- **Gate every interpreter candidate through a probe**, not `where python`: the Microsoft-Store WindowsApps stub is found first on fresh machines and cannot run scripts (exit 9009). Probe with `-c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 2)"` before trusting a candidate.
+- **Tolerate a quoted `PYTHON` override**: strip quotes (`set "X=%PYTHON:"=%"`) before use — a quoted value inside an `if` block otherwise breaks batch parsing.
+- **Default `PYTHONUTF8=1`** (`if not defined PYTHONUTF8 ...`) in every flavor.
+- **CRLF end to end** — enforced by `.gitattributes` and the contract test; after editing a `.cmd` from a POSIX host, re-normalize (`perl -pi -e 's/\r?\n/\r\n/'`).
+- Keep `.cmd` flavors as thin as the `.sh` ones (rule 6); behavior lives in Python.
 
 ---
 

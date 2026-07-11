@@ -67,5 +67,17 @@ When implementing try-except blocks for process filtering, command-matching, or 
 ## 3. Process Termination Rules (`terminate_editor_pid`)
 
 - **Route Windows-like PIDs through `taskkill`:** For native Windows, Cygwin, and MSYS environments, process termination must be routed through `taskkill` / `taskkill.exe`.
+- **Kill the tree, bound the spawn:** Use `/T` with `/F` so editor worker children (asset import workers, shader compiler) do not survive as orphans, and give the `taskkill` spawn itself a `timeout=` plus `hidden_window_subprocess_kwargs()` like every helper spawn (see cross-platform-python skill rule 3).
 - **Never call POSIX `os.kill(pid, signal.SIGTERM)` on Windows PIDs under MSYS/Cygwin:** This can terminate random processes or kill the entire process group, shutting down all user applications.
 - **Double-Validate PID:** Ensure the PID is strictly greater than `0` and explicitly matches the application to be terminated before calling any kill command.
+
+---
+
+## 4. PID Identity Re-Verification Before Force-Kill
+
+A pid recorded in a session file goes stale across editor crashes, reboots, and long gaps — the OS reuses pids, so the recorded number can now belong to an unrelated process (a browser, an IDE). `pid_is_alive` proves only that *some* process exists.
+
+- Before any force-kill of a recorded pid, re-verify identity **now**: the pid must appear in the live verified set for the target (bridge-state pid that is alive, or a process whose command line still targets the project — `list_live_project_editor_pids`).
+- If the pid is alive but identity cannot be confirmed (process visibility restricted, no fresh bridge state), **refuse and classify** instead of killing: return an explicit state such as `tracked_pid_not_project_editor`, keep the session file so a later verified run can still close out, and recommend inspection.
+- Membership checks belong **before** the kill, not after it. Post-kill verification cannot un-kill an innocent process.
+- Reference implementation: `templates/server_editor_host_lifecycle.py` (`restore_host_opened_editor_state` identity gate); behavioral guards: `tests/test_editor_host_kill_identity.py` (foreign-pid refusal, visibility-restricted refusal, confirmed-pid kill path).
