@@ -1921,6 +1921,134 @@ actions:
         self.assertEqual("close_and_reopen_unity_to_resolve_package", ctx.exception.details["next_distinct_action"])
         self.assertEqual([2468], ctx.exception.details["live_project_editor_pids"])
 
+    def test_ensure_ready_fails_fast_when_package_not_declared(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            open_editor=True,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+        )
+        import_state = {
+            "package_name": "com.xuunity.light-mcp",
+            "manifest_declared": False,
+            "manifest_dependency": "",
+            "import_state": "not_declared",
+        }
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "resolve_editor_log_path", return_value=Path("/tmp/editor.log")),
+            mock.patch.object(server, "inspect_light_mcp_import_state", return_value=import_state),
+            mock.patch.object(server, "build_project_discovery_report", return_value={}),
+            mock.patch.object(server, "open_unity_editor") as open_mock,
+            mock.patch.object(server, "wait_for_ready") as wait_mock,
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_ensure_ready(args)
+
+        self.assertEqual("package_not_declared", ctx.exception.code)
+        self.assertEqual(
+            "ensure_ready_package_not_declared",
+            ctx.exception.details["fail_fast_reason"],
+        )
+        self.assertEqual(
+            "run_setup_plan_then_setup_apply",
+            ctx.exception.details["recommended_next_action"],
+        )
+        open_mock.assert_not_called()
+        wait_mock.assert_not_called()
+
+    def test_ensure_ready_fails_fast_when_git_is_missing_for_git_dependency(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            open_editor=True,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+        )
+        import_state = {
+            "package_name": "com.xuunity.light-mcp",
+            "manifest_declared": True,
+            "manifest_dependency": "https://example.invalid/repo.git#v0.3.42",
+            "import_state": "declared_not_resolved",
+        }
+
+        import server_project_context
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "resolve_editor_log_path", return_value=Path("/tmp/editor.log")),
+            mock.patch.object(server, "inspect_light_mcp_import_state", return_value=import_state),
+            mock.patch.object(server, "build_project_discovery_report", return_value={}),
+            mock.patch.object(server_project_context.shutil, "which", return_value=None),
+            mock.patch.object(server, "open_unity_editor") as open_mock,
+            mock.patch.object(server, "wait_for_ready") as wait_mock,
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_ensure_ready(args)
+
+        self.assertEqual("git_executable_missing_for_package_resolve", ctx.exception.code)
+        self.assertEqual(
+            "ensure_ready_git_missing_for_git_dependency",
+            ctx.exception.details["fail_fast_reason"],
+        )
+        open_mock.assert_not_called()
+        wait_mock.assert_not_called()
+
+    def test_ensure_ready_extends_default_timeout_for_first_import(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            open_editor=True,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+            include_full_payload=False,
+        )
+        state = {
+            "bridge_generation": 3,
+            "bridge_session_id": "session-first-import",
+            "editor_pid": 321,
+            "health_status": "healthy",
+            "playmode_state": "edit",
+            "compiler_error_count": 0,
+        }
+        emitted_payloads: list[dict[str, object]] = []
+
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "resolve_editor_log_path", return_value=Path("/tmp/editor.log")),
+            mock.patch.object(
+                server,
+                "inspect_light_mcp_import_state",
+                return_value={"import_state": "declared_not_resolved", "manifest_dependency": "https://example.invalid/repo.git"},
+            ),
+            mock.patch.object(server, "build_project_discovery_report", return_value={}),
+            mock.patch.object(server, "bridge_config_state", return_value={"enabled": True}),
+            mock.patch.object(server, "current_project_context_bridge_state", return_value={}),
+            mock.patch.object(server, "bridge_state_is_ready", return_value=False),
+            mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/Applications/Unity.app")),
+            mock.patch.object(server, "open_unity_editor", return_value={"opened_by_host": True, "editor_pid": 321}),
+            mock.patch.object(server, "wait_for_ready", return_value=state) as wait_mock,
+            mock.patch.object(server, "update_host_editor_session_pid"),
+            mock.patch.object(server, "refresh_project_context"),
+            mock.patch.object(server, "inspect_package_dependency_alignment", return_value={"alignment": "git"}),
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_ensure_ready(args)
+
+        self.assertEqual(300000, wait_mock.call_args.kwargs["timeout_ms"])
+        self.assertEqual(1, len(emitted_payloads))
+
     def test_batch_editor_conflict_includes_concrete_recovery_command(self) -> None:
         project_root = Path("/tmp/FakeProject")
 

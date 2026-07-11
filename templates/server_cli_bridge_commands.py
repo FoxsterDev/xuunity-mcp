@@ -731,6 +731,11 @@ def cmd_ensure_ready(args):
     payload["discovery"] = build_project_discovery_report(project_root)
 
     try:
+        maybe_fail_fast_ensure_ready_package_state(
+            project_root,
+            package_import_state_before_ready,
+            bool(args.open_editor),
+        )
         if not args.open_editor:
             maybe_fail_fast_offline_ensure_ready_without_open(
                 project_root,
@@ -749,15 +754,24 @@ def cmd_ensure_ready(args):
             unity_app = detect_unity_app_path_for_project(project_root, args.unity_app)
             payload["launch"] = open_unity_editor(project_root, log_path, unity_app, args.background_open)
 
+        effective_timeout_ms = args.timeout_ms
+        if (
+            args.open_editor
+            and str(package_import_state_before_ready.get("import_state") or "") == "declared_not_resolved"
+            and effective_timeout_ms == 120000
+        ):
+            effective_timeout_ms = 300000
+            payload["first_import_timeout_extension_ms"] = effective_timeout_ms
+
         state = wait_for_ready(
             project_root=project_root,
-            timeout_ms=args.timeout_ms,
+            timeout_ms=effective_timeout_ms,
             heartbeat_max_age_seconds=args.heartbeat_max_age_seconds,
             startup_policy=args.startup_policy,
             editor_log_path=log_path,
         )
     except ToolInvocationError as exc:
-        if str(exc.details.get("fail_fast_reason") or "") == "ensure_ready_without_open_editor_offline":
+        if str(exc.details.get("fail_fast_reason") or "").startswith("ensure_ready_"):
             raise
         details = dict(exc.details or {})
         package_import_state = inspect_light_mcp_import_state(project_root)

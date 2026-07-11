@@ -135,6 +135,7 @@ from server_project_context import (
     find_latest_request_event,
     inspect_light_mcp_import_state,
     inspect_package_dependency_alignment,
+    maybe_fail_fast_ensure_ready_package_state,
 )
 from server_test_reporting import (
     format_test_results,

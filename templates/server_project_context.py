@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -281,3 +282,59 @@ def inspect_light_mcp_import_state(project_root: Path) -> dict[str, Any]:
         result["import_state"] = "cached_without_bridge_state"
 
     return result
+
+
+GIT_DEPENDENCY_PREFIXES = ("http://", "https://", "git@", "ssh://", "git+")
+
+
+def maybe_fail_fast_ensure_ready_package_state(
+    project_root: Path,
+    package_import_state: dict[str, Any],
+    open_editor: bool,
+) -> None:
+    """Fail before the heartbeat wait when readiness is impossible.
+
+    A package that is absent from Packages/manifest.json can never start the
+    bridge, and a git dependency cannot resolve on first open without a git
+    executable — both used to burn the full ensure-ready timeout.
+    """
+    import_state = str(package_import_state.get("import_state") or "")
+
+    if import_state == "not_declared":
+        raise ToolInvocationError(
+            "package_not_declared",
+            (
+                f"{LIGHTWEIGHT_PACKAGE_NAME} is not declared in Packages/manifest.json for "
+                f"{project_root}, so the editor bridge can never become ready. "
+                "Run setup-plan and setup-apply for this project first."
+            ),
+            {
+                "fail_fast_reason": "ensure_ready_package_not_declared",
+                "package_import_state": package_import_state,
+                "recommended_next_action": "run_setup_plan_then_setup_apply",
+            },
+        )
+
+    if not open_editor:
+        return
+
+    manifest_dependency = str(package_import_state.get("manifest_dependency") or "")
+    if (
+        import_state == "declared_not_resolved"
+        and manifest_dependency.startswith(GIT_DEPENDENCY_PREFIXES)
+        and shutil.which("git") is None
+    ):
+        raise ToolInvocationError(
+            "git_executable_missing_for_package_resolve",
+            (
+                "The package is declared as a git dependency "
+                f"({manifest_dependency}) but no git executable is on PATH, so Unity cannot "
+                "resolve it on first open. Install Git (Git for Windows on Windows) and retry."
+            ),
+            {
+                "fail_fast_reason": "ensure_ready_git_missing_for_git_dependency",
+                "manifest_dependency": manifest_dependency,
+                "package_import_state": package_import_state,
+                "recommended_next_action": "install_git_then_retry_ensure_ready",
+            },
+        )
