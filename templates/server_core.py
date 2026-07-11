@@ -96,3 +96,20 @@ def wrap_globals_with_proxies(module_globals: dict[str, Any], names: list[str]) 
 
 import functools
 import sys
+
+
+def reconfigure_stdio_utf8() -> None:
+    """Force UTF-8 stdio regardless of host locale.
+
+    MCP clients speak UTF-8, but Windows defaults piped stdio to the ANSI
+    codepage: a non-ASCII byte on stdin kills serve_stdio mid-decode and
+    non-ASCII CLI output raises UnicodeEncodeError on cp866/cp1251 consoles.
+    """
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass

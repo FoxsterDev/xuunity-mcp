@@ -42,6 +42,7 @@ _LAUNCHER_DIR = Path(os.path.abspath(__file__)).parent
 sys.path.insert(0, str(_LAUNCHER_DIR))
 
 import server_setup_wizard
+from server_core import reconfigure_stdio_utf8
 
 
 def fail(message: str, exit_code: int = 1) -> "SystemExit":
@@ -385,6 +386,8 @@ def run_server_with_optional_compact_summary(server_path: str, args: list, compa
         [sys.executable, server_path] + list(args),
         stdout=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     sys.stdout.write(completed.stdout)
     sys.stdout.flush()
@@ -475,6 +478,8 @@ def run_git(source_root: str, *args: str) -> str:
         ["git", "-C", source_root] + list(args),
         stdout=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if completed.returncode != 0:
         raise SystemExit(completed.returncode)
@@ -488,6 +493,8 @@ def remote_release_tag_commit(source_root: str, remote_name: str, release_tag: s
         ["git", "-C", source_root, "ls-remote", "--tags", remote_name, tag_ref, peeled_ref],
         stdout=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if completed.returncode != 0:
         return None
@@ -519,23 +526,35 @@ def read_project_unity_version(project_root: str) -> str:
     raise SystemExit("Could not find m_EditorVersion in ProjectVersion.txt")
 
 
+def format_package_file_dependency(package_source_path: str, packages_dir: str) -> str:
+    """UPM `file:` value: forward slashes on every host, absolute on cross-drive."""
+    try:
+        relative_source = os.path.relpath(
+            os.path.realpath(package_source_path),
+            os.path.realpath(packages_dir),
+        )
+        return "file:" + relative_source.replace(os.sep, "/").replace("\\", "/")
+    except ValueError:
+        return "file:" + Path(package_source_path).resolve().as_posix()
+
+
 def update_manifest_dependency(manifest_path: str, dependency_value: str) -> None:
     manifest = Path(manifest_path)
-    data = json.loads(manifest.read_text())
+    data = json.loads(manifest.read_text(encoding="utf-8"))
     dependencies = data.setdefault("dependencies", {})
     dependencies[PACKAGE_NAME] = dependency_value
-    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 def remove_lock_dependency(lock_path: str) -> None:
     lock = Path(lock_path)
     if not lock.is_file():
         return
-    data = json.loads(lock.read_text())
+    data = json.loads(lock.read_text(encoding="utf-8"))
     dependencies = data.get("dependencies")
     if isinstance(dependencies, dict) and PACKAGE_NAME in dependencies:
         del dependencies[PACKAGE_NAME]
-        lock.write_text(json.dumps(data, indent=2) + "\n")
+        lock.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 def switch_project_to_devmode(paths: LauncherPaths, args: list) -> None:
@@ -546,9 +565,8 @@ def switch_project_to_devmode(paths: LauncherPaths, args: list) -> None:
 
     require_package_source_root(paths.source_root)
 
-    dependency_value = "file:" + os.path.relpath(
-        os.path.realpath(package_source_path),
-        os.path.realpath(os.path.join(project_root, "Packages")),
+    dependency_value = format_package_file_dependency(
+        package_source_path, os.path.join(project_root, "Packages")
     )
 
     update_manifest_dependency(manifest_path, dependency_value)
@@ -748,6 +766,7 @@ def print_mode_help(mode: str) -> None:
 
 
 def main(argv: list) -> int:
+    reconfigure_stdio_utf8()
     compact_summary = False
     args = []
     for arg in argv:

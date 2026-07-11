@@ -33,6 +33,8 @@ def capture_git_dirty_paths(workspace_root: Path) -> tuple[str, list[str]]:
         ["git", "-C", str(workspace_root), "rev-parse", "--show-toplevel"],
         check=False,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -45,6 +47,8 @@ def capture_git_dirty_paths(workspace_root: Path) -> tuple[str, list[str]]:
         ["git", "-C", str(repo_root), "status", "--porcelain=v1", "--untracked-files=no"],
         check=False,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

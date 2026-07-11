@@ -324,6 +324,8 @@ def run_batch_build_config_compile_matrix_probe(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
     stdout = str(completed.stdout or "").strip()
@@ -384,6 +386,8 @@ def run_self_json_command_with_completed(args: list[str]) -> tuple[dict[str, Any
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     payload: dict[str, Any] | None = None
     stdout = str(completed.stdout or "").strip()
@@ -403,6 +407,8 @@ def run_self_json_command(command_args: list[str]) -> dict[str, Any]:
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     stdout_text = completed.stdout or ""
     stderr_text = completed.stderr or ""

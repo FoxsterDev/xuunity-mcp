@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONUTF8="${PYTHONUTF8:-1}"
 
 if [[ -n "${PYTHON:-}" ]]; then
   if [[ "$PYTHON" == "py -3" ]] && command -v py >/dev/null 2>&1; then

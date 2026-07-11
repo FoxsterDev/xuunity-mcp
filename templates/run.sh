@@ -8,6 +8,7 @@ script_source="${BASH_SOURCE[0]:-$0}"
 script_dir="$(cd "$(dirname "$script_source")" && pwd -P)"
 server_file="${XUUNITY_LIGHT_UNITY_MCP_SERVER:-$script_dir/server.py}"
 minimum_python_version="3.10"
+export PYTHONUTF8="${PYTHONUTF8:-1}"
 
 python_version_is_supported() {
   "$@" - "$minimum_python_version" <<'PY'

@@ -20,7 +20,7 @@ ProcessLauncher.configure(Path(__file__).resolve())
 import argparse
 
 # Core types and library imports
-from server_core import ToolInvocationError, read_json, write_json
+from server_core import ToolInvocationError, read_json, reconfigure_stdio_utf8, write_json
 from server_health import FRESH_HEARTBEAT_MAX_AGE_SECONDS, build_editor_log_diagnosis, classify_project_health
 from server_batch_reporting import build_batch_prepare_failure_summary
 from server_editor_host import (
@@ -230,6 +230,7 @@ from server_cli_commands import *
 from server_cli_parser import build_parser
 
 def main() -> None:
+    reconfigure_stdio_utf8()
     try:
         if len(sys.argv) == 1:
             raise SystemExit(serve_stdio())

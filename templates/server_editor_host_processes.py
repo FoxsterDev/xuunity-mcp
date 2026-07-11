@@ -270,6 +270,8 @@ def try_list_path_owner_pids(path: Path) -> list[int]:
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
     except OSError:
         return []

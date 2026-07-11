@@ -5,6 +5,9 @@ $launcher = Join-Path $scriptDir "templates/server_launcher.py"
 if ([string]::IsNullOrWhiteSpace($env:XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME)) {
     $env:XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME = Split-Path -Leaf $MyInvocation.MyCommand.Path
 }
+if ([string]::IsNullOrWhiteSpace($env:PYTHONUTF8)) {
+    $env:PYTHONUTF8 = "1"
+}
 
 if (-not [string]::IsNullOrWhiteSpace($env:PYTHON)) {
     if ($env:PYTHON -eq "py -3") {

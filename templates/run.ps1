@@ -5,6 +5,9 @@ $serverFile = $env:XUUNITY_LIGHT_UNITY_MCP_SERVER
 if ([string]::IsNullOrWhiteSpace($serverFile)) {
     $serverFile = Join-Path $scriptDir "server.py"
 }
+if ([string]::IsNullOrWhiteSpace($env:PYTHONUTF8)) {
+    $env:PYTHONUTF8 = "1"
+}
 
 if (-not [string]::IsNullOrWhiteSpace($env:PYTHON)) {
     if ($env:PYTHON -eq "py -3") {

@@ -30,6 +30,17 @@ def require_supported_python() -> None:
     fail(f"Python 3.10 or newer is required. Selected interpreter reports {current}.")
 
 
+def reconfigure_stdio_utf8() -> None:
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+
 def resolve_source_root(script_dir: Path) -> Path:
     explicit = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT")
     if explicit:
@@ -136,6 +147,8 @@ def refresh_helper_if_needed(installer: Path, server_path: Path, run_path: Path,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if completed.returncode != 0:
@@ -161,6 +174,8 @@ def exec_run(run_path: Path, args: list[str]) -> None:
 
 def main(argv: list[str]) -> int:
     require_supported_python()
+    reconfigure_stdio_utf8()
+    os.environ.setdefault("PYTHONUTF8", "1")
     script_dir = Path(__file__).resolve().parent
     source_root = resolve_source_root(script_dir)
     installer = source_root / "init_xuunity_light_unity_mcp.sh"

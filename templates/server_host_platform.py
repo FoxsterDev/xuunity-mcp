@@ -81,6 +81,8 @@ class HostPlatformAdapter:
                         [cmd, "/FI", f"PID eq {pid}", "/NH"],
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         check=False,
                     )
                     return windows_tasklist_contains_pid(completed.stdout, pid)
@@ -107,6 +109,8 @@ class HostPlatformAdapter:
                         [cmd, "/FI", f"PID eq {pid}", "/NH"],
                         capture_output=True,
                         text=True,
+                        encoding="utf-8",
+                        errors="replace",
                         check=False,
                     )
                     return windows_tasklist_contains_pid(completed.stdout, pid)
@@ -141,6 +145,7 @@ class HostPlatformAdapter:
                 }
 
             script = (
+                "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; "
                 "Get-CimInstance Win32_Process | "
                 "Where-Object { $_.CommandLine } | "
                 "Select-Object ProcessId,CommandLine | "
@@ -152,6 +157,8 @@ class HostPlatformAdapter:
                     check=False,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
             except OSError as exc:
                 return {
@@ -221,6 +228,8 @@ class HostPlatformAdapter:
                 check=False,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
         except OSError as exc:
             return {
@@ -410,6 +419,8 @@ def windows_to_wsl_path(path: str | Path) -> str:
             ["wslpath", "-u", path_str],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
         )
         converted = completed.stdout.strip()
@@ -438,6 +449,8 @@ def wsl_to_windows_path(path: str | Path) -> str:
                 ["wslpath", "-w", path_str],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=True,
             )
             return completed.stdout.strip()

@@ -139,7 +139,14 @@ def activate_unity_editor(project_root: Path, explicit_unity_app: Path | None = 
     unity_app = explicit_unity_app or detect_unity_app_path_for_project(project_root, None)
     if host_platform_kind() == "macos":
         try:
-            subprocess.run(["open", str(unity_app)], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["open", str(unity_app)],
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
         except subprocess.CalledProcessError as exc:
             stderr = (exc.stderr or "").strip()
             stdout = (exc.stdout or "").strip()

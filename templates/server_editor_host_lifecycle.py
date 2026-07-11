@@ -229,7 +229,14 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
                 ]
             )
             try:
-                subprocess.run(launch_command, check=True, capture_output=True, text=True)
+                subprocess.run(
+                    launch_command,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
             except subprocess.CalledProcessError as exc:
                 stderr = (exc.stderr or "").strip()
                 stdout = (exc.stdout or "").strip()
