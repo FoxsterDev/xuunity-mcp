@@ -465,6 +465,149 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertNotIn('command = "bash"', config_text)
             self.assertNotIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
 
+    def test_init_registers_native_windows_claude_config_on_windows_like_host(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            claude_config = temp_root / "claude.json"
+            claude_tools = temp_root / "claude-tools"
+            neutral_dir = temp_root / "neutral"
+
+            env = self.make_env()
+            env["CLAUDE_CONFIG_PATH"] = str(claude_config)
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+            env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+            env["OS"] = "Windows_NT"
+            env["APPDATA"] = str(temp_root / "AppData" / "Roaming")
+            env["USERPROFILE"] = str(temp_root)
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "claude", "--install-claude-config"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            config = json.loads(claude_config.read_text(encoding="utf-8"))
+            server_entry = config["mcpServers"]["xuunity_light_unity"]
+            self.assertEqual("cmd.exe", server_entry["command"])
+            self.assertEqual(["/d", "/c"], server_entry["args"][:2])
+            self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", server_entry["args"][2])
+            self.assertIn("CLAUDE_TOOLS_HOME", server_entry["args"][2])
+
+    def test_init_replaces_windows_bash_claude_config_with_cmd_launcher(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            claude_config = temp_root / "claude.json"
+            claude_config.write_text(
+                json.dumps(
+                    {
+                        "mcpServers": {
+                            "xuunity_light_unity": {
+                                "type": "stdio",
+                                "command": "bash",
+                                "args": ["-lc", 'exec "/home/user/.claude-tools/xuunity-mcp/run.sh"'],
+                            },
+                            "other_server": {"type": "stdio", "command": "other"},
+                        }
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            neutral_dir = temp_root / "neutral"
+
+            env = self.make_env()
+            env["CLAUDE_CONFIG_PATH"] = str(claude_config)
+            env["CLAUDE_TOOLS_HOME"] = str(temp_root / "claude-tools")
+            env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+            env["OS"] = "Windows_NT"
+            env["APPDATA"] = str(temp_root / "AppData" / "Roaming")
+            env["USERPROFILE"] = str(temp_root)
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "claude", "--install-claude-config"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            self.assertIn("windows_claude_launcher_mismatch", completed.stderr)
+            config = json.loads(claude_config.read_text(encoding="utf-8"))
+            server_entry = config["mcpServers"]["xuunity_light_unity"]
+            self.assertEqual("cmd.exe", server_entry["command"])
+            self.assertIn("other_server", config["mcpServers"])
+
+    def test_init_delegate_cmd_files_are_crlf_and_delegate_py_avoids_execv_on_windows(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            claude_tools = temp_root / "claude-tools"
+            neutral_dir = temp_root / "neutral"
+
+            env = self.make_env()
+            env["CLAUDE_TOOLS_HOME"] = str(claude_tools)
+            env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+
+            completed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "claude"],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, completed.returncode, completed.stderr)
+            claude_install = claude_tools / "xuunity-mcp"
+            for name in ("run.cmd", "run_installed_or_refresh_xuunity_mcp.cmd"):
+                data = (claude_install / name).read_bytes()
+                self.assertIn(b"\r\n", data, name)
+                self.assertEqual(0, data.replace(b"\r\n", b"").count(b"\n"), name)
+            for name in ("run_installed_or_refresh_xuunity_mcp.py", "server.py"):
+                text = (claude_install / name).read_text(encoding="utf-8")
+                self.assertIn('if os.name == "nt":', text, name)
+                self.assertIn("subprocess.run", text, name)
+
+    def test_refresh_python_native_fallback_syncs_without_bash(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            neutral_dir = Path(tmp_dir) / "neutral"
+
+            sys.path.insert(0, str(repo_root))
+            try:
+                import run_installed_or_refresh_xuunity_mcp as refresh_module
+            finally:
+                sys.path.remove(str(repo_root))
+
+            env_backup = {
+                key: os.environ.get(key)
+                for key in ("XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET", "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR")
+            }
+            try:
+                synced = refresh_module.refresh_via_native_launcher(repo_root, neutral_dir)
+            finally:
+                for key, value in env_backup.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+
+            self.assertTrue(synced)
+            self.assertTrue((neutral_dir / "server.py").is_file())
+            self.assertTrue((neutral_dir / "run.sh").is_file())
+            self.assertTrue((neutral_dir / "run.cmd").is_file())
+            self.assertTrue((neutral_dir / "run.ps1").is_file())
+            self.assertTrue((neutral_dir / "server_core.py").is_file())
+
     def test_init_warns_on_existing_windows_bash_codex_config_without_duplicate(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         init_script = repo_root / "init_xuunity_light_unity_mcp.sh"

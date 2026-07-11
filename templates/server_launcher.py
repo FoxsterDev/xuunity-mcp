@@ -30,6 +30,8 @@ if sys.version_info[:2] < (3, 10):
 PACKAGE_NAME = "com.xuunity.light-mcp"
 SERVER_TEMPLATE_RELATIVE_PATH = "templates/server.py"
 RUN_TEMPLATE_RELATIVE_PATH = "templates/run.sh"
+RUN_CMD_TEMPLATE_RELATIVE_PATH = "templates/run.cmd"
+RUN_PS1_TEMPLATE_RELATIVE_PATH = "templates/run.ps1"
 REFRESH_LAUNCHER_RELATIVE_PATH = "run_installed_or_refresh_xuunity_mcp.sh"
 REFRESH_PYTHON_RELATIVE_PATH = "run_installed_or_refresh_xuunity_mcp.py"
 REFRESH_CMD_RELATIVE_PATH = "run_installed_or_refresh_xuunity_mcp.cmd"
@@ -159,6 +161,8 @@ class LauncherPaths:
             self.install_dir = resolve_install_dir()
             self.server_path = os.path.join(self.install_dir, "server.py")
         self.run_path = os.path.join(self.install_dir, "run.sh")
+        self.run_cmd_path = os.path.join(self.install_dir, "run.cmd")
+        self.run_ps1_path = os.path.join(self.install_dir, "run.ps1")
         self.refresh_run_path = os.path.join(self.install_dir, "run_installed_or_refresh_xuunity_mcp.sh")
         self.refresh_python_path = os.path.join(self.install_dir, "run_installed_or_refresh_xuunity_mcp.py")
         self.refresh_cmd_path = os.path.join(self.install_dir, "run_installed_or_refresh_xuunity_mcp.cmd")
@@ -413,6 +417,10 @@ def sync_installed_helper_if_needed(paths: LauncherPaths) -> None:
 
     sync_file_from_source(paths, paths.server_path, SERVER_TEMPLATE_RELATIVE_PATH)
     sync_file_from_source(paths, paths.run_path, RUN_TEMPLATE_RELATIVE_PATH)
+    if os.path.isfile(os.path.join(paths.source_root, RUN_CMD_TEMPLATE_RELATIVE_PATH)):
+        sync_file_from_source(paths, paths.run_cmd_path, RUN_CMD_TEMPLATE_RELATIVE_PATH)
+    if os.path.isfile(os.path.join(paths.source_root, RUN_PS1_TEMPLATE_RELATIVE_PATH)):
+        sync_file_from_source(paths, paths.run_ps1_path, RUN_PS1_TEMPLATE_RELATIVE_PATH)
     if os.path.isfile(os.path.join(paths.source_root, REFRESH_LAUNCHER_RELATIVE_PATH)):
         sync_file_from_source(paths, paths.refresh_run_path, REFRESH_LAUNCHER_RELATIVE_PATH)
     if os.path.isfile(os.path.join(paths.source_root, REFRESH_PYTHON_RELATIVE_PATH)):

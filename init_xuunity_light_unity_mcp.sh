@@ -345,20 +345,27 @@ append_claude_block_if_missing() {
     claude_run_path_val="$neutral_refresh_run_path"
   fi
 
+  local host_flavor="unix"
+  if is_windows_like_host; then
+    host_flavor="windows"
+  fi
+
   if [[ $dry_run -eq 1 ]]; then
-    printf '[dry-run] register xuunity_light_unity MCP server in %s\n' "$claude_config_path"
+    printf '[dry-run] register xuunity_light_unity MCP server in %s (%s launcher)\n' "$claude_config_path" "$host_flavor"
     return
   fi
 
   mkdir -p "$(dirname "$claude_config_path")"
 
-  python3 - "$claude_config_path" "$claude_run_path_val" <<'PY'
+  python3 - "$claude_config_path" "$claude_run_path_val" "$host_flavor" "$target" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 config_path = Path(sys.argv[1])
 run_path = sys.argv[2]
+host_flavor = sys.argv[3]
+install_target = sys.argv[4]
 
 if config_path.exists() and config_path.stat().st_size > 0:
     try:
@@ -376,16 +383,45 @@ if not isinstance(data, dict):
 servers = data.setdefault("mcpServers", {})
 existing = servers.get("xuunity_light_unity")
 
-portable_run_command = f'exec "{run_path}"'
-desired = {
-    "type": "stdio",
-    "command": "bash",
-    "args": ["-lc", portable_run_command],
-}
+if host_flavor == "windows":
+    if install_target == "neutral":
+        windows_call = (
+            'if defined XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR '
+            '(call "%XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR%\\run_installed_or_refresh_xuunity_mcp.cmd") '
+            'else (call "%APPDATA%\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd")'
+        )
+    else:
+        windows_call = (
+            'if defined CLAUDE_TOOLS_HOME '
+            '(call "%CLAUDE_TOOLS_HOME%\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd") '
+            'else (call "%USERPROFILE%\\.claude-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd")'
+        )
+    desired = {
+        "type": "stdio",
+        "command": "cmd.exe",
+        "args": ["/d", "/c", windows_call],
+    }
+else:
+    portable_run_command = f'exec "{run_path}"'
+    desired = {
+        "type": "stdio",
+        "command": "bash",
+        "args": ["-lc", portable_run_command],
+    }
 
 if existing == desired:
     print(f"kept existing Claude MCP config in {config_path}")
     raise SystemExit(0)
+
+if (
+    host_flavor == "windows"
+    and isinstance(existing, dict)
+    and existing.get("command") == "bash"
+):
+    print(
+        f"windows_claude_launcher_mismatch: replacing bash launcher with cmd.exe in {config_path}",
+        file=sys.stderr,
+    )
 
 servers["xuunity_light_unity"] = desired
 config_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -589,23 +625,27 @@ EOF
   else
     cat > "$target_dir/run_installed_or_refresh_xuunity_mcp.py" <<EOF
 import os
+import subprocess
 import sys
 
 neutral_dir = os.path.expanduser("$neutral_dir")
 central_launcher = os.path.join(neutral_dir, "run_installed_or_refresh_xuunity_mcp.py")
-os.execv(sys.executable, [sys.executable, central_launcher] + sys.argv[1:])
+argv = [sys.executable, central_launcher] + sys.argv[1:]
+if os.name == "nt":
+    raise SystemExit(subprocess.run(argv, check=False).returncode)
+sys.stdout.flush()
+sys.stderr.flush()
+os.execv(sys.executable, argv)
 EOF
     chmod 644 "$target_dir/run_installed_or_refresh_xuunity_mcp.py"
   fi
 
-  # Write delegate run.cmd
+  # Write delegate run.cmd (CRLF + native separators for cmd.exe)
+  local neutral_dir_win="${neutral_dir//\//\\}"
   if [[ $dry_run -eq 1 ]]; then
     printf '[dry-run] write delegate run.cmd to %s/run.cmd\n' "$target_dir"
   else
-    cat > "$target_dir/run.cmd" <<EOF
-@echo off
-call "$neutral_dir\run.cmd" %*
-EOF
+    printf '@echo off\r\ncall "%s\\run.cmd" %%*\r\n' "$neutral_dir_win" > "$target_dir/run.cmd"
     chmod 644 "$target_dir/run.cmd"
   fi
 
@@ -613,10 +653,7 @@ EOF
   if [[ $dry_run -eq 1 ]]; then
     printf '[dry-run] write delegate run_installed_or_refresh_xuunity_mcp.cmd to %s/run_installed_or_refresh_xuunity_mcp.cmd\n' "$target_dir"
   else
-    cat > "$target_dir/run_installed_or_refresh_xuunity_mcp.cmd" <<EOF
-@echo off
-call "$neutral_dir\run_installed_or_refresh_xuunity_mcp.cmd" %*
-EOF
+    printf '@echo off\r\ncall "%s\\run_installed_or_refresh_xuunity_mcp.cmd" %%*\r\n' "$neutral_dir_win" > "$target_dir/run_installed_or_refresh_xuunity_mcp.cmd"
     chmod 644 "$target_dir/run_installed_or_refresh_xuunity_mcp.cmd"
   fi
 
@@ -636,6 +673,7 @@ EOF
   else
     cat > "$target_dir/server.py" <<EOF
 import os
+import subprocess
 import sys
 import platform
 
@@ -653,7 +691,12 @@ if os.path.isfile(venv_python) and os.access(venv_python, os.X_OK):
 else:
     python_bin = sys.executable
 
-os.execv(python_bin, [python_bin, central_server] + sys.argv[1:])
+argv = [python_bin, central_server] + sys.argv[1:]
+if os.name == "nt":
+    raise SystemExit(subprocess.run(argv, check=False).returncode)
+sys.stdout.flush()
+sys.stderr.flush()
+os.execv(python_bin, argv)
 EOF
     chmod 644 "$target_dir/server.py"
   fi
@@ -726,11 +769,11 @@ cat <<EOF
 Next steps:
 1. If you passed --project-root with --enable-project, open or reopen the Unity project once so the editor-only bridge can start writing heartbeat state.
 2. Smoke-check bridge state:
-   python3 $smoke_install_dir/server.py bridge-state --project-root /path/to/UnityProject
+   python "$smoke_install_dir/server.py" bridge-state --project-root "/path/to/UnityProject"
 3. Smoke-check the direct same-host request status path:
-   python3 $smoke_install_dir/server.py request-status --project-root /path/to/UnityProject
+   python "$smoke_install_dir/server.py" request-status --project-root "/path/to/UnityProject"
 4. Preferred interactive startup helper:
-   python3 $smoke_install_dir/server.py ensure-ready --project-root /path/to/UnityProject --open-editor --background-open --startup-policy fail_fast_on_interactive_compile_block
+   python "$smoke_install_dir/server.py" ensure-ready --project-root "/path/to/UnityProject" --open-editor --background-open --startup-policy fail_fast_on_interactive_compile_block
 
 Installed files:
 EOF

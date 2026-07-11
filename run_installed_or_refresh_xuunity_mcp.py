@@ -134,16 +134,45 @@ def find_bash() -> str:
     raise AssertionError("unreachable")
 
 
-def refresh_helper_if_needed(installer: Path, server_path: Path, run_path: Path, expected_version: str) -> None:
-    if not installer.is_file():
-        fail(f"xuunity MCP installer not found: {installer}")
+def refresh_via_native_launcher(source_root: Path, neutral_dir: Path) -> bool:
+    launcher = source_root / "templates" / "server_launcher.py"
+    if not launcher.is_file():
+        return False
+    env = dict(os.environ)
+    env["XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET"] = "neutral"
+    env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+    env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
+    completed = subprocess.run(
+        [sys.executable, str(launcher), "server-help"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        env=env,
+    )
+    return completed.returncode == 0
 
+
+def refresh_helper_if_needed(
+    installer: Path,
+    server_path: Path,
+    run_path: Path,
+    expected_version: str,
+    source_root: Path,
+    neutral_dir: Path,
+) -> None:
     current_version = installed_server_version(server_path)
     if current_version == expected_version and run_path.is_file():
         return
 
+    if refresh_via_native_launcher(source_root, neutral_dir):
+        if installed_server_version(server_path) == expected_version and run_path.is_file():
+            return
+
+    if not installer.is_file():
+        fail(f"xuunity MCP installer not found: {installer}")
+
     completed = subprocess.run(
-        [find_bash(), str(installer), "--target", "both", "--force"],
+        [find_bash(), str(installer).replace("\\", "/"), "--target", "both", "--force"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
@@ -186,7 +215,9 @@ def main(argv: list[str]) -> int:
     neutral_server = neutral_dir / "server.py"
     neutral_run = neutral_dir / ("run.cmd" if os.name == "nt" else "run.sh")
 
-    refresh_helper_if_needed(installer, neutral_server, neutral_run, expected_version)
+    refresh_helper_if_needed(
+        installer, neutral_server, neutral_run, expected_version, source_root, neutral_dir
+    )
 
     if argv[:1] == ["--print-server"]:
         print(neutral_server)
