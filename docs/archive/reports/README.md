@@ -35,6 +35,7 @@ Use these reports when:
 - `2026-05-09_multi_project_architecture_working_design.md`
 - `2026-05-11_batch_compile_gate_and_recovery_design_patch.md`
 - `2026-05-23_readme_install_simulation_audit.md`
+- `2026-07-10_windows_platform_deep_review.md` — why fresh-Windows setup fails while macOS works; Waves 1–2 fix status + editor main-thread load review
 
 ## Canonical Supporting Docs
 
