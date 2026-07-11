@@ -106,7 +106,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
             payload.event_id = BuildEventId(payload.event_type);
 
             var path = Path.Combine(XUUnityLightMcpFileIpcPaths.RequestJournalDirectory, $"{payload.event_id}.json");
-            File.WriteAllText(path, JsonUtility.ToJson(payload, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(path, JsonUtility.ToJson(payload, true));
             XUUnityLightMcpBridgeRuntimeState.MarkJournalEvent(path);
         }
 

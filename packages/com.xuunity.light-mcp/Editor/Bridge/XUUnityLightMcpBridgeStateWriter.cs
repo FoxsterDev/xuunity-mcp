@@ -100,7 +100,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 capabilities_report_path = XUUnityLightMcpFileIpcPaths.CapabilitiesReportPath
             };
 
-            File.WriteAllText(XUUnityLightMcpFileIpcPaths.BridgeStatePath, JsonUtility.ToJson(state, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(XUUnityLightMcpFileIpcPaths.BridgeStatePath, JsonUtility.ToJson(state, true));
         }
 
         static string ResolveCompilerDiagnosticsSource()

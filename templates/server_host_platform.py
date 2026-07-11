@@ -10,8 +10,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from server_core import hidden_window_subprocess_kwargs
+
 
 WSL_PROC_ROOT = Path("/proc")
+PID_PROBE_TIMEOUT_SECONDS = 10.0
+PROCESS_LISTING_TIMEOUT_SECONDS = 30.0
+WSLPATH_TIMEOUT_SECONDS = 10.0
 
 
 def _clear_thread_exception() -> None:
@@ -84,6 +89,8 @@ class HostPlatformAdapter:
                         encoding="utf-8",
                         errors="replace",
                         check=False,
+                        timeout=PID_PROBE_TIMEOUT_SECONDS,
+                        **hidden_window_subprocess_kwargs(),
                     )
                     return windows_tasklist_contains_pid(completed.stdout, pid)
                 except Exception:
@@ -112,6 +119,8 @@ class HostPlatformAdapter:
                         encoding="utf-8",
                         errors="replace",
                         check=False,
+                        timeout=PID_PROBE_TIMEOUT_SECONDS,
+                        **hidden_window_subprocess_kwargs(),
                     )
                     return windows_tasklist_contains_pid(completed.stdout, pid)
                 except Exception:
@@ -159,7 +168,17 @@ class HostPlatformAdapter:
                     text=True,
                     encoding="utf-8",
                     errors="replace",
+                    timeout=PROCESS_LISTING_TIMEOUT_SECONDS,
+                    **hidden_window_subprocess_kwargs(),
                 )
+            except subprocess.TimeoutExpired as exc:
+                return {
+                    "available": False,
+                    "commands": [],
+                    "error_code": "process_listing_timeout",
+                    "stderr": str(exc),
+                    "platform_kind": self.platform_kind,
+                }
             except OSError as exc:
                 return {
                     "available": False,
@@ -230,7 +249,16 @@ class HostPlatformAdapter:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                timeout=PROCESS_LISTING_TIMEOUT_SECONDS,
             )
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "available": False,
+                "commands": [],
+                "error_code": "process_listing_timeout",
+                "stderr": str(exc),
+                "platform_kind": self.platform_kind,
+            }
         except OSError as exc:
             return {
                 "available": False,
@@ -422,6 +450,7 @@ def windows_to_wsl_path(path: str | Path) -> str:
             encoding="utf-8",
             errors="replace",
             check=True,
+            timeout=WSLPATH_TIMEOUT_SECONDS,
         )
         converted = completed.stdout.strip()
         if converted:
@@ -452,6 +481,7 @@ def wsl_to_windows_path(path: str | Path) -> str:
                 encoding="utf-8",
                 errors="replace",
                 check=True,
+                timeout=WSLPATH_TIMEOUT_SECONDS,
             )
             return completed.stdout.strip()
         except Exception:

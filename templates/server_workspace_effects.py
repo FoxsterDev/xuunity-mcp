@@ -7,6 +7,10 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from server_core import hidden_window_subprocess_kwargs
+
+GIT_STATUS_TIMEOUT_SECONDS = 30.0
+
 
 def load_side_effect_allow_file(path_value: str, *, tool_error_type: type[Exception]) -> dict[str, Any]:
     if not path_value:
@@ -29,29 +33,39 @@ def capture_git_dirty_paths(workspace_root: Path) -> tuple[str, list[str]]:
     if shutil.which("git") is None:
         return "unavailable", []
 
-    repo_root_result = subprocess.run(
-        ["git", "-C", str(workspace_root), "rev-parse", "--show-toplevel"],
-        check=False,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        repo_root_result = subprocess.run(
+            ["git", "-C", str(workspace_root), "rev-parse", "--show-toplevel"],
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=GIT_STATUS_TIMEOUT_SECONDS,
+            **hidden_window_subprocess_kwargs(),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "unavailable", []
     if repo_root_result.returncode != 0:
         return "unavailable", []
 
     repo_root = Path(repo_root_result.stdout.strip()).expanduser().resolve()
     workspace_root = workspace_root.expanduser().resolve()
-    completed = subprocess.run(
-        ["git", "-C", str(repo_root), "status", "--porcelain=v1", "--untracked-files=no"],
-        check=False,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(repo_root), "status", "--porcelain=v1", "--untracked-files=no"],
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=GIT_STATUS_TIMEOUT_SECONDS,
+            **hidden_window_subprocess_kwargs(),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "unavailable", []
     if completed.returncode != 0:
         return "unavailable", []
 

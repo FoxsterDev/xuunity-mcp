@@ -83,7 +83,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 capabilities = capabilities
             };
 
-            File.WriteAllText(XUUnityLightMcpFileIpcPaths.CapabilitiesReportPath, JsonUtility.ToJson(report, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(XUUnityLightMcpFileIpcPaths.CapabilitiesReportPath, JsonUtility.ToJson(report, true));
             _cachedReport = report;
             return report;
         }

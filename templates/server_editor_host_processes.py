@@ -272,8 +272,9 @@ def try_list_path_owner_pids(path: Path) -> list[int]:
             text=True,
             encoding="utf-8",
             errors="replace",
+            timeout=10.0,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return []
 
     owner_pids: list[int] = []

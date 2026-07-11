@@ -345,7 +345,7 @@ namespace XUUnity.LightMcp.Editor.Batch
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(fullPath, JsonUtility.ToJson(result, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(fullPath, JsonUtility.ToJson(result, true));
         }
 
         static string[] NormalizeFilterValues(string[] values)

@@ -220,7 +220,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 phase = XUUnityLightMcpBridgeRuntimeStorage.PlayModeTransitionPhase,
             };
 
-            File.WriteAllText(XUUnityLightMcpFileIpcPaths.PlayModeTransitionStatePath, JsonUtility.ToJson(payload, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(XUUnityLightMcpFileIpcPaths.PlayModeTransitionStatePath, JsonUtility.ToJson(payload, true));
         }
 
         static void DeletePersistedStateLocked()

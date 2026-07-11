@@ -23,7 +23,13 @@ from server_bridge_runtime import (
     try_read_bridge_state,
     try_read_live_editor_state,
 )
-from server_core import ToolInvocationError, read_json, write_json
+from server_core import (
+    ToolInvocationError,
+    hidden_window_subprocess_kwargs,
+    read_json,
+    render_launcher_cli,
+    write_json,
+)
 from server_host_platform import (
     current_host_platform_adapter,
     host_path_to_local_path,
@@ -37,6 +43,8 @@ from server_specs import STARTUP_POLICIES
 ACTIVATION_DELAY_SECONDS = 0.35
 UNITY_EDITOR_ROOTS_ENV = "XUUNITY_UNITY_EDITOR_ROOTS"
 HOST_EDITOR_LAUNCH_IN_PROGRESS_MAX_AGE_SECONDS = 90.0
+TASKKILL_TIMEOUT_SECONDS = 15.0
+LAUNCH_HELPER_TIMEOUT_SECONDS = 30.0
 
 
 from server_editor_host_discovery import *
@@ -236,10 +244,11 @@ def open_unity_editor(project_root: Path, log_path: Path, unity_app: Path, backg
                     text=True,
                     encoding="utf-8",
                     errors="replace",
+                    timeout=LAUNCH_HELPER_TIMEOUT_SECONDS,
                 )
-            except subprocess.CalledProcessError as exc:
-                stderr = (exc.stderr or "").strip()
-                stdout = (exc.stdout or "").strip()
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                stderr = (getattr(exc, "stderr", "") or "").strip()
+                stdout = (getattr(exc, "stdout", "") or "").strip()
                 detail = stderr or stdout or str(exc)
                 unity_executable_path = unity_app / "Contents" / "MacOS" / "Unity"
                 launch_services_error_match = re.search(r"(?:Code=|error\s+)(-?\d+)", detail)
@@ -429,13 +438,19 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
         taskkill_success = False
         for cmd in ["taskkill", "taskkill.exe"]:
             try:
-                completed = subprocess.run([cmd, "/F", "/PID", str(pid)], capture_output=True, check=False)
+                completed = subprocess.run(
+                    [cmd, "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    check=False,
+                    timeout=TASKKILL_TIMEOUT_SECONDS,
+                    **hidden_window_subprocess_kwargs(),
+                )
                 if completed.returncode == 0:
                     taskkill_success = True
                     break
             except Exception:
                 pass
-        
+
         if not taskkill_success and os.name == "nt":
             try:
                 os.kill(pid, signal.SIGTERM)
@@ -450,7 +465,13 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
         else:
             for cmd in ["taskkill.exe", "taskkill"]:
                 try:
-                    subprocess.run([cmd, "/F", "/PID", str(pid)], capture_output=True, check=False)
+                    subprocess.run(
+                        [cmd, "/F", "/T", "/PID", str(pid)],
+                        capture_output=True,
+                        check=False,
+                        timeout=TASKKILL_TIMEOUT_SECONDS,
+                        **hidden_window_subprocess_kwargs(),
+                    )
                     break
                 except Exception:
                     pass
@@ -693,7 +714,27 @@ def restore_host_opened_editor_state(
             _attach_editor_closed_verification(restoration, project_root, 0)
             return restoration
 
-    if managed_pid > 0 and terminate_editor_pid(managed_pid, sigterm_timeout_ms):
+    # The session file may be stale: after a crash or reboot the recorded pid
+    # can belong to an unrelated process. Only force-kill a pid that is still
+    # provably a Unity editor of THIS project (bridge state or command line).
+    managed_pid_confirmed_project_editor = (
+        managed_pid > 0 and managed_pid in list_live_project_editor_pids(project_root)
+    )
+    if managed_pid > 0 and not managed_pid_confirmed_project_editor and pid_is_alive(managed_pid):
+        restoration["restored"] = False
+        restoration["closeout_verified"] = False
+        restoration["closeout_classification"] = "tracked_pid_not_project_editor"
+        restoration["reason"] = "tracked_pid_identity_unverified"
+        restoration["recommended_next_action"] = "inspect_project_editor_processes"
+        restoration["next_distinct_action"] = "manual_editor_close_or_request_quit_wait"
+        restoration["termination_skipped_pid"] = managed_pid
+        restoration["live_project_editor_pids"] = list_live_project_editor_pids(project_root)
+        restoration["same_project_editor_closed"] = False
+        restoration["process_exit_verified"] = False
+        restoration.update(process_visibility_summary())
+        return restoration
+
+    if managed_pid_confirmed_project_editor and terminate_editor_pid(managed_pid, sigterm_timeout_ms):
         live_project_pids = list_live_project_editor_pids(project_root)
         if managed_pid not in live_project_pids:
             clear_host_editor_session_state(project_root)

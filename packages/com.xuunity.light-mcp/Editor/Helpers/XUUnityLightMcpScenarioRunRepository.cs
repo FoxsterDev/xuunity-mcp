@@ -83,7 +83,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 }
             }
 
-            File.WriteAllText(state.resultPath, JsonUtility.ToJson(payload, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(state.resultPath, JsonUtility.ToJson(payload, true));
         }
 
         public static XUUnityLightMcpScenarioRunPayload BuildPayload(XUUnityLightMcpScenarioRunState state)
@@ -133,7 +133,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         public static void SaveState(XUUnityLightMcpScenarioRunState state)
         {
-            File.WriteAllText(XUUnityLightMcpFileIpcPaths.ActiveScenarioRunPath, JsonUtility.ToJson(state, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(XUUnityLightMcpFileIpcPaths.ActiveScenarioRunPath, JsonUtility.ToJson(state, true));
         }
 
         public static void SafeDeleteActiveState()

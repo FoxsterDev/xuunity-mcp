@@ -140,14 +140,19 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
         deadline = time.time() + (timeout_ms / 1000.0)
         while time.time() < deadline:
             if response_path.is_file():
+                response: Any = None
                 try:
                     response = read_json(response_path)
-                finally:
+                except (OSError, ValueError):
+                    # Mid-write or still locked by the editor; keep polling
+                    # instead of consuming a half-written response.
+                    response = None
+                if response is not None:
                     try:
                         response_path.unlink()
                     except OSError:
                         pass
-                return response, request_id, request_started_at
+                    return response, request_id, request_started_at
 
             current_state = read_best_effort_bridge_state(project_root)
             if observed_reset_state is None and bridge_identity_changed(initial_generation, initial_session_id, current_state):

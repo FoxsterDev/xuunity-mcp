@@ -44,7 +44,7 @@ _LAUNCHER_DIR = Path(os.path.abspath(__file__)).parent
 sys.path.insert(0, str(_LAUNCHER_DIR))
 
 import server_setup_wizard
-from server_core import reconfigure_stdio_utf8
+from server_core import hidden_window_subprocess_kwargs, reconfigure_stdio_utf8
 
 
 def fail(message: str, exit_code: int = 1) -> "SystemExit":
@@ -481,14 +481,26 @@ def normalize_git_url_for_unity_upm(git_url: str) -> str:
     return git_url
 
 
+GIT_LOCAL_TIMEOUT_SECONDS = 30.0
+GIT_REMOTE_TIMEOUT_SECONDS = 60.0
+
+
 def run_git(source_root: str, *args: str) -> str:
-    completed = subprocess.run(
-        ["git", "-C", source_root] + list(args),
-        stdout=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    try:
+        completed = subprocess.run(
+            ["git", "-C", source_root] + list(args),
+            stdout=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=GIT_LOCAL_TIMEOUT_SECONDS,
+            **hidden_window_subprocess_kwargs(),
+        )
+    except subprocess.TimeoutExpired:
+        sys.stderr.write(
+            "git %s timed out after %.0fs in %s\n" % (" ".join(args), GIT_LOCAL_TIMEOUT_SECONDS, source_root)
+        )
+        raise SystemExit(124)
     if completed.returncode != 0:
         raise SystemExit(completed.returncode)
     return completed.stdout.strip()
@@ -497,13 +509,18 @@ def run_git(source_root: str, *args: str) -> str:
 def remote_release_tag_commit(source_root: str, remote_name: str, release_tag: str):
     tag_ref = "refs/tags/%s" % release_tag
     peeled_ref = tag_ref + "^{}"
-    completed = subprocess.run(
-        ["git", "-C", source_root, "ls-remote", "--tags", remote_name, tag_ref, peeled_ref],
-        stdout=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    try:
+        completed = subprocess.run(
+            ["git", "-C", source_root, "ls-remote", "--tags", remote_name, tag_ref, peeled_ref],
+            stdout=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=GIT_REMOTE_TIMEOUT_SECONDS,
+            **hidden_window_subprocess_kwargs(),
+        )
+    except subprocess.TimeoutExpired:
+        return None
     if completed.returncode != 0:
         return None
     direct_hash = ""

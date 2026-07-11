@@ -435,7 +435,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
         static void PersistLocked(XUUnityLightMcpPersistedTestRunState state)
         {
             XUUnityLightMcpFileIpcPaths.EnsureDirectories();
-            File.WriteAllText(
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(
                 XUUnityLightMcpFileIpcPaths.ActiveTestRunStatePath,
                 UnityEngine.JsonUtility.ToJson(state, true));
             PersistResultLocked(state);
@@ -449,7 +449,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             XUUnityLightMcpFileIpcPaths.EnsureDirectories();
-            File.WriteAllText(
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(
                 XUUnityLightMcpFileIpcPaths.TestRunResultPath(state.request_id),
                 UnityEngine.JsonUtility.ToJson(state, true));
         }

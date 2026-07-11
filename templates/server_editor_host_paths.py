@@ -149,10 +149,11 @@ def activate_unity_editor(project_root: Path, explicit_unity_app: Path | None = 
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                timeout=30.0,
             )
-        except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or "").strip()
-            stdout = (exc.stdout or "").strip()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            stderr = (getattr(exc, "stderr", "") or "").strip()
+            stdout = (getattr(exc, "stdout", "") or "").strip()
             detail = stderr or stdout or str(exc)
             raise ToolInvocationError(
                 "unity_editor_activation_failed",

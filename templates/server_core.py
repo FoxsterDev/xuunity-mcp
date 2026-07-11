@@ -51,10 +51,29 @@ def read_json(path: Path) -> Any:
 
 
 def write_json(path: Path, data: Any) -> None:
+    """Publish atomically: pollers of `path` must never observe a partial file."""
+    import os
+    import time
+    import uuid
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        json.dump(data, handle, indent=2, ensure_ascii=True)
-        handle.write("\n")
+    payload = json.dumps(data, indent=2, ensure_ascii=True) + "\n"
+    tmp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp_path.write_text(payload, encoding="utf-8")
+        for _ in range(5):
+            try:
+                os.replace(tmp_path, path)
+                return
+            except PermissionError:
+                # Windows: a reader may briefly hold the destination open.
+                time.sleep(0.05)
+        path.write_text(payload, encoding="utf-8")
+    finally:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
 
 
 class ServerFunctionProxy:
@@ -134,6 +153,16 @@ def render_launcher_cli(subcommand: str, project_root: Any, *extra: str) -> str:
     parts = [launcher_command_name(), subcommand, "--project-root", quoted_shell_path(project_root)]
     parts.extend(extra)
     return " ".join(parts)
+
+
+def hidden_window_subprocess_kwargs() -> dict[str, Any]:
+    """Keep short helper probes from flashing console windows on Windows GUI hosts."""
+    import os
+    import subprocess
+
+    if os.name != "nt":
+        return {}
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
 
 
 def reconfigure_stdio_utf8() -> None:

@@ -41,6 +41,16 @@ def reconfigure_stdio_utf8() -> None:
             pass
 
 
+NATIVE_REFRESH_TIMEOUT_SECONDS = 120.0
+BASH_REFRESH_TIMEOUT_SECONDS = 300.0
+
+
+def hidden_window_subprocess_kwargs() -> dict:
+    if os.name != "nt":
+        return {}
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+
+
 def resolve_source_root(script_dir: Path) -> Path:
     explicit = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT")
     if explicit:
@@ -142,13 +152,18 @@ def refresh_via_native_launcher(source_root: Path, neutral_dir: Path) -> bool:
     env["XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET"] = "neutral"
     env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
     env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
-    completed = subprocess.run(
-        [sys.executable, str(launcher), "server-help"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-        env=env,
-    )
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(launcher), "server-help"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            env=env,
+            timeout=NATIVE_REFRESH_TIMEOUT_SECONDS,
+            **hidden_window_subprocess_kwargs(),
+        )
+    except subprocess.TimeoutExpired:
+        return False
     return completed.returncode == 0
 
 
@@ -171,15 +186,26 @@ def refresh_helper_if_needed(
     if not installer.is_file():
         fail(f"xuunity MCP installer not found: {installer}")
 
-    completed = subprocess.run(
-        [find_bash(), str(installer).replace("\\", "/"), "--target", "both", "--force"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [find_bash(), str(installer).replace("\\", "/"), "--target", "both", "--force"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=BASH_REFRESH_TIMEOUT_SECONDS,
+            **hidden_window_subprocess_kwargs(),
+        )
+    except subprocess.TimeoutExpired:
+        fail(
+            "xuunity MCP helper refresh timed out after "
+            f"{BASH_REFRESH_TIMEOUT_SECONDS:.0f}s. "
+            "Run: bash init_xuunity_light_unity_mcp.sh --target both --force",
+            124,
+        )
+        raise AssertionError("unreachable")
     if completed.returncode != 0:
         sys.stderr.write(completed.stderr)
         fail(

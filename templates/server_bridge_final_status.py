@@ -498,12 +498,16 @@ def try_take_recovered_response(project_root: Path, request_id: str) -> dict[str
         return None
 
     try:
-        return read_json(path)
-    finally:
-        try:
-            path.unlink()
-        except OSError:
-            pass
+        response = read_json(path)
+    except (OSError, ValueError):
+        # Mid-write or still locked by the editor; leave it for the next poll.
+        return None
+
+    try:
+        path.unlink()
+    except OSError:
+        pass
+    return response
 
 
 def peek_response_payload(project_root: Path, request_id: str) -> dict[str, Any] | None:

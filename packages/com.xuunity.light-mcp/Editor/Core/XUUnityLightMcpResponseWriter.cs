@@ -46,7 +46,7 @@ namespace XUUnity.LightMcp.Editor.Core
 
             XUUnityLightMcpFileIpcPaths.EnsureDirectories();
             var path = Path.Combine(XUUnityLightMcpFileIpcPaths.OutboxDirectory, $"{response.request_id}.json");
-            File.WriteAllText(path, JsonUtility.ToJson(response, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(path, JsonUtility.ToJson(response, true));
         }
     }
 }

@@ -393,7 +393,7 @@ namespace XUUnity.LightMcp.Editor.Batch
 
             var resolvedPath = Path.GetFullPath(resultFile);
             Directory.CreateDirectory(Path.GetDirectoryName(resolvedPath) ?? ".");
-            File.WriteAllText(resolvedPath, JsonUtility.ToJson(result, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(resolvedPath, JsonUtility.ToJson(result, true));
         }
 
         static string SanitizeFileComponent(string value)

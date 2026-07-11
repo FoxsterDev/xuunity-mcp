@@ -131,7 +131,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 bootstrap_attached_at_utc = XUUnityLightMcpBridgeRuntimeStorage.UtcNow(),
             };
 
-            File.WriteAllText(XUUnityLightMcpFileIpcPaths.BridgeGenerationStatePath, JsonUtility.ToJson(payload, true));
+            XUUnityLightMcpAtomicFileWriter.WriteAllText(XUUnityLightMcpFileIpcPaths.BridgeGenerationStatePath, JsonUtility.ToJson(payload, true));
         }
     }
 }
