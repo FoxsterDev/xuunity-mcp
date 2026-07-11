@@ -289,6 +289,84 @@ class WindowsHostHelperTests(unittest.TestCase):
         self.assertEqual([expected_root], raised.exception.details.get("searched_roots"))
         self.assertIn(expected_root, raised.exception.message)
 
+    @staticmethod
+    def make_project_with_version(root: Path, version: str) -> Path:
+        (root / "ProjectSettings").mkdir(parents=True)
+        (root / "ProjectSettings" / "ProjectVersion.txt").write_text(
+            f"m_EditorVersion: {version}\n", encoding="utf-8"
+        )
+        return root
+
+    def test_unity_version_mismatch_fails_fast_instead_of_newest_fallback(self) -> None:
+        installed = [
+            ("2022.3.10f1", Path("/apps/2022.3.10f1/Unity")),
+            ("6000.3.2f1", Path("/apps/6000.3.2f1/Unity")),
+        ]
+        searched = [Path("/apps")]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = self.make_project_with_version(Path(tmp_dir) / "Project", "2021.3.58f1")
+            with (
+                mock.patch.object(server_editor_host, "discover_unity_installations", return_value=installed),
+                mock.patch.object(server_editor_host, "candidate_unity_editor_roots", return_value=searched),
+            ):
+                with self.assertRaises(server_core.ToolInvocationError) as raised:
+                    server_editor_host.detect_unity_app_path_for_project(project_root, None)
+
+        self.assertEqual("unity_version_mismatch", raised.exception.code)
+        self.assertEqual("2021.3.58f1", raised.exception.details.get("project_unity_version"))
+        self.assertEqual(
+            ["2022.3.10f1", "6000.3.2f1"], raised.exception.details.get("installed_versions")
+        )
+        self.assertEqual([str(searched[0])], raised.exception.details.get("searched_roots"))
+        self.assertIn("2021.3.58f1", raised.exception.message)
+
+    def test_matching_project_version_still_selects_that_install(self) -> None:
+        matching_app = Path("/apps/2021.3.58f1/Unity")
+        installed = [
+            ("2021.3.58f1", matching_app),
+            ("6000.3.2f1", Path("/apps/6000.3.2f1/Unity")),
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = self.make_project_with_version(Path(tmp_dir) / "Project", "2021.3.58f1")
+            with mock.patch.object(
+                server_editor_host, "discover_unity_installations", return_value=installed
+            ):
+                selected = server_editor_host.detect_unity_app_path_for_project(project_root, None)
+
+        self.assertEqual(matching_app, selected)
+
+    def test_missing_project_version_keeps_newest_install_fallback(self) -> None:
+        newest_app = Path("/apps/6000.3.2f1/Unity")
+        installed = [
+            ("2022.3.10f1", Path("/apps/2022.3.10f1/Unity")),
+            ("6000.3.2f1", newest_app),
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir) / "Project"
+            project_root.mkdir(parents=True)
+            with mock.patch.object(
+                server_editor_host, "discover_unity_installations", return_value=installed
+            ):
+                selected = server_editor_host.detect_unity_app_path_for_project(project_root, None)
+
+        self.assertEqual(newest_app, selected)
+
+    def test_version_known_but_zero_installs_reports_not_found_not_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = self.make_project_with_version(Path(tmp_dir) / "Project", "2021.3.58f1")
+            with (
+                mock.patch.object(server_editor_host, "discover_unity_installations", return_value=[]),
+                mock.patch.object(
+                    server_editor_host,
+                    "candidate_unity_editor_roots",
+                    return_value=[Path("/definitely/missing/roots")],
+                ),
+            ):
+                with self.assertRaises(server_core.ToolInvocationError) as raised:
+                    server_editor_host.detect_unity_app_path_for_project(project_root, None)
+
+        self.assertEqual("unity_app_not_found", raised.exception.code)
+
     def test_discover_unity_installations_sorts_versions_and_deduplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

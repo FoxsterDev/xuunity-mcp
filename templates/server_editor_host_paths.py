@@ -131,9 +131,31 @@ def detect_unity_app_path_for_project(project_root: Path, explicit_path: str | N
 
     project_version = read_project_unity_version(project_root)
     if project_version:
-        for version, candidate in discover_unity_installations():
+        installations = discover_unity_installations()
+        for version, candidate in installations:
             if version == project_version:
                 return candidate
+        if installations:
+            # Silently opening with another version triggers Unity's interactive
+            # upgrade dialog, which then presents as a generic ensure-ready
+            # timeout that looks like a bridge failure.
+            installed_versions = [version for version, _ in installations]
+            searched_roots = [str(root) for root in candidate_unity_editor_roots()]
+            raise ToolInvocationError(
+                "unity_version_mismatch",
+                (
+                    f"The project needs Unity {project_version} "
+                    f"(ProjectSettings/ProjectVersion.txt), but only "
+                    f"{', '.join(installed_versions)} were found. "
+                    f"Install Unity {project_version} via Unity Hub, or pass an explicit "
+                    "unity app path to intentionally open with a different version."
+                ),
+                details={
+                    "project_unity_version": project_version,
+                    "installed_versions": installed_versions,
+                    "searched_roots": searched_roots,
+                },
+            )
 
     return detect_unity_app_path(None)
 

@@ -236,7 +236,18 @@ def main() -> None:
             raise SystemExit(serve_stdio())
 
         parser = build_parser()
-        args = parser.parse_args()
+        try:
+            args = parser.parse_args()
+        except SystemExit as exc:
+            # Historical Windows failure class: shell quoting truncates a spaced
+            # path before Python ever sees it. repr of the received argv is the
+            # only evidence usable at the failure point.
+            if exc.code not in (0, None):
+                sys.stderr.write(
+                    "[xuunity-mcp] argv as received (%d args): %r\n"
+                    % (len(sys.argv) - 1, sys.argv[1:])
+                )
+            raise
         if not hasattr(args, "func"):
             parser.print_help()
             raise SystemExit(1)

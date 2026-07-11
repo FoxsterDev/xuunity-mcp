@@ -291,10 +291,38 @@ def try_list_path_owner_pids(path: Path) -> list[int]:
     return owner_pids
 
 
+def windows_lock_open_denied(path: Path) -> bool | None:
+    """Windows share-mode probe; None when not applicable (non-Windows/missing file).
+
+    lsof does not exist on Windows, so per-pid lock attribution is unavailable
+    there. Unity holds Temp/UnityLockfile with an exclusive share mode, so a
+    denied read-write open proves some live process owns the lock even without
+    attribution. A PermissionError from other causes (e.g. a read-only file)
+    also reports True — the fail-safe direction, since callers only use this to
+    refuse deleting the lock.
+    """
+    if os.name != "nt" or not path.is_file():
+        return None
+    try:
+        handle = os.open(str(path), os.O_RDWR)
+    except PermissionError:
+        return True
+    except OSError:
+        return None
+    os.close(handle)
+    return False
+
+
 def inspect_project_lock(project_root: Path) -> dict[str, Any]:
     lock_path = project_lock_path(project_root)
     present = lock_path.is_file()
     owner_pids = try_list_path_owner_pids(lock_path) if present else []
+    owner_pid_source = "lsof" if owner_pids else ""
+    lock_open_denied = windows_lock_open_denied(lock_path) if present else None
+    if present and not owner_pids and lock_open_denied:
+        owner_pids = list_live_project_editor_pids(project_root)
+        if owner_pids:
+            owner_pid_source = "windows_share_mode_editor_attribution"
     live_owner_pids = [pid for pid in owner_pids if pid_is_alive(pid)]
 
     return {
@@ -302,12 +330,14 @@ def inspect_project_lock(project_root: Path) -> dict[str, Any]:
         "present": present,
         "owner_pids": owner_pids,
         "live_owner_pids": live_owner_pids,
+        "lock_open_denied": bool(lock_open_denied),
+        "owner_pid_source": owner_pid_source,
     }
 
 
 def clear_stale_project_lock(project_root: Path) -> dict[str, Any]:
     lock_state = inspect_project_lock(project_root)
-    if not lock_state["present"] or lock_state["live_owner_pids"]:
+    if not lock_state["present"] or lock_state["live_owner_pids"] or lock_state.get("lock_open_denied"):
         lock_state["removed"] = False
         return lock_state
 
