@@ -278,6 +278,7 @@ class WindowsHostHelperTests(unittest.TestCase):
 
     def test_unity_app_not_found_error_reports_searched_roots(self) -> None:
         searched = [Path("/definitely/missing/roots")]
+        expected_root = str(searched[0])
         with (
             mock.patch.object(server_editor_host, "discover_unity_installations", return_value=[]),
             mock.patch.object(server_editor_host, "candidate_unity_editor_roots", return_value=searched),
@@ -285,8 +286,8 @@ class WindowsHostHelperTests(unittest.TestCase):
             with self.assertRaises(server_core.ToolInvocationError) as raised:
                 server_editor_host.detect_unity_app_path(None)
 
-        self.assertEqual(["/definitely/missing/roots"], raised.exception.details.get("searched_roots"))
-        self.assertIn("/definitely/missing/roots", raised.exception.message)
+        self.assertEqual([expected_root], raised.exception.details.get("searched_roots"))
+        self.assertIn(expected_root, raised.exception.message)
 
     def test_discover_unity_installations_sorts_versions_and_deduplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

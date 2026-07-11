@@ -101,7 +101,7 @@ class CmdLauncherWindowsBehaviorTest(unittest.TestCase):
             {"PYTHON": f'"{sys.executable}"'},
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("usage:", completed.stdout)
+        self.assertIn("usage:", completed.stdout.lower())
 
     def test_unquoted_python_override_with_spaces_still_works(self):
         completed = self.run_wrapper(
@@ -110,7 +110,7 @@ class CmdLauncherWindowsBehaviorTest(unittest.TestCase):
             {"PYTHON": sys.executable},
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("usage:", completed.stdout)
+        self.assertIn("usage:", completed.stdout.lower())
 
 
 if __name__ == "__main__":

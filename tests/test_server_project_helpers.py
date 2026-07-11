@@ -1046,7 +1046,10 @@ class ServerProjectHelperTests(unittest.TestCase):
         )
         registry = types.SimpleNamespace(refresh_context=lambda _: context)
 
-        with mock.patch.object(server, "_BRIDGE_REGISTRY", registry):
+        with (
+            mock.patch.object(server, "_BRIDGE_REGISTRY", registry),
+            mock.patch.object(server_core, "is_windows_like_host", return_value=False),
+        ):
             details = server.enrich_error_details_with_discovery(
                 Path("/tmp/FakeProject"),
                 {
@@ -1082,20 +1085,22 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertNotIn("\\", posix_command)
 
     def test_recommended_recovery_command_for_apiupdate_relaunch(self) -> None:
-        command = server.recommended_recovery_command_for_project(
-            Path("/tmp/FakeProject"),
-            "relaunch_noninteractive_accept_apiupdate",
-        )
+        with mock.patch.object(server_core, "is_windows_like_host", return_value=False):
+            command = server.recommended_recovery_command_for_project(
+                Path("/tmp/FakeProject"),
+                "relaunch_noninteractive_accept_apiupdate",
+            )
 
         self.assertIn("-batchmode -quit -accept-apiupdate", command)
         self.assertIn('-projectPath "/tmp/FakeProject"', command)
         self.assertIn("unity_apiupdate.log", command)
 
     def test_recommended_recovery_command_for_safe_mode_compile_gate(self) -> None:
-        command = server.recommended_recovery_command_for_project(
-            Path("/tmp/FakeProject"),
-            "run_batch_compile_gate_and_fix_errors",
-        )
+        with mock.patch.object(server_core, "is_windows_like_host", return_value=False):
+            command = server.recommended_recovery_command_for_project(
+                Path("/tmp/FakeProject"),
+                "run_batch_compile_gate_and_fix_errors",
+            )
 
         self.assertIn('batch-build-config-compile-matrix --project-root "/tmp/FakeProject"', command)
         self.assertNotIn("-accept-apiupdate", command)
