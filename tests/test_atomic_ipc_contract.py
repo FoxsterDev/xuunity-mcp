@@ -238,8 +238,27 @@ class CSharpAtomicWriterContractTest(unittest.TestCase):
         self.assertIn('".tmp"', text)
         self.assertIn("File.Replace(", text)
         self.assertIn("File.Move(", text)
+        self.assertNotIn(
+            "Thread.Sleep",
+            text,
+            "writer runs on the editor main thread (heartbeat/pump); it must "
+            "fall back to the legacy write instead of sleeping",
+        )
         meta = writer.with_name(writer.name + ".meta")
         self.assertTrue(meta.is_file(), "new package source needs a committed .meta")
+
+    def test_no_main_thread_sleeps_in_editor_package(self) -> None:
+        # The bridge runs on EditorApplication.update; any Thread.Sleep there
+        # is a frame stall. GameViewUtility's screenshot settling delay is the
+        # single documented pre-existing exception (on-demand, not per-tick).
+        allowed = {"XUUnityLightMcpGameViewUtility.cs"}
+        offenders = []
+        for source in self.csharp_files():
+            if source.name in allowed:
+                continue
+            if "Thread.Sleep" in source.read_text(encoding="utf-8"):
+                offenders.append(str(source.relative_to(REPO_ROOT)))
+        self.assertEqual([], offenders)
 
     def test_bridge_state_and_response_writers_use_atomic_publisher(self) -> None:
         for relative in (

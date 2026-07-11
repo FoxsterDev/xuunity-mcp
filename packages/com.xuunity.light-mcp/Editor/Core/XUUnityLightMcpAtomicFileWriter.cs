@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Threading;
 
 namespace XUUnity.LightMcp.Editor.Core
 {
@@ -9,11 +8,13 @@ namespace XUUnity.LightMcp.Editor.Core
     /// outbox responses, journal events and batch/scenario results while the
     /// editor writes them; a plain File.WriteAllText lets the poller observe a
     /// half-written file (truncated JSON) or hit a sharing violation mid-write.
+    /// Runs on the editor main thread (heartbeat/pump), so it must never sleep
+    /// or block: on contention it falls back to the legacy in-place write,
+    /// whose torn reads the host's retry-until-deadline reader tolerates.
     /// </summary>
     internal static class XUUnityLightMcpAtomicFileWriter
     {
-        const int PublishAttempts = 5;
-        const int PublishRetryDelayMilliseconds = 20;
+        const int PublishAttempts = 3;
 
         public static void WriteAllText(string path, string contents)
         {
@@ -45,13 +46,11 @@ namespace XUUnity.LightMcp.Editor.Core
                     }
                     catch (IOException)
                     {
-                        // A reader may briefly hold the destination open.
+                        // A poller briefly holds the destination; retry immediately.
                     }
                     catch (UnauthorizedAccessException)
                     {
                     }
-
-                    Thread.Sleep(PublishRetryDelayMilliseconds);
                 }
 
                 File.WriteAllText(path, contents);

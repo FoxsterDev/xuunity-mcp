@@ -11,6 +11,14 @@ namespace XUUnity.LightMcp.Editor.Bridge
 {
     internal static class XUUnityLightMcpBridgeStateWriter
     {
+        static readonly int EditorProcessId = ResolveEditorProcessId();
+
+        static int ResolveEditorProcessId()
+        {
+            using var process = Process.GetCurrentProcess();
+            return process.Id;
+        }
+
         public static void WriteHeartbeat(string lastError = "")
         {
             XUUnityLightMcpFileIpcPaths.EnsureDirectories();
@@ -21,7 +29,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
             var state = new XUUnityLightMcpBridgeState
             {
                 project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath,
-                editor_pid = Process.GetCurrentProcess().Id,
+                editor_pid = EditorProcessId,
                 unity_version = Application.unityVersion,
                 transport_requested = XUUnityLightMcpBridgeTransportRuntime.RequestedTransport,
                 transport = XUUnityLightMcpBridgeTransportRuntime.ActiveTransport,

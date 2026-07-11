@@ -14,6 +14,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
         public const string FileIpcTransport = "file_ipc";
         public const string TcpLoopbackTransport = "tcp_loopback";
 
+        // Responses are written from the editor main thread; without a send
+        // timeout a dead peer with a full send buffer blocks the editor until
+        // the OS-level TCP timeout.
+        const int ResponseSendTimeoutMilliseconds = 5000;
+
         static readonly object Gate = new();
         static readonly Queue<PendingLoopbackRequest> PendingLoopbackRequests = new();
         static readonly Dictionary<string, PendingLoopbackRequest> ActiveLoopbackRequests = new();
@@ -242,6 +247,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
             try
             {
+                pending.Client.SendTimeout = ResponseSendTimeoutMilliseconds;
                 using var writer = new StreamWriter(pending.Client.GetStream(), new System.Text.UTF8Encoding(false), 4096, true);
                 writer.NewLine = "\n";
                 writer.Write(JsonUtility.ToJson(response, true));
