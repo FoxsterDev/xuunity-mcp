@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-07-12`
-Status: `current source after v0.3.43`
+Status: `current source after v0.3.44`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -236,6 +236,27 @@ Pass criteria:
   files, and unexpected new dirty files
 - a completed MCP request with failing tests is reported as a test-suite
   failure, not as an infrastructure failure
+
+### 5b. Batch-Result GUI Subset Selection
+
+`run_multi_project_gui_test_subset.sh --from-batch-results DIR` consumes the
+persisted compile evidence from a previous multi-project compile run. A passed
+compile matrix is eligible regardless of whether it ran in batch mode or the
+valid GUI fallback lane.
+
+Pass criteria:
+
+- the selection summary reports status-file, eligible, selected, excluded, and
+  legacy-result counts before GUI workers start;
+- a GUI fallback matrix retains its real total/passed/failed counters in the
+  persisted status and is selected once;
+- a malformed status, missing project root, duplicate eligible root, or
+  eligible-versus-selected mismatch reports `selection_warning` and stops
+  before any editor is opened;
+- an explicit `--from-batch-results` request with no eligible projects does
+  not fall back to broad project auto-discovery;
+- compact batch rows state whether license evidence came from cache and, when
+  available, its age in seconds.
 
 ### 6. PlayMode Lifecycle Retry Smoke
 

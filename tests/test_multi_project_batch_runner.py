@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import sys
@@ -5,6 +7,7 @@ import textwrap
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 TESTS_DIR = Path(__file__).resolve().parent
 if str(TESTS_DIR) not in sys.path:
@@ -16,6 +19,11 @@ from bash_support import resolve_bash_executable, run_with_timeout, skip_if_prio
 OPS_ROOT = Path(__file__).resolve().parents[1]
 RUNNER = OPS_ROOT / "scripts" / "testing" / "run_multi_project_batch_compile_matrix.sh"
 BASH = resolve_bash_executable()
+RUNNER_DIR = OPS_ROOT / "scripts" / "testing"
+if str(RUNNER_DIR) not in sys.path:
+    sys.path.insert(0, str(RUNNER_DIR))
+
+import run_multi_project
 
 
 class MultiProjectBatchRunnerTests(unittest.TestCase):
@@ -192,6 +200,13 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
                         "transport_outcome": "gui_operation_completed",
                         "unity_outcome": "passed"
                       },
+                      "license_capabilities": {
+                        "from_cache": true,
+                        "probed_at_utc": "2000-01-01T00:00:00Z"
+                      },
+                      "bridge_response": {
+                        "payload_json": "{\\\"matrix\\\":{\\\"status\\\":\\\"passed\\\",\\\"total\\\":6,\\\"passed\\\":6,\\\"failed\\\":0,\\\"skipped\\\":0}}"
+                      },
                       "summary_file": "/tmp/summary.json",
                       "result_file": "/tmp/result.json",
                       "log_path": "/tmp/editor.log"
@@ -245,11 +260,20 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
             self.assertEqual("passed_via_gui_fallback", status["operator_verdict"])
             self.assertEqual("gui_operation_completed", status["transport_outcome"])
             self.assertEqual("passed", status["unity_outcome"])
-            self.assertEqual("", status["matrix_status"])
+            self.assertEqual("passed", status["matrix_status"])
+            self.assertEqual(6, status["total"])
+            self.assertEqual(6, status["passed"])
+            self.assertEqual(0, status["failed"])
+            self.assertEqual("gui_fallback_matrix", status["compile_evidence"]["evidence_source"])
+            self.assertEqual("passed", status["compile_evidence"]["outcome"])
+            self.assertTrue(status["license_from_cache"])
+            self.assertGreaterEqual(status["license_probe_age_seconds"], 0)
             self.assertIn('"projects_failed": 0', completed.stdout)
             self.assertIn("verdict=passed_via_gui_fallback", completed.stdout)
             self.assertIn("effective_lane=gui", completed.stdout)
             self.assertIn("fallback_reason=access_token_unavailable", completed.stdout)
+            self.assertIn("license_from_cache=true", completed.stdout)
+            self.assertIn("license_probe_age_seconds=", completed.stdout)
 
     def test_require_batch_mode_forwards_and_fails_when_batchmode_unavailable(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -362,6 +386,134 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
             self.assertIn("batch_fallback_mode=require-batch", completed.stdout)
             self.assertIn('"projects_failed": 1', completed.stdout)
             self.assertIn("verdict=failed_before_unity", completed.stdout)
+
+
+class MultiProjectBatchSelectionTests(unittest.TestCase):
+    def write_status(self, directory: Path, name: str, payload: dict) -> None:
+        (directory / (name + "_status.json")).write_text(json.dumps(payload), encoding="utf-8")
+
+    def test_legacy_gui_fallback_status_is_selected(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            results_dir = Path(temp_dir)
+            self.write_status(
+                results_dir,
+                "FallbackProject",
+                {
+                    "project_root": "/tmp/FallbackProject",
+                    "recover_rc": 0,
+                    "batch_rc": 0,
+                    "succeeded": True,
+                    "operator_verdict": "passed_via_gui_fallback",
+                    "unity_outcome": "passed",
+                    "transport_outcome": "gui_operation_completed",
+                    "effective_execution_lane": "gui",
+                    "matrix_status": "",
+                    "failed": 0,
+                },
+            )
+
+            plan = run_multi_project.build_batch_selection_plan(str(results_dir))
+
+            self.assertEqual(["/tmp/FallbackProject"], plan["selected_projects"])
+            self.assertEqual(1, plan["eligible_projects"])
+            self.assertEqual(1, plan["legacy_projects"])
+            self.assertEqual([], plan["errors"])
+
+    def test_new_gui_fallback_evidence_is_selected_from_matrix(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            results_dir = Path(temp_dir)
+            self.write_status(
+                results_dir,
+                "FallbackProject",
+                {
+                    "project_root": "/tmp/FallbackProject",
+                    "compile_evidence": {
+                        "schema_version": 1,
+                        "outcome": "passed",
+                        "evidence_source": "gui_fallback_matrix",
+                        "execution_lane": "gui",
+                        "matrix": {"status": "passed", "total": 6, "passed": 6, "failed": 0, "skipped": 0},
+                    },
+                },
+            )
+
+            plan = run_multi_project.build_batch_selection_plan(str(results_dir))
+
+            self.assertEqual(["/tmp/FallbackProject"], plan["selected_projects"])
+            self.assertEqual(0, plan["legacy_projects"])
+            self.assertEqual([], plan["errors"])
+
+    def test_gui_main_passes_fallback_selection_to_workers(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            results_dir = root / "batch-results"
+            gui_results_dir = root / "gui-results"
+            results_dir.mkdir()
+            self.write_status(
+                results_dir,
+                "FallbackProject",
+                {
+                    "project_root": "/tmp/FallbackProject",
+                    "compile_evidence": {
+                        "schema_version": 1,
+                        "outcome": "passed",
+                        "evidence_source": "gui_fallback_matrix",
+                        "execution_lane": "gui",
+                        "matrix": {"status": "passed", "total": 6, "passed": 6, "failed": 0, "skipped": 0},
+                    },
+                },
+            )
+            with (
+                mock.patch.object(run_multi_project, "require_wrapper"),
+                mock.patch.object(run_multi_project, "run_workers") as run_workers,
+                mock.patch.object(run_multi_project, "emit_gui_final_summary", return_value=0),
+            ):
+                result = run_multi_project.main_gui(
+                    [
+                        "--from-batch-results",
+                        str(results_dir),
+                        "--results-dir",
+                        str(gui_results_dir),
+                        "--side-effect-mode",
+                        "off",
+                    ]
+                )
+
+            self.assertEqual(0, result)
+            self.assertEqual(["/tmp/FallbackProject"], run_workers.call_args.args[0])
+
+    def test_incomplete_batch_selection_warns_and_never_auto_discovers_projects(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            results_dir = Path(temp_dir)
+            self.write_status(
+                results_dir,
+                "MissingRoot",
+                {
+                    "compile_evidence": {
+                        "schema_version": 1,
+                        "outcome": "passed",
+                        "evidence_source": "gui_fallback_matrix",
+                        "execution_lane": "gui",
+                        "matrix": {"status": "passed", "total": 6, "passed": 6, "failed": 0, "skipped": 0},
+                    },
+                },
+            )
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with (
+                mock.patch.object(run_multi_project, "require_wrapper"),
+                mock.patch.object(run_multi_project, "discover_project_roots") as discover,
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+                self.assertRaises(SystemExit) as raised,
+            ):
+                run_multi_project.main_gui(["--from-batch-results", str(results_dir)])
+
+            self.assertEqual(2, raised.exception.code)
+            self.assertIn("selection_warning=eligible_status_missing_project_root", stdout.getvalue())
+            self.assertIn("selection_warning=selection_coverage_mismatch", stdout.getvalue())
+            self.assertIn("no workers were started", stderr.getvalue())
+            discover.assert_not_called()
 
 
 if __name__ == "__main__":

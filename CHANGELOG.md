@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.44
+
+Release tag: `v0.3.44`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.44
+```
+
 ### Fixed
 
 - Restored macOS/Linux GUI-client startup after the Windows launcher work:
@@ -23,6 +33,21 @@
   preflight. A live same-project editor now stays on the interactive MCP lane,
   including direct bridge-state recovery when the status-summary probe fails;
   unknown editor liveness blocks instead of falling through to batch mode.
+- Made multi-project compile evidence lane-agnostic: GUI fallback now preserves
+  its matrix counters from the bridge payload, and both the aggregate and GUI
+  subset selector use the same normalized evidence. Explicit batch-result
+  selection emits coverage accounting and fails before worker launch when the
+  selected set is malformed or incomplete. Compact batch rows also report
+  license-cache provenance and probe age when available.
+
+### Validation
+
+- Release metadata, documentation freshness, public-release safety, and public
+  site checks passed for `0.3.44`.
+- Host Python unittest suite passed: `430` tests with `13` expected skips.
+- Live Unity validation against ApperfunHub passed the GUI-fallback compile
+  matrix (`6/6`) and the selected GUI subset: EditMode `778/778`, PlayMode
+  `279/279`.
 
 ## 0.3.43
 

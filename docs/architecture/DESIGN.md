@@ -131,6 +131,13 @@ summaries are responsible for:
   part of the validation claim
 - summarizing workspace side effects without mutating or cleaning files
 
+Compile eligibility must be normalized once from the authoritative matrix
+evidence and then shared by the aggregate and any follow-up test selector.
+Valid GUI fallback evidence is not a second-class pass. The public target
+shape, legacy-result compatibility rules, selection fail-closed behavior,
+license freshness policy, and launcher-diagnostics boundary are specified in
+[`XUUNITY_MCP_VALIDATION_VERDICT_COHERENCE_DESIGN_2026-07-12.md`](designs/XUUNITY_MCP_VALIDATION_VERDICT_COHERENCE_DESIGN_2026-07-12.md).
+
 Current public bridge-state baseline includes:
 
 - `bridge_session_id`

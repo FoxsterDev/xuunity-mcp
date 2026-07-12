@@ -23,6 +23,7 @@ import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -212,6 +213,117 @@ def parse_last_json_document(text: str) -> tuple:
     return payload, parse_error
 
 
+def normalized_matrix(raw_matrix) -> dict:
+    if not isinstance(raw_matrix, dict):
+        return {}
+    status = str(raw_matrix.get("status") or "")
+    if status not in {"passed", "failed"}:
+        return {}
+    try:
+        counters = {
+            "total": int(raw_matrix.get("total", 0)),
+            "passed": int(raw_matrix.get("passed", 0)),
+            "failed": int(raw_matrix.get("failed", 0)),
+            "skipped": int(raw_matrix.get("skipped", 0)),
+        }
+    except (TypeError, ValueError):
+        return {}
+    if any(value < 0 for value in counters.values()):
+        return {}
+    return {"status": status, **counters}
+
+
+def decoded_json_mapping(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str):
+        return {}
+    try:
+        decoded = json.loads(value)
+    except (TypeError, ValueError):
+        return {}
+    return decoded if isinstance(decoded, dict) else {}
+
+
+def extract_compile_matrix(payload: dict, result_summary: dict) -> tuple[dict, str]:
+    """Return matrix evidence from a stable summary or the GUI bridge payload."""
+    candidates = [(result_summary.get("matrix"), "batch_result_summary")]
+    for container in (payload, result_summary):
+        if not isinstance(container, dict):
+            continue
+        candidates.append((container.get("matrix"), "top_level_matrix"))
+        candidates.append((container.get("result_payload"), "result_payload"))
+        bridge_response = decoded_json_mapping(container.get("bridge_response"))
+        if bridge_response:
+            candidates.append((bridge_response.get("matrix"), "bridge_response_matrix"))
+            candidates.append((bridge_response.get("payload_json"), "gui_fallback_matrix"))
+
+    for candidate, source in candidates:
+        candidate_mapping = decoded_json_mapping(candidate)
+        matrix = normalized_matrix(candidate_mapping.get("matrix") if "matrix" in candidate_mapping else candidate_mapping)
+        if matrix:
+            return matrix, source
+    return {}, "none"
+
+
+def probe_age_seconds(probed_at_utc: str) -> int | None:
+    if not probed_at_utc:
+        return None
+    try:
+        parsed = datetime.fromisoformat(probed_at_utc.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0, int((datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()))
+
+
+def license_probe_facts(payload: dict, result_summary: dict) -> tuple[bool | None, str, int | None]:
+    capabilities = {}
+    for container in (result_summary, payload):
+        if not isinstance(container, dict):
+            continue
+        candidate = container.get("license_capabilities")
+        if isinstance(candidate, dict):
+            capabilities = candidate
+            break
+    from_cache = capabilities.get("from_cache") if isinstance(capabilities.get("from_cache"), bool) else None
+    probed_at_utc = str(capabilities.get("probed_at_utc") or "")
+    return from_cache, probed_at_utc, probe_age_seconds(probed_at_utc)
+
+
+def compile_evidence_from_run(
+    *,
+    payload: dict,
+    result_summary: dict,
+    recover_rc: int,
+    batch_rc: int,
+    execution_lane: str,
+) -> dict:
+    matrix, evidence_source = extract_compile_matrix(payload, result_summary)
+    succeeded = bool(payload.get("succeeded"))
+    passed = (
+        recover_rc == 0
+        and batch_rc == 0
+        and succeeded
+        and matrix.get("status") == "passed"
+        and matrix.get("failed") == 0
+    )
+    if passed:
+        outcome = "passed"
+    elif matrix:
+        outcome = "failed"
+    else:
+        outcome = "unproven"
+    return {
+        "schema_version": 1,
+        "outcome": outcome,
+        "evidence_source": evidence_source,
+        "execution_lane": execution_lane if execution_lane in {"batch", "gui"} else "none",
+        "matrix": matrix,
+    }
+
+
 def build_batch_status(
     project_name: str,
     project_root: str,
@@ -228,7 +340,7 @@ def build_batch_status(
         payload, parse_error = parse_last_json_document(stdout_file.read_text(encoding="utf-8"))
 
     result_summary = payload.get("result_summary") if isinstance(payload, dict) else {}
-    matrix = result_summary.get("matrix") if isinstance(result_summary, dict) else {}
+    result_summary = result_summary if isinstance(result_summary, dict) else {}
     stderr_tail = ""
     if stderr_file.is_file():
         stderr_lines = stderr_file.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -269,15 +381,24 @@ def build_batch_status(
     transport_outcome = first_string(
         result_summary.get("transport_outcome") if isinstance(result_summary, dict) else ""
     )
-    matrix_status = first_string(matrix.get("status") if isinstance(matrix, dict) else "")
+    compile_evidence = compile_evidence_from_run(
+        payload=payload,
+        result_summary=result_summary,
+        recover_rc=recover_rc,
+        batch_rc=batch_rc,
+        execution_lane=effective_execution_lane,
+    )
+    matrix = compile_evidence["matrix"]
+    matrix_status = str(matrix.get("status") or "")
     gui_fallback_pass = (
         bool(payload.get("succeeded")) if isinstance(payload, dict) else False
     ) and unity_outcome == "passed" and transport_outcome == "gui_operation_completed" and effective_execution_lane == "gui"
-    batch_matrix_pass = matrix_status == "passed" and effective_execution_lane in {"", "batch"}
+    batch_matrix_pass = compile_evidence["outcome"] == "passed" and effective_execution_lane in {"", "batch"}
+    gui_matrix_pass = compile_evidence["outcome"] == "passed" and effective_execution_lane == "gui"
 
     if recover_rc == 0 and batch_rc == 0 and bool(payload.get("succeeded")) and batch_matrix_pass and int(matrix.get("failed", 0)) == 0:
         operator_verdict = "passed_via_batch"
-    elif recover_rc == 0 and batch_rc == 0 and gui_fallback_pass:
+    elif recover_rc == 0 and batch_rc == 0 and gui_fallback_pass and gui_matrix_pass:
         operator_verdict = "passed_via_gui_fallback"
     elif unity_outcome in {"not_started", ""} and (
         batch_rc != 0 or transport_outcome.endswith("_blocked") or effective_execution_lane == "none"
@@ -287,6 +408,8 @@ def build_batch_status(
         operator_verdict = "failed_in_unity"
     else:
         operator_verdict = "failed_wrapper_unity_unproven"
+
+    license_from_cache, license_probed_at_utc, license_probe_age = license_probe_facts(payload, result_summary)
 
     status = {
         "project": project_name,
@@ -301,14 +424,18 @@ def build_batch_status(
         "batch_fallback_mode": batch_fallback_mode,
         "lane_fallback_reason": lane_fallback_reason,
         "license_blocker_code": license_blocker_code,
+        "license_from_cache": license_from_cache,
+        "license_probed_at_utc": license_probed_at_utc,
+        "license_probe_age_seconds": license_probe_age,
         "operator_verdict": operator_verdict,
+        "compile_evidence": compile_evidence,
         "unity_outcome": unity_outcome,
         "transport_outcome": transport_outcome,
         "matrix_status": matrix_status,
-        "total": int(matrix.get("total", 0)) if isinstance(matrix, dict) else 0,
-        "passed": int(matrix.get("passed", 0)) if isinstance(matrix, dict) else 0,
-        "failed": int(matrix.get("failed", 0)) if isinstance(matrix, dict) else 0,
-        "skipped": int(matrix.get("skipped", 0)) if isinstance(matrix, dict) else 0,
+        "total": int(matrix.get("total", 0)),
+        "passed": int(matrix.get("passed", 0)),
+        "failed": int(matrix.get("failed", 0)),
+        "skipped": int(matrix.get("skipped", 0)),
         "summary_file": str(payload.get("summary_file", "")) if isinstance(payload, dict) else "",
         "result_file": str(payload.get("result_file", "")) if isinstance(payload, dict) else "",
         "log_path": str(payload.get("log_path", "")) if isinstance(payload, dict) else "",
@@ -378,17 +505,12 @@ def emit_batch_final_summary(results_dir: str) -> int:
     overall_failed = 0
     verdict_counts = {}
     for item in statuses:
-        gui_fallback_pass = (
-            item.get("succeeded") is True
-            and item.get("unity_outcome") == "passed"
-            and item.get("transport_outcome") == "gui_operation_completed"
-            and item.get("effective_execution_lane") == "gui"
-        )
+        compile_evidence = compile_evidence_from_status(item)
         operator_verdict = str(item.get("operator_verdict") or "")
         if not operator_verdict:
-            if item.get("matrix_status") == "passed" and item.get("failed", 0) == 0:
+            if compile_evidence["outcome"] == "passed" and item.get("effective_execution_lane") in {"", "batch"}:
                 operator_verdict = "passed_via_batch"
-            elif gui_fallback_pass:
+            elif compile_evidence["outcome"] == "passed" and item.get("effective_execution_lane") == "gui":
                 operator_verdict = "passed_via_gui_fallback"
             elif item.get("unity_outcome") in {"not_started", ""}:
                 operator_verdict = "failed_before_unity"
@@ -397,13 +519,7 @@ def emit_batch_final_summary(results_dir: str) -> int:
             else:
                 operator_verdict = "failed_wrapper_unity_unproven"
         verdict_counts[operator_verdict] = verdict_counts.get(operator_verdict, 0) + 1
-        ok = (
-            item.get("recover_rc", 0) == 0
-            and item.get("batch_rc", 0) == 0
-            and item.get("succeeded") is True
-            and (item.get("matrix_status") == "passed" or gui_fallback_pass)
-            and item.get("failed", 0) == 0
-        )
+        ok = compile_evidence["outcome"] == "passed"
         if not ok:
             overall_failed += 1
         fields = [
@@ -417,6 +533,8 @@ def emit_batch_final_summary(results_dir: str) -> int:
             f"fallback_mode={item.get('batch_fallback_mode', '')}",
             f"fallback_reason={item.get('lane_fallback_reason', '')}",
             f"license_blocker={item.get('license_blocker_code', '')}",
+            f"license_from_cache={str(item.get('license_from_cache')).lower() if item.get('license_from_cache') is not None else ''}",
+            f"license_probe_age_seconds={item.get('license_probe_age_seconds', '')}",
             f"transport={item.get('transport_outcome', '')}",
             f"unity={item.get('unity_outcome', '')}",
             f"matrix_status={item.get('matrix_status', '')}",
@@ -545,6 +663,8 @@ Options:
 
 Behavior:
   - selects a GUI-test subset from explicit project roots, a prior batch results dir, or auto-discovery
+  - treats successful GUI-fallback compile evidence as eligible for batch-result selection
+  - fails before worker launch when an explicit batch-results selection is malformed or incomplete
   - runs recover -> ensure-ready -> editmode -> playmode -> restore for each project
   - keeps editmode and playmode strictly sequential inside each project
   - emits one compact per-project summary plus a final aggregate summary
@@ -574,27 +694,124 @@ def capture_dirty_paths(workspace_root: str, side_effect_mode: str, output_file:
     Path(output_file).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def collect_green_projects_from_batch_results(results_dir: str) -> list:
+def compile_evidence_from_status(item: dict) -> dict:
+    evidence = item.get("compile_evidence")
+    if isinstance(evidence, dict):
+        outcome = str(evidence.get("outcome") or "")
+        matrix = normalized_matrix(evidence.get("matrix"))
+        if outcome in {"passed", "failed", "unproven"}:
+            return {
+                "outcome": outcome,
+                "evidence_source": str(evidence.get("evidence_source") or "none"),
+                "matrix": matrix,
+            }
+
+    common_success = (
+        item.get("recover_rc", 0) == 0
+        and item.get("batch_rc", 0) == 0
+        and item.get("succeeded") is True
+    )
+    matrix = normalized_matrix(
+        {
+            "status": item.get("matrix_status"),
+            "total": item.get("total", 0),
+            "passed": item.get("passed", 0),
+            "failed": item.get("failed", 0),
+            "skipped": item.get("skipped", 0),
+        }
+    )
+    verdict = str(item.get("operator_verdict") or "")
+    gui_fallback_pass = (
+        common_success
+        and verdict == "passed_via_gui_fallback"
+        and item.get("unity_outcome") == "passed"
+        and item.get("transport_outcome") == "gui_operation_completed"
+        and item.get("effective_execution_lane") == "gui"
+    )
+    batch_matrix_pass = common_success and matrix.get("status") == "passed" and matrix.get("failed") == 0
+    return {
+        "outcome": "passed" if batch_matrix_pass or gui_fallback_pass else "failed",
+        "evidence_source": "legacy_status",
+        "matrix": matrix,
+    }
+
+
+def build_batch_selection_plan(results_dir: str) -> dict:
     results_path = Path(results_dir)
     if not results_path.is_dir():
-        sys.stderr.write("Batch results dir not found: %s\n" % results_path)
-        return []
+        return {
+            "results_dir": str(results_path),
+            "status_files": 0,
+            "eligible_projects": 0,
+            "selected_projects": [],
+            "excluded_projects": 0,
+            "legacy_projects": 0,
+            "errors": ["batch_results_dir_not_found"],
+        }
     selected = []
-    for status_path in sorted(results_path.glob("*_status.json")):
+    selected_roots = set()
+    errors = []
+    status_files = sorted(results_path.glob("*_status.json"))
+    eligible_projects = 0
+    excluded_projects = 0
+    legacy_projects = 0
+    for status_path in status_files:
         try:
             item = json.loads(status_path.read_text(encoding="utf-8"))
         except Exception:
+            errors.append("malformed_status:%s" % status_path.name)
             continue
-        ok = (
-            item.get("recover_rc", 0) == 0
-            and item.get("batch_rc", 0) == 0
-            and item.get("succeeded") is True
-            and item.get("matrix_status") == "passed"
-            and int(item.get("failed", 0)) == 0
-        )
-        if ok and item.get("project_root"):
-            selected.append(item["project_root"])
-    return selected
+        if not isinstance(item, dict):
+            errors.append("invalid_status:%s" % status_path.name)
+            continue
+        evidence = compile_evidence_from_status(item)
+        if evidence["outcome"] != "passed":
+            excluded_projects += 1
+            continue
+        eligible_projects += 1
+        if evidence["evidence_source"] == "legacy_status":
+            legacy_projects += 1
+        project_root = str(item.get("project_root") or "")
+        if not project_root:
+            errors.append("eligible_status_missing_project_root:%s" % status_path.name)
+            continue
+        if project_root in selected_roots:
+            errors.append("duplicate_eligible_project_root:%s" % project_root)
+            continue
+        selected_roots.add(project_root)
+        selected.append(project_root)
+
+    if not status_files:
+        errors.append("no_batch_status_files")
+    if eligible_projects != len(selected):
+        errors.append("selection_coverage_mismatch:eligible=%d:selected=%d" % (eligible_projects, len(selected)))
+    return {
+        "results_dir": str(results_path),
+        "status_files": len(status_files),
+        "eligible_projects": eligible_projects,
+        "selected_projects": selected,
+        "excluded_projects": excluded_projects,
+        "legacy_projects": legacy_projects,
+        "errors": errors,
+    }
+
+
+def emit_batch_selection_summary(plan: dict) -> None:
+    print("MULTI_PROJECT_GUI_BATCH_SELECTION_BEGIN")
+    print("batch_results_dir=%s" % plan["results_dir"])
+    print("status_files=%d" % plan["status_files"])
+    print("eligible_projects=%d" % plan["eligible_projects"])
+    print("selected_projects=%d" % len(plan["selected_projects"]))
+    print("excluded_projects=%d" % plan["excluded_projects"])
+    print("legacy_projects=%d" % plan["legacy_projects"])
+    for error in plan["errors"]:
+        print("selection_warning=%s" % error)
+    print("MULTI_PROJECT_GUI_BATCH_SELECTION_END")
+
+
+def collect_green_projects_from_batch_results(results_dir: str) -> list:
+    """Compatibility projection for callers that only need selected roots."""
+    return list(build_batch_selection_plan(results_dir)["selected_projects"])
 
 
 def run_json_command(cmd: list, stdout_file: str, stderr_file: str) -> int:
@@ -1227,9 +1444,19 @@ def main_gui(argv: list) -> int:
     require_wrapper()
 
     if batch_results_dir and not project_roots:
-        project_roots = collect_green_projects_from_batch_results(batch_results_dir)
+        selection_plan = build_batch_selection_plan(batch_results_dir)
+        emit_batch_selection_summary(selection_plan)
+        if selection_plan["errors"]:
+            raise fail(
+                "Batch-result GUI selection is incomplete; no workers were started. "
+                "See selection_warning lines above.",
+                exit_code=2,
+            )
+        project_roots = selection_plan["selected_projects"]
 
     if not project_roots:
+        if batch_results_dir:
+            raise fail("No eligible projects were found in batch results; no workers were started.", exit_code=2)
         project_roots = discover_project_roots(repo_root)
 
     if not project_roots:
