@@ -14,6 +14,8 @@ small editor-only Unity package.
 
 Full technical package name: **XUUnity Light Unity MCP**
 
+> **Independent open-source project. Not affiliated with or endorsed by Unity Technologies. Authorization under Unity Terms of Service has not yet been confirmed.**
+
 <p>
   <a href="https://github.com/FoxsterDev/xuunity-mcp"><img alt="GitHub stars" src="https://img.shields.io/github/stars/FoxsterDev/xuunity-mcp?style=flat&logo=github"></a>
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-red.svg"></a>
