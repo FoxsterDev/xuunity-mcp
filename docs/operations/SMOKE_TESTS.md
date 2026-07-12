@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-07-01`
-Status: `current for v0.3.42`
+Status: `current for v0.3.43`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.42`: `291` tests passed, with one expected skip
+- host Python tests for `v0.3.43`: `291` tests passed, with one expected skip
 - source package self-tests for the current release line: EditMode and PlayMode
   self-test lanes passed on runnable installed Unity `2021.3`, `2022.3`, and
   `6000.x` editors after offline optional Test Framework setup

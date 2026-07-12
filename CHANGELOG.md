@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.43
+
+Release tag: `v0.3.43`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.43
+```
+
 ### Changed
 
 - Scenario decision verdicts now distinguish a project-hook mutation that was
@@ -14,6 +24,26 @@
   settle, compact and full responses report `stale_risk` plus a
   `confirm_via_unity_playmode_state` next action instead of presenting the
   sampled PlayMode value as definitive.
+- Hardened native Windows installation and launch paths: self-hosted refresh
+  launchers, safe paths with spaces, predictable non-zero error propagation,
+  Python 3.10+ gating, UTF-8 process handling, and client configs that point to
+  the resolved launcher path.
+- Improved cross-platform Unity discovery and readiness recovery, including
+  extra Unity Hub installation locations, host-native recovery commands, and
+  faster failure when interactive readiness cannot be achieved.
+- Made bridge file IPC and request artifacts safer under lifecycle churn with
+  atomic writes, torn-read resistance, process identity checks, subprocess
+  timeouts, and editor-main-thread-safe runtime paths.
+- Added end-to-end host regressions for Windows launchers, PowerShell setup,
+  MCP stdio, installed delegate recovery, hostile code pages, and simulated
+  file-IPC bridge behavior.
+- Added public issue templates, contribution and conduct guidance, and an
+  explicit independent-project notice.
+
+### Validation
+
+- Release metadata, public documentation, release-safety, host regression, and
+  public-site checks passed before tagging.
 
 ## 0.3.42
 
