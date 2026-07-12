@@ -2,7 +2,7 @@
 
 import json
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 CLIENTS_DIR = Path(__file__).resolve().parents[1] / "templates" / "clients"
@@ -17,7 +17,7 @@ JSON_CONFIGS = (
 
 class PosixClientConfigContractTests(unittest.TestCase):
     def assert_posix_launcher(self, command: str, args: list[str], source: Path) -> None:
-        self.assertTrue(Path(command).is_absolute(), f"{source}: {command!r}")
+        self.assertTrue(PurePosixPath(command).is_absolute(), f"{source}: {command!r}")
         self.assertEqual("-c", args[0], f"{source}: {args!r}")
         self.assertNotIn("-lc", args, f"{source}: login profiles must not affect MCP startup")
         self.assertIn(command, args[1], f"{source}: launcher must reuse the resolved shell")
