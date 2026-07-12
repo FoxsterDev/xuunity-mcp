@@ -18,6 +18,22 @@ import sys
 from pathlib import Path
 
 
+def executable_basename(value: str) -> str:
+    return value.replace("\\", "/").rsplit("/", 1)[-1] or "unknown"
+
+
+def prerequisite_summary() -> str:
+    shell_name = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_SHELL_BASENAME") or "unknown"
+    shell_version = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_SHELL_VERSION") or "unknown"
+    python_name = executable_basename(sys.executable)
+    python_version = ".".join(str(part) for part in sys.version_info[:3])
+    return (
+        "launcher prerequisites: "
+        f"shell={shell_name} version={shell_version} "
+        f"python={python_name} version={python_version}"
+    )
+
+
 def fail(message: str, exit_code: int = 1) -> None:
     print(message, file=sys.stderr)
     raise SystemExit(exit_code)
@@ -27,7 +43,10 @@ def require_supported_python() -> None:
     if sys.version_info[:2] >= (3, 10):
         return
     current = ".".join(str(part) for part in sys.version_info[:3])
-    fail(f"Python 3.10 or newer is required. Selected interpreter reports {current}.")
+    fail(
+        f"Python 3.10 or newer is required. Selected interpreter reports {current}.\n"
+        f"{prerequisite_summary()}"
+    )
 
 
 def reconfigure_stdio_utf8() -> None:
@@ -80,12 +99,21 @@ def expected_package_version(package_json: Path) -> str:
     return str(payload.get("version") or "").strip()
 
 
+def is_windows_like_host() -> bool:
+    return (
+        os.name == "nt"
+        or sys.platform.startswith("win")
+        or os.environ.get("OS") == "Windows_NT"
+        or str(os.environ.get("MSYSTEM") or "").upper().startswith(("MINGW", "MSYS", "CYGWIN"))
+    )
+
+
 def neutral_install_dir() -> Path:
     explicit = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR")
     if explicit:
         return Path(explicit).expanduser()
 
-    if os.environ.get("OS") == "Windows_NT" or os.environ.get("APPDATA"):
+    if is_windows_like_host():
         appdata = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
         return Path(appdata.replace("\\", "/")) / "xuunity-mcp"
 
@@ -122,6 +150,14 @@ def installed_server_version(server_path: Path) -> str | None:
 
 def find_bash() -> str:
     if os.name != "nt":
+        inherited_bash = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_BASH")
+        if (
+            inherited_bash
+            and os.path.isabs(inherited_bash)
+            and os.path.isfile(inherited_bash)
+            and os.access(inherited_bash, os.X_OK)
+        ):
+            return inherited_bash
         bash = shutil.which("bash")
         if bash:
             return bash
@@ -224,7 +260,8 @@ def exec_run(run_path: Path, args: list[str]) -> None:
 
     if not run_path.is_file():
         fail(f"xuunity MCP run launcher not found after refresh: {run_path}")
-    os.execv(str(run_path), [str(run_path), *args])
+    bash = find_bash()
+    os.execv(bash, [bash, str(run_path), *args])
 
 
 def main(argv: list[str]) -> int:

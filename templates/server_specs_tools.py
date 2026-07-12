@@ -211,13 +211,18 @@ TOOLS: dict[str, dict[str, Any]] = {
         }
     },
     "unity_request_final_status": {
-        "description": "Resolve final disposition for one request id from the request journal and current bridge state.",
+        "description": "Resolve a compact final delivery disposition for one request id from the request journal and current bridge state. Set includeFullPayload=true for journal paths, discovery, timing, and artifact evidence.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
                 "requestId": {"type": "string"},
                 "operation": {"type": "string"},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When true, include full journal, discovery, timing, and artifact evidence instead of the compact delivery verdict."
+                },
                 "timeoutMs": {"type": "integer", "default": 2000, "minimum": 0}
             },
             "required": ["projectRoot", "requestId"]

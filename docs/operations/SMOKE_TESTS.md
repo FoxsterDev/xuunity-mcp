@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
-Date: `2026-07-01`
-Status: `current for v0.3.43`
+Date: `2026-07-12`
+Status: `current source after v0.3.43`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,8 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- host Python tests for `v0.3.43`: `291` tests passed, with one expected skip
+- current-source host Python tests: `426` tests passed on macOS, with `13`
+  expected native-Windows-only skips covered by the Windows CI leg
 - source package self-tests for the current release line: EditMode and PlayMode
   self-test lanes passed on runnable installed Unity `2021.3`, `2022.3`, and
   `6000.x` editors after offline optional Test Framework setup
@@ -431,6 +432,15 @@ Pass criteria:
 
 - completed requests reclassified after lifecycle churn report
   `operator_verdict.status=confirmed_success_after_lifecycle_churn`
+- when Unity completion is confirmed but the original host response was not
+  observed, tracked requests instead report
+  `terminal_disposition=unity_completed_host_delivery_unproven`,
+  `operation_outcome=completed_ok`, and
+  `result_trust_class=unity_completed_confirmed`
+- that delivery-unproven completed disposition reports
+  `operator_verdict.should_retry=false`,
+  `safe_next_action=continue_without_retry`, while keeping the operation-level
+  `recommended_next_action=none`
 - `operator_verdict.should_retry=false` when
   `recommended_next_action=none`
 - unproven lifecycle failures keep warning-first wording and do not claim Unity
@@ -511,13 +521,17 @@ phase and next terminal condition. Bridge generation churn should be
 compiler errors are zero, and unrecovered abandoned requests are zero;
 otherwise classify it as `actionable_churn`.
 
-When `run_post_change_validation.sh` would open Unity and
-`--compile-mode build-config-matrix` is selected, it runs
+Before batch preflight, `run_post_change_validation.sh` emits an explicit
+`lane_decision`. A healthy or otherwise live same-project editor selects
+`interactive_mcp`; if `request-status-summary` fails, the runner checks direct
+`bridge-state` liveness before deciding. Only a positive closed-editor result
+selects `closed_batch_preflight` and lets `--compile-mode build-config-matrix` run
 `batch-build-config-compile-matrix --batch-fallback-mode require-batch` before
-`ensure-ready --open-editor`. This keeps a script compile failure from becoming
-a GUI Safe Mode startup blocker. If a healthy editor is already being reused, or
-the caller passed `--no-open-editor`, the runner keeps the existing bridge
-compile matrix after readiness.
+`ensure-ready --open-editor`. This keeps script compile failures out of GUI Safe
+Mode startup without sending a healthy open editor into a conflicting batch
+lane. If both probes leave editor liveness unknown, the runner emits
+`lane_decision=blocked` and stops before batch execution. Callers using
+`--no-open-editor` keep the existing bridge compile matrix after readiness.
 
 Optional post-change parity inputs:
 

@@ -2,6 +2,24 @@
 from __future__ import annotations
 
 from server_cli_shared import *
+from server_bridge_final_status import build_compact_final_status_projection
+
+
+def _final_status_cli_payload(summary: dict[str, Any], include_full_payload: bool) -> dict[str, Any]:
+    if include_full_payload:
+        return summary
+
+    compact = build_compact_final_status_projection(summary)
+    for key in (
+        "lookup_mode",
+        "lookup_found",
+        "matched_operations",
+        "lookup_event_type",
+        "lookup_event_at_utc",
+    ):
+        if key in summary:
+            compact[key] = summary.get(key)
+    return compact
 
 def cmd_recover_editor_session(args):
     project_root = ensure_project_root(args.project_root)
@@ -166,7 +184,7 @@ def cmd_request_latest_status(args):
 
     if latest_event is None:
         stabilization = build_bridge_stabilization_summary(current_state)
-        print_json(apply_discovery_to_final_status_summary({
+        summary = apply_discovery_to_final_status_summary({
             "lookup_mode": "latest_request_by_operation",
             "lookup_found": False,
             "matched_operations": operations,
@@ -192,7 +210,8 @@ def cmd_request_latest_status(args):
             "journal_event_count": 0,
             "journal_event_paths": [],
             "bridge_stabilization": stabilization,
-        }, project_root))
+        }, project_root)
+        print_json(_final_status_cli_payload(summary, args.include_full_payload))
         return
 
     request_id = str(latest_event.get("request_id") or "").strip()
@@ -204,13 +223,13 @@ def cmd_request_latest_status(args):
     summary["lookup_event_type"] = str(latest_event.get("event_type") or "")
     summary["lookup_event_at_utc"] = str(latest_event.get("event_at_utc") or "")
     summary["lookup_event_path"] = str(latest_event.get("_path") or "")
-    print_json(summary)
+    print_json(_final_status_cli_payload(summary, args.include_full_payload))
 
 
 def cmd_request_final_status(args):
     project_root = ensure_project_root(args.project_root)
     summary = build_request_final_status_from_context(project_root, args.request_id, args.operation or "", args.timeout_ms)
-    print_json(summary)
+    print_json(_final_status_cli_payload(summary, args.include_full_payload))
 
 
 def cmd_request_cancel(args):

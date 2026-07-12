@@ -48,10 +48,10 @@ Config:
   "mcpServers": {
     "xuunity_light_unity": {
       "type": "stdio",
-      "command": "bash",
+      "command": "/bin/bash",
       "args": [
-        "-lc",
-        "exec \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""
+        "-c",
+        "exec \"/bin/bash\" \"${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""
       ],
       "timeout": 600000
     }
@@ -108,7 +108,7 @@ bash init_xuunity_light_unity_mcp.sh \
 
 ```bash
 claude mcp add --scope local --transport stdio xuunity_light_unity \
-  -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"'
+  -- /bin/bash -c 'exec "/bin/bash" "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"'
 ```
 
 Native Windows equivalent:

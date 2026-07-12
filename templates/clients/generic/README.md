@@ -23,9 +23,9 @@ Important:
 - Client wiring does not prove Unity project readiness. Validate the target
   Unity project separately after wiring.
 
-The command intentionally goes through `bash -lc` so `$HOME` and optional
-tool-home overrides are resolved by the shell instead of relying on client-side
-tilde expansion.
+The command intentionally goes through absolute `/bin/bash -c` so `$HOME` and
+optional tool-home overrides are resolved by the shell without relying on
+client-side tilde expansion, PATH lookup, or login-profile side effects.
 
 The Windows command intentionally goes through `cmd.exe /d /c` and calls
 `run_installed_or_refresh_xuunity_mcp.cmd` so `%USERPROFILE%`,

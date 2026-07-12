@@ -16,6 +16,21 @@ import server_host_platform
 
 
 class WindowsHostHelperTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "POSIX host classification")
+    def test_appdata_alone_does_not_select_windows_launcher_on_posix(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "APPDATA": "/forwarded/windows/appdata",
+                "OS": "",
+                "MSYSTEM": "",
+                "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME": "",
+            },
+            clear=False,
+        ):
+            self.assertFalse(server_core.is_windows_like_host())
+            self.assertEqual("xuunity_light_unity_mcp.sh", server_core.launcher_command_name())
+
     def test_read_json_accepts_portable_plan_file_encodings(self) -> None:
         payload = {"action": "setup_plan", "projects": [{"project_root": "C:/Project"}]}
 

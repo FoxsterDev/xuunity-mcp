@@ -105,6 +105,49 @@ class WrapperSourceRootTests(unittest.TestCase):
             ):
                 self.assertEqual(str(git_bash), module.find_bash())
 
+    def test_refresh_prerequisite_summary_uses_basenames_not_private_paths(self) -> None:
+        module = self.load_refresh_launcher_module()
+
+        with (
+            mock.patch.dict(
+                module.os.environ,
+                {
+                    "XUUNITY_LIGHT_UNITY_MCP_SHELL_BASENAME": "bash",
+                    "XUUNITY_LIGHT_UNITY_MCP_SHELL_VERSION": "5.2.37",
+                },
+                clear=False,
+            ),
+            mock.patch.object(
+                module.sys,
+                "executable",
+                "/Users/private-account/Library/Application Support/xuunity/.venv/bin/python3",
+            ),
+        ):
+            summary = module.prerequisite_summary()
+
+        self.assertIn("shell=bash version=5.2.37", summary)
+        self.assertIn("python=python3 version=", summary)
+        self.assertNotIn("private-account", summary)
+        self.assertNotIn("Application Support", summary)
+
+    @unittest.skipIf(os.name == "nt", "POSIX install path classification")
+    def test_refresh_appdata_alone_keeps_posix_neutral_install_path(self) -> None:
+        module = self.load_refresh_launcher_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir, mock.patch.dict(
+            module.os.environ,
+            {
+                "APPDATA": str(Path(tmp_dir) / "forwarded-appdata"),
+                "XDG_DATA_HOME": str(Path(tmp_dir) / "xdg-data"),
+                "OS": "",
+                "MSYSTEM": "",
+            },
+            clear=False,
+        ):
+            install_dir = module.neutral_install_dir()
+
+        self.assertEqual(Path(tmp_dir) / "xdg-data" / "xuunity-mcp", install_dir)
+
     def test_refresh_python_uses_run_cmd_for_windows_exec(self) -> None:
         module = self.load_refresh_launcher_module()
 
@@ -418,6 +461,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertTrue(neutral_refresh_cmd.is_file())
             self.assertTrue(codex_refresh.is_file())
             self.assertTrue(os.access(codex_refresh, os.X_OK))
+            self.assertIn('exec "$BASH"', codex_refresh.read_text(encoding="utf-8"))
             self.assertTrue(codex_refresh_py.is_file())
             self.assertTrue(codex_refresh_cmd.is_file())
             self.assertEqual(repo_root.resolve(), Path((neutral_dir / ".source_root").read_text(encoding="utf-8").strip()).resolve())
@@ -428,6 +472,9 @@ class WrapperSourceRootTests(unittest.TestCase):
                 self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", config_text)
                 self.assertNotIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
             else:
+                self.assertRegex(config_text, r'command = "/[^"\n]+/bash"')
+                self.assertIn('args = ["-c",', config_text)
+                self.assertNotIn('"-lc"', config_text)
                 self.assertIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
                 self.assertNotIn('command = "cmd.exe"', config_text)
             self.assertNotIn("/xuunity-mcp/run.sh", config_text)
@@ -665,11 +712,80 @@ class WrapperSourceRootTests(unittest.TestCase):
         launcher = repo_root / "run_installed_or_refresh_xuunity_mcp.sh"
         text = launcher.read_text(encoding="utf-8")
 
-        self.assertLessEqual(len(text.splitlines()), 30)
+        self.assertLessEqual(len(text.splitlines()), 40)
         self.assertIn("run_installed_or_refresh_xuunity_mcp.py", text)
         self.assertNotIn("SERVER_INFO", text)
         self.assertNotIn("package.json", text)
         self.assertNotIn("init_xuunity_light_unity_mcp.sh --target", text)
+
+    @unittest.skipIf(os.name == "nt", "POSIX launcher preference")
+    def test_refresh_shell_launcher_prefers_sibling_venv_before_path(self) -> None:
+        source_launcher = REPO_ROOT / "run_installed_or_refresh_xuunity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            install_dir = Path(tmp_dir) / "neutral"
+            venv_python = install_dir / ".venv" / "bin" / "python"
+            path_python = Path(tmp_dir) / "path-bin" / "python3"
+            venv_python.parent.mkdir(parents=True)
+            path_python.parent.mkdir(parents=True)
+            (install_dir / source_launcher.name).write_text(
+                source_launcher.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            (install_dir / "run_installed_or_refresh_xuunity_mcp.py").write_text(
+                "# argv marker only\n", encoding="utf-8"
+            )
+            venv_python.write_text(
+                "#!/bin/sh\nprintf 'selected=venv\\n'\n", encoding="utf-8"
+            )
+            path_python.write_text(
+                "#!/bin/sh\nprintf 'selected=path\\n'\n", encoding="utf-8"
+            )
+            venv_python.chmod(0o755)
+            path_python.chmod(0o755)
+
+            env = dict(os.environ)
+            env.pop("PYTHON", None)
+            env["PATH"] = os.pathsep.join(
+                [str(path_python.parent), "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+            )
+            completed = run_with_timeout(
+                [resolve_bash_executable(), (install_dir / source_launcher.name).as_posix()],
+                env=env,
+                timeout_seconds=30,
+            )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual("selected=venv", completed.stdout.strip())
+
+    @unittest.skipIf(os.name == "nt", "POSIX launcher preference")
+    def test_refresh_shell_launcher_preserves_explicit_python_override_priority(self) -> None:
+        source_launcher = REPO_ROOT / "run_installed_or_refresh_xuunity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            install_dir = Path(tmp_dir) / "neutral"
+            venv_python = install_dir / ".venv" / "bin" / "python"
+            venv_python.parent.mkdir(parents=True)
+            (install_dir / source_launcher.name).write_text(
+                source_launcher.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            (install_dir / "run_installed_or_refresh_xuunity_mcp.py").write_text(
+                "print('selected=override')\n", encoding="utf-8"
+            )
+            venv_python.write_text(
+                "#!/bin/sh\nprintf 'selected=venv\\n'\n", encoding="utf-8"
+            )
+            venv_python.chmod(0o755)
+
+            env = dict(os.environ)
+            env["PYTHON"] = sys.executable
+            completed = run_with_timeout(
+                [resolve_bash_executable(), (install_dir / source_launcher.name).as_posix()],
+                env=env,
+                timeout_seconds=30,
+            )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual("selected=override", completed.stdout.strip())
 
     def test_installed_refresh_launcher_uses_source_root_marker_to_update_neutral_server(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

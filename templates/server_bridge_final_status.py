@@ -12,6 +12,7 @@ from server_bridge_journal import (
     bridge_identity_from_state,
     parse_journal_utc_timestamp,
     read_request_journal_events,
+    record_request_delivery_event,
     write_host_request_journal_event,
 )
 from server_bridge_paths import default_editor_log_path, response_path, test_result_path
@@ -21,7 +22,7 @@ from server_bridge_state import (
     read_best_effort_bridge_state,
     try_read_bridge_state,
 )
-from server_core import ToolInvocationError, read_json
+from server_core import ToolInvocationError, read_json, render_launcher_cli
 from server_operation_evidence import attach_operation_evidence_to_final_status
 
 def build_bridge_stabilization_summary(
@@ -160,7 +161,19 @@ def build_operator_verdict(
     operation_outcome: str,
     result_trust_class: str,
     recommended_next_action: str,
+    terminal_disposition: str = "",
 ) -> dict[str, Any]:
+    if (
+        terminal_disposition == "unity_completed_host_delivery_unproven"
+        and result_trust_class == "unity_completed_confirmed"
+    ):
+        return {
+            "status": terminal_disposition,
+            "message": "Unity completion is confirmed by the request journal; original host delivery is unproven.",
+            "should_retry": False,
+            "next_action": "continue_without_retry",
+        }
+
     if (
         request_completed
         and reclassified
@@ -211,6 +224,20 @@ def build_compact_final_status_projection(final_status: dict[str, Any]) -> dict[
         "request_observed_in_unity_journal": bool(final_status.get("request_observed_in_unity_journal")),
         "operation_outcome": str(final_status.get("operation_outcome") or ""),
         "result_trust_class": str(final_status.get("result_trust_class") or ""),
+        "terminal_disposition": str(final_status.get("terminal_disposition") or ""),
+        "completion_source": str(final_status.get("completion_source") or ""),
+        "host_delivery_tracking": bool(final_status.get("host_delivery_tracking")),
+        "host_delivery_observed": bool(final_status.get("host_delivery_observed")),
+        "host_delivery_pending": bool(final_status.get("host_delivery_pending")),
+        "host_delivery_unproven": bool(final_status.get("host_delivery_unproven")),
+        "host_delivery_source": str(final_status.get("host_delivery_source") or ""),
+        "request_timeout_ms": int(final_status.get("request_timeout_ms") or 0),
+        "delivery_deadline_elapsed": bool(final_status.get("delivery_deadline_elapsed")),
+        "safe_next_action": str(final_status.get("safe_next_action") or ""),
+        "submission_bridge_generation": int(final_status.get("submission_bridge_generation") or 0),
+        "completion_bridge_generation": int(final_status.get("completion_bridge_generation") or 0),
+        "current_bridge_generation": int(final_status.get("current_bridge_generation") or 0),
+        "bridge_generation_delta": final_status.get("bridge_generation_delta"),
         "recommended_next_action": str(final_status.get("recommended_next_action") or ""),
         "retryable": bool(final_status.get("retryable")),
         "bridge_changed_since_submission": bool(final_status.get("bridge_changed_since_submission")),
@@ -281,6 +308,13 @@ def build_request_final_status(
             if str(event.get("event_type") or "") in {"request_reclassified", "request_abandoned"}
         ]
         reclassified_event = reclassified_events[-1] if reclassified_events else None
+        delivery_events = [
+            event
+            for event in events
+            if str(event.get("event_type") or "")
+            in {"request_delivery_observed", "request_delivery_unproven"}
+        ]
+        delivery_event = delivery_events[-1] if delivery_events else None
         last_event = events[-1] if events else None
 
         request_submitted = submitted_event is not None
@@ -297,8 +331,41 @@ def build_request_final_status(
         cancellation_requested = cancellation_event_type == "request_cancel_requested"
         request_cancelled = cancellation_event_type == "request_cancelled"
         reclassified = reclassified_event is not None
-        retryable = bool((reclassified_event or {}).get("retryable")) if reclassified else False
+        reclassification_retryable = (
+            bool((reclassified_event or {}).get("retryable")) if reclassified else False
+        )
+        retryable = reclassification_retryable and not request_completed
         request_observed_in_unity_journal = request_started or request_completed
+        host_delivery_tracking = bool((submitted_event or {}).get("host_delivery_tracking"))
+        delivery_event_type = str((delivery_event or {}).get("event_type") or "")
+        host_delivery_observed = delivery_event_type == "request_delivery_observed"
+        explicit_host_delivery_unproven = delivery_event_type == "request_delivery_unproven"
+        request_timeout_ms = max(0, int((submitted_event or {}).get("request_timeout_ms") or 0))
+        request_submitted_unix = float(
+            (submitted_event or {}).get("request_submitted_unix")
+            or parse_journal_utc_timestamp((submitted_event or {}).get("event_at_utc"))
+            or 0.0
+        )
+        delivery_deadline_elapsed = (
+            request_timeout_ms <= 0
+            or request_submitted_unix <= 0
+            or time.time() >= request_submitted_unix + (request_timeout_ms / 1000.0)
+        )
+        host_delivery_pending = bool(
+            host_delivery_tracking
+            and request_completed
+            and not host_delivery_observed
+            and not explicit_host_delivery_unproven
+            and not delivery_deadline_elapsed
+        )
+        host_delivery_unproven = explicit_host_delivery_unproven or (
+            host_delivery_tracking
+            and request_completed
+            and not host_delivery_observed
+            and delivery_deadline_elapsed
+        )
+        host_delivery_source = str((delivery_event or {}).get("host_delivery_source") or "")
+        host_delivery_reason = str((delivery_event or {}).get("reason") or "")
 
         submitted_generation = int((submitted_event or {}).get("bridge_generation") or 0)
         submitted_session_id = str((submitted_event or {}).get("bridge_session_id") or "")
@@ -317,6 +384,26 @@ def build_request_final_status(
         reclassified_event_type = str((reclassified_event or {}).get("event_type") or "")
         reclassified_status = str((reclassified_event or {}).get("reclassified_status") or "")
         reclassified_reason = str((reclassified_event or {}).get("reason") or "")
+
+        if request_completed:
+            completion_source = "unity_request_journal"
+        elif request_started:
+            completion_source = "unity_request_journal_in_progress"
+        else:
+            completion_source = "none"
+
+        if request_completed and completion_status == "ok" and host_delivery_unproven:
+            terminal_disposition = "unity_completed_host_delivery_unproven"
+        elif request_completed and completion_status != "ok" and host_delivery_unproven:
+            terminal_disposition = "unity_failed_host_delivery_unproven"
+        elif host_delivery_unproven:
+            terminal_disposition = "host_delivery_unproven_unity_completion_unproven"
+        elif request_completed and completion_status == "ok" and host_delivery_observed:
+            terminal_disposition = "unity_completed_host_delivery_observed"
+        elif request_completed and host_delivery_observed:
+            terminal_disposition = "unity_failed_host_delivery_observed"
+        else:
+            terminal_disposition = ""
 
         if request_completed and completion_status == "ok":
             operation_outcome = "completed_ok"
@@ -387,6 +474,15 @@ def build_request_final_status(
             operation_outcome=operation_outcome,
             result_trust_class=result_trust_class,
             recommended_next_action=recommended_next_action,
+            terminal_disposition=terminal_disposition,
+        )
+
+        completion_generation = int((completed_event or {}).get("bridge_generation") or 0)
+        current_generation = int(active_state.get("bridge_generation") or 0)
+        bridge_generation_delta = (
+            completion_generation - submitted_generation
+            if submitted_generation > 0 and completion_generation > 0
+            else None
         )
 
         summary = {
@@ -410,15 +506,40 @@ def build_request_final_status(
             "reclassified_event_type": reclassified_event_type,
             "reclassified_status": reclassified_status,
             "reclassified_reason": reclassified_reason,
+            "reclassification_retryable": reclassification_retryable,
             "retryable": retryable,
             "recommended_next_action": recommended_next_action,
             "result_trust_class": result_trust_class,
+            "terminal_disposition": terminal_disposition,
+            "completion_source": completion_source,
+            "host_delivery_tracking": host_delivery_tracking,
+            "host_delivery_observed": host_delivery_observed,
+            "host_delivery_pending": host_delivery_pending,
+            "host_delivery_unproven": host_delivery_unproven,
+            "host_delivery_event_type": delivery_event_type,
+            "host_delivery_source": host_delivery_source,
+            "host_delivery_reason": host_delivery_reason,
+            "submission_bridge_generation": submitted_generation,
+            "submission_bridge_session_id": submitted_session_id,
+            "completion_bridge_generation": completion_generation,
+            "completion_bridge_session_id": str((completed_event or {}).get("bridge_session_id") or ""),
+            "current_bridge_generation": current_generation,
+            "current_bridge_session_id": str(active_state.get("bridge_session_id") or ""),
+            "bridge_generation_delta": bridge_generation_delta,
+            "safe_next_action": str(operator_verdict.get("next_action") or ""),
             "recommended_recovery_command": (
-                f"request-final-status --project-root {project_root} --request-id {request_id}"
+                render_launcher_cli(
+                    "request-final-status",
+                    project_root,
+                    "--request-id",
+                    request_id,
+                )
                 if request_id
                 else ""
             ),
             "request_submitted_at_utc": str((submitted_event or {}).get("event_at_utc") or ""),
+            "request_timeout_ms": request_timeout_ms,
+            "delivery_deadline_elapsed": delivery_deadline_elapsed,
             "request_started_at_utc": str(
                 (started_event or {}).get("started_at_utc")
                 or (started_event or {}).get("event_at_utc")
@@ -480,6 +601,10 @@ def build_request_final_status(
                     operation_outcome=str(summary.get("operation_outcome") or ""),
                     result_trust_class=str(summary.get("result_trust_class") or ""),
                     recommended_next_action=str(summary.get("recommended_next_action") or ""),
+                    terminal_disposition=str(summary.get("terminal_disposition") or ""),
+                )
+                summary["safe_next_action"] = str(
+                    (summary.get("operator_verdict") or {}).get("next_action") or ""
                 )
                 summary["playmode_verdict_summary"] = dict(verdict_summary)
             return attach_operation_evidence_to_final_status(
@@ -830,12 +955,30 @@ def build_lifecycle_reset_tool_error(
     transport_port: int = 0,
     poll_timeout_ms: int = 1500,
 ) -> ToolInvocationError:
-    _, final_status = try_recover_completed_response_after_reset(
+    delivery_event_path: Path | None = None
+    try:
+        delivery_event_path = record_request_delivery_event(
+            project_root=project_root,
+            request_id=request_id,
+            operation=operation,
+            transport_name=transport,
+            state=current_state,
+            observed=False,
+            source="lifecycle_reset_before_response_delivery",
+            reason="response_channel_reset_before_host_delivery",
+        )
+    except Exception:
+        pass
+
+    # The caller already attempted response recovery. Do not consume a late
+    # outbox response a second time while constructing an error payload.
+    final_status = build_request_final_status(
         project_root,
-        request_id=request_id,
-        operation=operation,
+        request_id,
+        operation,
         current_state=current_state,
         poll_timeout_ms=poll_timeout_ms,
+        return_reclassified_terminal_immediately=False,
     )
     stabilization = final_status.get("bridge_stabilization") or {}
     current_generation = int(stabilization.get("bridge_generation") or 0)
@@ -843,8 +986,11 @@ def build_lifecycle_reset_tool_error(
     operation_outcome = str(final_status.get("operation_outcome") or "unknown")
     recommended_next_action = str(final_status.get("recommended_next_action") or "inspect_request_journal")
     result_trust_class = str(final_status.get("result_trust_class") or "")
-    recommended_recovery_command = (
-        f"request-final-status --project-root {project_root} --request-id {request_id}"
+    recommended_recovery_command = render_launcher_cli(
+        "request-final-status",
+        project_root,
+        "--request-id",
+        request_id,
     )
 
     message = (
@@ -866,6 +1012,7 @@ def build_lifecycle_reset_tool_error(
             "operation_outcome: completed_ok "
             "result_trust_class: unity_completed_confirmed "
             "recommended_next_action: none "
+            "safe_next_action: continue_without_retry "
             f"next_step: {recommended_recovery_command}"
         )
         code = "response_missing_after_lifecycle_reset"
@@ -892,6 +1039,14 @@ def build_lifecycle_reset_tool_error(
         "transport": transport,
         "transport_outcome": "reset_before_response_commit",
         "operation_outcome": operation_outcome,
+        "terminal_disposition": str(final_status.get("terminal_disposition") or ""),
+        "completion_source": str(final_status.get("completion_source") or ""),
+        "host_delivery_pending": bool(final_status.get("host_delivery_pending")),
+        "host_delivery_unproven": bool(final_status.get("host_delivery_unproven")),
+        "request_timeout_ms": int(final_status.get("request_timeout_ms") or 0),
+        "delivery_deadline_elapsed": bool(final_status.get("delivery_deadline_elapsed")),
+        "bridge_generation_delta": final_status.get("bridge_generation_delta"),
+        "safe_next_action": str(final_status.get("safe_next_action") or ""),
         "recommended_next_action": recommended_next_action,
         "result_trust_class": result_trust_class,
         "recommended_recovery_command": recommended_recovery_command,
@@ -910,6 +1065,8 @@ def build_lifecycle_reset_tool_error(
     }
     if journal_event_path is not None:
         details["journal_event_path"] = str(journal_event_path)
+    if delivery_event_path is not None:
+        details["delivery_event_path"] = str(delivery_event_path)
     if transport_host:
         details["host"] = transport_host
     if transport_port > 0:
@@ -927,7 +1084,24 @@ def build_transport_response_missing_tool_error(
     transport_host: str = "",
     transport_port: int = 0,
     poll_timeout_ms: int = 1000,
+    missing_reason: str = "response_missing_without_reset_signal",
+    automatic_retry_safe: bool = True,
 ) -> ToolInvocationError:
+    delivery_event_path: Path | None = None
+    try:
+        delivery_event_path = record_request_delivery_event(
+            project_root=project_root,
+            request_id=request_id,
+            operation=operation,
+            transport_name=transport,
+            state=current_state,
+            observed=False,
+            source="transport_response_missing",
+            reason=missing_reason,
+        )
+    except Exception:
+        pass
+
     final_status = build_request_final_status(
         project_root,
         request_id,
@@ -940,15 +1114,33 @@ def build_transport_response_missing_tool_error(
     heartbeat_age = heartbeat_age_seconds(current_state or {}) if current_state else None
     operation_outcome = str(final_status.get("operation_outcome") or "unknown")
     result_trust_class = str(final_status.get("result_trust_class") or "")
+    terminal_disposition = str(final_status.get("terminal_disposition") or "")
     request_processed = bool(final_status.get("request_started") or final_status.get("request_completed"))
     recommended_next_action = str(final_status.get("recommended_next_action") or "retry_request")
-    recommended_recovery_command = (
-        f"request-final-status --project-root {project_root} --request-id {request_id}"
+    recommended_recovery_command = render_launcher_cli(
+        "request-final-status",
+        project_root,
+        "--request-id",
+        request_id,
     )
 
-    if request_processed:
+    transport_label = "TCP loopback" if transport == TCP_LOOPBACK_BRIDGE_TRANSPORT else transport
+    if terminal_disposition == "unity_completed_host_delivery_unproven":
         message = (
-            "The TCP loopback transport closed before the wrapper observed a response payload. "
+            f"The {transport_label} response was not delivered to the original host session. "
+            "Unity completion is confirmed by the request journal; do not retry the operation. "
+            f"request_id: {request_id} "
+            "transport_outcome: host_delivery_unproven "
+            "operation_outcome: completed_ok "
+            "terminal_disposition: unity_completed_host_delivery_unproven "
+            "completion_source: unity_request_journal "
+            "recommended_next_action: none "
+            "safe_next_action: continue_without_retry "
+            f"next_step: {recommended_recovery_command}"
+        )
+    elif request_processed:
+        message = (
+            f"The {transport_label} transport ended before the wrapper observed a response payload. "
             f"request_id: {request_id} "
             "transport_outcome: response_missing_without_reset_signal "
             f"operation_outcome: {operation_outcome} "
@@ -958,7 +1150,7 @@ def build_transport_response_missing_tool_error(
         )
     else:
         message = (
-            "The TCP loopback transport closed before the request was observed in the Unity request journal. "
+            f"The {transport_label} transport ended before the request was observed in the Unity request journal. "
             f"request_id: {request_id} "
             "transport_outcome: response_missing_without_reset_signal "
             "operation_outcome: unknown "
@@ -968,10 +1160,19 @@ def build_transport_response_missing_tool_error(
 
     details: dict[str, Any] = {
         "classification": "transport_response_missing",
+        "missing_reason": missing_reason,
         "request_id": request_id,
         "operation": operation,
         "transport": transport,
         "transport_outcome": "response_missing_without_reset_signal",
+        "terminal_disposition": terminal_disposition,
+        "completion_source": str(final_status.get("completion_source") or ""),
+        "host_delivery_pending": bool(final_status.get("host_delivery_pending")),
+        "host_delivery_unproven": bool(final_status.get("host_delivery_unproven")),
+        "request_timeout_ms": int(final_status.get("request_timeout_ms") or 0),
+        "delivery_deadline_elapsed": bool(final_status.get("delivery_deadline_elapsed")),
+        "bridge_generation_delta": final_status.get("bridge_generation_delta"),
+        "safe_next_action": str(final_status.get("safe_next_action") or ""),
         "operation_outcome": operation_outcome,
         "recommended_next_action": recommended_next_action,
         "result_trust_class": result_trust_class,
@@ -982,6 +1183,7 @@ def build_transport_response_missing_tool_error(
         "safe_to_retry": bool(stabilization.get("safe_to_retry")),
         "retryable": bool(final_status.get("retryable")) if request_processed else True,
         "request_processed": request_processed,
+        "automatic_retry_safe": bool(automatic_retry_safe),
         "request_final_status": compact_final_status,
         "request_final_status_payload_mode": "compact_transport_failure",
         "full_payload_available": True,
@@ -992,6 +1194,8 @@ def build_transport_response_missing_tool_error(
         details["host"] = transport_host
     if transport_port > 0:
         details["port"] = transport_port
+    if delivery_event_path is not None:
+        details["delivery_event_path"] = str(delivery_event_path)
     return ToolInvocationError("transport_response_missing", message, details)
 
 

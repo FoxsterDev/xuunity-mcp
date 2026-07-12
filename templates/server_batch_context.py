@@ -162,6 +162,15 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "request_ownership_acquired",
         "transport_outcome",
         "operation_outcome",
+        "terminal_disposition",
+        "completion_source",
+        "host_delivery_pending",
+        "host_delivery_unproven",
+        "request_timeout_ms",
+        "delivery_deadline_elapsed",
+        "missing_reason",
+        "bridge_generation_delta",
+        "safe_next_action",
         "recommended_next_action",
         "next_distinct_action",
         "closeout_classification",
@@ -185,9 +194,11 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "current_bridge_session_id",
         "retryable",
         "request_processed",
+        "automatic_retry_safe",
         "bridge_stabilization",
         "request_final_status",
         "journal_event_path",
+        "delivery_event_path",
         "recommended_recovery_command",
         "package_import_state",
         "package_import_diagnosis",
@@ -217,6 +228,8 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
     recommended_recovery_command = str(payload.get("recommended_recovery_command") or "")
     transport_outcome = str(payload.get("transport_outcome") or "")
     operation_outcome = str(payload.get("operation_outcome") or "")
+    terminal_disposition = str(payload.get("terminal_disposition") or "")
+    safe_next_action = str(payload.get("safe_next_action") or "")
     closeout_classification = str(payload.get("closeout_classification") or "")
     closeout_verified = payload.get("closeout_verified")
     process_visibility_error_code = str(payload.get("process_visibility_error_code") or "")
@@ -241,6 +254,10 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
         parts.append(f"transport_outcome={transport_outcome}")
     if operation_outcome:
         parts.append(f"operation_outcome={operation_outcome}")
+    if terminal_disposition:
+        parts.append(f"terminal_disposition={terminal_disposition}")
+    if safe_next_action:
+        parts.append(f"safe_next_action={safe_next_action}")
     if requested_execution_lane:
         parts.append(f"requested_execution_lane={requested_execution_lane}")
     if effective_execution_lane:

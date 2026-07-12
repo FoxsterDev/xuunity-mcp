@@ -159,6 +159,7 @@ def record_request_submission_event(
     operation: str,
     transport_name: str,
     state: dict[str, Any] | None,
+    timeout_ms: int = 0,
 ) -> Path:
     bridge_generation, bridge_session_id = bridge_identity_from_state(state)
     return write_host_request_journal_event(
@@ -172,6 +173,37 @@ def record_request_submission_event(
             "bridge_session_id": bridge_session_id,
             "request_submitted": True,
             "request_ownership_acquired": False,
+            "host_delivery_tracking": True,
+            "request_timeout_ms": max(0, int(timeout_ms or 0)),
+            "request_submitted_unix": time.time(),
+        },
+    )
+
+
+def record_request_delivery_event(
+    *,
+    project_root: Path,
+    request_id: str,
+    operation: str,
+    transport_name: str,
+    state: dict[str, Any] | None,
+    observed: bool,
+    source: str,
+    reason: str = "",
+) -> Path:
+    bridge_generation, bridge_session_id = bridge_identity_from_state(state)
+    return write_host_request_journal_event(
+        project_root,
+        "request_delivery_observed" if observed else "request_delivery_unproven",
+        {
+            "request_id": request_id,
+            "operation": operation,
+            "transport": transport_name,
+            "bridge_generation": bridge_generation,
+            "bridge_session_id": bridge_session_id,
+            "host_delivery_observed": observed,
+            "host_delivery_source": source,
+            "reason": reason,
         },
     )
 

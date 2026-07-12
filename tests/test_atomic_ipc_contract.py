@@ -146,7 +146,11 @@ class FileIpcResponseReaderTest(unittest.TestCase):
             with self.assertRaises(ToolInvocationError) as ctx:
                 self.invoke(project_root, timeout_ms=700)
 
-            self.assertEqual("operation_timeout", ctx.exception.code)
+            self.assertEqual("transport_response_missing", ctx.exception.code)
+            self.assertEqual(str(FIXED_REQUEST_ID), ctx.exception.details.get("request_id"))
+            final_status = ctx.exception.details.get("request_final_status") or {}
+            self.assertEqual(str(FIXED_REQUEST_ID), final_status.get("request_id"))
+            self.assertFalse(ctx.exception.details.get("automatic_retry_safe"))
             self.assertTrue(
                 response_path.is_file(),
                 "half-written response must stay on disk for the next poll",

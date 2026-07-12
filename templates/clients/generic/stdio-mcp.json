@@ -2,10 +2,10 @@
   "mcpServers": {
     "xuunity_light_unity": {
       "type": "stdio",
-      "command": "bash",
+      "command": "/bin/bash",
       "args": [
-        "-lc",
-        "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""
+        "-c",
+        "exec \"/bin/bash\" \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""
       ]
     }
   }

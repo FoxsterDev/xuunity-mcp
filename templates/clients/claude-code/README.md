@@ -104,7 +104,7 @@ Adds the `xuunity_light_unity` server block to `~/.claude.json`
 
 ```bash
 claude mcp add --scope local --transport stdio xuunity_light_unity \
-  -- bash -lc 'exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"'
+  -- /bin/bash -c 'exec "/bin/bash" "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"'
 ```
 
 ## How To Verify
@@ -118,7 +118,7 @@ claude mcp list
 Expected line:
 
 ```
-xuunity_light_unity: bash -lc exec "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"  - Connected
+xuunity_light_unity: /bin/bash -c exec "/bin/bash" "${CLAUDE_TOOLS_HOME:-$HOME/.claude-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh"  - Connected
 ```
 
 A failed connect typically means the Claude-side server was never installed

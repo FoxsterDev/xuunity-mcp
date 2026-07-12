@@ -250,7 +250,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 pending.Client.SendTimeout = ResponseSendTimeoutMilliseconds;
                 using var writer = new StreamWriter(pending.Client.GetStream(), new System.Text.UTF8Encoding(false), 4096, true);
                 writer.NewLine = "\n";
-                writer.Write(JsonUtility.ToJson(response, true));
+                writer.WriteLine(JsonUtility.ToJson(response, false));
                 writer.Flush();
                 return true;
             }
@@ -391,9 +391,10 @@ namespace XUUnity.LightMcp.Editor.Bridge
             }
 
             var response = XUUnityLightMcpResponseWriter.Error(requestId, code, message);
+            client.SendTimeout = ResponseSendTimeoutMilliseconds;
             using var writer = new StreamWriter(client.GetStream(), new System.Text.UTF8Encoding(false), 4096, true);
             writer.NewLine = "\n";
-            writer.Write(JsonUtility.ToJson(response, true));
+            writer.WriteLine(JsonUtility.ToJson(response, false));
             writer.Flush();
         }
 

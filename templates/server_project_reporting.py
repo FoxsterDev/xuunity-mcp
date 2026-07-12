@@ -265,6 +265,8 @@ def enrich_error_details_with_discovery_data(
     )
     if (
         preferred_next_action
+        and str(enriched.get("terminal_disposition") or "")
+        != "unity_completed_host_delivery_unproven"
         and current_next_action in {
             "",
             "inspect_request_journal",

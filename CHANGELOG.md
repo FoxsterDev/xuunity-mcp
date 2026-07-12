@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Fixed
+
+- Restored macOS/Linux GUI-client startup after the Windows launcher work:
+  installed POSIX refresh launchers now prefer their sibling virtual
+  environment over `PATH`, generated client configs persist an absolute Bash
+  path and avoid login profiles, explicit `PYTHON` overrides keep priority, and
+  a forwarded `APPDATA` variable alone no longer misclassifies a POSIX host as
+  Windows.
+- Made `tcp_loopback` responses compact newline-delimited JSON frames and let
+  the host return as soon as one complete JSON value is received, instead of
+  waiting for socket close. TCP requests can also recover a completed file
+  outbox fallback.
+- Added decision-grade accounting for Unity operations that completed but whose
+  original host delivery is unproven. Final status preserves confirmed Unity
+  success, reports `unity_completed_host_delivery_unproven`, and explicitly
+  prevents blind retry. MCP and CLI final/latest status surfaces are compact by
+  default with an explicit full-payload opt-in.
+- Made post-change validation select and report its execution lane before batch
+  preflight. A live same-project editor now stays on the interactive MCP lane,
+  including direct bridge-state recovery when the status-summary probe fails;
+  unknown editor liveness blocks instead of falling through to batch mode.
+
 ## 0.3.43
 
 Release tag: `v0.3.43`

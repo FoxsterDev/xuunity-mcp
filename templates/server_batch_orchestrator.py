@@ -420,6 +420,15 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "transport_outcome",
         "operation_outcome",
         "result_trust_class",
+        "terminal_disposition",
+        "completion_source",
+        "host_delivery_pending",
+        "host_delivery_unproven",
+        "request_timeout_ms",
+        "delivery_deadline_elapsed",
+        "missing_reason",
+        "bridge_generation_delta",
+        "safe_next_action",
         "heartbeat_age_seconds",
         "busy_reason",
         "blocking_reasons",
@@ -447,10 +456,12 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "current_bridge_session_id",
         "retryable",
         "request_processed",
+        "automatic_retry_safe",
         "bridge_stabilization",
         "request_final_status",
         "request_final_status_payload_mode",
         "journal_event_path",
+        "delivery_event_path",
         "recommended_recovery_command",
         "full_payload_available",
         "full_payload_recovery_command",
@@ -483,6 +494,8 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
     recommended_recovery_command = str(payload.get("recommended_recovery_command") or "")
     transport_outcome = str(payload.get("transport_outcome") or "")
     operation_outcome = str(payload.get("operation_outcome") or "")
+    terminal_disposition = str(payload.get("terminal_disposition") or "")
+    safe_next_action = str(payload.get("safe_next_action") or "")
     closeout_classification = str(payload.get("closeout_classification") or "")
     closeout_verified = payload.get("closeout_verified")
     process_visibility_error_code = str(payload.get("process_visibility_error_code") or "")
@@ -507,6 +520,10 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
         parts.append(f"transport_outcome={transport_outcome}")
     if operation_outcome:
         parts.append(f"operation_outcome={operation_outcome}")
+    if terminal_disposition:
+        parts.append(f"terminal_disposition={terminal_disposition}")
+    if safe_next_action:
+        parts.append(f"safe_next_action={safe_next_action}")
     if requested_execution_lane:
         parts.append(f"requested_execution_lane={requested_execution_lane}")
     if effective_execution_lane:
@@ -1218,7 +1235,13 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                 refresh_project_context(project_root)
                 return response
             except ToolInvocationError as exc:
-                if exc.code == "request_lifecycle_reset" and attempt_index + 1 < max_attempts:
+                if (
+                    exc.code == "request_lifecycle_reset"
+                    and bool(policy.get("retry_on_lifecycle_reset"))
+                    and attempt_index + 1 < max_attempts
+                    and bool((exc.details or {}).get("retryable"))
+                    and not bool((exc.details or {}).get("request_processed"))
+                ):
                     lifecycle["lifecycle_reset_retry"] = exc.details
                     lifecycle["lifecycle_reset_recovery"] = recover_project_bridge_for_reconciliation(
                         project_root,
@@ -1236,6 +1259,7 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                     and bool(policy.get("retry_on_transport_response_missing"))
                     and attempt_index + 1 < max_attempts
                     and not bool((exc.details or {}).get("request_processed"))
+                    and bool((exc.details or {}).get("automatic_retry_safe", True))
                 ):
                     lifecycle["transport_response_missing_retry"] = exc.details
                     lifecycle["transport_response_missing_recovery"] = recover_project_bridge_for_reconciliation(

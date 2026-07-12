@@ -105,6 +105,14 @@ def standard_session_messages(project_root: Path) -> list:
     ]
 
 
+def gui_like_path() -> str:
+    """Return a restricted system PATH without developer interpreter locations."""
+    # Deliberately omit /bin: macOS keeps bash there, and this regression must
+    # prove that the persisted absolute shell survives a client PATH without it.
+    system_dirs = ("/usr/bin", "/usr/sbin", "/sbin")
+    return os.pathsep.join(path for path in system_dirs if Path(path).is_dir())
+
+
 class InstalledDelegateStdioTest(unittest.TestCase):
     maxDiff = None
 
@@ -164,7 +172,7 @@ class ClaudeConfigToConnectionTest(unittest.TestCase):
     def test_command_written_into_claude_config_starts_a_working_mcp_server(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
-            install_dir = temp_root / "neutral-install"
+            install_dir = temp_root / "neutral install"
             project_root = scaffold_unity_project(temp_root / "Fake Project")
             env = self.build_installer_env(temp_root, install_dir)
 
@@ -173,7 +181,7 @@ class ClaudeConfigToConnectionTest(unittest.TestCase):
                     self.bash_executable,
                     INSTALLER_SH.as_posix(),
                     "--target",
-                    "neutral",
+                    "claude",
                     "--install-claude-config",
                 ],
                 cwd=str(REPO_ROOT),
@@ -204,17 +212,32 @@ class ClaudeConfigToConnectionTest(unittest.TestCase):
                     launcher_arg,
                 )
                 self.assertEqual(
-                    install_dir.resolve(),
+                    (Path(env["CLAUDE_TOOLS_HOME"]) / "xuunity-mcp").resolve(),
                     Path(launcher_arg).parent.resolve(),
                     "config must carry the install-time-resolved launcher path",
                 )
             else:
-                self.assertEqual("bash", server_entry["command"], server_entry)
+                self.assertTrue(
+                    Path(server_entry["command"]).is_absolute(),
+                    "POSIX clients do not reliably inherit a PATH containing bash",
+                )
+                self.assertEqual("-c", server_entry["args"][0], server_entry)
+                self.assertNotIn("-lc", server_entry["args"], server_entry)
+                self.assertIn(server_entry["command"], server_entry["args"][1])
+                self.assertIn(
+                    (Path(env["CLAUDE_TOOLS_HOME"]) / "xuunity-mcp").as_posix(),
+                    server_entry["args"][1],
+                )
+
+            runtime_env = dict(env)
+            if os.name != "nt":
+                runtime_env.pop("PYTHON", None)
+                runtime_env["PATH"] = gui_like_path()
 
             completed = run_with_timeout(
                 configured_argv,
                 cwd=str(temp_root),
-                env=env,
+                env=runtime_env,
                 timeout_seconds=300,
                 input_text=encode_stdin(standard_session_messages(project_root)),
             )

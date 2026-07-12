@@ -87,7 +87,7 @@ done
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 is_windows_like_host() {
-  if [[ "${OS:-}" == "Windows_NT" ]] || [[ -n "${APPDATA:-}" ]]; then
+  if [[ "${OS:-}" == "Windows_NT" ]]; then
     return 0
   fi
 
@@ -150,7 +150,7 @@ resolve_neutral_install_dir() {
     return 0
   fi
 
-  if [[ "${OS:-}" == "Windows_NT" ]] || [[ -n "${APPDATA:-}" ]]; then
+  if is_windows_like_host; then
     local appdata_val="${APPDATA:-}"
     if [[ -z "$appdata_val" ]]; then
       appdata_val="$HOME/AppData/Roaming"
@@ -178,6 +178,24 @@ neutral_install_dir="$(resolve_neutral_install_dir)"
 neutral_run_path="$neutral_install_dir/run.sh"
 neutral_refresh_run_path="$neutral_install_dir/run_installed_or_refresh_xuunity_mcp.sh"
 
+resolve_bash_bin() {
+  local candidate="${BASH:-}"
+  if [[ "$candidate" == /* && -x "$candidate" ]]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  candidate="$(command -v bash 2>/dev/null || true)"
+  if [[ "$candidate" == /* && -x "$candidate" ]]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  printf 'Unable to resolve an absolute Bash executable for client configuration.\n' >&2
+  exit 1
+}
+
+BASH_BIN="$(resolve_bash_bin)"
 
 resolve_python_bin() {
   if [[ -n "${PYTHON:-}" ]]; then
@@ -319,8 +337,8 @@ append_codex_block_if_missing() {
     block+=$'command = "cmd.exe"\n'
     block+="args = [\"/d\", \"/c\", \"call\", \"${windows_launcher_path//\\/\\\\}\"]"$'\n'
   else
-    block+=$'command = "bash"\n'
-    block+="args = [\"-lc\", \"exec \\\"$codex_run_path_val\\\"\"]"$'\n'
+    block+="command = \"$BASH_BIN\""$'\n'
+    block+="args = [\"-c\", \"exec \\\"$BASH_BIN\\\" \\\"$codex_run_path_val\\\"\"]"$'\n'
   fi
   block+=$'required = false\n'
 
@@ -372,8 +390,9 @@ append_claude_block_if_missing() {
 
   mkdir -p "$(dirname "$claude_config_path")"
 
-  python3 - "$claude_config_path" "$claude_run_path_val" "$host_flavor" "$windows_launcher_dir" <<'PY'
+  python3 - "$claude_config_path" "$claude_run_path_val" "$host_flavor" "$windows_launcher_dir" "$BASH_BIN" <<'PY'
 import json
+import shlex
 import sys
 from pathlib import Path, PureWindowsPath
 
@@ -381,6 +400,7 @@ config_path = Path(sys.argv[1])
 run_path = sys.argv[2]
 host_flavor = sys.argv[3]
 windows_launcher_dir = sys.argv[4]
+bash_path = sys.argv[5]
 
 if config_path.exists() and config_path.stat().st_size > 0:
     try:
@@ -412,11 +432,11 @@ if host_flavor == "windows":
         "args": ["/d", "/c", "call", windows_launcher],
     }
 else:
-    portable_run_command = f'exec "{run_path}"'
+    portable_run_command = f"exec {shlex.quote(bash_path)} {shlex.quote(run_path)}"
     desired = {
         "type": "stdio",
-        "command": "bash",
-        "args": ["-lc", portable_run_command],
+        "command": bash_path,
+        "args": ["-c", portable_run_command],
     }
 
 if existing == desired:
@@ -613,7 +633,7 @@ install_delegates_into() {
   else
     cat > "$target_dir/run.sh" <<EOF
 #!/usr/bin/env bash
-exec "$neutral_dir/run.sh" "\$@"
+exec "\$BASH" "$neutral_dir/run.sh" "\$@"
 EOF
     chmod 755 "$target_dir/run.sh"
   fi
@@ -624,7 +644,7 @@ EOF
   else
     cat > "$target_dir/run_installed_or_refresh_xuunity_mcp.sh" <<EOF
 #!/usr/bin/env bash
-exec "$neutral_dir/run_installed_or_refresh_xuunity_mcp.sh" "\$@"
+exec "\$BASH" "$neutral_dir/run_installed_or_refresh_xuunity_mcp.sh" "\$@"
 EOF
     chmod 755 "$target_dir/run_installed_or_refresh_xuunity_mcp.sh"
   fi

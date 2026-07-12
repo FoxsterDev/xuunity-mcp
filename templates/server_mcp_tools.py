@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+from server_bridge_final_status import build_compact_final_status_projection
 from server_mcp_protocol import JsonRpcError
 
 
@@ -320,6 +321,10 @@ def call_unity_request_final_status_tool(
     if operation is not None and not isinstance(operation, str):
         raise JsonRpcError(-32602, "operation must be a string when provided.")
 
+    include_full_payload = arguments.get("includeFullPayload", False)
+    if not isinstance(include_full_payload, bool):
+        raise JsonRpcError(-32602, "includeFullPayload must be a boolean when provided.")
+
     project_root = ensure_project_root(project_root_value)
     summary = build_request_final_status_summary(
         project_root,
@@ -327,14 +332,15 @@ def call_unity_request_final_status_tool(
         operation.strip() if isinstance(operation, str) else "",
         timeout_ms,
     )
+    payload = summary if include_full_payload else build_compact_final_status_projection(summary)
     return {
         "content": [
             {
                 "type": "text",
-                "text": json.dumps(summary, ensure_ascii=True),
+                "text": json.dumps(payload, ensure_ascii=True),
             }
         ],
-        "structuredContent": summary,
+        "structuredContent": payload,
         "isError": False,
     }
 

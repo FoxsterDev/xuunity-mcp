@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OPS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-WRAPPER="$OPS_ROOT/xuunity_light_unity_mcp.sh"
+WRAPPER="${XUUNITY_LIGHT_UNITY_MCP_WRAPPER:-$OPS_ROOT/xuunity_light_unity_mcp.sh}"
 
 PROJECT_ROOT=""
 ACCEPTANCE_SCENARIO=""
@@ -348,37 +348,112 @@ PY
 
 maybe_reuse_healthy_editor() {
   local status_summary_file="$TMP_DIR/status_summary_preflight.json"
+  local status_summary_error_file="$TMP_DIR/status_summary_preflight.stderr"
+  local bridge_state_file="$TMP_DIR/bridge_state_preflight.json"
+  local bridge_state_error_file="$TMP_DIR/bridge_state_preflight.stderr"
+  local lane_probe=""
+  local lane_probe_kind="unknown"
+  local lane_probe_pid="0"
+  local lane_probe_source="none"
 
-  if ! "$WRAPPER" request-status-summary \
+  echo "[lane] lane_decision=probing reason=checking_existing_editor"
+
+  if "$WRAPPER" request-status-summary \
     --project-root "$PROJECT_ROOT" \
-    --timeout-ms 5000 >"$status_summary_file" 2>/dev/null; then
-    return 0
-  fi
-
-  if python3 - "$status_summary_file" <<'PY'
+    --timeout-ms 5000 >"$status_summary_file" 2>"$status_summary_error_file"; then
+    if lane_probe="$(python3 - "$status_summary_file" <<'PY'
 import json
 import sys
 
 data = json.load(open(sys.argv[1], encoding="utf-8"))
+editor_running = bool(data.get("editor_running"))
+visibility_proven = (
+    data.get("process_visibility_available") is not False and
+    not bool(data.get("process_visibility_restricted"))
+)
 ready = (
-    bool(data.get("editor_running")) and
+    editor_running and
     bool(data.get("mcp_reachable")) and
     data.get("health_status") == "healthy" and
     int(data.get("pending_request_count") or 0) == 0 and
     data.get("playmode_state") == "edit"
 )
-sys.exit(0 if ready else 1)
+kind = (
+    "healthy"
+    if ready
+    else ("live" if editor_running else ("closed" if visibility_proven else "unknown"))
+)
+print(f"{kind}:{int(data.get('editor_pid') or 0)}")
 PY
-  then
-    OPEN_EDITOR="false"
-    echo "[info] reusing healthy editor pid=$(python3 - "$status_summary_file" <<'PY'
+)"; then
+      lane_probe_kind="${lane_probe%%:*}"
+      lane_probe_pid="${lane_probe#*:}"
+      lane_probe_source="request-status-summary"
+    else
+      echo "[warn] request-status-summary returned invalid JSON; checking direct bridge state" >&2
+    fi
+  else
+    echo "[warn] request-status-summary preflight failed; checking direct bridge state" >&2
+    while IFS= read -r line; do
+      echo "[preflight-stderr] $line" >&2
+    done <"$status_summary_error_file"
+  fi
+
+  if [[ "$lane_probe_kind" != "healthy" && "$lane_probe_kind" != "live" ]]; then
+    if "$WRAPPER" bridge-state \
+      --project-root "$PROJECT_ROOT" >"$bridge_state_file" 2>"$bridge_state_error_file"; then
+      if lane_probe="$(python3 - "$bridge_state_file" <<'PY'
 import json
 import sys
+
 data = json.load(open(sys.argv[1], encoding="utf-8"))
-print(int(data.get("editor_pid") or 0))
+live = bool((data.get("_xuunity_bridge_state") or {}).get("state_is_live"))
+ready = (
+    live and
+    data.get("health_status") == "healthy" and
+    int(data.get("pending_request_count") or 0) == 0 and
+    data.get("playmode_state") == "edit"
+)
+kind = "healthy" if ready else ("live" if live else "unknown")
+print(f"{kind}:{int(data.get('editor_pid') or 0)}")
 PY
-)"
+)"; then
+        if [[ "${lane_probe%%:*}" == "healthy" || "${lane_probe%%:*}" == "live" ]]; then
+          lane_probe_kind="${lane_probe%%:*}"
+          lane_probe_pid="${lane_probe#*:}"
+          lane_probe_source="bridge-state"
+        fi
+      else
+        echo "[warn] bridge-state preflight returned invalid JSON" >&2
+      fi
+    else
+      echo "[warn] bridge-state preflight failed" >&2
+      while IFS= read -r line; do
+        echo "[preflight-stderr] $line" >&2
+      done <"$bridge_state_error_file"
+    fi
   fi
+
+  if [[ "$lane_probe_kind" == "healthy" ]]; then
+    OPEN_EDITOR="false"
+    echo "[lane] lane_decision=interactive_mcp reason=healthy_existing_editor source=$lane_probe_source pid=$lane_probe_pid"
+    return 0
+  fi
+
+  if [[ "$lane_probe_kind" == "live" ]]; then
+    OPEN_EDITOR="false"
+    echo "[lane] lane_decision=interactive_mcp reason=live_editor_requires_interactive_recovery source=$lane_probe_source pid=$lane_probe_pid"
+    return 0
+  fi
+
+  if [[ "$lane_probe_kind" == "closed" ]]; then
+    echo "[lane] lane_decision=closed_batch_preflight reason=status_summary_confirmed_no_editor"
+    return 0
+  fi
+
+  echo "[lane] lane_decision=blocked reason=editor_liveness_unproven"
+  echo "[error] Cannot safely choose batch or interactive validation because editor liveness is unproven. Run request-status-summary and bridge-state, then retry." >&2
+  return 1
 }
 
 echo "[mcp-validate] project_root=$PROJECT_ROOT"

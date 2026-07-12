@@ -139,9 +139,11 @@ Persist the install-time-resolved launcher path as its own argv entry:
 
 Never embed quotes, parentheses, or env-var conditionals in a Windows
 client-config arg (an unquoted `%VAR%` also breaks on expansion when the
-value contains spaces). POSIX configs may keep `bash -lc 'exec "..."'` —
-POSIX spawn passes argv verbatim. Guarded by
-`tests/test_windows_client_config_contract.py` and the config-to-connection
+value contains spaces). POSIX configs should persist an absolute Bash path,
+use `-c` instead of `-lc`, and invoke the launcher through that same shell;
+GUI clients may not inherit a developer `PATH`, and login profiles can mutate
+the runtime unexpectedly. Guarded by `tests/test_posix_client_config_contract.py`,
+`tests/test_windows_client_config_contract.py`, and the config-to-connection
 e2e in `tests/test_installed_delegate_e2e.py`.
 
 ---

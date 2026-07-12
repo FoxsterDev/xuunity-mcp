@@ -17,6 +17,7 @@ the Unity side. These tests close that gap without Unity:
 """
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -33,7 +34,7 @@ if str(TEMPLATES_DIR) not in sys.path:
 
 from bash_support import run_with_timeout, skip_if_prior_subprocess_timeout
 from bridge_ipc_simulator import SIMULATOR_MARKER, STRESS_BLOB
-from server_bridge_paths import bridge_config_path, bridge_state_path
+from server_bridge_paths import bridge_config_path, bridge_state_path, request_journal_dir
 from server_core import read_json, write_json
 from test_mcp_stdio_e2e import (
     PROTOCOL_VERSION,
@@ -48,9 +49,14 @@ from test_mcp_stdio_e2e import (
 SIMULATOR_PATH = TESTS_DIR / "bridge_ipc_simulator.py"
 
 
-def start_simulator(project_root: Path, deadline_seconds: float) -> subprocess.Popen:
+def start_simulator(
+    project_root: Path,
+    deadline_seconds: float,
+    *,
+    mode: str = "simulate",
+) -> subprocess.Popen:
     return subprocess.Popen(
-        [sys.executable, str(SIMULATOR_PATH), "simulate", str(project_root), str(deadline_seconds)],
+        [sys.executable, str(SIMULATOR_PATH), mode, str(project_root), str(deadline_seconds)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -153,6 +159,123 @@ class UnityStatusThroughSimulatedBridgeTest(unittest.TestCase):
                 Path(str(payload.get("echo_project_root") or "")).resolve(),
                 "project root must reach the editor side intact through the request file",
             )
+
+    def test_generation_change_preserves_completed_outcome_without_retrying(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            project_root = scaffold_unity_project(
+                temp_root / "Lifecycle Delivery" / "Fake Project", declare_light_mcp=True
+            )
+            write_json(
+                bridge_config_path(project_root),
+                {"enabled": True, "transport": "file_ipc"},
+            )
+            env = make_launcher_env(temp_root / "neutral-install")
+
+            simulator = start_simulator(
+                project_root,
+                deadline_seconds=30.0,
+                mode="complete-without-delivery",
+            )
+            try:
+                self.wait_for_simulator_state(project_root, simulator)
+                completed = run_with_timeout(
+                    launcher_argv(),
+                    cwd=str(TESTS_DIR.parent),
+                    env=env,
+                    timeout_seconds=240,
+                    input_text=encode_stdin(
+                        [
+                            mcp_request(1, "initialize", {"protocolVersion": PROTOCOL_VERSION}),
+                            mcp_notification("notifications/initialized"),
+                            mcp_request(
+                                2,
+                                "tools/call",
+                                {
+                                    "name": "unity_status",
+                                    "arguments": {
+                                        "projectRoot": str(project_root),
+                                        "timeoutMs": 1200,
+                                    },
+                                },
+                            ),
+                        ]
+                    ),
+                )
+
+                request_match = re.search(r"request_id=([0-9a-fA-F-]{36})", completed.stderr)
+                self.assertIsNotNone(request_match, completed.stderr)
+                request_id = request_match.group(1)
+
+                final_status = run_with_timeout(
+                    launcher_argv(
+                        [
+                            "request-final-status",
+                            "--project-root",
+                            str(project_root),
+                            "--request-id",
+                            request_id,
+                            "--timeout-ms",
+                            "0",
+                        ]
+                    ),
+                    cwd=str(TESTS_DIR.parent),
+                    env=env,
+                    timeout_seconds=240,
+                )
+            finally:
+                sim_stdout, sim_stderr = stop_process(simulator)
+
+            self.assertEqual(0, completed.returncode, completed.stderr + sim_stderr)
+            responses = {}
+            for line in completed.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("{"):
+                    payload = json.loads(line)
+                    responses[payload.get("id")] = payload
+            call_result = responses[2]["result"]
+            self.assertTrue(call_result.get("isError"), call_result)
+            transport_error = call_result.get("structuredContent") or {}
+            self.assertEqual(
+                "unity_completed_host_delivery_unproven",
+                transport_error.get("terminal_disposition"),
+                transport_error,
+            )
+            self.assertEqual("continue_without_retry", transport_error.get("safe_next_action"))
+
+            self.assertEqual(0, final_status.returncode, final_status.stderr)
+            status = json.loads(final_status.stdout)
+            self.assertEqual("completed_ok", status.get("operation_outcome"), status)
+            self.assertEqual("unity_completed_confirmed", status.get("result_trust_class"), status)
+            self.assertEqual(
+                "unity_completed_host_delivery_unproven",
+                status.get("terminal_disposition"),
+                status,
+            )
+            self.assertEqual("unity_request_journal", status.get("completion_source"), status)
+            self.assertEqual(1, status.get("submission_bridge_generation"), status)
+            self.assertEqual(2, status.get("completion_bridge_generation"), status)
+            self.assertEqual(1, status.get("bridge_generation_delta"), status)
+            self.assertEqual("none", status.get("recommended_next_action"), status)
+            self.assertEqual("continue_without_retry", status.get("safe_next_action"), status)
+            self.assertFalse((status.get("operator_verdict") or {}).get("should_retry"), status)
+            journal_events = [
+                read_json(path)
+                for path in request_journal_dir(project_root).glob("*.json")
+            ]
+            submitted_ids = {
+                str(event.get("request_id") or "")
+                for event in journal_events
+                if event.get("event_type") == "request_submitted"
+            }
+            started_ids = {
+                str(event.get("request_id") or "")
+                for event in journal_events
+                if event.get("event_type") == "request_started"
+            }
+            self.assertEqual({request_id}, submitted_ids, journal_events)
+            self.assertEqual({request_id}, started_ids, journal_events)
+            self.assertEqual("", sim_stdout)
 
 
 class ConcurrentAtomicPublishStressTest(unittest.TestCase):

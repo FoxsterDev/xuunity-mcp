@@ -136,18 +136,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     latest_status_cmd = sub.add_parser(
         "request-latest-status",
-        help="Recover the latest request summary from the journal, optionally narrowed by one or more operation names.",
+        help="Recover the latest compact request verdict from the journal; use --include-full-payload for full evidence.",
     )
     latest_status_cmd.add_argument("--project-root", required=True)
     latest_status_cmd.add_argument("--operation", action="append", default=[])
     latest_status_cmd.add_argument("--timeout-ms", type=int, default=2000)
+    latest_status_cmd.add_argument("--include-full-payload", action="store_true")
     latest_status_cmd.set_defaults(func_name="cmd_request_latest_status")
 
-    final_status_cmd = sub.add_parser("request-final-status", help="Summarize final disposition for a request id using the request journal and current bridge state.")
+    final_status_cmd = sub.add_parser("request-final-status", help="Summarize a compact final disposition from the request journal; use --include-full-payload for full evidence.")
     final_status_cmd.add_argument("--project-root", required=True)
     final_status_cmd.add_argument("--request-id", required=True)
     final_status_cmd.add_argument("--operation")
     final_status_cmd.add_argument("--timeout-ms", type=int, default=2000)
+    final_status_cmd.add_argument("--include-full-payload", action="store_true")
     final_status_cmd.set_defaults(func_name="cmd_request_final_status")
 
     cancel_cmd = sub.add_parser("request-cancel", help="Best-effort host-side cancellation for a submitted request id in the current same-host editor lane.")

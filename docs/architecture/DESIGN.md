@@ -30,7 +30,12 @@ Current transport shape:
 - transport selection is maintained per project instead of as a single global host assumption
 - host wrapper now uses an internal transport adapter layer
 - `tcp_loopback` on `127.0.0.1` is the default same-host transport for new project setup
+- each TCP response is one compact newline-delimited JSON frame; the host
+  accepts a complete JSON value immediately and does not require socket EOF as
+  the response boundary
 - `file_ipc` remains the fallback and explicit compatibility transport
+- a TCP request may recover its matching file outbox response when the socket
+  channel disappears after Unity processing
 - lifecycle orchestration is no longer hard-wired directly to inbox/outbox paths
 - this choice is intentionally cross-platform for macOS, Windows, and Linux; the design avoids Unix-domain-socket-only assumptions
 
@@ -182,6 +187,8 @@ Current reconnect policy:
 - lifecycle-reset output now separates:
   - `transport_outcome`
   - `operation_outcome`
+  - `terminal_disposition`
+  - host delivery observed/unproven state
   - `recommended_next_action`
 - lifecycle-reset recovery now also classifies `result_trust_class` so the
   operator can distinguish:
@@ -189,7 +196,19 @@ Current reconnect policy:
   - Unity completed across lifecycle churn
   - wrapper/session failed after Unity accepted the request, leaving the Unity
     result unproven
-- compact operator recovery is available through `request-final-status <request_id>`
+- compact operator recovery is the default through
+  `request-final-status <request_id>` and `request-latest-status`; CLI callers
+  can request complete evidence with `--include-full-payload`
+- tracked requests that have a Unity `request_completed` journal event but no
+  host delivery receipt preserve their confirmed operation result and report
+  `terminal_disposition=unity_completed_host_delivery_unproven`; their safe
+  action is `continue_without_retry`, not replay
+- the MCP `unity_request_final_status` tool returns the compact decision fields
+  by default and accepts `includeFullPayload=true` for the complete journal and
+  artifact evidence
+- delivery remains `host_delivery_pending` while the original tracked request
+  is still inside its timeout; it becomes unproven only after the deadline or
+  an explicit response-channel loss event
 - explicitly idempotent operations can be retried once automatically
 - non-idempotent operations stay fail-fast and surface the lifecycle-reset evidence instead of retrying blindly
 - deferred async operations now retain active-request ownership until their completion callback, which makes `request_abandoned` reachable during real in-flight reloads instead of only in theory

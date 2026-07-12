@@ -25,6 +25,7 @@ from server_bridge_journal import (
     bridge_identity_from_state,
     emit_request_not_submitted_ack,
     emit_request_submission_ack,
+    record_request_delivery_event,
     record_request_submission_event,
     write_host_request_journal_event,
 )
@@ -33,11 +34,49 @@ from server_bridge_state import (
     bridge_enabled,
     inspect_bridge_state_liveness,
     read_best_effort_bridge_state,
-    summarize_state_for_error,
     try_read_bridge_config,
     try_read_bridge_state,
 )
 from server_core import ToolInvocationError, read_json, write_json
+
+
+def _try_decode_complete_response(chunks: list[bytes]) -> dict[str, Any] | None:
+    if not chunks:
+        return None
+    try:
+        decoded = b"".join(chunks).decode("utf-8")
+        response = json.loads(decoded)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return response if isinstance(response, dict) else None
+
+
+def _record_delivery_best_effort(
+    *,
+    project_root: Path,
+    request_id: str,
+    operation: str,
+    transport_name: str,
+    state: dict[str, Any] | None,
+    observed: bool,
+    source: str,
+    reason: str = "",
+) -> None:
+    try:
+        record_request_delivery_event(
+            project_root=project_root,
+            request_id=request_id,
+            operation=operation,
+            transport_name=transport_name,
+            state=state,
+            observed=observed,
+            source=source,
+            reason=reason,
+        )
+    except Exception:
+        # Delivery accounting must never turn a usable Unity response into a
+        # host-side failure. The response itself remains the primary result.
+        pass
 
 class BridgeTransportAdapter:
     name = "unknown"
@@ -135,6 +174,7 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
             operation=operation,
             transport_name=self.name,
             state=initial_state,
+            timeout_ms=timeout_ms,
         )
 
         deadline = time.time() + (timeout_ms / 1000.0)
@@ -152,6 +192,15 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
                         response_path.unlink()
                     except OSError:
                         pass
+                    _record_delivery_best_effort(
+                        project_root=project_root,
+                        request_id=request_id,
+                        operation=operation,
+                        transport_name=self.name,
+                        state=read_best_effort_bridge_state(project_root) or initial_state,
+                        observed=True,
+                        source="file_outbox",
+                    )
                     return response, request_id, request_started_at
 
             current_state = read_best_effort_bridge_state(project_root)
@@ -164,7 +213,7 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
         if observed_reset_state is not None:
             state = state or observed_reset_state
             recovery_timeout_ms = resolve_post_reset_recovery_timeout_ms(deadline, post_reset_recovery_cap_ms)
-            recovered_response, _ = try_recover_completed_response_after_reset(
+            recovered_response, recovered_status = try_recover_completed_response_after_reset(
                 project_root,
                 request_id=request_id,
                 operation=operation,
@@ -172,10 +221,23 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
                 poll_timeout_ms=recovery_timeout_ms,
             )
             if recovered_response is not None:
+                _record_delivery_best_effort(
+                    project_root=project_root,
+                    request_id=request_id,
+                    operation=operation,
+                    transport_name=self.name,
+                    state=state,
+                    observed=True,
+                    source="file_outbox_recovery_after_lifecycle_reset",
+                )
                 return recovered_response, request_id, request_started_at
 
             current_generation, current_session_id = bridge_identity_from_state(state)
-            processed = str((state or {}).get("last_processed_request_id") or "") == request_id
+            processed = bool(
+                recovered_status.get("request_started")
+                or recovered_status.get("request_completed")
+                or str((state or {}).get("last_processed_request_id") or "") == request_id
+            )
             retryable = not processed
             journal_path = write_host_request_journal_event(
                 project_root,
@@ -212,12 +274,37 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
                 journal_event_path=journal_path,
                 retryable_hint=retryable,
                 request_processed_hint=processed,
-                poll_timeout_ms=recovery_timeout_ms,
+                poll_timeout_ms=0,
             )
 
-        raise ToolInvocationError(
-            "operation_timeout",
-            f"Timed out waiting for {response_path}. transport={self.name}. {summarize_state_for_error(state)}",
+        recovered_response, _ = try_recover_completed_response_after_reset(
+            project_root,
+            request_id=request_id,
+            operation=operation,
+            current_state=state,
+            poll_timeout_ms=1000,
+        )
+        if recovered_response is not None:
+            _record_delivery_best_effort(
+                project_root=project_root,
+                request_id=request_id,
+                operation=operation,
+                transport_name=self.name,
+                state=state,
+                observed=True,
+                source="file_outbox_recovery_after_timeout",
+            )
+            return recovered_response, request_id, request_started_at
+
+        raise build_transport_response_missing_tool_error(
+            project_root,
+            request_id=request_id,
+            operation=operation,
+            transport=self.name,
+            current_state=state,
+            poll_timeout_ms=0,
+            missing_reason="response_not_observed_before_operation_deadline",
+            automatic_retry_safe=False,
         )
 
 
@@ -297,12 +384,25 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
         payload = (json.dumps(request, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
         deadline = time.time() + (timeout_ms / 1000.0)
         chunks: list[bytes] = []
+        response: dict[str, Any] | None = None
+        dispatch_started = False
+        submission_recorded = False
+        response_channel_failure_reason = ""
 
         try:
             connect_timeout = max(1.0, min(5.0, timeout_ms / 1000.0))
             with socket.create_connection((host, port), timeout=connect_timeout) as sock:
                 sock.settimeout(0.2)
-                sock.sendall(payload)
+                dispatch_started = True
+                try:
+                    sock.sendall(payload)
+                except OSError as exc:
+                    # sendall may have placed the complete frame in the kernel
+                    # before surfacing a reset. Once dispatch begins, treating
+                    # this as "not submitted" could replay a mutation.
+                    response_channel_failure_reason = (
+                        f"tcp_send_failed_after_dispatch_started:{type(exc).__name__}"
+                    )
                 emit_request_submission_ack(
                     project_root=project_root,
                     operation=operation,
@@ -310,101 +410,119 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                     transport_name=self.name,
                     state=initial_state,
                 )
-                record_request_submission_event(
-                    project_root=project_root,
-                    request_id=request_id,
-                    operation=operation,
-                    transport_name=self.name,
-                    state=initial_state,
-                )
                 try:
-                    sock.shutdown(socket.SHUT_WR)
-                except OSError:
+                    record_request_submission_event(
+                        project_root=project_root,
+                        request_id=request_id,
+                        operation=operation,
+                        transport_name=self.name,
+                        state=initial_state,
+                        timeout_ms=timeout_ms,
+                    )
+                    submission_recorded = True
+                except Exception:
+                    # The response channel remains usable even when host-side
+                    # journal persistence is temporarily unavailable.
                     pass
 
-                while time.time() < deadline:
+                if not response_channel_failure_reason:
                     try:
-                        chunk = sock.recv(65536)
-                        if chunk:
-                            chunks.append(chunk)
-                            continue
-                        break
-                    except socket.timeout:
-                        current_state = read_best_effort_bridge_state(project_root)
-                        if observed_reset_state is None and bridge_identity_changed(initial_generation, initial_session_id, current_state):
-                            observed_reset_state = current_state
-                        continue
-                    except OSError as exc:
-                        current_state = read_best_effort_bridge_state(project_root)
-                        if observed_reset_state is None and bridge_identity_changed(initial_generation, initial_session_id, current_state):
-                            observed_reset_state = current_state
+                        sock.shutdown(socket.SHUT_WR)
+                    except OSError:
+                        pass
+
+                    while time.time() < deadline:
+                        try:
+                            chunk = sock.recv(65536)
+                            if chunk:
+                                chunks.append(chunk)
+                                response = _try_decode_complete_response(chunks)
+                                if response is not None:
+                                    break
+                                continue
+                            response_channel_failure_reason = (
+                                "tcp_connection_closed_without_complete_response_frame"
+                            )
                             break
-                        raise ToolInvocationError(
-                            "transport_io_failed",
-                            (
-                                f"TCP loopback transport failed for {operation}: {exc}. "
-                                f"host={host} port={port}."
-                            ),
-                            {
-                                "request_id": request_id,
-                                "operation": operation,
-                                "transport": self.name,
-                                "host": host,
-                                "port": port,
-                            },
-                        ) from exc
+                        except socket.timeout:
+                            current_state = read_best_effort_bridge_state(project_root)
+                            if observed_reset_state is None and bridge_identity_changed(initial_generation, initial_session_id, current_state):
+                                observed_reset_state = current_state
+                            continue
+                        except OSError as exc:
+                            response_channel_failure_reason = (
+                                f"tcp_receive_failed_after_submission:{type(exc).__name__}"
+                            )
+                            current_state = read_best_effort_bridge_state(project_root)
+                            if observed_reset_state is None and bridge_identity_changed(initial_generation, initial_session_id, current_state):
+                                observed_reset_state = current_state
+                            break
         except ToolInvocationError:
             raise
         except OSError as exc:
-            emit_request_not_submitted_ack(
-                project_root=project_root,
-                operation=operation,
-                transport_name=self.name,
-                reason="transport_connect_failed",
-            )
-            raise ToolInvocationError(
-                "transport_connect_failed",
-                (
-                    f"Failed to connect to TCP loopback transport for {operation}: {exc}. "
-                    f"host={host} port={port} listener_state={listener_state or 'unknown'}."
-                ),
-                {
-                    "request_id": request_id,
-                    "request_submitted": False,
-                    "request_ownership_acquired": False,
-                    "operation": operation,
-                    "transport_outcome": "request_not_submitted",
-                    "operation_outcome": "request_not_dispatched",
-                    "recommended_next_action": "request_status_summary_then_retry",
-                    "transport": self.name,
-                    "host": host,
-                    "port": port,
-                    "listener_state": listener_state,
-                },
-            ) from exc
-
-        if chunks:
-            try:
-                response = json.loads(b"".join(chunks).decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            if dispatch_started:
+                response_channel_failure_reason = response_channel_failure_reason or (
+                    f"tcp_channel_failed_after_dispatch_started:{type(exc).__name__}"
+                )
+                if not submission_recorded:
+                    try:
+                        record_request_submission_event(
+                            project_root=project_root,
+                            request_id=request_id,
+                            operation=operation,
+                            transport_name=self.name,
+                            state=initial_state,
+                            timeout_ms=timeout_ms,
+                        )
+                        submission_recorded = True
+                    except Exception:
+                        pass
+            else:
+                emit_request_not_submitted_ack(
+                    project_root=project_root,
+                    operation=operation,
+                    transport_name=self.name,
+                    reason="transport_connect_failed",
+                )
                 raise ToolInvocationError(
-                    "transport_response_invalid",
-                    f"TCP loopback transport returned invalid JSON for {operation}: {exc}.",
+                    "transport_connect_failed",
+                    (
+                        f"Failed to connect to TCP loopback transport for {operation}: {exc}. "
+                        f"host={host} port={port} listener_state={listener_state or 'unknown'}."
+                    ),
                     {
                         "request_id": request_id,
+                        "request_submitted": False,
+                        "request_ownership_acquired": False,
                         "operation": operation,
+                        "transport_outcome": "request_not_submitted",
+                        "operation_outcome": "request_not_dispatched",
+                        "recommended_next_action": "request_status_summary_then_retry",
                         "transport": self.name,
                         "host": host,
                         "port": port,
+                        "listener_state": listener_state,
                     },
                 ) from exc
+
+        if chunks and response is None:
+            response_channel_failure_reason = response_channel_failure_reason or (
+                "tcp_connection_closed_with_incomplete_response_frame:"
+                f"{sum(len(chunk) for chunk in chunks)}_bytes"
+            )
+            # An incomplete frame is not proof that Unity did not complete.
+            # Route it through journal/outbox recovery before producing the
+            # decision-grade response-missing verdict below.
+            chunks = []
+
+        if response is not None:
             if response.get("status") == "error":
                 error = response.get("error") or {}
                 error_code = str(error.get("code") or "")
                 if error_code == "transport_restarting":
                     current_state = read_best_effort_bridge_state(project_root)
                     recovery_timeout_ms = resolve_post_reset_recovery_timeout_ms(deadline, post_reset_recovery_cap_ms)
-                    recovered_response, _ = try_recover_completed_response_after_reset(
+                    recovered_response, recovered_status = try_recover_completed_response_after_reset(
                         project_root,
                         request_id=request_id,
                         operation=operation,
@@ -412,8 +530,24 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                         poll_timeout_ms=recovery_timeout_ms,
                     )
                     if recovered_response is not None:
+                        _record_delivery_best_effort(
+                            project_root=project_root,
+                            request_id=request_id,
+                            operation=operation,
+                            transport_name=self.name,
+                            state=current_state,
+                            observed=True,
+                            source="file_outbox_recovery_after_transport_restart",
+                        )
                         return recovered_response, request_id, request_started_at
 
+                    request_processed = bool(
+                        recovered_status.get("request_started")
+                        or recovered_status.get("request_completed")
+                        or str((current_state or {}).get("last_processed_request_id") or "")
+                        == request_id
+                    )
+                    retryable = not request_processed
                     current_generation, current_session_id = bridge_identity_from_state(current_state)
                     journal_path = write_host_request_journal_event(
                         project_root,
@@ -422,8 +556,12 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                             "request_id": request_id,
                             "operation": operation,
                             "reason": "bridge_generation_changed_before_response",
-                            "retryable": True,
-                            "reclassified_status": "retryable_after_lifecycle_reset",
+                            "retryable": retryable,
+                            "reclassified_status": (
+                                "retryable_after_lifecycle_reset"
+                                if retryable
+                                else "response_missing_after_lifecycle_reset"
+                            ),
                             "previous_bridge_generation": initial_generation,
                             "previous_bridge_session_id": initial_session_id,
                             "bridge_generation": current_generation,
@@ -439,18 +577,28 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                         initial_bridge_session_id=initial_session_id,
                         current_state=current_state,
                         journal_event_path=journal_path,
-                        retryable_hint=True,
+                        retryable_hint=retryable,
+                        request_processed_hint=request_processed,
                         transport_host=host,
                         transport_port=port,
-                        poll_timeout_ms=recovery_timeout_ms,
+                        poll_timeout_ms=0,
                     )
+            _record_delivery_best_effort(
+                project_root=project_root,
+                request_id=request_id,
+                operation=operation,
+                transport_name=self.name,
+                state=read_best_effort_bridge_state(project_root) or state,
+                observed=True,
+                source="tcp_json_frame",
+            )
             return response, request_id, request_started_at
 
         state = read_best_effort_bridge_state(project_root)
         if observed_reset_state is not None:
             state = state or observed_reset_state
             recovery_timeout_ms = resolve_post_reset_recovery_timeout_ms(deadline, post_reset_recovery_cap_ms)
-            recovered_response, _ = try_recover_completed_response_after_reset(
+            recovered_response, recovered_status = try_recover_completed_response_after_reset(
                 project_root,
                 request_id=request_id,
                 operation=operation,
@@ -458,10 +606,23 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                 poll_timeout_ms=recovery_timeout_ms,
             )
             if recovered_response is not None:
+                _record_delivery_best_effort(
+                    project_root=project_root,
+                    request_id=request_id,
+                    operation=operation,
+                    transport_name=self.name,
+                    state=state,
+                    observed=True,
+                    source="file_outbox_recovery_after_lifecycle_reset",
+                )
                 return recovered_response, request_id, request_started_at
 
             current_generation, current_session_id = bridge_identity_from_state(state)
-            processed = str((state or {}).get("last_processed_request_id") or "") == request_id
+            processed = bool(
+                recovered_status.get("request_started")
+                or recovered_status.get("request_completed")
+                or str((state or {}).get("last_processed_request_id") or "") == request_id
+            )
             retryable = not processed
             journal_path = write_host_request_journal_event(
                 project_root,
@@ -495,8 +656,27 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                 request_processed_hint=processed,
                 transport_host=host,
                 transport_port=port,
-                poll_timeout_ms=recovery_timeout_ms,
+                poll_timeout_ms=0,
             )
+
+        recovered_response, _ = try_recover_completed_response_after_reset(
+            project_root,
+            request_id=request_id,
+            operation=operation,
+            current_state=state,
+            poll_timeout_ms=1000,
+        )
+        if recovered_response is not None:
+            _record_delivery_best_effort(
+                project_root=project_root,
+                request_id=request_id,
+                operation=operation,
+                transport_name=self.name,
+                state=state,
+                observed=True,
+                source="file_outbox_fallback_after_tcp_response_missing",
+            )
+            return recovered_response, request_id, request_started_at
 
         raise build_transport_response_missing_tool_error(
             project_root,
@@ -506,6 +686,12 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
             current_state=state,
             transport_host=host,
             transport_port=port,
+            poll_timeout_ms=0,
+            missing_reason=(
+                response_channel_failure_reason
+                or "tcp_connection_closed_without_complete_response_frame"
+            ),
+            automatic_retry_safe=False,
         )
 
 

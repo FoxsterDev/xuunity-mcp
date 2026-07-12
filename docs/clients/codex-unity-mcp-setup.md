@@ -55,8 +55,8 @@ The same setup in `~/.codex/config.toml` looks like this on Linux/macOS:
 
 ```toml
 [mcp_servers.xuunity_light_unity]
-command = "bash"
-args = ["-lc", "exec \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""]
+command = "/bin/bash"
+args = ["-c", "exec \"/bin/bash\" \"${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh\""]
 required = false
 ```
 
