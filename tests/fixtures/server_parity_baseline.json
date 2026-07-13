@@ -121,7 +121,7 @@
       "request-scenario-run-and-wait",
       "batch-compile"
     ],
-    "root_command_count": 66,
+    "root_command_count": 67,
     "root_commands": [
       "setup-plan",
       "setup-apply",
@@ -188,12 +188,13 @@
       "batch-test-framework-version-regression",
       "batch-build-player",
       "artifact-probe",
+      "sdk-generated-diff-guard",
       "maintenance-prune"
     ]
   },
   "mcp_tools_list": {
-  "sha256": "0b6741be65db2875c3c887a6d1f8e41a3a8906ac5e8535cea682a2fef359170f",
-    "tool_count": 45,
+  "sha256": "016ef7316d793dbd18c24a8f3ec2c8697c4c135022f712ba03b6624ab402777d",
+    "tool_count": 46,
     "tool_names": [
       "xuunity_setup_plan",
       "xuunity_setup_apply",
@@ -216,6 +217,7 @@
       "unity_package_install_test_framework",
       "unity_edm4u_resolve",
       "unity_sdk_dependency_verify",
+      "unity_sdk_generated_diff_guard",
       "unity_console_tail",
       "unity_console_grep",
       "unity_loading_timing",
