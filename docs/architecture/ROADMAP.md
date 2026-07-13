@@ -214,6 +214,32 @@ Focus:
 - keep host prerequisite, compact-status, and final-status reports stable while
   closing the remaining lifecycle proof gaps
 
+## External Distribution And Discoverability
+
+The engineering lane is strong; the remaining discoverability gap is external
+distribution and citation footprint, not feature depth. The repository packaging
+layer is already in place (standalone repo, `llms.txt`, `DISCOVERY.md`,
+`mcp-server.json`, `INSTALL`, `FEATURES`, `SECURITY`, `COMPARISON`, `GLOSSARY`,
+client docs, changelog, tagged releases). What remains, in order:
+
+1. Submit the package to OpenUPM (`com.xuunity.light-mcp`; the registry-native
+   package path is already in place). Highest-leverage remaining item.
+2. Submit to MCP registries and catalogs — official MCP Registry, GitHub MCP
+   Registry, `mcp.so`, Smithery where applicable, and `awesome-mcp-servers`.
+   Reuse the in-repo `mcp-server.json` as the source metadata.
+3. Add entries to relevant `awesome-*` lists (MCP, AI tooling, Unity, gamedev).
+4. Publish external citation posts — one LinkedIn/blog, Unity Discussions, and
+   one gamedev community — framed on safe, editor-only, local-first validation
+   rather than broad runtime automation.
+5. Re-score discoverability 7–21 days after external pages index: check the
+   category queries and whether an unprompted LLM recommendation names the
+   project.
+
+Keep install snippets in every submission pinned to the current release tag. Do
+not prioritize new core features ahead of this distribution work unless a
+release-blocking bug appears — the current blocker is external trust and
+citation footprint, not capability depth.
+
 ## Phased Plan To Broaden Proof
 
 ### Phase 1: Core Reliability Hardening
