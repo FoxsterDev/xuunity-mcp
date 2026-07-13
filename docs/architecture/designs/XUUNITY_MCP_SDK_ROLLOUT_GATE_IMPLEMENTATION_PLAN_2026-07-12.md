@@ -1,7 +1,7 @@
 # XUUnity MCP SDK Rollout Gate — Implementation Plan
 
 Date: `2026-07-12`
-Status: `implementation plan (top-tier); hardened after adversarial review (§14)`
+Status: `P0.1 Git-tracked generated-diff vertical slice implemented in unreleased source; broader plan remains open; hardened after adversarial review (§14)`
 Baseline: released source line `v0.3.44`
 Elaborates: `XUUNITY_MCP_SDK_ROLLOUT_VALIDATION_DESIGN_2026-05-14.md` (direction) —
 this document turns that direction into a build-ready plan with exact
@@ -497,6 +497,20 @@ opt-in and may slip without blocking the P0 value. These are named so a future
 reader does not mistake them for oversights.
 
 ## 15. Do-first
+
+The first release-ready vertical slice is now implemented in unreleased source:
+`unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` compares explicit
+Git-tracked files against `HEAD` (or another named Git ref), returns a compact
+verdict, writes ignored-library JSON evidence, and fails closed on missing
+required post-resolve markers, stale configured previous versions, or
+unallowlisted file changes. It intentionally rejects Library-baseline capture
+and non-Git baseline sources rather than treating them as a pass. Host regression
+coverage exercises an expected version update, missing marker, stale version,
+unexpected change, MCP exposure, and CLI registration.
+
+Remaining P0.1 work is the richer structure-aware XML/Gradle classification,
+Git-untracked fingerprint-bound Library fallback, and artifact-registry
+registration. P0.2+ remains unchanged.
 
 Ship **P0.1 (`unity.sdk.generated_diff_guard` + the shared helper)** first. It is
 the highest-ROI false-positive catch (destructive generated-file change while

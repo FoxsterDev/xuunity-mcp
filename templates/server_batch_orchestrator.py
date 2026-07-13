@@ -238,6 +238,7 @@ from server_runtime_config import (
 )
 from server_artifact_probe import load_artifact_probe_config, run_artifact_probe
 from server_artifact_registry import register_artifact, write_artifact_report
+from server_sdk_diff_guard import run_sdk_generated_diff_guard
 
 # ProcessLauncher for self-invocation
 from server_process_launcher import ProcessLauncher
@@ -1976,6 +1977,23 @@ def call_unity_project_action_invoke_tool(arguments: dict[str, Any]) -> dict[str
     return mcp_json_result(result, is_error=is_error)
 
 
+def call_unity_sdk_generated_diff_guard_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+
+    try:
+        project_root = ensure_project_root(project_root_value)
+        payload = run_sdk_generated_diff_guard(
+            project_root=project_root,
+            config=dict(arguments),
+            report_file=_optional_string_arg(arguments, "reportFile"),
+        )
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    return mcp_json_result(payload, is_error=payload.get("verdict") != "passed")
+
+
 def call_unity_artifact_register_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     project_root_value = arguments.get("projectRoot")
     if not isinstance(project_root_value, str) or not project_root_value.strip():
@@ -2148,6 +2166,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_loading_timing": call_unity_loading_timing_tool,
             "unity_project_action_list": call_unity_project_action_list_tool,
             "unity_project_action_invoke": call_unity_project_action_invoke_tool,
+            "unity_sdk_generated_diff_guard": call_unity_sdk_generated_diff_guard_tool,
             "unity_artifact_register": call_unity_artifact_register_tool,
             "unity_artifact_write_report": call_unity_artifact_write_report_tool,
         },

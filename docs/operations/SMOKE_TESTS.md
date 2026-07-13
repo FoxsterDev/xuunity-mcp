@@ -89,6 +89,29 @@ Pass criteria:
   batch summary reports `unity_outcome: not_started` and surfaces a concrete
   recovery command before any heavier validation is attempted
 
+### 2a. SDK Generated-Diff Guard
+
+For an SDK rollout, run `unity_sdk_generated_diff_guard` (or
+`sdk-generated-diff-guard --config-file <guard.json>`) after resolver work and
+before treating dependency presence or compile-green as rollout proof. The
+current source slice uses a Git-tracked baseline and returns a compact verdict.
+
+Pass criteria:
+
+- every requested generated file has a readable baseline at `baselineRef`
+  (default `HEAD`);
+- every `requiredMarkersAfter` value remains present outside comments;
+- every requested generated file still exists in the working tree;
+- no configured previous native version remains after the resolve; and
+- no unallowlisted generated-file change is present when
+  `failOnUnexpectedChangedFile=true`.
+
+The guard writes its JSON evidence under
+`Library/XUUnityLightMcp/sdk/generated_diff_guard.json` by default. A failed
+guard is a validation failure, not a passing resolver request. It does not yet
+prove EDM4U async freshness, perform a package restore, or replace the planned
+portfolio SDK lane.
+
 Log-presence checks:
 
 - `unity.console.grep` / `request-console-grep` default to `source=editor_log`

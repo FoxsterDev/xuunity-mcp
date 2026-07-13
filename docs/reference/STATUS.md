@@ -69,6 +69,15 @@ OpenUPM status:
 
 ## Current Surface
 
+Current-source SDK rollout safety (unreleased):
+
+- `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` provides the
+  Git-tracked generated-file vertical slice of the SDK rollout gate. It is a
+  host-side, compact proof that detects missing required markers, stale expected
+  versions, and unallowlisted changes without opening Unity. Resolver freshness,
+  package restore, GUI admission control, and portfolio orchestration remain
+  separate open slices.
+
 Implemented Unity-side operations:
 
 - `unity.status`
@@ -131,6 +140,7 @@ Implemented host-side MCP tools and helpers:
 - `unity_build_target_switch`
 - `unity_edm4u_resolve`
 - `unity_sdk_dependency_verify`
+- `unity_sdk_generated_diff_guard`
 - `xuunity_setup_plan`
 - `xuunity_setup_apply`
 - `xuunity_setup_validate`
@@ -182,6 +192,7 @@ Implemented host-side MCP tools and helpers:
 - `artifact-register`
 - `artifact-write-report`
 - `artifact-probe`
+- `sdk-generated-diff-guard`
 
 ## Current Validation Evidence
 

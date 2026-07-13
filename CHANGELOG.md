@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Added `unity_sdk_generated_diff_guard` and `sdk-generated-diff-guard`, a
+  compact, host-side SDK rollout proof for Git-tracked generated files. It
+  compares each requested path to a named Git baseline and fails closed when a
+  required marker is absent, a tracked generated file disappears, an expected
+  previous native version remains, or an unallowlisted generated-file change is
+  present. The guard writes a JSON proof
+  under the project's ignored MCP evidence directory by default.
+
 ## 0.3.44
 
 Release tag: `v0.3.44`

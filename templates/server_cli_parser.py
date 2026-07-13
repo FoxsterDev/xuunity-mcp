@@ -680,6 +680,18 @@ def build_parser() -> argparse.ArgumentParser:
     add_artifact_probe_arguments(artifact_probe_cmd)
     artifact_probe_cmd.set_defaults(func_name="cmd_artifact_probe")
 
+    sdk_generated_diff_guard_cmd = sub.add_parser(
+        "sdk-generated-diff-guard",
+        help="Fail closed when Git-tracked generated SDK files lose required markers, retain stale versions, or change unexpectedly.",
+    )
+    sdk_generated_diff_guard_cmd.add_argument("--project-root", required=True)
+    sdk_generated_diff_guard_cmd.add_argument("--config-file", required=True)
+    sdk_generated_diff_guard_cmd.add_argument(
+        "--report-file",
+        help="Optional JSON evidence path under projectRoot; defaults to Library/XUUnityLightMcp/sdk/generated_diff_guard.json.",
+    )
+    sdk_generated_diff_guard_cmd.set_defaults(func_name="cmd_sdk_generated_diff_guard")
+
     maintenance_prune_cmd = sub.add_parser(
         "maintenance-prune",
         help="Prune stale request-journal, scenario-result, capture, and optional log artifacts under Library/XUUnityLightMcp.",

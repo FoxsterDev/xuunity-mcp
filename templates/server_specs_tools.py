@@ -440,6 +440,37 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["projectRoot", "expectations"]
         }
     },
+    "unity_sdk_generated_diff_guard": {
+        "bridgeOperation": "host.sdk.generated_diff_guard",
+        "description": "Compare Git-tracked generated SDK files to a named baseline and fail closed on missing critical markers, stale expected versions, or unexpected changes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "baselineSource": {"type": "string", "enum": ["git_head"], "default": "git_head"},
+                "baselineRef": {"type": "string", "default": "HEAD"},
+                "trackedPaths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "expectedChangedAllowlist": {"type": "array", "items": {"type": "string"}, "default": []},
+                "requiredMarkersAfter": {"type": "array", "items": {"type": "string"}, "default": []},
+                "expectedVersionChanges": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "fromValue": {"type": "string"},
+                            "toValue": {"type": "string"}
+                        },
+                        "required": ["path", "fromValue", "toValue"]
+                    },
+                    "default": []
+                },
+                "failOnUnexpectedChangedFile": {"type": "boolean", "default": True},
+                "reportFile": {"type": "string"}
+            },
+            "required": ["projectRoot", "trackedPaths"]
+        }
+    },
     "unity_console_tail": {
         "bridgeOperation": "unity.console.tail",
         "description": (

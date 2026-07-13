@@ -319,6 +319,9 @@ from server_cli_project_commands import (
     cmd_request_scenario_run_and_wait,
     cmd_request_scenario_validate,
 )
+from server_cli_sdk_commands import (
+    cmd_sdk_generated_diff_guard,
+)
 from server_cli_batch_commands import (
     cmd_batch_build_player as cmd_batch_build_player_base,
 )
