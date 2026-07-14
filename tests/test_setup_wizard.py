@@ -379,41 +379,110 @@ class SetupWizardTests(unittest.TestCase):
         self.assertEqual(wizard.default_git_dependency("0.3.24"), current)
 
     def test_helper_target_requires_refresh_for_old_or_unknown_install(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            install_dir = root / "codex-tools" / "xuunity-mcp"
-            create_installed_helper(
-                install_dir,
-                version="0.3.23",
-                refresh_name="run_installed_or_refresh_xuunity_mcp.sh",
-            )
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "HOME": str(root / "home"),
-                    "CODEX_SHELL": "1",
-                    "CODEX_TOOLS_HOME": str(root / "codex-tools"),
-                    "CLAUDE_TOOLS_HOME": str(root / "claude-tools"),
-                    "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR": str(root / "neutral"),
-                },
-                clear=True,
-            ):
-                targets = server_setup_common.helper_install_targets("0.3.45")
-                write_json(
-                    install_dir / "packages" / "com.xuunity.light-mcp" / "package.json",
-                    {"name": "com.xuunity.light-mcp", "version": "0.3.45"},
+        for host_system, refresh_name in (
+            ("Darwin", "run_installed_or_refresh_xuunity_mcp.sh"),
+            ("Linux", "run_installed_or_refresh_xuunity_mcp.sh"),
+            ("Windows", "run_installed_or_refresh_xuunity_mcp.cmd"),
+        ):
+            with self.subTest(host_system=host_system), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                install_dir = root / "codex-tools" / "xuunity-mcp"
+                create_installed_helper(
+                    install_dir,
+                    version="0.3.23",
+                    refresh_name=refresh_name,
                 )
-                same_version_without_integrity = server_setup_common.helper_install_targets("0.3.45")
+                with mock.patch.object(
+                    server_setup_common.platform,
+                    "system",
+                    return_value=host_system,
+                ), mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(root / "home"),
+                        "CODEX_SHELL": "1",
+                        "CODEX_TOOLS_HOME": str(root / "codex-tools"),
+                        "CLAUDE_TOOLS_HOME": str(root / "claude-tools"),
+                        "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR": str(root / "neutral"),
+                    },
+                    clear=True,
+                ):
+                    targets = server_setup_common.helper_install_targets("0.3.45")
+                    write_json(
+                        install_dir / "packages" / "com.xuunity.light-mcp" / "package.json",
+                        {"name": "com.xuunity.light-mcp", "version": "0.3.45"},
+                    )
+                    same_version_without_integrity = server_setup_common.helper_install_targets("0.3.45")
+                    (
+                        install_dir / "packages" / "com.xuunity.light-mcp" / "package.json"
+                    ).unlink()
+                    unknown_version = server_setup_common.helper_install_targets("0.3.45")
 
-        codex = next(item for item in targets if item["client_id"] == "codex")
-        self.assertEqual("0.3.23", codex["installed_version"])
-        self.assertEqual("stale", codex["version_alignment"])
-        self.assertEqual("refresh_existing_helper", codex["helper_action"])
-        self.assertFalse(codex["runtime_execution_allowed"])
-        unverified = next(item for item in same_version_without_integrity if item["client_id"] == "codex")
-        self.assertEqual("integrity_missing", unverified["version_alignment"])
-        self.assertEqual("refresh_existing_helper", unverified["helper_action"])
-        self.assertFalse(unverified["runtime_execution_allowed"])
+                codex = next(item for item in targets if item["client_id"] == "codex")
+                self.assertEqual("0.3.23", codex["installed_version"])
+                self.assertEqual("stale", codex["version_alignment"])
+                self.assertEqual("refresh_existing_helper", codex["helper_action"])
+                self.assertFalse(codex["runtime_execution_allowed"])
+                unverified = next(
+                    item for item in same_version_without_integrity if item["client_id"] == "codex"
+                )
+                self.assertEqual("integrity_missing", unverified["version_alignment"])
+                self.assertEqual("refresh_existing_helper", unverified["helper_action"])
+                self.assertFalse(unverified["runtime_execution_allowed"])
+                unknown = next(item for item in unknown_version if item["client_id"] == "codex")
+                self.assertEqual("unknown", unknown["version_alignment"])
+                self.assertEqual("refresh_existing_helper", unknown["helper_action"])
+                self.assertFalse(unknown["runtime_execution_allowed"])
+
+    def test_helper_target_rejects_non_native_refresh_launcher(self) -> None:
+        for host_system, wrong_refresh_name, expected_refresh_name in (
+            (
+                "Darwin",
+                "run_installed_or_refresh_xuunity_mcp.cmd",
+                "run_installed_or_refresh_xuunity_mcp.sh",
+            ),
+            (
+                "Linux",
+                "run_installed_or_refresh_xuunity_mcp.cmd",
+                "run_installed_or_refresh_xuunity_mcp.sh",
+            ),
+            (
+                "Windows",
+                "run_installed_or_refresh_xuunity_mcp.sh",
+                "run_installed_or_refresh_xuunity_mcp.cmd",
+            ),
+        ):
+            with self.subTest(host_system=host_system), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                install_dir = root / "codex-tools" / "xuunity-mcp"
+                create_installed_helper(
+                    install_dir,
+                    version="0.3.45",
+                    refresh_name=wrong_refresh_name,
+                )
+                with mock.patch.object(
+                    server_setup_common.platform,
+                    "system",
+                    return_value=host_system,
+                ), mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(root / "home"),
+                        "CODEX_SHELL": "1",
+                        "CODEX_TOOLS_HOME": str(root / "codex-tools"),
+                        "CLAUDE_TOOLS_HOME": str(root / "claude-tools"),
+                        "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR": str(root / "neutral"),
+                    },
+                    clear=True,
+                ):
+                    targets = server_setup_common.helper_install_targets("0.3.45")
+
+                codex = next(item for item in targets if item["client_id"] == "codex")
+                self.assertEqual("refresh_launcher_missing", codex["version_alignment"])
+                self.assertFalse(codex["refresh_launcher_present"])
+                self.assertTrue(codex["run_path"].endswith(expected_refresh_name))
+                self.assertEqual("refresh_existing_helper", codex["helper_action"])
+                self.assertFalse(codex["runtime_execution_allowed"])
 
     def test_windows_codex_bash_launcher_requires_native_migration(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
