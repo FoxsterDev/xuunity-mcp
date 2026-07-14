@@ -2,19 +2,7 @@
 
 <img src="docs/assets/xuunity-mcp-preview.png" alt="XUUnity Light Unity MCP preview banner" width="100%">
 
-<br>
-
-# XUUnity MCP
-
-**XUUnity MCP is a lightweight Unity MCP server for safe Unity Editor automation.**
-
-Connect Cursor, Claude Code, Claude Desktop, Rider, Windsurf, Antigravity IDE, Codex-style
-agents, and custom MCP clients to Unity through a local stdio MCP server and a
-small editor-only Unity package.
-
-Full technical package name: **XUUnity Light Unity MCP**
-
-> **Independent open-source project. Not affiliated with or endorsed by Unity Technologies. Authorization under Unity Terms of Service has not yet been confirmed.**
+<h1>XUUnity MCP<br><small>Local-first Unity MCP for compile checks, tests, scene validation, and console evidence.</small></h1>
 
 <p>
   <a href="https://github.com/FoxsterDev/xuunity-mcp"><img alt="GitHub stars" src="https://img.shields.io/github/stars/FoxsterDev/xuunity-mcp?style=flat&logo=github"></a>
@@ -23,19 +11,28 @@ Full technical package name: **XUUnity Light Unity MCP**
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white">
   <img alt="MCP enabled" src="https://img.shields.io/badge/MCP-enabled-green.svg">
   <img alt="Git UPM ready" src="https://img.shields.io/badge/Git%20UPM-ready-brightgreen.svg">
-  <img alt="OpenUPM planned" src="https://img.shields.io/badge/OpenUPM-planned-lightgrey.svg">
+  <img alt="OpenUPM planned" src="https://img.shields.io/badge/OpenUPM-planned-lightgrey.svg"><br>
+  <img alt="Editor-only" src="https://img.shields.io/badge/-Editor--only-0f766e.svg">
+  <img alt="macOS" src="https://img.shields.io/badge/-macOS-111827.svg?logo=apple&amp;logoColor=white">
+  <img alt="Windows" src="https://img.shields.io/badge/-Windows-0078D4.svg?logo=windows11&amp;logoColor=white">
+  <img alt="Linux" src="https://img.shields.io/badge/-Linux-FCC624.svg?logo=linux&amp;logoColor=111827">
+  <img alt="Cursor" src="https://img.shields.io/badge/-Cursor-111827.svg">
+  <img alt="Claude" src="https://img.shields.io/badge/-Claude-D97757.svg?logo=anthropic&amp;logoColor=white">
+  <img alt="Codex" src="https://img.shields.io/badge/-Codex-111827.svg?logo=openai&amp;logoColor=white">
+  <img alt="Rider" src="https://img.shields.io/badge/-Rider-8B5CF6.svg?logo=rider&amp;logoColor=white">
+  <img alt="Other MCP clients" src="https://img.shields.io/badge/-other_MCP_clients-64748B.svg"><br>
+  <a href="#agent-quick-start">Agent Quick Start</a> |
+  <a href="#manual-install">Manual Install</a> |
+  <a href="#verify-existing-install">Verify Existing Install</a> |
+  <a href="#ai-agent-setup-prompt">AI Setup Prompt</a> |
+  <a href="docs/index.html">Pages Site</a> |
+  <a href="docs/reference/FEATURES.md">Features</a> |
+  <a href="#supported-clients">Client Docs</a> |
+  <a href="SECURITY.md">Security</a> |
+  <a href="docs/reference/COMPARISON.md">Comparison</a> |
+  <a href="docs/agents/AGENT_WORKFLOWS.md">Agent Workflows</a><br>
+  <sub>Independent open-source project · Not affiliated with or endorsed by Unity Technologies · Unity Terms of Service authorization not confirmed</sub>
 </p>
-
-[Agent Quick Start](#agent-quick-start) |
-[Manual Install](#manual-install) |
-[Verify Existing Install](#verify-existing-install) |
-[AI Setup Prompt](#ai-agent-setup-prompt) |
-[Pages Site](docs/index.html) |
-[Features](docs/reference/FEATURES.md) |
-[Client Docs](#supported-clients) |
-[Security](SECURITY.md) |
-[Comparison](docs/reference/COMPARISON.md) |
-[Agent Workflows](docs/agents/AGENT_WORKFLOWS.md)
 
 </div>
 
