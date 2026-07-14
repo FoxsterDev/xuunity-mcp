@@ -1,7 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
-const README_URL = "https://github.com/FoxsterDev/xuunity-mcp/blob/master/README.md";
+const REPOSITORY_URL = "https://github.com/FoxsterDev/xuunity-mcp";
+const RELEASE = "v0.3.45";
+const README_URL = `${REPOSITORY_URL}/blob/${RELEASE}/README.md`;
 const LINKEDIN_URL = "https://www.linkedin.com/in/khalandachou/";
 
 async function collectVisibleOverflow(page: Page) {
@@ -77,7 +79,7 @@ test.describe("public homepage", () => {
     await expect(footer.getByRole("link", { name: "Security" })).toHaveAttribute("href", "https://github.com/FoxsterDev/xuunity-mcp/security");
   });
 
-  test("copies the one-prompt setup text with the README URL", async ({ context, page }) => {
+  test("copies the complete release-pinned setup safety contract", async ({ context, page }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/");
 
@@ -85,10 +87,21 @@ test.describe("public homepage", () => {
     await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
 
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clipboardText).toContain("Use the repository README");
-    expect(clipboardText).toContain(`the repository README (${README_URL})`);
+    expect(clipboardText).toContain(`release ${RELEASE}`);
+    expect(clipboardText).toContain(`the canonical repository (${REPOSITORY_URL})`);
+    expect(clipboardText).toContain(`the release README for ${RELEASE} (${README_URL})`);
     expect(clipboardText).toContain("/path/to/UnityProject");
-    expect(clipboardText).toContain("run EditMode tests");
+    expect(clipboardText).toContain("Do not execute an existing helper until");
+    expect(clipboardText).toContain(".source_root");
+    expect(clipboardText).toContain("stale files refreshed");
+    expect(clipboardText).toContain("On native Windows, migrate only the XUUnity client block");
+    expect(clipboardText).toContain("cmd.exe");
+    expect(clipboardText).toContain("run_installed_or_refresh_xuunity_mcp.cmd");
+    expect(clipboardText).toContain("restart or refresh the client");
+    expect(clipboardText).toContain("list the live MCP tools");
+    expect(clipboardText).toContain("unity_status_summary");
+    expect(clipboardText).toContain("mcp_server_info.version=0.3.45");
+    expect(clipboardText).toContain("Only then run EditMode tests");
   });
 
   test("has no horizontal overflow in the tested viewport", async ({ page }) => {

@@ -86,6 +86,8 @@ def build_setup_plan(
     if not projects:
         raise ToolInvocationError("unity_projects_not_found", "No Unity projects were discovered for setup planning.")
 
+    client_context = detect_client_context()
+    normalized_package_version = normalize_package_version(package_version)
     result: dict[str, Any] = {
         "action": "setup_plan",
         "workspace_root": str(Path(workspace_root).expanduser().resolve()) if workspace_root else "",
@@ -97,17 +99,17 @@ def build_setup_plan(
         "recursive": recursive,
         "include_test_framework": include_test_framework,
         "package_source": package_source,
-        "detected_client": detect_client_context()["detected_client"],
-        "detection_basis": detect_client_context()["detection_basis"],
-        "client_context_confidence": detect_client_context()["client_context_confidence"],
-        "intended_wiring_target": intended_wiring_target_for_detected_client(str(detect_client_context()["detected_client"])),
-        "helper_install_targets": helper_install_targets(),
+        "requested_package_version": normalized_package_version,
+        "detected_client": client_context["detected_client"],
+        "detection_basis": client_context["detection_basis"],
+        "client_context_confidence": client_context["client_context_confidence"],
+        "intended_wiring_target": intended_wiring_target_for_detected_client(str(client_context["detected_client"])),
+        "helper_install_targets": helper_install_targets(normalized_package_version),
         "projects": [],
     }
     primary_project_root = explicit_project_roots[0] if explicit_project_roots else (projects[0] if projects else None)
     client_config_targets = build_client_config_targets(primary_project_root)
 
-    git_dependency = default_git_dependency(package_version)
     for project_root in projects:
         unity_version = parse_unity_version(project_root)
         package_dependency = manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME)
@@ -116,20 +118,36 @@ def build_setup_plan(
         planned_actions: list[dict[str, Any]] = []
         manual_actions: list[dict[str, Any]] = []
 
-        if package_dependency:
-            package_dependency_state = "declared"
-        else:
-            package_dependency_state = "missing"
-            dependency_value = (
-                f"file:{Path(local_package_source).expanduser().resolve()}"
-                if package_source == "file"
-                else git_dependency
-            )
+        package_alignment = classify_light_mcp_dependency(
+            package_dependency,
+            package_source=package_source,
+            package_version=normalized_package_version,
+            local_package_source=local_package_source,
+        )
+        package_dependency_state = str(package_alignment["status"])
+        if package_alignment["automatic_update_allowed"] and package_dependency_state != "aligned":
             planned_actions.append(
                 {
                     "kind": "set_manifest_dependency",
                     "package": LIGHT_MCP_PACKAGE_NAME,
-                    "value": dependency_value,
+                    "value": package_alignment["requested_dependency"],
+                    "current_value": package_dependency,
+                    "expected_current_value": package_dependency,
+                    "reason": package_alignment["reason"],
+                    "requires_approval": True,
+                    "apply_phase": "before_opening_unity",
+                }
+            )
+        elif not package_alignment["runtime_execution_allowed"]:
+            manual_actions.append(
+                {
+                    "kind": "resolve_package_source_or_version_mismatch",
+                    "current_value": package_dependency,
+                    "requested_value": package_alignment["requested_dependency"],
+                    "declared_version": package_alignment["declared_version"],
+                    "requested_version": package_alignment["requested_version"],
+                    "reason": package_alignment["reason"],
+                    "requires_explicit_source_or_version_selection": True,
                 }
             )
 
@@ -212,6 +230,8 @@ def build_setup_plan(
                 "unity_version": unity_version,
                 "package_dependency_state": package_dependency_state,
                 "package_dependency": package_dependency,
+                "package_alignment": package_alignment,
+                "runtime_execution_allowed": bool(package_alignment["runtime_execution_allowed"]),
                 "bridge_config_state": bridge_state,
                 "test_framework_state": tf_state,
                 "test_capabilities_state": test_capabilities_state(tf_state),
@@ -229,6 +249,54 @@ def build_setup_plan(
             for changed_path in project.get("planned_project_file_changes") or []
         }
     )
+    selected_helpers = [
+        item for item in result["helper_install_targets"] if item.get("selected_by_default")
+    ]
+    selected_client_targets = [
+        item for item in client_config_targets if item.get("selected_by_default")
+    ]
+    alignment_blockers: list[str] = []
+    if not all(bool(project.get("runtime_execution_allowed")) for project in result["projects"]):
+        alignment_blockers.append("project_package_alignment_required")
+    if not selected_helpers or not all(bool(item.get("runtime_execution_allowed")) for item in selected_helpers):
+        alignment_blockers.append("helper_install_or_refresh_required")
+    if not selected_client_targets:
+        alignment_blockers.append("client_selection_required")
+    elif not all(bool(item.get("runtime_execution_allowed")) for item in selected_client_targets):
+        alignment_blockers.append("client_launcher_install_or_migration_required")
+
+    on_disk_alignment_ready = not alignment_blockers
+    host_mutation_required = any(
+        str(item.get("helper_action")) != "reuse_current_helper" for item in selected_helpers
+    ) or any(
+        str(item.get("config_action")) != "verify_existing_server_block"
+        for item in selected_client_targets
+    )
+    result["installation_alignment"] = {
+        "status": (
+            "on_disk_aligned_live_session_unverified"
+            if on_disk_alignment_ready
+            else "blocked_until_upgrade_or_wiring_fix"
+        ),
+        "on_disk_alignment_ready": on_disk_alignment_ready,
+        "runtime_execution_allowed": False,
+        "runtime_execution_allowed_after_live_session_proof": on_disk_alignment_ready,
+        "current_mcp_session_safe": False,
+        "live_mcp_session_status": "unverified",
+        "live_session_proof_required": True,
+        "required_live_server_version": normalized_package_version,
+        "client_restart_required_after_host_changes": host_mutation_required,
+        "blockers": alignment_blockers,
+        "safety_rule": (
+            "Do not run Unity operations, ensure-ready, or tests through an existing helper/session "
+            "until package, helper, and native client launcher all match the requested release."
+        ),
+    }
+    result["setup_status"] = (
+        "on_disk_aligned_live_session_unverified"
+        if on_disk_alignment_ready
+        else "upgrade_or_wiring_required"
+    )
     review_notes: list[str] = [
         "Review planned project manifest and bridge changes before applying setup."
     ]
@@ -237,6 +305,9 @@ def build_setup_plan(
     )
     review_notes.append(
         "setup-plan is pre-approval inspection only; it must not refresh installed helper files or mutate user-level client config."
+    )
+    review_notes.append(
+        "A stale or unknown helper must not be executed to continue setup; refresh it from the requested source checkout first."
     )
     if explicit_project_roots:
         review_notes.append("The plan is scoped to the explicitly requested Unity project roots only.")
@@ -270,9 +341,20 @@ def build_setup_plan(
         },
         "notes": review_notes,
         "recommended_next_step": (
-            "Run setup-apply with the approved project_root selection after user review."
-            if len(projects) > 1
-            else "Review the plan, approve mutations, then run setup-apply."
+            "Resolve the reported package/helper/client alignment blockers, restart the MCP client after host changes, then prove the live server version before Unity operations."
+            if alignment_blockers
+            else (
+                (
+                    "Run setup-apply with the approved project_root selection after user review."
+                    if len(projects) > 1
+                    else "Review the plan, approve mutations, then run setup-apply."
+                )
+                if aggregate_project_file_changes
+                else (
+                    "Restart or refresh the MCP client, verify the live server reports the requested version, "
+                    "list XUUnity tools, and run unity_status_summary before Unity operations."
+                )
+            )
         ),
     }
     result["preflight_review"]["preferred_review_summary"] = render_preferred_review_summary(

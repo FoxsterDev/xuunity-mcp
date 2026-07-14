@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+## 0.3.45
+
+Release tag: `v0.3.45`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.45
+```
+
+### Changed
+
+- Released `v0.3.45` package metadata, server metadata, package manifests, and Git UPM examples.
+- Made setup fail closed on stale canonical Git UPM pins, helper versions,
+  helper integrity manifests, and client launcher flavor mismatches. Setup plans
+  now upgrade older pins after approval, refuse automatic downgrades or custom
+  source rewrites, and reject apply when the reviewed manifest changed.
+- Reworked the public one-prompt install contract around the canonical
+  `v0.3.45` source and tagged README. Existing helpers are verified before use,
+  native Windows Codex blocks migrate from `bash`/`run.sh` to
+  `cmd.exe`/the refresh `.cmd` without replacing unrelated config, and client
+  restart plus live-tool proof is required before tests.
+
+### Fixed
+
+- Prevented stale/reused bridge PIDs from being trusted as Unity process
+  identity. Automatic recovery no longer treats editor-open permission as
+  force-termination permission, revalidates exact project ownership before an
+  explicitly authorized termination, and Windows `taskkill` no longer uses
+  the descendant-tree `/T` flag.
+- Added a safety-epoch, hash-verified helper install manifest and published the
+  legacy `server.py` version marker last, so interrupted or mixed-version
+  helper rollouts are refreshed instead of executed.
+
+### Validation
+
+- Host Python unittest suite passed: `452` tests with `13` expected skips.
+- Public site Playwright checks passed: `39/39`, including the 320 px viewport
+  and clipboard safety-contract assertion.
+- Release metadata consistency, documentation freshness, and public-release
+  safety checks passed for `0.3.45`.
+
 ### Added
 
 - Added `unity_sdk_generated_diff_guard` and `sdk-generated-diff-guard`, a

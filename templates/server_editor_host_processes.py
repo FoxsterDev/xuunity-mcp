@@ -238,12 +238,11 @@ def find_running_unity_hub_launchers_for_project(project_root: Path) -> list[dic
 def list_live_project_editor_pids(project_root: Path) -> list[int]:
     pids: set[int] = set()
 
-    bridge_state = try_read_live_editor_state(project_root)
-    if bridge_state is not None:
-        bridge_pid = int(bridge_state.get("editor_pid") or 0)
-        if bridge_pid > 0 and pid_is_alive(bridge_pid):
-            pids.add(bridge_pid)
-
+    # A persisted bridge-state PID is not process identity. The file can
+    # survive an editor crash long enough for the operating system to reuse
+    # the PID for an unrelated application. Only the current process table,
+    # with both a Unity executable role and an exact -projectPath match, may
+    # classify a PID as this project's editor.
     for editor in find_running_unity_editors_for_project(project_root):
         pid = int(editor.get("pid") or 0)
         if pid > 0 and pid_is_alive(pid):

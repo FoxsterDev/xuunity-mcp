@@ -1,7 +1,7 @@
 # Install XUUnity Light Unity MCP
 
 Date: `2026-05-23`
-Status: `current for v0.3.44`
+Status: `current for v0.3.45`
 
 XUUnity Light Unity MCP has two pieces:
 
@@ -10,44 +10,74 @@ XUUnity Light Unity MCP has two pieces:
 
 Install both before expecting an AI client to control Unity.
 
+Canonical source for this guide:
+
+- repository: `https://github.com/FoxsterDev/xuunity-mcp`
+- release: `v0.3.45`
+- release-pinned README:
+  `https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.45/README.md`
+
 Important:
 
 - UI auto-review, sandbox auto-approval, or tool-level approval is not the same
   thing as user approval of setup mutations.
-- If the host helper is already installed locally under `~/.codex-tools`,
-  `~/.claude-tools`, or another explicit tools path, reuse it before cloning a
-  fresh copy of the repo.
+- If a host helper directory already exists under `~/.codex-tools`,
+  `~/.claude-tools`, or another explicit tools path, reuse only the directory.
+  Do not execute its helper files until the installed version and `.source_root`
+  have been checked against v0.3.45 and stale files have been refreshed from the
+  approved release source.
 
 ## Agent Preflight Rules
 
-For short agent requests such as "setup MCP from this repo into
-/path/to/UnityProject and run EditMode tests", prefer this default behavior:
+For short agent requests, use a self-contained source reference such as:
+
+```text
+Set up XUUnity Light Unity MCP release v0.3.45 from
+https://github.com/FoxsterDev/xuunity-mcp for /path/to/UnityProject. Follow
+https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.45/README.md. Before executing
+an existing helper, compare its version and .source_root with v0.3.45 and refresh
+stale files. On native Windows, migrate only the XUUnity client block to cmd.exe
+plus run_installed_or_refresh_xuunity_mcp.cmd. After any helper or client-config
+change, restart or refresh the client, list the live MCP tools, and run
+unity_status_summary. Require mcp_server_info.version=0.3.45 in that live result.
+Only then run EditMode tests.
+```
+
+Prefer this default behavior:
 
 1. treat the current host client that is executing the request as the default
    MCP wiring target unless the user explicitly names another client
-2. use `setup-plan` before any mutation
-3. for one explicitly requested Unity project, prefer
+2. compare the requested v0.3.45 release with the manifest package pin, installed
+   helper version/source, and current client launcher before executing an
+   existing helper
+3. use `setup-plan` from the approved v0.3.45 source before any mutation
+4. for one explicitly requested Unity project, prefer
    `setup-plan --project-root /path/to/UnityProject`
-4. for a multi-project workspace or nested repo, use
+5. for a multi-project workspace or nested repo, use
    `setup-plan --workspace-root /path/to/workspace --recursive`
-5. show a short preflight review before any mutation:
+6. show a short preflight review before any mutation:
    - detected current client
    - intended wiring target
    - requested Unity project root
    - additional discovered Unity projects
+   - requested package release and current manifest pin
+   - installed helper version/source and refresh requirement
+   - current client launcher and native Windows migration requirement
    - files that will change, including user-level client config
    - whether the client must restart or refresh after the change
-6. wait for approval before `git clone`, installer runs, `setup-apply`,
+7. wait for approval before `git clone`, installer runs, `setup-apply`,
    manifest edits, lockfile edits, or user-level client config changes
-7. run `validate-setup`, then `ensure-ready`, then the status check
+8. run `validate-setup`, then `ensure-ready`, then the status check
    sequentially; do not run the status check before `ensure-ready` finishes
-8. use `request-status-summary` as the first helper verification when the
-   current client cannot see newly wired MCP tools yet; after restart or
-   refresh, treat `unity_status_summary` as the canonical first live MCP-tool
-   smoke-check
-9. if `ensure-ready --open-editor` opens Unity for the workflow
-   (`opened_by_host: true`), run `restore-editor-state` and then
-   `verify-editor-closed` before the final report
+9. use `request-status-summary` as helper-side verification when the current
+   client cannot see newly wired MCP tools yet
+10. after any helper or client-config change, restart or refresh the client,
+    confirm that `xuunity_light_unity` is listed, list its live tools, and run
+    `unity_status_summary`; do not call setup complete until this live smoke
+    check succeeds
+11. if `ensure-ready --open-editor` opens Unity for the workflow
+    (`opened_by_host: true`), run `restore-editor-state` and then
+    `verify-editor-closed` before the final report
 
 Before running the helper, verify which Python it will use:
 
@@ -66,6 +96,11 @@ files under `~/.codex-tools` or `~/.claude-tools`, edit manifests, or change
 user-level client config. If helper refresh is required, do it only after the
 preflight review is approved.
 
+An installed refresh launcher is source-relative: it can keep an old helper
+current relative to an old `.source_root`. It is not proof that the helper is at
+the requested release. For an install or upgrade to v0.3.45, inspect before use
+and refresh from the approved v0.3.45 source after approval.
+
 For uninstall or cleanup requests, use `uninstall-plan` before any removal.
 Minimal clean mode keeps user-level client config and helper installs. Full
 reset mode is current-user scoped and removes only the selected
@@ -82,10 +117,15 @@ Preflight review
 - Wiring target: <target client>
 - Unity project root: <approved project root>
 - Additional discovered Unity projects: <none or list>
-- Existing helper install: <reuse existing helper | clone required>
+- Requested package release: <v0.3.45>
+- Current package pin: <missing | current | stale | custom>
+- Existing helper directory: <present | missing>
+- Helper state: <current | refresh required | missing> (<installed version and source root>)
+- Client launcher: <native/current | migration required>
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no and which client>
+- Required live proof after restart: <server listed, tools listed, unity_status_summary healthy with mcp_server_info.version=0.3.45>
 - Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 
 Do not run setup-apply, installer commands, helper sync, or client config edits
@@ -108,7 +148,7 @@ Add this dependency to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.44"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.45"
   }
 }
 ```
@@ -233,11 +273,12 @@ If the user gave one explicit Unity project path, default to
 Unity projects exist nearby. Mention additional projects in the review, but do
 not mutate them unless the user approves those exact roots.
 
-If the current host already has the helper installed, prefer reusing it for
-`setup-apply` and verification instead of cloning a fresh repo copy only to run
-the same commands. For `setup-plan`, use the available non-mutating entrypoint:
-the wrapper runs it from the source checkout, and an installed helper may run
-it directly when no source checkout is available.
+If the current host already has a helper directory, it may be reused as the
+installation target only after checking its installed version and `.source_root`
+against the requested release. Do not run an unverified installed helper to plan
+or perform a v0.3.45 upgrade: an old refresh launcher can remain pinned to its
+old source checkout. Run `setup-plan` from the approved v0.3.45 source checkout,
+then refresh stale helper files from that same source after approval.
 
 If the helper is missing but the repo checkout is available, `setup-plan` can
 run from the source checkout for preflight. Install or refresh the host helper
@@ -345,8 +386,20 @@ The installer can append a Codex MCP config block:
 bash init_xuunity_light_unity_mcp.sh --install-codex-config
 ```
 
-If the current Codex session does not hot-reload new MCP servers, restart the
-client after this change.
+On native Windows, install or refresh the Codex helper from the approved source
+without executing an old installed helper:
+
+```powershell
+$env:XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET = "codex"
+.\xuunity_light_unity_mcp.cmd server-help
+```
+
+Then merge or replace the XUUnity Codex block with the native Windows template
+below after approval.
+
+After changing the helper or Codex MCP block, restart or refresh Codex. The
+helper commands can verify project readiness, but they do not prove that the
+current Codex session loaded the server.
 
 If `~/.codex/config.toml` already contains `[mcp_servers.xuunity_light_unity]`,
 merge or verify the existing block instead of appending a duplicate entry.
@@ -374,6 +427,16 @@ Replace `<YOUR_USERNAME>` with your Windows user name, or let
 Keep every `args` entry free of embedded quotes and parentheses: clients
 quote argv with the C-runtime rules, which escape embedded quotes as `\"` —
 cmd.exe misparses that and the server never starts.
+
+On native Windows, an existing XUUnity block that uses `bash`, `run.sh`, or a
+WSL path is not reusable. After explicit approval, replace only that server
+block with the native template above. Preserve every unrelated setting and MCP
+server, and do not leave a duplicate old block behind.
+
+After the restart or refresh, confirm that `xuunity_light_unity` appears in the
+MCP server list, ask Codex to list its live tools, and run
+`unity_status_summary`. Until that succeeds, report
+`MCP client connection unverified` rather than setup complete.
 
 ## Connect Claude Code
 
@@ -453,11 +516,15 @@ After package import and bridge enablement:
 1. open the Unity project
 2. confirm the package appears in Package Manager
 3. confirm the bridge state appears under `Library/XUUnityLightMcp/`
-4. call `unity.status` or `unity_status_summary`
-5. call `unity.capabilities.get`
-6. call `unity.health.probe`
+4. after any helper or client-config change, restart or refresh the MCP client
+5. confirm that `xuunity_light_unity` appears in the client and list its live tools
+6. call `unity.status` or `unity_status_summary`
+7. call `unity.capabilities.get`
+8. call `unity.health.probe`
 
-Do not treat the install as ready until status, capabilities, and health probe all succeed.
+Do not treat the install as ready until the client has loaded the live tools and
+status, capabilities, and health probe all succeed. Helper-only validation is
+not a substitute for this client-session proof.
 
 When an automated setup or verification step opens Unity with
 `ensure-ready --open-editor`, inspect the result for `opened_by_host`. If it is
@@ -481,7 +548,7 @@ If those checks succeed but a later compile or test run fails, treat that as a
 Unity project or runtime failure unless the error explicitly points back to
 bridge readiness, package import, or unsupported capability.
 
-For package-level verification after upgrading to `v0.3.44`, run:
+For package-level verification after upgrading to `v0.3.45`, run:
 
 ```bash
 templates/smoke/run_package_self_tests.sh \

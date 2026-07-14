@@ -98,6 +98,22 @@ def apply_setup_plan(
             if kind == "set_manifest_dependency":
                 package_name = str(action.get("package") or "")
                 value = str(action.get("value") or "")
+                if "expected_current_value" in action:
+                    expected_current_value = str(action.get("expected_current_value") or "")
+                    actual_current_value = manifest_dependency(project_root, package_name)
+                    if actual_current_value != expected_current_value:
+                        raise ToolInvocationError(
+                            "setup_plan_stale_dependency_changed",
+                            "The package dependency changed after setup-plan was reviewed; refusing to apply a stale plan.",
+                            {
+                                "project_root": str(project_root),
+                                "package": package_name,
+                                "expected_current_value": expected_current_value,
+                                "actual_current_value": actual_current_value,
+                                "requested_value": value,
+                                "recommended_next_step": "Run setup-plan again and review the new dependency state.",
+                            },
+                        )
                 set_manifest_dependency(project_root, package_name, value)
                 removed = remove_lock_entries(project_root, [package_name])
                 applied_actions.append({**action, "packages_lock_entries_removed": removed})

@@ -103,6 +103,31 @@ class ProjectDiscoveryTests(unittest.TestCase):
         self.assertFalse(result["bridge_state_live"])
         self.assertEqual("stale_bridge_state", result["reconciliation_case"])
 
+    def test_alive_stale_bridge_pid_without_process_match_is_not_project_editor(self) -> None:
+        project_root = Path("/tmp/ProjectA")
+        result = discover_project_context_state(
+            project_root,
+            try_read_bridge_state=lambda _: {"editor_pid": 4242, "transport": "tcp_loopback"},
+            try_read_host_editor_session_state=lambda _: {"editor_pid": 4242, "opened_by_host": True},
+            find_running_unity_editors_for_project=lambda _: [],
+            pid_is_alive=lambda pid: pid == 4242,
+            bridge_enabled=lambda _: True,
+            process_visibility_report={
+                "process_visibility_available": True,
+                "process_visibility_error_code": "",
+                "process_visibility_platform_kind": "windows",
+            },
+        )
+
+        self.assertTrue(result["bridge_pid_alive"])
+        self.assertTrue(result["host_session_pid_alive"])
+        self.assertFalse(result["bridge_pid_matches_project"])
+        self.assertFalse(result["host_session_pid_matches_project"])
+        self.assertFalse(result["bridge_state_live"])
+        self.assertFalse(result["host_session_live"])
+        self.assertEqual([], result["detected_editor_pids"])
+        self.assertEqual("stale_state", result["discovery_classification"])
+
     def test_discovery_classifies_disabled_bridge_without_live_editor(self) -> None:
         project_root = Path("/tmp/ProjectA")
         result = discover_project_context_state(

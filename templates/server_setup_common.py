@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import platform
 import re
@@ -24,6 +25,7 @@ UNINSTALL_MODES = {UNINSTALL_MODE_PROJECT_ONLY, UNINSTALL_MODE_FULL_RESET}
 UNINSTALL_MODE_ALIASES = {UNINSTALL_MODE_FULL_RESET_ALIAS: UNINSTALL_MODE_FULL_RESET}
 UNINSTALL_MODE_INPUTS = UNINSTALL_MODES | set(UNINSTALL_MODE_ALIASES)
 SUPPORTED_USER_CLIENTS = {"codex", "claude_code", "cursor", "windsurf", "claude_desktop", "neutral"}
+MINIMUM_HELPER_SAFETY_EPOCH = 2
 
 
 def normalize_uninstall_mode(mode: str) -> str:
@@ -245,6 +247,96 @@ def default_git_dependency(package_version: str) -> str:
     return f"{DEFAULT_GIT_REPO_URL}?path=/packages/com.xuunity.light-mcp#v{package_version}"
 
 
+_CANONICAL_LIGHT_MCP_GIT_DEPENDENCY_RE = re.compile(
+    r"^https://github\.com/FoxsterDev/xuunity-mcp(?:\.git)?"
+    r"\?path=/packages/com\.xuunity\.light-mcp#v(?P<version>[^#\s]+)$",
+    flags=re.IGNORECASE,
+)
+
+
+def normalize_package_version(version: str) -> str:
+    return str(version or "").strip().removeprefix("v")
+
+
+def canonical_light_mcp_git_version(dependency: str) -> str:
+    match = _CANONICAL_LIGHT_MCP_GIT_DEPENDENCY_RE.fullmatch(str(dependency or "").strip())
+    return normalize_package_version(match.group("version")) if match else ""
+
+
+def classify_light_mcp_dependency(
+    dependency: str,
+    *,
+    package_source: str,
+    package_version: str,
+    local_package_source: str,
+) -> dict[str, Any]:
+    """Compare the declared package with the exact source requested by setup.
+
+    Only a missing dependency, a stale pin from the canonical repository, or an
+    explicitly requested local-file source is safe to rewrite automatically
+    after approval. Forks and other custom sources remain manual decisions.
+    """
+
+    current = str(dependency or "").strip()
+    requested_version = normalize_package_version(package_version)
+    requested_dependency = (
+        f"file:{Path(local_package_source).expanduser().resolve()}"
+        if package_source == "file"
+        else default_git_dependency(requested_version)
+    )
+    declared_version = canonical_light_mcp_git_version(current)
+    status = "missing"
+    automatic_update_allowed = True
+    runtime_execution_allowed = False
+    reason = "install_missing_dependency"
+
+    if not current:
+        pass
+    elif current == requested_dependency:
+        status = "aligned"
+        automatic_update_allowed = False
+        runtime_execution_allowed = True
+        reason = "requested_dependency_already_declared"
+    elif package_source == "git" and declared_version:
+        if declared_version == requested_version:
+            # Accept the canonical URL with or without the optional .git suffix.
+            status = "aligned"
+            automatic_update_allowed = False
+            runtime_execution_allowed = True
+            reason = "requested_canonical_version_already_declared"
+        elif version_tuple(declared_version) < version_tuple(requested_version):
+            status = "stale_git_pin"
+            automatic_update_allowed = True
+            reason = "upgrade_stale_git_pin"
+        elif version_tuple(declared_version) > version_tuple(requested_version):
+            status = "newer_than_requested"
+            automatic_update_allowed = False
+            reason = "refuse_automatic_downgrade"
+        else:
+            status = "version_mismatch"
+            automatic_update_allowed = False
+            reason = "manual_version_review_required"
+    elif package_source == "file":
+        status = "explicit_source_change"
+        automatic_update_allowed = True
+        reason = "switch_to_explicit_local_source"
+    else:
+        status = "custom_source_mismatch"
+        automatic_update_allowed = False
+        reason = "preserve_custom_or_forked_source"
+
+    return {
+        "status": status,
+        "current_dependency": current,
+        "requested_dependency": requested_dependency,
+        "declared_version": declared_version,
+        "requested_version": requested_version,
+        "automatic_update_allowed": automatic_update_allowed,
+        "runtime_execution_allowed": runtime_execution_allowed,
+        "reason": reason,
+    }
+
+
 def platform_kind() -> str:
     system = platform.system().lower()
     if system == "darwin":
@@ -371,7 +463,167 @@ def get_neutral_install_dir() -> Path:
     return home / ".local" / "share" / "xuunity-mcp"
 
 
-def helper_install_targets() -> list[dict[str, Any]]:
+def read_helper_package_version(install_dir: Path) -> str:
+    package_path = install_dir / "packages" / LIGHT_MCP_PACKAGE_NAME / "package.json"
+    try:
+        payload = read_json(package_path)
+    except Exception:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    return normalize_package_version(str(payload.get("version") or ""))
+
+
+def read_helper_source_root(install_dir: Path) -> tuple[str, str]:
+    marker_path = install_dir / ".source_root"
+    try:
+        source_root = marker_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return "", ""
+    if not source_root:
+        return "", ""
+    source_version = ""
+    try:
+        payload = read_json(Path(source_root) / "packages" / LIGHT_MCP_PACKAGE_NAME / "package.json")
+        if isinstance(payload, dict):
+            source_version = normalize_package_version(str(payload.get("version") or ""))
+    except Exception:
+        pass
+    return source_root, source_version
+
+
+def verify_helper_integrity_manifest(install_dir: Path, expected_version: str) -> dict[str, Any]:
+    manifest_path = install_dir / ".install_manifest.json"
+    try:
+        payload = read_json(manifest_path)
+    except Exception:
+        return {"status": "missing", "verified": False, "safety_epoch": 0, "mismatched_files": []}
+    if not isinstance(payload, dict):
+        return {"status": "invalid", "verified": False, "safety_epoch": 0, "mismatched_files": []}
+
+    try:
+        safety_epoch = int(payload.get("safety_epoch") or 0)
+    except (TypeError, ValueError):
+        return {"status": "invalid", "verified": False, "safety_epoch": 0, "mismatched_files": []}
+    manifest_version = normalize_package_version(str(payload.get("version") or ""))
+    files = payload.get("files")
+    if safety_epoch < MINIMUM_HELPER_SAFETY_EPOCH:
+        return {
+            "status": "unsafe_epoch",
+            "verified": False,
+            "safety_epoch": safety_epoch,
+            "mismatched_files": [],
+        }
+    if manifest_version != normalize_package_version(expected_version):
+        return {
+            "status": "version_mismatch",
+            "verified": False,
+            "safety_epoch": safety_epoch,
+            "mismatched_files": [],
+        }
+    if not isinstance(files, dict) or not files:
+        return {
+            "status": "invalid",
+            "verified": False,
+            "safety_epoch": safety_epoch,
+            "mismatched_files": [],
+        }
+
+    mismatched_files: list[str] = []
+    for relative_name, expected_hash in files.items():
+        relative_path = Path(str(relative_name))
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            mismatched_files.append(str(relative_name))
+            continue
+        file_path = install_dir / relative_path
+        try:
+            actual_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
+        except OSError:
+            actual_hash = ""
+        if actual_hash != str(expected_hash or ""):
+            mismatched_files.append(str(relative_name))
+    return {
+        "status": "verified" if not mismatched_files else "file_hash_mismatch",
+        "verified": not mismatched_files,
+        "safety_epoch": safety_epoch,
+        "mismatched_files": sorted(mismatched_files),
+    }
+
+
+def build_helper_install_target(
+    *,
+    client_id: str,
+    tools_home: Path,
+    install_dir: Path,
+    expected_version: str,
+    selected_by_default: bool,
+) -> dict[str, Any]:
+    current_platform = platform_kind()
+    legacy_run_path = install_dir / "run.sh"
+    server_path = install_dir / "server.py"
+    refresh_run_path = install_dir / (
+        "run_installed_or_refresh_xuunity_mcp.cmd"
+        if current_platform == "windows"
+        else "run_installed_or_refresh_xuunity_mcp.sh"
+    )
+    installed = legacy_run_path.is_file() and server_path.is_file()
+    installed_version = read_helper_package_version(install_dir) if installed else ""
+    source_root, source_version = read_helper_source_root(install_dir) if installed else ("", "")
+    normalized_expected = normalize_package_version(expected_version)
+    refresh_launcher_present = refresh_run_path.is_file()
+    integrity = (
+        verify_helper_integrity_manifest(install_dir, normalized_expected)
+        if installed
+        else {"status": "missing", "verified": False, "safety_epoch": 0, "mismatched_files": []}
+    )
+
+    if not installed:
+        version_alignment = "missing"
+        helper_action = "neutral_install" if client_id == "neutral" else "install_helper"
+    elif not installed_version:
+        version_alignment = "unknown"
+        helper_action = "refresh_existing_helper"
+    elif installed_version != normalized_expected:
+        version_alignment = "stale" if version_tuple(installed_version) < version_tuple(normalized_expected) else "mismatch"
+        helper_action = "refresh_existing_helper"
+    elif source_version and source_version != normalized_expected:
+        version_alignment = "source_root_mismatch"
+        helper_action = "refresh_existing_helper"
+    elif not refresh_launcher_present:
+        version_alignment = "refresh_launcher_missing"
+        helper_action = "refresh_existing_helper"
+    elif not integrity["verified"]:
+        version_alignment = f"integrity_{integrity['status']}"
+        helper_action = "refresh_existing_helper"
+    else:
+        version_alignment = "aligned"
+        helper_action = "reuse_current_helper"
+
+    return {
+        "client_id": client_id,
+        "tools_home": str(tools_home),
+        "install_dir": str(install_dir),
+        "run_path": str(refresh_run_path),
+        "legacy_direct_run_path": str(legacy_run_path),
+        "server_path": str(server_path),
+        "installed": installed,
+        "installed_version": installed_version,
+        "expected_version": normalized_expected,
+        "version_alignment": version_alignment,
+        "source_root": source_root,
+        "source_root_version": source_version,
+        "refresh_launcher_present": refresh_launcher_present,
+        "integrity_status": integrity["status"],
+        "integrity_verified": integrity["verified"],
+        "safety_epoch": integrity["safety_epoch"],
+        "integrity_mismatched_files": integrity["mismatched_files"],
+        "runtime_execution_allowed": version_alignment == "aligned",
+        "helper_action": helper_action,
+        "selected_by_default": selected_by_default,
+    }
+
+
+def helper_install_targets(expected_version: str = "") -> list[dict[str, Any]]:
     home = user_home_fallback()
     codex_tools_home = Path(os.environ.get("CODEX_TOOLS_HOME") or home / ".codex-tools")
     claude_tools_home = Path(os.environ.get("CLAUDE_TOOLS_HOME") or home / ".claude-tools")
@@ -383,38 +635,107 @@ def helper_install_targets() -> list[dict[str, Any]]:
         ("claude_code", claude_tools_home),
     ):
         install_dir = tools_home / "xuunity-mcp"
-        run_path = install_dir / "run.sh"
-        server_path = install_dir / "server.py"
-        installed = run_path.is_file() and server_path.is_file()
         targets.append(
-            {
-                "client_id": client_id,
-                "tools_home": str(tools_home),
-                "install_dir": str(install_dir),
-                "run_path": str(run_path),
-                "server_path": str(server_path),
-                "installed": installed,
-                "helper_action": "reuse_existing_helper" if installed else "install_helper",
-                "selected_by_default": client_id == intended_wiring_target_for_detected_client(detected_client),
-            }
+            build_helper_install_target(
+                client_id=client_id,
+                tools_home=tools_home,
+                install_dir=install_dir,
+                expected_version=expected_version,
+                selected_by_default=client_id == intended_wiring_target_for_detected_client(detected_client),
+            )
         )
 
-    neutral_run = neutral_tools_home / "run.sh"
-    neutral_server = neutral_tools_home / "server.py"
-    neutral_installed = neutral_run.is_file() and neutral_server.is_file()
     targets.append(
-        {
-            "client_id": "neutral",
-            "tools_home": str(neutral_tools_home.parent),
-            "install_dir": str(neutral_tools_home),
-            "run_path": str(neutral_run),
-            "server_path": str(neutral_server),
-            "installed": neutral_installed,
-            "helper_action": "neutral_install" if not neutral_installed else "reuse_existing_helper",
-            "selected_by_default": True,
-        }
+        build_helper_install_target(
+            client_id="neutral",
+            tools_home=neutral_tools_home.parent,
+            install_dir=neutral_tools_home,
+            expected_version=expected_version,
+            selected_by_default=True,
+        )
     )
     return targets
+
+
+def toml_server_block_text(path: Path) -> str:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    match = re.search(
+        r"^\[mcp_servers\.xuunity_light_unity\]\s*$"
+        r"(?P<body>.*?)(?=^\[|\Z)",
+        text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    return match.group(0).strip() if match else ""
+
+
+def json_server_entry(path: Path) -> dict[str, Any]:
+    try:
+        payload = read_json(path)
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    servers = payload.get("mcpServers")
+    if not isinstance(servers, dict):
+        return {}
+    entry = servers.get("xuunity_light_unity")
+    return entry if isinstance(entry, dict) else {}
+
+
+def classify_client_launcher(path: Path, config_format: str, current_platform: str) -> dict[str, Any]:
+    command = ""
+    args: list[str] = []
+    raw = ""
+    if config_format == "toml":
+        raw = toml_server_block_text(path)
+        command_match = re.search(r'^\s*command\s*=\s*"([^"\n]+)"', raw, flags=re.MULTILINE)
+        command = command_match.group(1) if command_match else ""
+        args_match = re.search(r"^\s*args\s*=\s*(\[[^\n]*\])", raw, flags=re.MULTILINE)
+        if args_match:
+            try:
+                parsed_args = json.loads(args_match.group(1))
+                if isinstance(parsed_args, list):
+                    args = [str(item) for item in parsed_args]
+            except Exception:
+                pass
+    else:
+        entry = json_server_entry(path)
+        command = str(entry.get("command") or "")
+        raw_args = entry.get("args")
+        if isinstance(raw_args, list):
+            args = [str(item) for item in raw_args]
+        raw = json.dumps(entry, ensure_ascii=True)
+
+    if not raw:
+        return {"status": "missing", "issue_codes": [], "command": "", "args": []}
+
+    issue_codes: list[str] = []
+    combined = " ".join([command, *args]).lower()
+    if current_platform == "windows":
+        if command.lower() not in {"cmd", "cmd.exe"}:
+            issue_codes.append("windows_launcher_flavor_mismatch")
+        if args[:3] != ["/d", "/c", "call"]:
+            issue_codes.append("windows_cmd_invocation_mismatch")
+        if "run_installed_or_refresh_xuunity_mcp.cmd" not in combined:
+            issue_codes.append("refresh_launcher_missing")
+        if "bash" in combined or ".sh" in combined or re.search(r"(?:^|[\\/])run\.sh(?:$|\s)", combined):
+            issue_codes.append("unsafe_legacy_launcher_reference")
+        status = "compatible" if not issue_codes else "windows_launcher_migration_required"
+    else:
+        if not command.startswith("/"):
+            issue_codes.append("posix_launcher_not_absolute")
+        if not args or args[0] != "-c" or "-lc" in args:
+            issue_codes.append("posix_login_shell_not_allowed")
+        if "run_installed_or_refresh_xuunity_mcp.sh" not in combined:
+            issue_codes.append("refresh_launcher_missing")
+        if re.search(r"(?:^|/)run\.sh(?:$|[\s\"'])", combined):
+            issue_codes.append("unsafe_legacy_launcher_reference")
+        status = "compatible" if not issue_codes else "posix_launcher_migration_required"
+
+    return {"status": status, "issue_codes": issue_codes, "command": command, "args": args}
 
 def toml_contains_server_block(path: Path) -> bool:
     try:
@@ -455,8 +776,15 @@ def build_client_config_targets(primary_project_root: Path | None) -> list[dict[
             has_server_block = toml_contains_server_block(path) if path.is_file() else False
         else:
             has_server_block = json_contains_server_block(path) if path.is_file() else False
-        if has_server_block:
+        launcher = (
+            classify_client_launcher(path, config_format, current_platform)
+            if has_server_block
+            else {"status": "missing", "issue_codes": [], "command": "", "args": []}
+        )
+        if has_server_block and launcher["status"] == "compatible":
             config_action = "verify_existing_server_block"
+        elif has_server_block:
+            config_action = "replace_incompatible_server_block"
         elif path.is_file():
             config_action = "merge_add_server_block"
         else:
@@ -470,6 +798,11 @@ def build_client_config_targets(primary_project_root: Path | None) -> list[dict[
                 "exists": path.is_file(),
                 "server_block_present": has_server_block,
                 "config_action": config_action,
+                "launcher_status": launcher["status"],
+                "launcher_issue_codes": launcher["issue_codes"],
+                "configured_command": launcher["command"],
+                "configured_args": launcher["args"],
+                "runtime_execution_allowed": launcher["status"] == "compatible",
                 "merge_only": True,
                 "selected_by_default": client_id == intended_wiring_target_for_detected_client(detected_client),
                 "restart_or_refresh_required": restart_or_refresh_required,

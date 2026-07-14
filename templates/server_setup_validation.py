@@ -62,15 +62,39 @@ def install_test_framework(project_root: Path, *, approve: bool, version: str = 
     }
 
 
-def validate_setup(project_root: Path, *, include_tests: bool = False) -> dict[str, Any]:
+def validate_setup(
+    project_root: Path,
+    *,
+    include_tests: bool = False,
+    expected_package_version: str = "",
+) -> dict[str, Any]:
     unity_version = parse_unity_version(project_root)
     package_dependency = manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME)
     bridge_state = bridge_config_state(project_root)
     import_state = inspect_light_mcp_import_state(project_root)
     tf_state = classify_test_framework_state(project_root, unity_version)
+    normalized_expected_version = normalize_package_version(expected_package_version)
+    package_alignment: dict[str, Any] = {
+        "status": "not_checked",
+        "current_dependency": package_dependency,
+        "requested_version": normalized_expected_version,
+    }
+    if package_dependency and normalized_expected_version:
+        package_alignment = classify_light_mcp_dependency(
+            package_dependency,
+            package_source="git",
+            package_version=normalized_expected_version,
+            local_package_source="",
+        )
     blockers: list[str] = []
     if not package_dependency:
         blockers.append("mcp_package_missing")
+    elif (
+        normalized_expected_version
+        and canonical_light_mcp_git_version(package_dependency)
+        and package_alignment.get("status") != "aligned"
+    ):
+        blockers.append("mcp_package_version_mismatch")
     if not bridge_state["enabled"]:
         blockers.append("bridge_config_missing")
     if include_tests and not tf_state["supported"]:
@@ -82,6 +106,8 @@ def validate_setup(project_root: Path, *, include_tests: bool = False) -> dict[s
         "unity_version": unity_version,
         "package_dependency_state": "declared" if package_dependency else "missing",
         "package_dependency": package_dependency,
+        "expected_package_version": normalized_expected_version,
+        "package_alignment": package_alignment,
         "package_import_state": import_state,
         "bridge_config_state": bridge_state,
         "test_framework_state": tf_state,
@@ -90,8 +116,9 @@ def validate_setup(project_root: Path, *, include_tests: bool = False) -> dict[s
         "offline_validation_status": offline_status,
         "readiness_scope": "offline_manifest_and_bridge_config_only",
         "readiness_scope_note": (
-            "validate-setup does not prove Unity package resolution, package import, "
-            "or live bridge heartbeat; run ensure-ready --open-editor for live readiness."
+            "validate-setup checks the canonical package pin when an expected release is supplied, "
+            "but does not prove Unity package resolution, package import, or live bridge heartbeat; "
+            "run ensure-ready --open-editor only after package/helper/client alignment is ready."
         ),
         "blockers": blockers,
     }

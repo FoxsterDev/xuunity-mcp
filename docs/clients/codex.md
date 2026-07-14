@@ -3,6 +3,10 @@
 Use the Codex-style config when the client reads MCP servers from
 `~/.codex/config.toml`.
 
+This guide is pinned to XUUnity release `v0.3.45` from the canonical repository
+`https://github.com/FoxsterDev/xuunity-mcp`. Use the matching release README:
+`https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.45/README.md`.
+
 When a short install request does not name a client explicitly, treat the
 current host client that is executing the request as the default wiring target.
 For prompts coming from Codex, wire Codex by default and show that assumption in
@@ -34,11 +38,16 @@ Preflight review
 - Wiring target: Codex
 - Unity project root: <approved project root>
 - Additional discovered Unity projects: <none or list>
-- Existing helper install: <reuse existing helper | install or refresh after approval>
+- Requested package release: <v0.3.45>
+- Current package pin: <missing | current | stale | custom>
+- Existing helper directory: <present | missing>
+- Helper state: <current | refresh required | missing> (<installed version and source root>)
 - Existing Codex MCP block: <present | missing>
+- Codex launcher state: <native/current | migration required>
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no>
+- Required live proof after restart: <server listed, tools listed, unity_status_summary healthy with mcp_server_info.version=0.3.45>
 - Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 
 Do not run setup-apply, installer commands, helper sync, or Codex config edits
@@ -46,8 +55,9 @@ until the user explicitly approves this review.
 ```
 
 If `~/.codex/config.toml` already contains
-`[mcp_servers.xuunity_light_unity]`, the default action is verify-only:
-inspect the block, avoid adding a duplicate, and run project readiness checks.
+`[mcp_servers.xuunity_light_unity]`, inspect the existing block before reuse.
+Avoid adding a duplicate. On native Windows, a block that uses `bash`, `run.sh`,
+or a WSL path is `migration required`, not verify-only; do not launch it.
 
 For one explicitly requested Unity project, use
 `setup-plan --project-root /path/to/UnityProject` by default even if sibling
@@ -62,6 +72,18 @@ Install the host-side server files:
 bash init_xuunity_light_unity_mcp.sh --target codex
 ```
 
+On native Windows, install or refresh the Codex helper from the approved
+v0.3.45 source through the native wrapper instead of executing an old helper or
+requiring Git Bash:
+
+```powershell
+$env:XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET = "codex"
+.\xuunity_light_unity_mcp.cmd server-help
+```
+
+`server-help` first synchronizes the selected installed helper from this source
+checkout, then verifies that the installed server CLI starts.
+
 When the wrapper runs from a Codex-style environment, its default `auto`
 install target prefers `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}` even if a
 Claude-side helper also exists. To make that explicit in scripts, set:
@@ -70,9 +92,10 @@ Claude-side helper also exists. To make that explicit in scripts, set:
 export XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex
 ```
 
-If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh`
-already exists, reuse that helper install instead of cloning a fresh repo just
-to run the installer again.
+If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp` already exists, reuse
+the directory only after comparing the installed helper version and
+`.source_root` with v0.3.45. Do not execute stale helper files. Refresh them
+from the approved v0.3.45 source after the preflight review is approved.
 
 Enable the bridge for the Unity project without changing package mode:
 
@@ -95,8 +118,8 @@ bash init_xuunity_light_unity_mcp.sh \
   --install-codex-config
 ```
 
-If the current Codex session does not hot-reload newly installed MCP servers,
-restart the client after this change.
+After changing the helper or Codex MCP block, restart or refresh Codex. Treat
+this as a required setup phase, not an optional cleanup note.
 
 If `~/.codex/config.toml` already contains
 `[mcp_servers.xuunity_light_unity]`, merge or verify the existing block instead
@@ -107,6 +130,11 @@ On native Windows, the installer writes a `cmd.exe` block that calls
 `[mcp_servers.xuunity_light_unity]` block still uses `bash`, the installer
 keeps it in place and reports `windows_codex_launcher_mismatch` with the
 merge-safe replacement block.
+
+That warning is not a successful migration. Do not execute the stale block.
+After explicit approval, replace only the existing XUUnity block with the
+reported native `cmd.exe`/`.cmd` block. Preserve unrelated Codex settings and
+MCP servers, and do not leave a duplicate old block behind.
 
 ## Manual Config
 
@@ -140,6 +168,10 @@ embedded quotes as `\"` — cmd.exe misparses that and the server never starts.
 The Windows config uses `run_installed_or_refresh_xuunity_mcp.cmd`, which
 delegates to the refresh-before-run launcher before starting the installed
 server. Keep `run.cmd` as a low-level fallback, not the default client command.
+
+The refresh launcher is source-relative. If `.source_root` points at an older
+checkout, it can keep an older helper current relative to that checkout. Verify
+the installed version/source against v0.3.45 before executing it for this setup.
 
 Manual or automatic Codex config only wires the client to the host helper. It
 does not prove that a specific Unity project has the MCP package dependency,
@@ -225,10 +257,10 @@ Windows route for project paths containing spaces.
 
 Run these commands sequentially; do not run the status check before
 `ensure-ready` finishes. If the current Codex session does not hot-reload newly
-installed MCP servers, this helper status summary is the correct first
-verification.
+installed MCP servers, this helper status summary is useful helper-side
+verification, but it does not prove that Codex loaded the MCP server.
 
-Then restart or refresh Codex if needed, confirm that `xuunity_light_unity`
+Then restart or refresh Codex, confirm that `xuunity_light_unity`
 appears in the MCP server list, and ask the client to list the server tools:
 
 ```text
@@ -237,7 +269,7 @@ Use xuunity_light_unity MCP and list tools.
 
 Then verify a concrete Unity project:
 
-1. `unity_status_summary`
+1. `unity_status_summary` and require `mcp_server_info.version=0.3.45`
 2. `unity_capabilities`
 3. `unity_health_probe`
 4. `unity_console_tail`
@@ -245,6 +277,11 @@ Then verify a concrete Unity project:
 Treat `unity_status_summary` as the canonical first live MCP-tool smoke-check
 after Codex can see the server. Only move on to tests or builds after the
 status summary reports a healthy bridge.
+
+Do not report setup complete until the restart/refresh, live tool listing, and
+`unity_status_summary` all succeed. If the current session still cannot see the
+server, report `MCP client connection unverified` and the required restart
+instead.
 
 If Codex used `ensure-ready --open-editor` and the result reports
 `opened_by_host: true`, Codex owns that temporary Unity editor session. Before

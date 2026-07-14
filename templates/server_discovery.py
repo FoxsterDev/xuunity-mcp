@@ -462,12 +462,12 @@ def discover_project_context_state(
     bridge_pid_alive = pid_is_alive(bridge_pid) if bridge_pid > 0 else False
     host_session_pid_alive = pid_is_alive(host_session_pid) if host_session_pid > 0 else False
 
-    bridge_pid_matches_project = bridge_pid_alive and (
-        not detected_editor_pid_set or bridge_pid in detected_editor_pid_set
-    )
-    host_session_pid_matches_project = host_session_pid_alive and (
-        not detected_editor_pid_set or host_session_pid in detected_editor_pid_set
-    )
+    # Empty or unavailable process discovery is absence of identity evidence,
+    # not proof that an arbitrary alive PID belongs to this Unity project.
+    # Persisted bridge/session files can outlive their process and their PID can
+    # be reused, so require a positive executable + -projectPath table match.
+    bridge_pid_matches_project = bridge_pid_alive and bridge_pid in detected_editor_pid_set
+    host_session_pid_matches_project = host_session_pid_alive and host_session_pid in detected_editor_pid_set
 
     bridge_state_live = bool(bridge_state) and bridge_pid_matches_project
     host_session_live = bool(host_editor_session_state) and host_session_pid_matches_project

@@ -52,7 +52,11 @@ def cmd_uninstall_apply(args):
 
 def cmd_validate_setup(args):
     project_root = normalize_setup_project_root(args.project_root)
-    payload = validate_setup(project_root, include_tests=bool(args.include_tests))
+    payload = validate_setup(
+        project_root,
+        include_tests=bool(args.include_tests),
+        expected_package_version=default_light_mcp_package_version(),
+    )
     print_json(payload)
     if payload.get("validation_status") != "ready":
         raise SystemExit(1)

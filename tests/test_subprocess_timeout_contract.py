@@ -143,7 +143,7 @@ class HiddenWindowKwargsTest(unittest.TestCase):
 
 
 class TaskkillContractTest(unittest.TestCase):
-    def test_taskkill_kills_process_tree_with_timeout(self) -> None:
+    def test_editor_taskkill_targets_only_verified_pid_with_timeout(self) -> None:
         completed = mock.Mock(returncode=0)
         # Call through the facade: it re-syncs the owner module, so leftover
         # patches from earlier facade-based tests cannot leak in here.
@@ -158,7 +158,7 @@ class TaskkillContractTest(unittest.TestCase):
 
         run_mock.assert_called_once()
         argv = run_mock.call_args.args[0]
-        self.assertEqual(["taskkill", "/F", "/T", "/PID", "4242"], argv)
+        self.assertEqual(["taskkill", "/F", "/PID", "4242"], argv)
         self.assertEqual(
             server_editor_host_lifecycle.TASKKILL_TIMEOUT_SECONDS,
             run_mock.call_args.kwargs["timeout"],

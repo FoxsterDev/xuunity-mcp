@@ -27,6 +27,7 @@ from server_editor_host import (
     bridge_state_is_ready,
     default_batch_operation_log_path,
     detect_unity_app_path_for_project,
+    find_running_unity_editors_for_project,
     open_unity_editor,
     process_visibility_summary,
     terminate_editor_pid,
@@ -91,6 +92,7 @@ def execute_host_health_recovery_policy(
     startup_policy: str,
     allow_open_editor: bool,
     background_open: bool = False,
+    allow_force_terminate: bool = False,
 ) -> dict[str, Any]:
     before_state = current_project_context_bridge_state(project_root)
     discovery = current_project_context_discovery_details(project_root)
@@ -99,6 +101,7 @@ def execute_host_health_recovery_policy(
     result: dict[str, Any] = {
         "host_health_classification": health_classification,
         "termination_policy": termination_policy,
+        "force_termination_authorized": bool(allow_force_terminate),
         "action": "none",
     }
 
@@ -109,25 +112,51 @@ def execute_host_health_recovery_policy(
         result["action"] = "observe_only"
         return result
 
+    if not allow_open_editor:
+        result["action"] = "termination_deferred_no_open"
+        return result
+
+    if not allow_force_terminate:
+        result["action"] = "termination_deferred_force_not_authorized"
+        result["recommended_next_action"] = "manual_editor_close_or_explicit_force_terminate"
+        return result
+
+    detected_pids = {
+        int(value or 0)
+        for value in (discovery.get("detected_editor_pids") or [])
+        if int(value or 0) > 0
+    }
     candidate_pid = 0
     for value in (
         int(discovery.get("bridge_pid") or 0),
         int(discovery.get("host_session_pid") or 0),
     ):
-        if value > 0:
+        if value > 0 and value in detected_pids:
             candidate_pid = value
             break
     if candidate_pid <= 0:
-        detected_pids = list(discovery.get("detected_editor_pids") or [])
-        candidate_pid = int(detected_pids[0] or 0) if detected_pids else 0
+        candidate_pid = min(detected_pids) if detected_pids else 0
 
     if candidate_pid <= 0:
         result["action"] = "no_live_pid_for_termination"
         return result
 
     result["target_editor_pid"] = candidate_pid
-    if not allow_open_editor:
-        result["action"] = "termination_deferred_no_open"
+
+    visibility = process_visibility_summary()
+    verified_editor_pids = {
+        int(editor.get("pid") or 0)
+        for editor in find_running_unity_editors_for_project(project_root)
+        if int(editor.get("pid") or 0) > 0
+    }
+    if (
+        not bool(visibility.get("process_visibility_available"))
+        or candidate_pid not in verified_editor_pids
+    ):
+        result["action"] = "termination_skipped_identity_unverified"
+        result["process_visibility_available"] = bool(visibility.get("process_visibility_available"))
+        result["process_visibility_error_code"] = str(visibility.get("process_visibility_error_code") or "")
+        result["verified_project_editor_pids"] = sorted(verified_editor_pids)
         return result
 
     result["terminated"] = terminate_editor_pid(candidate_pid, min(timeout_ms, 15000))
@@ -177,6 +206,7 @@ def recover_project_bridge_for_reconciliation(
     startup_policy: str,
     allow_open_editor: bool,
     background_open: bool = False,
+    allow_force_terminate: bool = False,
 ) -> dict[str, Any]:
     current_state = current_project_context_bridge_state(project_root)
     discovery = current_project_context_discovery_details(project_root)
@@ -187,6 +217,7 @@ def recover_project_bridge_for_reconciliation(
         "reconciliation_status": str(discovery.get("reconciliation_status") or ""),
         "reconciliation_recommended_next_action": next_action,
         "allow_open_editor": allow_open_editor,
+        "allow_force_terminate": bool(allow_force_terminate),
         "action": "none",
     }
 
@@ -200,6 +231,7 @@ def recover_project_bridge_for_reconciliation(
         startup_policy=startup_policy,
         allow_open_editor=allow_open_editor,
         background_open=background_open,
+        allow_force_terminate=allow_force_terminate,
     )
     recovery["host_health_recovery"] = host_health_recovery
     if str(host_health_recovery.get("action") or "") in {
@@ -208,6 +240,8 @@ def recover_project_bridge_for_reconciliation(
         "termination_failed",
         "no_live_pid_for_termination",
         "termination_deferred_no_open",
+        "termination_deferred_force_not_authorized",
+        "termination_skipped_identity_unverified",
     }:
         recovery["action"] = str(host_health_recovery.get("action") or "none")
         return recovery

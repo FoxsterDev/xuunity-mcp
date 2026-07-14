@@ -14,6 +14,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server
+import server_batch_orchestrator
 import server_editor_host
 import server_project_context
 from server_host_platform import HostPlatformAdapter
@@ -1265,34 +1266,159 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertEqual("termination_deferred_no_open", recovery["action"])
         terminate_mock.assert_not_called()
 
-    def test_execute_host_health_recovery_policy_terminates_and_reopens_for_anr(self) -> None:
-        context = types.SimpleNamespace(
-            discovery_details={
-                "host_health_classification": "anr",
-                "host_health_termination_policy": "graceful_terminate",
-                "host_health_recommended_next_action": "inspect_editor_log_and_consider_graceful_restart",
-                "bridge_pid": 777,
-                "detected_editor_pids": [777],
-            },
-            last_bridge_state={},
-        )
-        registry = types.SimpleNamespace(refresh_context=lambda _: context)
+    def test_execute_host_health_recovery_policy_requires_explicit_force_permission(self) -> None:
+        discovery = {
+            "host_health_classification": "anr",
+            "host_health_termination_policy": "graceful_terminate",
+            "bridge_pid": 777,
+            "detected_editor_pids": [777],
+            "process_visibility_available": True,
+        }
 
         with (
-            mock.patch.object(server, "_BRIDGE_REGISTRY", registry),
-            mock.patch.object(server, "read_best_effort_bridge_state", return_value={"editor_pid": 777, "bridge_generation": 4}),
-            mock.patch.object(server, "terminate_editor_pid", return_value=True) as terminate_mock,
-            mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/Applications/Unity.app")),
-            mock.patch.object(server, "open_unity_editor", return_value={"editor_pid": 888, "reused_existing_editor": False}) as open_mock,
-            mock.patch.object(server, "wait_for_ready", return_value={"editor_pid": 888, "health_status": "healthy", "bridge_generation": 5}) as wait_mock,
-            mock.patch.object(server, "update_host_editor_session_pid") as update_mock,
-            mock.patch.object(server, "refresh_project_context", return_value=context),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "current_project_context_bridge_state",
+                return_value={"editor_pid": 777},
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "current_project_context_discovery_details",
+                return_value=discovery,
+            ),
+            mock.patch.object(
+                server_batch_orchestrator, "terminate_editor_pid"
+            ) as terminate_mock,
         ):
-            recovery = server.execute_host_health_recovery_policy(
+            recovery = server_batch_orchestrator.execute_host_health_recovery_policy(
                 Path("/tmp/FakeProject"),
                 timeout_ms=5000,
                 startup_policy="fail_fast_on_interactive_compile_block",
                 allow_open_editor=True,
+            )
+
+        self.assertEqual("termination_deferred_force_not_authorized", recovery["action"])
+        self.assertFalse(recovery["force_termination_authorized"])
+        terminate_mock.assert_not_called()
+
+    def test_execute_host_health_recovery_policy_revalidates_pid_identity_before_force(self) -> None:
+        discovery = {
+            "host_health_classification": "anr",
+            "host_health_termination_policy": "graceful_terminate",
+            "bridge_pid": 4242,
+            "detected_editor_pids": [4242],
+            "process_visibility_available": True,
+        }
+
+        with (
+            mock.patch.object(
+                server_batch_orchestrator,
+                "current_project_context_bridge_state",
+                return_value={"editor_pid": 4242},
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "current_project_context_discovery_details",
+                return_value=discovery,
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "process_visibility_summary",
+                return_value={
+                    "process_visibility_available": True,
+                    "process_visibility_error_code": "",
+                    "process_visibility_platform_kind": "windows",
+                },
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "find_running_unity_editors_for_project",
+                return_value=[],
+            ),
+            mock.patch.object(
+                server_batch_orchestrator, "terminate_editor_pid"
+            ) as terminate_mock,
+        ):
+            recovery = server_batch_orchestrator.execute_host_health_recovery_policy(
+                Path("/tmp/FakeProject"),
+                timeout_ms=5000,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                allow_open_editor=True,
+                allow_force_terminate=True,
+            )
+
+        self.assertEqual("termination_skipped_identity_unverified", recovery["action"])
+        self.assertTrue(recovery["force_termination_authorized"])
+        self.assertEqual([], recovery["verified_project_editor_pids"])
+        terminate_mock.assert_not_called()
+
+    def test_execute_host_health_recovery_policy_terminates_and_reopens_for_anr(self) -> None:
+        discovery = {
+            "host_health_classification": "anr",
+            "host_health_termination_policy": "graceful_terminate",
+            "host_health_recommended_next_action": "inspect_editor_log_and_consider_graceful_restart",
+            "bridge_pid": 777,
+            "detected_editor_pids": [777],
+            "process_visibility_available": True,
+        }
+        before_state = {"editor_pid": 777, "bridge_generation": 4}
+
+        with (
+            mock.patch.object(
+                server_batch_orchestrator,
+                "current_project_context_bridge_state",
+                return_value=before_state,
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "current_project_context_discovery_details",
+                return_value=discovery,
+            ),
+            mock.patch.object(
+                server_batch_orchestrator, "terminate_editor_pid", return_value=True
+            ) as terminate_mock,
+            mock.patch.object(
+                server_batch_orchestrator,
+                "process_visibility_summary",
+                return_value={
+                    "process_visibility_available": True,
+                    "process_visibility_error_code": "",
+                    "process_visibility_platform_kind": "windows",
+                },
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "find_running_unity_editors_for_project",
+                return_value=[{"pid": 777}],
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "detect_unity_app_path_for_project",
+                return_value=Path("/Applications/Unity.app"),
+            ),
+            mock.patch.object(
+                server_batch_orchestrator,
+                "open_unity_editor",
+                return_value={"editor_pid": 888, "reused_existing_editor": False},
+            ) as open_mock,
+            mock.patch.object(
+                server_batch_orchestrator,
+                "wait_for_ready",
+                return_value={"editor_pid": 888, "health_status": "healthy", "bridge_generation": 5},
+            ) as wait_mock,
+            mock.patch.object(
+                server_batch_orchestrator, "update_host_editor_session_pid"
+            ) as update_mock,
+            mock.patch.object(
+                server_batch_orchestrator, "refresh_project_context"
+            ),
+        ):
+            recovery = server_batch_orchestrator.execute_host_health_recovery_policy(
+                Path("/tmp/FakeProject"),
+                timeout_ms=5000,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                allow_open_editor=True,
+                allow_force_terminate=True,
             )
 
         self.assertEqual("terminated_and_reopened", recovery["action"])

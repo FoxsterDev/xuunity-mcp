@@ -26,7 +26,7 @@
             "operatingSystem": "macOS, Windows, Linux",
             "url": "https://foxsterdev.github.io/xuunity-mcp/",
             "downloadUrl": "https://github.com/FoxsterDev/xuunity-mcp",
-            "softwareVersion": "v0.3.44",
+            "softwareVersion": "v0.3.45",
             "description": "Lightweight Unity MCP server for safe Unity Editor automation, compile validation, tests, scene assertions, and validation-heavy workflows.",
             "keywords": "xuunity mcp, unity mcp, lightweight unity mcp, safe unity mcp, unity mcp testing, unity compile validation mcp",
             "license": "https://github.com/FoxsterDev/xuunity-mcp/blob/master/LICENSE"
@@ -47,7 +47,7 @@
                 "name": "What is the fastest way to try XUUnity MCP?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Ask an agent to set up XUUnity MCP from the repository README into a Unity project, run EditMode tests there, and print the results. The workflow still follows setup-plan, approval, setup-apply, validate-setup, and ensure-ready."
+                  "text": "Ask an agent to set up XUUnity MCP v0.3.45 from https://github.com/FoxsterDev/xuunity-mcp by following https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.45/README.md. The agent must verify or refresh an existing helper before use, migrate native Windows clients to the .cmd launcher, and prove the live MCP tools after a client restart or refresh before running EditMode tests."
                 }
               },
               {
@@ -119,11 +119,21 @@
             </div>
             <div class="prompt-copy-card">
               <p id="one-prompt-copy" class="prompt-text">
-                Use
-                <a href="https://github.com/FoxsterDev/xuunity-mcp/blob/master/README.md">the repository README</a>
-                to set up XUUnity MCP in
-                <code>/path/to/UnityProject</code>, run EditMode tests in that
-                project, and print the results here.
+                Set up XUUnity Light Unity MCP release <code>v0.3.45</code> from
+                <a href="https://github.com/FoxsterDev/xuunity-mcp">the canonical repository</a>
+                for <code>/path/to/UnityProject</code>. Follow
+                <a href="https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.45/README.md">the release README for v0.3.45</a>.
+                Do not execute an existing helper until its installed version
+                and <code>.source_root</code> have been checked and stale files
+                refreshed from v0.3.45. On native Windows, migrate only the
+                XUUnity client block to <code>cmd.exe</code> plus
+                <code>run_installed_or_<wbr>refresh_xuunity_mcp.cmd</code> and
+                preserve unrelated config. After any helper or client-config
+                change, restart or refresh the client, confirm
+                <code>xuunity_light_unity</code>, list the live MCP tools, and
+                run <code>unity_status_summary</code>. Require
+                <code>mcp_server_info.<wbr>version=<wbr>0.3.45</code> in that live result. Only then run EditMode
+                tests in that project and print the results here.
               </p>
             </div>
             <div class="prompt-action">
@@ -144,7 +154,7 @@
                 <span class="benefit-meta">01</span>
                 <div>
                   <h3>Faster first try</h3>
-                  <p>Paste the prompt once. The agent uses the repository README, picks the right client guide, makes a setup plan, applies after approval, and can run the first EditMode test pass.</p>
+                  <p>Paste the prompt once. The agent follows the v0.3.45 release README, checks old package/helper/client state, makes a setup plan, applies after approval, proves the restarted client loaded live tools, and can run the first EditMode test pass.</p>
                 </div>
               </div>
               <div class="benefit-row">
@@ -248,7 +258,7 @@
                   </div>
                   <div class="flow-row">
                     <span class="flow-num">C</span>
-                    <div><strong>Closeout proof</strong><span>The agent reports files changed, commands run, readiness, test result, and whether a client refresh is still needed.</span></div>
+                    <div><strong>Closeout proof</strong><span>The agent reports files changed, commands run, version alignment, readiness, client restart, live tool/status proof, and the test result.</span></div>
                   </div>
                 </div>
               </div>
@@ -270,14 +280,14 @@
                       <span>Git UPM package</span>
                       <span>current release</span>
                     </div>
-                    <pre><code>https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.44</code></pre>
+                    <pre><code>https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.45</code></pre>
                   </div>
                   <div class="code-panel">
                     <div class="code-top">
                       <span>First setup plan</span>
                       <span>non-mutating</span>
                     </div>
-                    <pre><code>bash init_xuunity_light_unity_mcp.sh
+                    <pre><code>cd &lt;APPROVED_V0.3.45_MCP_REPO_ROOT&gt;
 bash xuunity_light_unity_mcp.sh setup-plan \
   --project-root /path/to/UnityProject</code></pre>
                   </div>

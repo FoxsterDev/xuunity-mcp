@@ -692,6 +692,26 @@ class WindowsHostHelperTests(unittest.TestCase):
         mock_kill.assert_called_once_with(4321, server_editor_host.signal.SIGTERM)
         mock_run.assert_not_called()
 
+    @unittest.skipIf(os.name == "nt", "simulates WSL from a POSIX test host")
+    def test_terminate_editor_pid_uses_single_pid_taskkill_for_wsl_windows_process(self) -> None:
+        completed = mock.Mock(returncode=0)
+        with (
+            mock.patch.object(server_editor_host, "is_wsl", return_value=True),
+            mock.patch.object(server_editor_host, "pid_is_alive", side_effect=[True, False]),
+            mock.patch.object(
+                server_editor_host, "wsl_linux_unity_interop_pid_status", return_value=False
+            ),
+            mock.patch.object(
+                server_editor_host.subprocess, "run", return_value=completed
+            ) as mock_run,
+        ):
+            self.assertTrue(server_editor_host.terminate_editor_pid(4321, 1000))
+
+        argv = mock_run.call_args.args[0]
+        self.assertIn(argv[0], {"taskkill.exe", "taskkill"})
+        self.assertEqual(["/F", "/PID", "4321"], argv[1:])
+        self.assertNotIn("/T", argv)
+
     def test_process_visibility_warns_on_missing_wslpath_under_wsl(self) -> None:
         with (
             mock.patch.object(
@@ -861,6 +881,7 @@ class WindowsHostHelperTests(unittest.TestCase):
             self.assertTrue(server_editor_host.terminate_editor_pid(1234, 1000))
             mock_run.assert_called_once()
             self.assertIn("taskkill", mock_run.call_args[0][0])
+            self.assertNotIn("/T", mock_run.call_args[0][0])
 
 
 if __name__ == "__main__":

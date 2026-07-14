@@ -11,10 +11,12 @@ Contract mirrors the bash wrapper exactly: command names, env variables
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 MINIMUM_PYTHON_VERSION = "3.10"
@@ -409,13 +411,55 @@ def sync_file_from_source(paths: LauncherPaths, destination_path: str, relative_
     destination.write_bytes(payload)
 
 
+def write_helper_integrity_manifest(install_dir: str) -> None:
+    target = Path(install_dir)
+    package_path = target / PACKAGE_METADATA_RELATIVE_PATH
+    package = json.loads(package_path.read_text(encoding="utf-8"))
+    names = {
+        "server.py",
+        "run.sh",
+        "run.cmd",
+        "run.ps1",
+        "run_installed_or_refresh_xuunity_mcp.sh",
+        "run_installed_or_refresh_xuunity_mcp.py",
+        "run_installed_or_refresh_xuunity_mcp.cmd",
+        os.path.basename(RUNTIME_DEFAULTS_TEMPLATE_RELATIVE_PATH),
+        PACKAGE_METADATA_RELATIVE_PATH,
+        ".source_root",
+    }
+    names.update(path.name for path in target.glob(SERVER_MODULES_TEMPLATE_GLOB) if path.is_file())
+    files = {
+        relative_name: hashlib.sha256((target / relative_name).read_bytes()).hexdigest()
+        for relative_name in sorted(names)
+        if (target / relative_name).is_file()
+    }
+    payload = {
+        "schema_version": 1,
+        "version": str(package.get("version") or ""),
+        "safety_epoch": 2,
+        "files": files,
+    }
+    fd, temp_name = tempfile.mkstemp(prefix=".install_manifest.", suffix=".tmp", dir=target)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(payload, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_name, target / ".install_manifest.json")
+    finally:
+        try:
+            os.unlink(temp_name)
+        except FileNotFoundError:
+            pass
+
+
 def sync_installed_helper_if_needed(paths: LauncherPaths) -> None:
     if not os.path.isfile(os.path.join(paths.source_root, SERVER_TEMPLATE_RELATIVE_PATH)):
         return
 
     os.makedirs(paths.install_dir, exist_ok=True)
 
-    sync_file_from_source(paths, paths.server_path, SERVER_TEMPLATE_RELATIVE_PATH)
     sync_file_from_source(paths, paths.run_path, RUN_TEMPLATE_RELATIVE_PATH)
     if os.path.isfile(os.path.join(paths.source_root, RUN_CMD_TEMPLATE_RELATIVE_PATH)):
         sync_file_from_source(paths, paths.run_cmd_path, RUN_CMD_TEMPLATE_RELATIVE_PATH)
@@ -447,10 +491,14 @@ def sync_installed_helper_if_needed(paths: LauncherPaths) -> None:
             os.path.join(paths.install_dir, module_source_path.name),
             os.path.join("templates", module_source_path.name),
         )
+    Path(paths.install_dir, ".source_root").write_text(paths.source_root + "\n", encoding="utf-8")
+    # Keep the legacy version marker stale until every supporting module and
+    # launcher has been published. This makes interrupted refreshes retryable.
+    sync_file_from_source(paths, paths.server_path, SERVER_TEMPLATE_RELATIVE_PATH)
     os.chmod(paths.run_path, 0o755)
     if os.path.isfile(paths.refresh_run_path):
         os.chmod(paths.refresh_run_path, 0o755)
-    Path(paths.install_dir, ".source_root").write_text(paths.source_root + "\n", encoding="utf-8")
+    write_helper_integrity_manifest(paths.install_dir)
 
 
 def require_project_root_argument(args: list) -> str:

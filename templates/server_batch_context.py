@@ -56,8 +56,15 @@ MUTATING_BRIDGE_OPERATIONS = frozenset(
 TProjectOperationResult = TypeVar("TProjectOperationResult")
 
 def default_local_package_source() -> Path:
-    templates_dir = Path(__file__).resolve().parent
-    return templates_dir.parent / "packages" / "com.xuunity.light-mcp"
+    module_dir = Path(__file__).resolve().parent
+    candidates = (
+        module_dir.parent / "packages" / "com.xuunity.light-mcp",  # source checkout/templates
+        module_dir / "packages" / "com.xuunity.light-mcp",  # installed helper root
+    )
+    for candidate in candidates:
+        if (candidate / "package.json").is_file():
+            return candidate
+    return candidates[0]
 
 
 def default_light_mcp_package_version() -> str:

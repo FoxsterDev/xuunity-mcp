@@ -465,6 +465,13 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertTrue(codex_refresh_py.is_file())
             self.assertTrue(codex_refresh_cmd.is_file())
             self.assertEqual(repo_root.resolve(), Path((neutral_dir / ".source_root").read_text(encoding="utf-8").strip()).resolve())
+            neutral_manifest = json.loads((neutral_dir / ".install_manifest.json").read_text(encoding="utf-8"))
+            codex_manifest = json.loads((codex_install / ".install_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(2, neutral_manifest["safety_epoch"])
+            self.assertEqual(2, codex_manifest["safety_epoch"])
+            self.assertIn("server.py", neutral_manifest["files"])
+            self.assertIn("server_core.py", neutral_manifest["files"])
+            self.assertIn("run_installed_or_refresh_xuunity_mcp.py", neutral_manifest["files"])
 
             config_text = (codex_home / "config.toml").read_text(encoding="utf-8")
             if env.get("OS") == "Windows_NT" or env.get("APPDATA") or os.name == "nt":
@@ -669,7 +676,7 @@ class WrapperSourceRootTests(unittest.TestCase):
             self.assertTrue((neutral_dir / "run.ps1").is_file())
             self.assertTrue((neutral_dir / "server_core.py").is_file())
 
-    def test_init_warns_on_existing_windows_bash_codex_config_without_duplicate(self) -> None:
+    def test_init_replaces_existing_windows_bash_codex_block_without_touching_other_blocks(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
 
@@ -679,10 +686,14 @@ class WrapperSourceRootTests(unittest.TestCase):
             codex_home.mkdir(parents=True)
             config_path = codex_home / "config.toml"
             existing_config = (
+                "[mcp_servers.keep_me]\n"
+                'command = "keep-command"\n\n'
                 "[mcp_servers.xuunity_light_unity]\n"
                 'command = "bash"\n'
                 'args = ["-lc", "exec \\"/tmp/xuunity/run_installed_or_refresh_xuunity_mcp.sh\\""]\n'
-                "required = false\n"
+                "required = false\n\n"
+                "[notice]\n"
+                'hide_rate_limit_model_nudge = true\n'
             )
             config_path.write_text(existing_config, encoding="utf-8")
 
@@ -702,10 +713,18 @@ class WrapperSourceRootTests(unittest.TestCase):
             )
 
             self.assertEqual(0, completed.returncode, completed.stderr)
-            self.assertEqual(existing_config, config_path.read_text(encoding="utf-8"))
+            config_text = config_path.read_text(encoding="utf-8")
+            self.assertEqual(1, config_text.count("[mcp_servers.xuunity_light_unity]"))
+            self.assertIn("[mcp_servers.keep_me]", config_text)
+            self.assertIn('command = "keep-command"', config_text)
+            self.assertIn("[notice]", config_text)
+            self.assertIn("hide_rate_limit_model_nudge = true", config_text)
+            self.assertIn('command = "cmd.exe"', config_text)
+            self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", config_text)
+            self.assertNotIn('command = "bash"', config_text)
+            self.assertNotIn("run_installed_or_refresh_xuunity_mcp.sh", config_text)
             self.assertIn("windows_codex_launcher_mismatch", completed.stderr)
-            self.assertIn('command = "cmd.exe"', completed.stderr)
-            self.assertIn("run_installed_or_refresh_xuunity_mcp.cmd", completed.stderr)
+            self.assertIn("replaced XUUnity MCP block", completed.stdout)
 
     def test_refresh_shell_launcher_stays_thin(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -830,6 +849,44 @@ class WrapperSourceRootTests(unittest.TestCase):
                         if isinstance(target, ast.Name) and target.id == "SERVER_INFO":
                             refreshed_version = str(ast.literal_eval(node.value).get("version") or "")
             self.assertEqual(package_version, refreshed_version)
+
+    def test_installed_refresh_launcher_repairs_same_version_mixed_module_install(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        init_script = repo_root / "init_xuunity_light_unity_mcp.sh"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            neutral_dir = temp_root / "neutral"
+            env = self.make_env()
+            env["CODEX_TOOLS_HOME"] = str(temp_root / "codex-tools")
+            env["CLAUDE_TOOLS_HOME"] = str(temp_root / "claude-tools")
+            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral_dir)
+
+            installed = run_with_timeout(
+                [resolve_bash_executable(), init_script.as_posix(), "--target", "neutral"],
+                env=env,
+                timeout_seconds=120,
+            )
+            self.assertEqual(0, installed.returncode, installed.stderr)
+
+            module_path = neutral_dir / "server_editor_host_lifecycle.py"
+            expected = (repo_root / "templates" / module_path.name).read_bytes()
+            module_path.write_bytes(b"# stale mixed-version module\n")
+
+            refreshed = run_with_timeout(
+                [
+                    resolve_bash_executable(),
+                    (neutral_dir / "run_installed_or_refresh_xuunity_mcp.sh").as_posix(),
+                    "--print-server",
+                ],
+                env=env,
+                timeout_seconds=120,
+            )
+
+            self.assertEqual(0, refreshed.returncode, refreshed.stderr)
+            self.assertEqual(expected, module_path.read_bytes())
+            manifest = json.loads((neutral_dir / ".install_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(2, manifest["safety_epoch"])
 
     def test_explicit_install_target_can_force_claude_from_codex_context(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

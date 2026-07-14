@@ -18,6 +18,8 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server_editor_host
+import server_editor_host_lifecycle
+import server_editor_host_processes
 
 
 def make_unity_project(root: Path) -> Path:
@@ -109,6 +111,54 @@ class RestoreHostOpenedEditorKillIdentityTest(unittest.TestCase):
             terminate_mock.assert_not_called()
             self.assertEqual("tracked_pid_not_project_editor", result["closeout_classification"])
             self.assertEqual("inspect_project_editor_processes", result["recommended_next_action"])
+
+    def test_stale_bridge_foreign_pid_never_passes_restore_identity_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = make_unity_project(Path(tmp_dir) / "MyProject")
+            self.write_session(project_root, 4242)
+            stale_bridge_state = {"editor_pid": 4242, "heartbeat_utc": "2000-01-01T00:00:00Z"}
+
+            with (
+                mock.patch.object(
+                    server_editor_host_lifecycle,
+                    "try_read_live_editor_state",
+                    return_value=stale_bridge_state,
+                ),
+                mock.patch.object(
+                    server_editor_host_processes,
+                    "try_read_live_editor_state",
+                    return_value=stale_bridge_state,
+                ),
+                mock.patch.object(
+                    server_editor_host_processes,
+                    "find_running_unity_editors_for_project",
+                    return_value=[],
+                ),
+                mock.patch.object(server_editor_host_processes, "pid_is_alive", return_value=True),
+                mock.patch.object(
+                    server_editor_host_lifecycle,
+                    "list_live_project_editor_pids",
+                    side_effect=server_editor_host_processes.list_live_project_editor_pids,
+                ),
+                mock.patch.object(
+                    server_editor_host_lifecycle,
+                    "process_visibility_summary",
+                    return_value=dict(VISIBILITY_OK),
+                ),
+                mock.patch.object(server_editor_host_lifecycle, "pid_is_alive", return_value=True),
+                mock.patch.object(
+                    server_editor_host_lifecycle, "terminate_editor_pid"
+                ) as terminate_mock,
+            ):
+                request_quit = mock.Mock()
+                result = server_editor_host_lifecycle.restore_host_opened_editor_state(
+                    project_root, 30000, request_quit
+                )
+
+            terminate_mock.assert_not_called()
+            request_quit.assert_not_called()
+            self.assertTrue(result["same_project_editor_closed"])
+            self.assertEqual("tracked_editor_already_closed", result["closeout_classification"])
 
     def test_confirmed_project_editor_pid_is_killed_and_closed_out(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

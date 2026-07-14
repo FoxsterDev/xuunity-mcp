@@ -438,8 +438,10 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
         taskkill_success = False
         for cmd in ["taskkill", "taskkill.exe"]:
             try:
+                # Deliberately omit /T. Even a verified editor PID must not
+                # grant permission to terminate an unbounded descendant tree.
                 completed = subprocess.run(
-                    [cmd, "/F", "/T", "/PID", str(pid)],
+                    [cmd, "/F", "/PID", str(pid)],
                     capture_output=True,
                     check=False,
                     timeout=TASKKILL_TIMEOUT_SECONDS,
@@ -465,8 +467,10 @@ def terminate_editor_pid(pid: int, timeout_ms: int) -> bool:
         else:
             for cmd in ["taskkill.exe", "taskkill"]:
                 try:
+                    # Same single-PID boundary for Windows processes reached
+                    # through WSL interop.
                     subprocess.run(
-                        [cmd, "/F", "/T", "/PID", str(pid)],
+                        [cmd, "/F", "/PID", str(pid)],
                         capture_output=True,
                         check=False,
                         timeout=TASKKILL_TIMEOUT_SECONDS,

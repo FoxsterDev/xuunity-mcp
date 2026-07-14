@@ -9,6 +9,7 @@ logic.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import platform
@@ -62,6 +63,7 @@ def reconfigure_stdio_utf8() -> None:
 
 NATIVE_REFRESH_TIMEOUT_SECONDS = 120.0
 BASH_REFRESH_TIMEOUT_SECONDS = 300.0
+MINIMUM_HELPER_SAFETY_EPOCH = 2
 
 
 def hidden_window_subprocess_kwargs() -> dict:
@@ -148,6 +150,38 @@ def installed_server_version(server_path: Path) -> str | None:
     return None
 
 
+def helper_integrity_verified(install_dir: Path, expected_version: str) -> bool:
+    manifest_path = install_dir / ".install_manifest.json"
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    try:
+        safety_epoch = int(payload.get("safety_epoch") or 0)
+    except (TypeError, ValueError):
+        return False
+    if safety_epoch < MINIMUM_HELPER_SAFETY_EPOCH:
+        return False
+    if str(payload.get("version") or "").strip() != expected_version:
+        return False
+    files = payload.get("files")
+    if not isinstance(files, dict) or not files:
+        return False
+    for relative_name, expected_hash in files.items():
+        relative_path = Path(str(relative_name))
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            return False
+        try:
+            actual_hash = hashlib.sha256((install_dir / relative_path).read_bytes()).hexdigest()
+        except OSError:
+            return False
+        if actual_hash != str(expected_hash or ""):
+            return False
+    return True
+
+
 def find_bash() -> str:
     if os.name != "nt":
         inherited_bash = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_BASH")
@@ -212,11 +246,19 @@ def refresh_helper_if_needed(
     neutral_dir: Path,
 ) -> None:
     current_version = installed_server_version(server_path)
-    if current_version == expected_version and run_path.is_file():
+    if (
+        current_version == expected_version
+        and run_path.is_file()
+        and helper_integrity_verified(neutral_dir, expected_version)
+    ):
         return
 
     if refresh_via_native_launcher(source_root, neutral_dir):
-        if installed_server_version(server_path) == expected_version and run_path.is_file():
+        if (
+            installed_server_version(server_path) == expected_version
+            and run_path.is_file()
+            and helper_integrity_verified(neutral_dir, expected_version)
+        ):
             return
 
     if not installer.is_file():
@@ -248,6 +290,15 @@ def refresh_helper_if_needed(
             "xuunity MCP helper refresh failed. "
             "Run: bash init_xuunity_light_unity_mcp.sh --target both --force",
             completed.returncode,
+        )
+    if not (
+        installed_server_version(server_path) == expected_version
+        and run_path.is_file()
+        and helper_integrity_verified(neutral_dir, expected_version)
+    ):
+        fail(
+            "xuunity MCP helper refresh completed without a verified, internally consistent install. "
+            "Do not run Unity operations; re-run the installer from the requested tagged source checkout."
         )
 
 

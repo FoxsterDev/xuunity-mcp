@@ -1434,6 +1434,7 @@ actions:
         self.assertEqual(7, result["structuredContent"]["bridge_generation"])
         self.assertEqual("session-a", result["structuredContent"]["bridge_session_id"])
         self.assertEqual("healthy", result["structuredContent"]["health_status"])
+        self.assertEqual(server.SERVER_INFO, result["structuredContent"]["mcp_server_info"])
         self.assertEqual("idle", result["structuredContent"]["busy_reason"])
         self.assertEqual("fresh", result["structuredContent"]["host_health_classification"])
         self.assertEqual("bridge_live", result["structuredContent"]["discovery_classification"])
@@ -1499,6 +1500,7 @@ actions:
         self.assertEqual("stale_bridge_state", result["structuredContent"]["reconciliation_case"])
         self.assertEqual("offline", result["structuredContent"]["reconciliation_status"])
         self.assertEqual("recover_editor_session", result["structuredContent"]["reconciliation_recommended_next_action"])
+        self.assertEqual(server.SERVER_INFO, result["structuredContent"]["mcp_server_info"])
 
     def test_tools_call_scenario_result_summary_falls_back_to_discovery_when_editor_is_offline(self) -> None:
         with (

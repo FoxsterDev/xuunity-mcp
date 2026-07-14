@@ -289,6 +289,63 @@ copy_if_needed() {
   printf 'installed %s\n' "$dst"
 }
 
+write_integrity_manifest() {
+  local target_dir="$1"
+  if [[ $dry_run -eq 1 ]]; then
+    printf '[dry-run] write verified helper integrity manifest to %s/.install_manifest.json\n' "$target_dir"
+    return
+  fi
+  python3 - "$target_dir" <<'PY'
+import hashlib
+import json
+import os
+import tempfile
+from pathlib import Path
+import sys
+
+target = Path(sys.argv[1])
+package_path = target / "packages" / "com.xuunity.light-mcp" / "package.json"
+package = json.loads(package_path.read_text(encoding="utf-8"))
+names = {
+    "server.py",
+    "run.sh",
+    "run.cmd",
+    "run.ps1",
+    "run_installed_or_refresh_xuunity_mcp.sh",
+    "run_installed_or_refresh_xuunity_mcp.py",
+    "run_installed_or_refresh_xuunity_mcp.cmd",
+    "packages/com.xuunity.light-mcp/package.json",
+}
+names.update(path.name for path in target.glob("server_*.py") if path.is_file())
+if (target / ".source_root").is_file():
+    names.add(".source_root")
+files = {}
+for relative_name in sorted(names):
+    path = target / relative_name
+    if path.is_file():
+        files[relative_name] = hashlib.sha256(path.read_bytes()).hexdigest()
+payload = {
+    "schema_version": 1,
+    "version": str(package.get("version") or ""),
+    "safety_epoch": 2,
+    "files": files,
+}
+fd, temp_name = tempfile.mkstemp(prefix=".install_manifest.", suffix=".tmp", dir=target)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
+        json.dump(payload, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temp_name, target / ".install_manifest.json")
+finally:
+    try:
+        os.unlink(temp_name)
+    except FileNotFoundError:
+        pass
+PY
+}
+
 warn_ripgrep_fallback_once() {
   if [[ "${xuunity_light_unity_mcp_rg_fallback_warned:-0}" -eq 1 ]]; then
     return 0
@@ -342,30 +399,71 @@ append_codex_block_if_missing() {
   fi
   block+=$'required = false\n'
 
-  if [[ -f "$config_path" ]] && file_contains_regex '^\[mcp_servers\.xuunity_light_unity\]' "$config_path"; then
-    if is_windows_like_host && file_mcp_block_contains_regex '^[[:space:]]*command[[:space:]]*=[[:space:]]*"bash"' "$config_path"; then
-      {
-        printf 'windows_codex_launcher_mismatch: existing [mcp_servers.xuunity_light_unity] in %s uses bash on a Windows-like host.\n' "$config_path"
-        printf 'Recommended native Windows replacement block:\n%s' "$block"
-      } >&2
-    fi
-    printf 'kept existing MCP config in %s\n' "$config_path"
-    return
-  fi
-
   if [[ $dry_run -eq 1 ]]; then
-    printf '[dry-run] append MCP block to %s\n' "$config_path"
+    if [[ -f "$config_path" ]] && file_contains_regex '^\[mcp_servers\.xuunity_light_unity\]' "$config_path"; then
+      printf '[dry-run] replace only the XUUnity MCP block in %s\n' "$config_path"
+    else
+      printf '[dry-run] append MCP block to %s\n' "$config_path"
+    fi
     printf '%s' "$block"
     return
   fi
 
-  mkdir -p "$codex_home"
-  touch "$config_path"
-  if [[ -s "$config_path" ]]; then
-    printf '\n' >> "$config_path"
+  if [[ -f "$config_path" ]] && is_windows_like_host && file_mcp_block_contains_regex '^[[:space:]]*command[[:space:]]*=[[:space:]]*"bash"' "$config_path"; then
+    printf 'windows_codex_launcher_mismatch: replacing the stale bash launcher with the approved native Windows launcher in %s.\n' "$config_path" >&2
   fi
-  printf '%s' "$block" >> "$config_path"
-  printf 'updated %s\n' "$config_path"
+
+  mkdir -p "$codex_home"
+  codex_config_action="$(python3 - "$config_path" "$block" <<'PY'
+import os
+import re
+import sys
+import tempfile
+from pathlib import Path
+
+path = Path(sys.argv[1])
+block = sys.argv[2].rstrip() + "\n"
+try:
+    current = path.read_text(encoding="utf-8")
+except OSError:
+    current = ""
+
+pattern = re.compile(
+    r"^\[mcp_servers\.xuunity_light_unity\]\s*$.*?(?=^\[|\Z)",
+    flags=re.MULTILINE | re.DOTALL,
+)
+match = pattern.search(current)
+if match:
+    prefix = current[: match.start()].rstrip()
+    suffix = current[match.end() :].lstrip()
+    parts = [part for part in (prefix, block.rstrip(), suffix.rstrip()) if part]
+    updated = "\n\n".join(parts) + "\n"
+    action = "kept" if updated == current else "replaced"
+else:
+    prefix = current.rstrip()
+    updated = (prefix + "\n\n" if prefix else "") + block
+    action = "appended"
+
+if updated != current:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(updated)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if path.exists():
+            os.chmod(temp_name, path.stat().st_mode)
+        os.replace(temp_name, path)
+    finally:
+        try:
+            os.unlink(temp_name)
+        except FileNotFoundError:
+            pass
+print(action)
+PY
+)"
+  printf '%s XUUnity MCP block in %s\n' "$codex_config_action" "$config_path"
 }
 
 append_claude_block_if_missing() {
@@ -601,7 +699,6 @@ install_server_into() {
   local target_dir="$1"
   run mkdir -p "$target_dir"
   setup_venv_if_needed "$target_dir"
-  copy_if_needed "$templates_dir/server.py" "$target_dir/server.py" 644
   for helper_module in "$templates_dir"/server_*.py; do
     [[ -f "$helper_module" ]] || continue
     copy_if_needed "$helper_module" "$target_dir/$(basename "$helper_module")" 644
@@ -620,6 +717,11 @@ install_server_into() {
   fi
   run mkdir -p "$target_dir/packages/com.xuunity.light-mcp"
   copy_if_needed "$package_metadata_source" "$target_dir/packages/com.xuunity.light-mcp/package.json" 644
+  # server.py contains the release marker read by legacy refresh launchers.
+  # Publish it last so an interrupted rollout cannot advertise a new version
+  # while still retaining old process-management modules.
+  copy_if_needed "$templates_dir/server.py" "$target_dir/server.py" 644
+  write_integrity_manifest "$target_dir"
 }
 
 install_delegates_into() {
@@ -736,6 +838,7 @@ EOF
   # stale package metadata here is misleading after a package bump.
   run mkdir -p "$target_dir/packages/com.xuunity.light-mcp"
   copy_if_needed "$package_metadata_source" "$target_dir/packages/com.xuunity.light-mcp/package.json" 644
+  write_integrity_manifest "$target_dir"
 }
 
 run mkdir -p "$codex_home"

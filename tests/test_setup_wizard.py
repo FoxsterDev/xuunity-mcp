@@ -11,6 +11,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server
+import server_batch_context
 import server_setup_common
 import server_setup_wizard as wizard
 
@@ -36,6 +37,17 @@ def create_unity_project(
     )
     write_json(root / "Packages" / "manifest.json", {"dependencies": dependencies or {}})
     return root
+
+
+def create_installed_helper(install_dir: Path, *, version: str, refresh_name: str) -> None:
+    install_dir.mkdir(parents=True, exist_ok=True)
+    (install_dir / "run.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (install_dir / "server.py").write_text("SERVER_INFO = {}\n", encoding="utf-8")
+    (install_dir / refresh_name).write_text("launcher\n", encoding="utf-8")
+    write_json(
+        install_dir / "packages" / "com.xuunity.light-mcp" / "package.json",
+        {"name": "com.xuunity.light-mcp", "version": version},
+    )
 
 
 class SetupWizardTests(unittest.TestCase):
@@ -246,6 +258,261 @@ class SetupWizardTests(unittest.TestCase):
             targets = server_setup_common.helper_install_targets()
 
         self.assertIn("codex", {target["client_id"] for target in targets})
+
+    def test_setup_plan_upgrades_stale_canonical_pin_instead_of_reporting_configured(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_root = create_unity_project(
+                root / "Project",
+                unity_version="6000.3.2f1",
+                dependencies={
+                    "com.xuunity.light-mcp": wizard.default_git_dependency("0.3.23"),
+                },
+            )
+            wizard.write_bridge_config(project_root)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": str(root / "home"),
+                    "CODEX_SHELL": "1",
+                    "CODEX_HOME": str(root / "codex-home"),
+                    "CODEX_TOOLS_HOME": str(root / "codex-tools"),
+                    "CLAUDE_TOOLS_HOME": str(root / "claude-tools"),
+                    "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR": str(root / "neutral"),
+                },
+                clear=True,
+            ):
+                plan = wizard.build_setup_plan(
+                    workspace_root=None,
+                    project_roots=[str(project_root)],
+                    recursive=False,
+                    include_test_framework="no",
+                    package_source="git",
+                    package_version="0.3.45",
+                    local_package_source="/unused",
+                )
+
+        project = plan["projects"][0]
+        dependency_actions = [
+            action for action in project["planned_actions"]
+            if action["kind"] == "set_manifest_dependency"
+        ]
+        self.assertEqual("stale_git_pin", project["package_dependency_state"])
+        self.assertEqual("ready_to_apply", project["validation_status"])
+        self.assertNotEqual("already_configured", plan["setup_status"])
+        self.assertFalse(plan["installation_alignment"]["runtime_execution_allowed"])
+        self.assertFalse(plan["installation_alignment"]["current_mcp_session_safe"])
+        self.assertTrue(plan["installation_alignment"]["live_session_proof_required"])
+        self.assertEqual("0.3.45", plan["installation_alignment"]["required_live_server_version"])
+        self.assertEqual(1, len(dependency_actions))
+        self.assertEqual("upgrade_stale_git_pin", dependency_actions[0]["reason"])
+        self.assertEqual(wizard.default_git_dependency("0.3.23"), dependency_actions[0]["expected_current_value"])
+        self.assertEqual(wizard.default_git_dependency("0.3.45"), dependency_actions[0]["value"])
+
+    def test_setup_plan_keeps_exact_pin_and_refuses_automatic_downgrade_or_custom_rewrite(self) -> None:
+        cases = (
+            (wizard.default_git_dependency("0.3.45"), "aligned", False),
+            (wizard.default_git_dependency("0.3.46"), "newer_than_requested", True),
+            ("https://example.com/fork.git?path=/package#v9.0.0", "custom_source_mismatch", True),
+            ("file:../local-package", "custom_source_mismatch", True),
+        )
+        for dependency, expected_status, expects_manual in cases:
+            with self.subTest(dependency=dependency), tempfile.TemporaryDirectory() as tmp:
+                project_root = create_unity_project(
+                    Path(tmp) / "Project",
+                    unity_version="2022.3.60f1",
+                    dependencies={"com.xuunity.light-mcp": dependency},
+                )
+                wizard.write_bridge_config(project_root)
+                plan = wizard.build_setup_plan(
+                    workspace_root=None,
+                    project_roots=[str(project_root)],
+                    recursive=False,
+                    include_test_framework="no",
+                    package_source="git",
+                    package_version="0.3.45",
+                    local_package_source="/unused",
+                )
+
+                project = plan["projects"][0]
+                dependency_actions = [
+                    action for action in project["planned_actions"]
+                    if action["kind"] == "set_manifest_dependency"
+                ]
+                mismatch_actions = [
+                    action for action in project["manual_actions"]
+                    if action["kind"] == "resolve_package_source_or_version_mismatch"
+                ]
+                self.assertEqual(expected_status, project["package_dependency_state"])
+                self.assertEqual([], dependency_actions)
+                self.assertEqual(expects_manual, bool(mismatch_actions))
+
+    def test_setup_apply_rejects_dependency_changed_after_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = create_unity_project(
+                Path(tmp) / "Project",
+                unity_version="6000.3.2f1",
+                dependencies={"com.xuunity.light-mcp": wizard.default_git_dependency("0.3.23")},
+            )
+            wizard.write_bridge_config(project_root)
+            plan = wizard.build_setup_plan(
+                workspace_root=None,
+                project_roots=[str(project_root)],
+                recursive=False,
+                include_test_framework="no",
+                package_source="git",
+                package_version="0.3.45",
+                local_package_source="/unused",
+            )
+            wizard.set_manifest_dependency(
+                project_root,
+                "com.xuunity.light-mcp",
+                wizard.default_git_dependency("0.3.24"),
+            )
+
+            with self.assertRaises(wizard.ToolInvocationError) as cm:
+                wizard.apply_setup_plan(plan, approve=True)
+
+            current = wizard.manifest_dependency(project_root, "com.xuunity.light-mcp")
+
+        self.assertEqual("setup_plan_stale_dependency_changed", cm.exception.code)
+        self.assertEqual(wizard.default_git_dependency("0.3.24"), current)
+
+    def test_helper_target_requires_refresh_for_old_or_unknown_install(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            install_dir = root / "codex-tools" / "xuunity-mcp"
+            create_installed_helper(
+                install_dir,
+                version="0.3.23",
+                refresh_name="run_installed_or_refresh_xuunity_mcp.sh",
+            )
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": str(root / "home"),
+                    "CODEX_SHELL": "1",
+                    "CODEX_TOOLS_HOME": str(root / "codex-tools"),
+                    "CLAUDE_TOOLS_HOME": str(root / "claude-tools"),
+                    "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR": str(root / "neutral"),
+                },
+                clear=True,
+            ):
+                targets = server_setup_common.helper_install_targets("0.3.45")
+                write_json(
+                    install_dir / "packages" / "com.xuunity.light-mcp" / "package.json",
+                    {"name": "com.xuunity.light-mcp", "version": "0.3.45"},
+                )
+                same_version_without_integrity = server_setup_common.helper_install_targets("0.3.45")
+
+        codex = next(item for item in targets if item["client_id"] == "codex")
+        self.assertEqual("0.3.23", codex["installed_version"])
+        self.assertEqual("stale", codex["version_alignment"])
+        self.assertEqual("refresh_existing_helper", codex["helper_action"])
+        self.assertFalse(codex["runtime_execution_allowed"])
+        unverified = next(item for item in same_version_without_integrity if item["client_id"] == "codex")
+        self.assertEqual("integrity_missing", unverified["version_alignment"])
+        self.assertEqual("refresh_existing_helper", unverified["helper_action"])
+        self.assertFalse(unverified["runtime_execution_allowed"])
+
+    def test_windows_codex_bash_launcher_requires_native_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_home = root / "codex-home"
+            codex_home.mkdir(parents=True)
+            (codex_home / "config.toml").write_text(
+                "[mcp_servers.xuunity_light_unity]\n"
+                'command = "bash"\n'
+                'args = ["-lc", "exec \\"/tmp/xuunity/run.sh\\""]\n'
+                "required = false\n",
+                encoding="utf-8",
+            )
+            with mock.patch.object(server_setup_common.platform, "system", return_value="Windows"), mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": str(root / "home"),
+                    "USERPROFILE": str(root / "home"),
+                    "CODEX_SHELL": "1",
+                    "CODEX_HOME": str(codex_home),
+                },
+                clear=True,
+            ):
+                targets = server_setup_common.build_client_config_targets(None)
+
+        codex = next(item for item in targets if item["client_id"] == "codex")
+        self.assertEqual("windows_launcher_migration_required", codex["launcher_status"])
+        self.assertEqual("replace_incompatible_server_block", codex["config_action"])
+        self.assertIn("windows_launcher_flavor_mismatch", codex["launcher_issue_codes"])
+        self.assertIn("unsafe_legacy_launcher_reference", codex["launcher_issue_codes"])
+        self.assertFalse(codex["runtime_execution_allowed"])
+
+    def test_windows_codex_native_refresh_launcher_is_compatible(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex_home = root / "codex-home"
+            codex_home.mkdir(parents=True)
+            args = ["/d", "/c", "call", r"C:\\Users\\dev\\.codex-tools\\xuunity-mcp\\run_installed_or_refresh_xuunity_mcp.cmd"]
+            (codex_home / "config.toml").write_text(
+                "[mcp_servers.xuunity_light_unity]\n"
+                'command = "cmd.exe"\n'
+                f"args = {json.dumps(args)}\n"
+                "required = false\n",
+                encoding="utf-8",
+            )
+            with mock.patch.object(server_setup_common.platform, "system", return_value="Windows"), mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": str(root / "home"),
+                    "USERPROFILE": str(root / "home"),
+                    "CODEX_SHELL": "1",
+                    "CODEX_HOME": str(codex_home),
+                },
+                clear=True,
+            ):
+                targets = server_setup_common.build_client_config_targets(None)
+
+        codex = next(item for item in targets if item["client_id"] == "codex")
+        self.assertEqual("compatible", codex["launcher_status"])
+        self.assertEqual("verify_existing_server_block", codex["config_action"])
+        self.assertTrue(codex["runtime_execution_allowed"])
+
+    def test_validate_setup_blocks_stale_canonical_release(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = create_unity_project(
+                Path(tmp) / "Project",
+                unity_version="6000.3.2f1",
+                dependencies={"com.xuunity.light-mcp": wizard.default_git_dependency("0.3.23")},
+            )
+            wizard.write_bridge_config(project_root)
+            result = wizard.validate_setup(
+                project_root,
+                expected_package_version="0.3.45",
+            )
+
+        self.assertEqual("blocked", result["validation_status"])
+        self.assertEqual("stale_git_pin", result["package_alignment"]["status"])
+        self.assertIn("mcp_package_version_mismatch", result["blockers"])
+
+    def test_default_package_version_finds_installed_helper_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            install_dir = Path(tmp) / "xuunity-mcp"
+            write_json(
+                install_dir / "packages" / "com.xuunity.light-mcp" / "package.json",
+                {"version": "0.3.45"},
+            )
+            with mock.patch.object(
+                server_batch_context,
+                "__file__",
+                str(install_dir / "server_batch_context.py"),
+            ):
+                package_source = server_batch_context.default_local_package_source()
+                version = server_batch_context.default_light_mcp_package_version()
+
+        self.assertEqual(
+            (install_dir / "packages" / "com.xuunity.light-mcp").resolve(),
+            package_source.resolve(),
+        )
+        self.assertEqual("0.3.45", version)
 
     def test_setup_apply_requires_approval_and_mutates_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
