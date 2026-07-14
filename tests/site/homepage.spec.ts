@@ -5,6 +5,8 @@ const REPOSITORY_URL = "https://github.com/FoxsterDev/xuunity-mcp";
 const RELEASE = "v0.3.45";
 const README_URL = `${REPOSITORY_URL}/blob/${RELEASE}/README.md`;
 const LINKEDIN_URL = "https://www.linkedin.com/in/khalandachou/";
+const POSIX_PROJECT_PATH = "/Users/developer/Projects/BallSort";
+const WINDOWS_PROJECT_PATH = "C:\\Projects\\Ball  Sort";
 
 async function collectVisibleOverflow(page: Page) {
   return page.evaluate(() => {
@@ -79,10 +81,42 @@ test.describe("public homepage", () => {
     await expect(footer.getByRole("link", { name: "Security" })).toHaveAttribute("href", "https://github.com/FoxsterDev/xuunity-mcp/security");
   });
 
+  test("requires and highlights the Unity project path before copying", async ({ page }) => {
+    await page.goto("/");
+
+    const pathNote = page.getByRole("note", { name: "Add your Unity project path" });
+    const pathInput = page.getByRole("textbox", { name: "Unity project path", exact: true });
+    const pathPreview = page.locator("#project-path-preview");
+    const copyButton = page.getByRole("button", { name: "Copy prompt" });
+
+    await expect(pathNote).toBeVisible();
+    await expect(pathNote.getByText("Required", { exact: true })).toBeVisible();
+    await expect(pathInput).toHaveAttribute("placeholder", "/path/to/UnityProject");
+    await expect(pathInput).toHaveAttribute("required", "");
+    await expect(pathPreview).toHaveText("/path/to/UnityProject");
+    await expect(pathPreview).toHaveClass(/project-path-placeholder/);
+    await expect(copyButton).toBeDisabled();
+    await expect(copyButton).toHaveAttribute("aria-describedby", "project-path-copy-hint");
+
+    await pathInput.fill("BallSort");
+    await expect(pathInput).toHaveAttribute("aria-invalid", "true");
+    await expect(copyButton).toBeDisabled();
+    await expect(
+      page.getByText("Enter an absolute path and replace the example placeholder.", { exact: true })
+    ).toBeVisible();
+
+    await pathInput.fill(POSIX_PROJECT_PATH);
+    await expect(pathInput).toHaveAttribute("aria-invalid", "false");
+    await expect(pathPreview).toHaveText(POSIX_PROJECT_PATH);
+    await expect(copyButton).toBeEnabled();
+    await expect(page.getByText("Your path is included in the prompt.", { exact: true })).toBeVisible();
+  });
+
   test("copies the complete release-pinned setup safety contract", async ({ context, page }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/");
 
+    await page.getByRole("textbox", { name: "Unity project path", exact: true }).fill(WINDOWS_PROJECT_PATH);
     await page.getByRole("button", { name: "Copy prompt" }).click();
     await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
 
@@ -90,7 +124,9 @@ test.describe("public homepage", () => {
     expect(clipboardText).toContain(`release ${RELEASE}`);
     expect(clipboardText).toContain(`the canonical repository (${REPOSITORY_URL})`);
     expect(clipboardText).toContain(`the release README for ${RELEASE} (${README_URL})`);
-    expect(clipboardText).toContain("/path/to/UnityProject");
+    expect(clipboardText).toContain(WINDOWS_PROJECT_PATH);
+    expect(clipboardText).not.toContain("C:\\Projects\\Ball Sort");
+    expect(clipboardText).not.toContain("/path/to/UnityProject");
     expect(clipboardText).toContain("Do not execute an existing helper until");
     expect(clipboardText).toContain(".source_root");
     expect(clipboardText).toContain("stale files refreshed");

@@ -117,11 +117,46 @@
             <div class="prompt-band-head">
               <h2 id="prompt-title">Set up Unity MCP from one prompt</h2>
             </div>
+            <div
+              id="project-path-note"
+              class="project-path-callout"
+              role="note"
+              aria-labelledby="project-path-note-title"
+            >
+              <div class="project-path-callout-copy">
+                <span class="project-path-required">Required</span>
+                <div>
+                  <h3 id="project-path-note-title">Add your Unity project path</h3>
+                  <p id="project-path-help">
+                    Paste the absolute path to your Unity project. It replaces the
+                    highlighted placeholder in the prompt before you copy it.
+                  </p>
+                </div>
+              </div>
+              <label class="project-path-field" for="unity-project-path">
+                <span>Unity project path</span>
+                <input
+                  id="unity-project-path"
+                  name="unity-project-path"
+                  type="text"
+                  placeholder="/path/to/UnityProject"
+                  aria-describedby="project-path-help project-path-examples"
+                  autocomplete="off"
+                  spellcheck="false"
+                  required
+                >
+              </label>
+              <p id="project-path-examples" class="project-path-examples">
+                macOS/Linux: <code>/absolute/path/to/MyGame</code>
+                <span aria-hidden="true">·</span>
+                Windows: <code>C:\Projects\MyGame</code>
+              </p>
+            </div>
             <div class="prompt-copy-card">
               <p id="one-prompt-copy" class="prompt-text">
                 Set up XUUnity Light Unity MCP release <code>v0.3.45</code> from
                 <a href="https://github.com/FoxsterDev/xuunity-mcp">the canonical repository</a>
-                for <code>/path/to/UnityProject</code>. Follow
+                for <code id="project-path-preview" class="project-path-placeholder">/path/to/UnityProject</code>. Follow
                 <a href="https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.45/README.md">the release README for v0.3.45</a>.
                 Do not execute an existing helper until its installed version
                 and <code>.source_root</code> have been checked and stale files
@@ -137,7 +172,22 @@
               </p>
             </div>
             <div class="prompt-action">
-              <button class="button copy-button" type="button" data-copy-target="one-prompt-copy">Copy prompt</button>
+              <button
+                class="button copy-button"
+                type="button"
+                data-copy-target="one-prompt-copy"
+                aria-describedby="project-path-copy-hint"
+                disabled
+              >Copy prompt</button>
+              <p
+                id="project-path-copy-hint"
+                class="prompt-action-hint"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                Enter a project path to enable copying.
+              </p>
             </div>
           </section>
 
@@ -438,16 +488,55 @@ bash xuunity_light_unity_mcp.sh setup-plan \
       </footer>
     </div>
     <script>
+      const projectPathInput = document.getElementById("unity-project-path");
+      const projectPathPreview = document.getElementById("project-path-preview");
+      const projectPathCopyButton = document.querySelector('[data-copy-target="one-prompt-copy"]');
+      const projectPathCopyHint = document.getElementById("project-path-copy-hint");
+      const defaultProjectPath = "/path/to/UnityProject";
+      const projectPathToken = "\uFFF0XUUNITY_PROJECT_PATH\uFFF1";
+
+      const isAbsoluteProjectPath = (projectPath) =>
+        projectPath.startsWith("/") ||
+        /^[A-Za-z]:[\\/]/.test(projectPath) ||
+        /^\\\\/.test(projectPath);
+
+      const syncProjectPath = () => {
+        const projectPath = projectPathInput ? projectPathInput.value.trim() : "";
+        const projectPathIsValid =
+          projectPath !== defaultProjectPath && isAbsoluteProjectPath(projectPath);
+        if (projectPathPreview) projectPathPreview.textContent = projectPath || defaultProjectPath;
+        if (projectPathInput) {
+          projectPathInput.setAttribute(
+            "aria-invalid",
+            String(Boolean(projectPath) && !projectPathIsValid)
+          );
+        }
+        if (projectPathCopyButton) projectPathCopyButton.disabled = !projectPathIsValid;
+        if (projectPathCopyHint) {
+          projectPathCopyHint.textContent = !projectPath
+            ? "Enter a project path to enable copying."
+            : projectPathIsValid
+              ? "Your path is included in the prompt."
+              : "Enter an absolute path and replace the example placeholder.";
+        }
+      };
+
+      if (projectPathInput) projectPathInput.addEventListener("input", syncProjectPath);
+      syncProjectPath();
+
       document.querySelectorAll("[data-copy-target]").forEach((button) => {
         button.addEventListener("click", async () => {
           const target = document.getElementById(button.getAttribute("data-copy-target"));
           const readText = (node) => {
             if (node.nodeType === Node.TEXT_NODE) return node.textContent;
             if (node.nodeType !== Node.ELEMENT_NODE) return "";
+            if (node.id === "project-path-preview") return projectPathToken;
             if (node.tagName === "A") return `${node.textContent} (${node.href})`;
             return Array.from(node.childNodes).map(readText).join("");
           };
-          const text = target ? readText(target).replace(/\s+/g, " ").trim() : "";
+          const normalizedText = target ? readText(target).replace(/\s+/g, " ").trim() : "";
+          const exactProjectPath = projectPathPreview ? projectPathPreview.textContent : defaultProjectPath;
+          const text = normalizedText.replace(projectPathToken, () => exactProjectPath);
           if (!text) return;
 
           try {

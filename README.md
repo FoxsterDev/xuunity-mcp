@@ -120,6 +120,12 @@ repo and run the first MCP command or EditMode tests correctly.
 
 Use this contract when the user gives a short request such as:
 
+> [!IMPORTANT]
+> Replace `/path/to/UnityProject` with the absolute path to your Unity project
+> before sending the prompt. Example shape for macOS/Linux:
+> `/absolute/path/to/MyGame`. On Windows, use an absolute drive-letter or UNC
+> path.
+
 ```text
 Set up XUUnity Light Unity MCP release v0.3.45 from the canonical repository
 https://github.com/FoxsterDev/xuunity-mcp for /path/to/UnityProject, follow

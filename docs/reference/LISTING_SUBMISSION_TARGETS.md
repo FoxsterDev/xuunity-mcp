@@ -136,8 +136,12 @@ of official Registry publication, not as a separate manual submission target.
 - For these surfaces, the acceptance criterion is a stable public XUUnity MCP
   permalink, not merely a temporary search result or feed entry.
 - Use the one-prompt setup idea in public-safe form:
-  `Set up XUUnity MCP from the repository README into /path/to/UnityProject,
-  run EditMode tests there, and print the results here.`
+  `Set up XUUnity Light Unity MCP release v0.3.45 from
+  https://github.com/FoxsterDev/xuunity-mcp for /path/to/UnityProject. Follow
+  https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.45/README.md, then run
+  EditMode tests there and print the results here.` Replace
+  `/path/to/UnityProject` with the absolute project path before publishing or
+  sending the prompt.
 
 ### MCP Market, mcp.so, mcpservers.org
 
