@@ -287,6 +287,78 @@ class ProjectHealthTests(unittest.TestCase):
         self.assertEqual("run_batch_compile_gate_and_fix_errors", result["host_health_recommended_next_action"])
         self.assertEqual("observe_only", result["host_health_termination_policy"])
 
+    def _quiescent_modal_discovery(self) -> dict:
+        return {
+            "bridge_state_live": False,
+            "host_session_live": True,
+            "bridge_enabled": True,
+            "detected_editor_count": 1,
+            "bridge_pid_alive": False,
+            "host_session_pid_alive": True,
+            "reconciliation_recommended_next_action": "recover_editor_session",
+        }
+
+    def test_classify_project_health_detects_startup_modal_block_when_log_quiescent(self) -> None:
+        result = classify_project_health(
+            bridge_state={},
+            discovery=self._quiescent_modal_discovery(),
+            editor_log_diagnosis={
+                "code": "interactive_compile_block_detected",
+                "severity": "error",
+                "summary": "Compile blocker observed.",
+                "log_idle_seconds": 45.0,
+            },
+            heartbeat_age_seconds=heartbeat_age_seconds,
+            derive_busy_reason=derive_busy_reason,
+        )
+
+        self.assertEqual("stale", result["host_health_classification"])
+        self.assertEqual("startup_modal_dialog_block", result["host_health_reason"])
+        self.assertEqual(
+            "dismiss_editor_startup_dialog_or_quit_editor_then_retry",
+            result["host_health_recommended_next_action"],
+        )
+        self.assertEqual("observe_only", result["host_health_termination_policy"])
+        self.assertTrue(result["editor_log_diagnosis"]["startup_modal_block_suspected"])
+
+    def test_classify_project_health_keeps_generic_block_when_log_recently_active(self) -> None:
+        result = classify_project_health(
+            bridge_state={},
+            discovery=self._quiescent_modal_discovery(),
+            editor_log_diagnosis={
+                "code": "interactive_compile_block_detected",
+                "severity": "error",
+                "summary": "Compile blocker observed.",
+                "log_idle_seconds": 3.0,
+            },
+            heartbeat_age_seconds=heartbeat_age_seconds,
+            derive_busy_reason=derive_busy_reason,
+        )
+
+        self.assertEqual("possible_safe_mode_dialog_block", result["host_health_reason"])
+        self.assertEqual(
+            "run_batch_compile_gate_and_fix_errors",
+            result["host_health_recommended_next_action"],
+        )
+        self.assertNotIn("startup_modal_block_suspected", result["editor_log_diagnosis"])
+
+    def test_build_editor_log_diagnosis_stamps_log_idle_seconds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            log_path = Path(tmp_dir) / "idle_stamp.log"
+            log_path.write_text(
+                "Assets/Foo.cs(12,3): error CS1002: ; expected\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = build_editor_log_diagnosis(
+                log_path,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                classify_editor_log=classify_editor_log,
+            )
+
+        self.assertIn("log_idle_seconds", diagnosis)
+        self.assertGreaterEqual(diagnosis["log_idle_seconds"], 0.0)
+
     def test_build_editor_log_diagnosis_uses_session_scope_when_offset_is_available(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             log_path = Path(tmp_dir) / "scoped_compile_blocker.log"

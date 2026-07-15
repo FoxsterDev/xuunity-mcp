@@ -10,6 +10,7 @@ from typing import Any, Callable
 FRESH_HEARTBEAT_MAX_AGE_SECONDS = 5.0
 STALE_HEARTBEAT_MAX_AGE_SECONDS = 15.0
 ANR_SUSPECTED_HEARTBEAT_MAX_AGE_SECONDS = 30.0
+STARTUP_MODAL_QUIESCENCE_SECONDS = 20.0
 DEFAULT_LOG_TAIL_MAX_CHARS = 40000
 EDITOR_LOG_GREP_MAX_CHARS = 500000
 EDITOR_LOG_CONSOLE_CAVEAT = (
@@ -426,7 +427,41 @@ def _matching_log_lines(log_text: str, patterns: list[str], limit: int = 3) -> l
     return matches
 
 
+def _editor_log_idle_seconds(log_path: Path) -> float | None:
+    try:
+        mtime = float(log_path.stat().st_mtime or 0.0)
+    except OSError:
+        return None
+    if mtime <= 0.0:
+        return None
+    return max(0.0, time.time() - mtime)
+
+
 def build_editor_log_diagnosis(
+    log_path: Path,
+    *,
+    startup_policy: str,
+    classify_editor_log: Callable[[str, str], tuple[str, str] | None],
+    max_chars: int = DEFAULT_LOG_TAIL_MAX_CHARS,
+    session_start_offset_bytes: int | None = None,
+    session_start_mtime: float | None = None,
+) -> dict[str, Any]:
+    diagnosis = _build_editor_log_diagnosis_core(
+        log_path,
+        startup_policy=startup_policy,
+        classify_editor_log=classify_editor_log,
+        max_chars=max_chars,
+        session_start_offset_bytes=session_start_offset_bytes,
+        session_start_mtime=session_start_mtime,
+    )
+    if diagnosis:
+        idle_seconds = _editor_log_idle_seconds(log_path)
+        if idle_seconds is not None:
+            diagnosis["log_idle_seconds"] = round(idle_seconds, 3)
+    return diagnosis
+
+
+def _build_editor_log_diagnosis_core(
     log_path: Path,
     *,
     startup_policy: str,
@@ -738,6 +773,7 @@ def classify_project_health(
                 termination_policy = "graceful_terminate"
                 anr_classification = "anr"
 
+    startup_modal_block = False
     if editor_log_diagnosis and classification in {"stale", "anr_suspected", "anr"}:
         diagnosis_code = str(editor_log_diagnosis.get("code") or "")
         if diagnosis_code in {
@@ -764,8 +800,22 @@ def classify_project_health(
             "interactive_compile_block_with_safe_mode_dialog",
             "safe_mode_manual_required",
         }:
-            reason = "possible_safe_mode_dialog_block"
-            recommended_next_action = "run_batch_compile_gate_and_fix_errors"
+            # Unity does not log a "Safe Mode" marker while the "Enter Safe Mode?" prompt is
+            # displayed, so string matching alone misses a blocking prompt. A live editor with
+            # compile errors, no live bridge state, and an idle Editor.log is the reliable
+            # fingerprint of a modal blocking startup.
+            log_idle_seconds = editor_log_diagnosis.get("log_idle_seconds")
+            startup_modal_block = (
+                not bridge_state_live
+                and isinstance(log_idle_seconds, (int, float))
+                and float(log_idle_seconds) >= STARTUP_MODAL_QUIESCENCE_SECONDS
+            )
+            if startup_modal_block:
+                reason = "startup_modal_dialog_block"
+                recommended_next_action = "dismiss_editor_startup_dialog_or_quit_editor_then_retry"
+            else:
+                reason = "possible_safe_mode_dialog_block"
+                recommended_next_action = "run_batch_compile_gate_and_fix_errors"
             termination_policy = "observe_only"
             if classification == "anr":
                 classification = "stale"
@@ -776,6 +826,17 @@ def classify_project_health(
         bridge_state_live=bridge_state_live,
         live_editor_present=live_editor_present,
     )
+
+    if startup_modal_block:
+        idle_seconds = editor_log_diagnosis.get("log_idle_seconds")
+        annotated_editor_log_diagnosis["startup_modal_block_suspected"] = True
+        annotated_editor_log_diagnosis["summary"] = (
+            "Editor process is alive but Editor.log has been idle"
+            + (f" for ~{round(float(idle_seconds))}s" if isinstance(idle_seconds, (int, float)) else "")
+            + " after compile errors with no live bridge heartbeat — most likely blocked on the "
+            "'Enter Safe Mode?' startup dialog. This wrapper does not click editor dialogs; dismiss it "
+            "in the editor or quit the editor, then retry."
+        )
 
     return {
         "host_health_classification": classification,

@@ -2,8 +2,19 @@
 
 ## Unreleased
 
+## 0.3.46
+
+Release tag: `v0.3.46`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.46
+```
+
 ### Changed
 
+- Released `v0.3.46` package metadata, server metadata, package manifests, and Git UPM examples.
 - Hardened `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` with
   structure-aware defaults: XML comparison is order-insensitive, Gradle
   comparison ignores comments/formatting and normalizes adjacent generated
@@ -13,9 +24,21 @@
   outputs now fail with typed `invalid_generated_files` evidence, and per-path
   rows report the selected diff mode, semantic-change state, and marker proof.
 
+### Fixed
+
+- Detect the "Enter Safe Mode?" startup dialog blocking the editor even when
+  Editor.log contains no "Safe Mode" marker (Unity does not log the marker while
+  the prompt is displayed). `build_editor_log_diagnosis` now records
+  `log_idle_seconds`, and project-health classification reports
+  `startup_modal_dialog_block` with a
+  `dismiss_editor_startup_dialog_or_quit_editor_then_retry` recovery when a live
+  editor has compile errors, no live bridge heartbeat, and a quiescent
+  Editor.log. Previously this degraded to a generic compile-block signal whose
+  batch-gate recovery cannot run while the modal holds the project Library.
+
 ### Validation
 
-- Host regression passed `458` tests with `13` expected platform skips.
+- Host regression passed `461` tests with `13` expected platform skips.
 - The guard passed against real Git-tracked XML/Gradle generated files in a
   Unity 6000 consumer and a tracked line-normalized file in a Unity 2022
   consumer. The same projects passed the package EditMode/PlayMode self-test
