@@ -10,7 +10,13 @@ namespace XUUnity.LightMcp.Editor.Helpers
         const string PlayModeTestsOperationName = "unity.tests.run_playmode";
         static readonly object Gate = new();
 
-        public static XUUnityLightMcpPersistedTestRunState Begin(string requestId, string operation, string testMode, string filterSummary, int requestTimeoutMs)
+        public static XUUnityLightMcpPersistedTestRunState Begin(
+            string requestId,
+            string operation,
+            string testMode,
+            string filterSummary,
+            bool filterRequested,
+            int requestTimeoutMs)
         {
             lock (Gate)
             {
@@ -29,6 +35,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     timeout_classification = "",
                     completed_at_utc = "",
                     filter_summary = filterSummary ?? "",
+                    filter_requested = filterRequested,
                     response_handoff_state = "pending",
                     failures = new System.Collections.Generic.List<XUUnityLightMcpTestFailure>(),
                 };
@@ -182,6 +189,10 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     : "completed";
                 state.completion_basis = completionBasis ?? "";
                 state.playmode_state_after_settle = playmodeStateAfterSettle ?? "";
+                state.status = ResolveStatus(state);
+                state.test_verdict = state.status;
+                state.recommended_next_action = ResolveRecommendedNextAction(state);
+                state.recommended_recovery_command = ResolveRecommendedRecoveryCommand(state);
                 state.response_handoff_state = "pending_write";
                 PersistLocked(state);
                 return BuildResponseLocked(state);
@@ -287,12 +298,17 @@ namespace XUUnity.LightMcp.Editor.Helpers
             };
         }
 
+        internal static XUUnityLightMcpTestsPayload BuildPayloadForState(XUUnityLightMcpPersistedTestRunState state)
+        {
+            return BuildPayloadLocked(state);
+        }
+
         static XUUnityLightMcpTestsPayload BuildPayloadLocked(XUUnityLightMcpPersistedTestRunState state)
         {
             return new XUUnityLightMcpTestsPayload
             {
                 project_root = state.project_root ?? XUUnityLightMcpFileIpcPaths.ProjectRootPath,
-                status = ResolveStatus(state),
+                status = string.IsNullOrWhiteSpace(state.status) ? ResolveStatus(state) : state.status,
                 total = Math.Max(0, state.total),
                 passed = Math.Max(0, state.passed),
                 failed = Math.Max(0, state.failed),
@@ -309,6 +325,15 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 last_progress_at_utc = state.last_progress_at_utc ?? "",
                 timeout_classification = state.timeout_classification ?? "",
                 runtime_timeout_ms = Math.Max(0, state.runtime_timeout_ms),
+                filter_summary = state.filter_summary ?? "",
+                filter_requested = state.filter_requested,
+                test_verdict = string.IsNullOrWhiteSpace(state.test_verdict) ? ResolveStatus(state) : state.test_verdict,
+                recommended_next_action = string.IsNullOrWhiteSpace(state.recommended_next_action)
+                    ? ResolveRecommendedNextAction(state)
+                    : state.recommended_next_action,
+                recommended_recovery_command = string.IsNullOrWhiteSpace(state.recommended_recovery_command)
+                    ? ResolveRecommendedRecoveryCommand(state)
+                    : state.recommended_recovery_command,
                 last_started_test = state.last_started_test ?? "",
                 last_finished_test = state.last_finished_test ?? "",
                 lifecycle_churn_observed = state.lifecycle_churn_observed,
@@ -323,11 +348,36 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return "infrastructure_error";
             }
 
-            return state.total <= 0
-                ? "no_tests"
-                : state.failed > 0
-                    ? "failed"
-                    : "passed";
+            return IsRequestedFilterZeroMatch(state)
+                ? "test_filter_no_match"
+                : state.total <= 0
+                    ? "no_tests"
+                    : state.failed > 0
+                        ? "failed"
+                        : "passed";
+        }
+
+        static bool IsRequestedFilterZeroMatch(XUUnityLightMcpPersistedTestRunState state)
+        {
+            return state != null && state.filter_requested && state.total <= 0;
+        }
+
+        static string ResolveRecommendedNextAction(XUUnityLightMcpPersistedTestRunState state)
+        {
+            return IsRequestedFilterZeroMatch(state)
+                ? "refresh_project_once_then_retry_same_filter"
+                : "none";
+        }
+
+        static string ResolveRecommendedRecoveryCommand(XUUnityLightMcpPersistedTestRunState state)
+        {
+            if (!IsRequestedFilterZeroMatch(state))
+            {
+                return "";
+            }
+
+            var projectRoot = state.project_root ?? XUUnityLightMcpFileIpcPaths.ProjectRootPath;
+            return $"request-project-refresh --project-root \"{projectRoot}\" --timeout-ms 180000";
         }
 
         static bool TryLoadLocked(out XUUnityLightMcpPersistedTestRunState state)

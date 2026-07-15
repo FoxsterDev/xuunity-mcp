@@ -106,14 +106,14 @@ namespace XUUnity.LightMcp.Editor.Batch
                 throw new InvalidOperationException($"Cannot run EditMode tests while open scenes have unsaved changes: {sceneList}");
             }
 
-            if (!TryBuildFilter(args, out var filter, out var errorMessage))
+            if (!TryBuildFilter(args, out var filter, out var filterSummary, out var filterRequested, out var errorMessage))
             {
                 throw new InvalidOperationException(errorMessage);
             }
 
             var api = ScriptableObject.CreateInstance<TestRunnerApi>();
             var callbacks = new BatchEditModeCallbacks(OnEditModeTestsCompleted);
-            callbacks.Begin(result.project_root);
+            callbacks.Begin(result.project_root, filterSummary, filterRequested);
             api.RegisterCallbacks(callbacks);
             api.Execute(new ExecutionSettings(filter));
         }
@@ -177,18 +177,35 @@ namespace XUUnity.LightMcp.Editor.Batch
             return rawArgs[valueIndex];
         }
 
-        static bool TryBuildFilter(BatchTestArgs args, out Filter filter, out string errorMessage)
+        static bool TryBuildFilter(
+            BatchTestArgs args,
+            out Filter filter,
+            out string filterSummary,
+            out bool filterRequested,
+            out string errorMessage)
         {
             filter = new Filter
             {
                 testMode = TestMode.EditMode
             };
+            filterSummary = "all";
+            filterRequested = false;
             errorMessage = "";
 
             filter.testNames = XUUnityLightMcpTestArgsUtility.NormalizeOptionalStringArray(args.testNames);
             filter.groupNames = XUUnityLightMcpTestArgsUtility.NormalizeOptionalStringArray(args.groupNames);
             filter.categoryNames = XUUnityLightMcpTestArgsUtility.NormalizeOptionalStringArray(args.categoryNames);
             filter.assemblyNames = XUUnityLightMcpTestArgsUtility.NormalizeOptionalStringArray(args.assemblyNames);
+            filterRequested = XUUnityLightMcpTestArgsUtility.HasRequestedFilters(
+                filter.testNames,
+                filter.groupNames,
+                filter.categoryNames,
+                filter.assemblyNames);
+            filterSummary = XUUnityLightMcpTestArgsUtility.BuildFilterSummary(
+                filter.testNames,
+                filter.groupNames,
+                filter.categoryNames,
+                filter.assemblyNames);
             XUUnityLightMcpEditModeFilterResolver.ResolveTestNames(filter);
             return true;
         }
@@ -267,6 +284,8 @@ namespace XUUnity.LightMcp.Editor.Batch
             readonly List<XUUnityLightMcpTestFailure> _failures = new();
 
             string _projectRoot = "";
+            string _filterSummary = "all";
+            bool _filterRequested;
             DateTime _startedAtUtc;
             int _total;
             int _passed;
@@ -278,9 +297,11 @@ namespace XUUnity.LightMcp.Editor.Batch
                 _onCompleted = onCompleted ?? throw new ArgumentNullException(nameof(onCompleted));
             }
 
-            public void Begin(string projectRoot)
+            public void Begin(string projectRoot, string filterSummary, bool filterRequested)
             {
                 _projectRoot = projectRoot ?? "";
+                _filterSummary = filterSummary ?? "all";
+                _filterRequested = filterRequested;
                 _startedAtUtc = DateTime.UtcNow;
                 _total = 0;
                 _passed = 0;
@@ -305,14 +326,25 @@ namespace XUUnity.LightMcp.Editor.Batch
                     skipped = _skipped,
                     duration_seconds = Math.Round((DateTime.UtcNow - _startedAtUtc).TotalSeconds, 6),
                     failures = new List<XUUnityLightMcpTestFailure>(_failures),
+                    filter_summary = _filterSummary,
+                    filter_requested = _filterRequested,
                     validation_evidence = "unity_batchmode"
                 };
 
-                payload.status = payload.total == 0
-                    ? "no_tests"
+                payload.status = payload.total == 0 && payload.filter_requested
+                    ? "test_filter_no_match"
+                    : payload.total == 0
+                        ? "no_tests"
                     : payload.failed > 0
-                        ? "failed"
-                        : "passed";
+                            ? "failed"
+                            : "passed";
+                payload.test_verdict = payload.status;
+                payload.recommended_next_action = payload.status == "test_filter_no_match"
+                    ? "refresh_project_once_then_retry_same_filter"
+                    : "none";
+                payload.recommended_recovery_command = payload.status == "test_filter_no_match"
+                    ? $"request-project-refresh --project-root \"{_projectRoot}\" --timeout-ms 180000"
+                    : "";
 
                 _onCompleted(payload);
             }

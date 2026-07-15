@@ -113,7 +113,7 @@ def classify_unity_process_role(command: str) -> str:
     if (
         "Unity.app/Contents/MacOS/Unity" in normalized_command
         or "unity.exe" in lower_command
-        or re.search(r'(^|\s)"?(?:/[^"\s]+)+/Unity"?(?:\s|$)', command_for_match)
+        or re.search(r'(^|\s)"?/[^"\s]*/Unity"?(?:\s|$)', command_for_match)
         or command_for_match.endswith("/Unity")
     ):
         return "main_editor"

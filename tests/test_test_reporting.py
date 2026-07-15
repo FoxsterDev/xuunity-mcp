@@ -126,6 +126,40 @@ class TestReportingTests(unittest.TestCase):
         self.assertEqual(2, json_payload["summary"]["rows_total"])
         self.assertEqual(3, json_payload["summary"]["total"])
 
+    def test_requested_zero_match_is_reported_as_non_passing_filter_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = make_project(Path(temp_dir), "ConsumerProject")
+            result_dir = server_test_reporting.test_results_dir(project_root)
+            write_json(
+                result_dir / "filter-no-match.json",
+                {
+                    "project_root": str(project_root),
+                    "request_id": "filter-no-match",
+                    "operation": "unity.tests.run_editmode",
+                    "test_mode": "editmode",
+                    "completed_at_utc": "2026-07-15T10:00:00Z",
+                    "filter_requested": True,
+                    "filter_summary": "tests=Missing.Namespace.Test; groups=all; categories=all; assemblies=all",
+                    "total": 0,
+                    "passed": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                },
+            )
+
+            rows = server_test_reporting.select_test_result_rows(
+                project_roots=[project_root],
+                request_ids=["filter-no-match"],
+            )
+            summary = server_test_reporting.summarize_test_rows(rows)
+
+        self.assertEqual(1, len(rows))
+        self.assertEqual("test_filter_no_match", rows[0]["status"])
+        self.assertTrue(rows[0]["filter_requested"])
+        self.assertEqual("test_filter_no_match", rows[0]["test_verdict"])
+        self.assertEqual(1, summary["rows_test_filter_no_match"])
+        self.assertEqual(1, summary["rows_non_passing"])
+
     def test_failure_classifier_groups_repeated_setup_failures(self) -> None:
         rows = []
         for project, test_name in (("A", "Example.Tests.Fixture.TestA"), ("B", "Example.Tests.Fixture.TestB")):

@@ -1806,6 +1806,13 @@ class ServerProjectHelperTests(unittest.TestCase):
 
         self.assertEqual("/tmp/xuunity/My Project", result)
 
+    def test_classify_unity_process_role_rejects_long_non_unity_posix_command(self) -> None:
+        command = "python3 " + "/nested-path" * 2000 + "/not-unity"
+
+        result = server_editor_host.classify_unity_process_role(command)
+
+        self.assertEqual("", result)
+
 
 if __name__ == "__main__":
     unittest.main()

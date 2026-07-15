@@ -35,6 +35,10 @@ def load_test_result(path: Path) -> dict[str, Any]:
         "passed": passed,
         "failed": failed,
         "skipped": skipped,
+        "filter_requested": _filter_was_requested(payload),
+        "filter_summary": str(payload.get("filter_summary") or ""),
+        "test_verdict": str(payload.get("test_verdict") or status),
+        "recommended_next_action": str(payload.get("recommended_next_action") or ""),
         "request_id": str(payload.get("request_id") or path.stem),
         "result_path": str(path),
         "lifecycle_churn_observed": bool(payload.get("lifecycle_churn_observed")),
@@ -194,9 +198,12 @@ def format_test_results(rows: list[dict[str, Any]], *, output_format: str = "mar
 
 def summarize_test_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     failed_rows = [row for row in rows if str(row.get("status") or "") == "failed"]
+    filter_no_match_rows = [row for row in rows if str(row.get("status") or "") == "test_filter_no_match"]
     return {
         "rows_total": len(rows),
         "rows_failed": len(failed_rows),
+        "rows_test_filter_no_match": len(filter_no_match_rows),
+        "rows_non_passing": len([row for row in rows if str(row.get("status") or "") != "passed"]),
         "lifecycle_churn_observed": any(bool(row.get("lifecycle_churn_observed")) for row in rows),
         "total": sum(_to_int(row.get("total")) for row in rows),
         "passed": sum(_to_int(row.get("passed")) for row in rows),
@@ -302,8 +309,25 @@ def _test_status(payload: dict[str, Any], *, total: int, failed: int) -> str:
     if failed > 0:
         return "failed"
     if total <= 0:
-        return "no_tests"
+        return "test_filter_no_match" if _filter_was_requested(payload) else "no_tests"
     return "passed"
+
+
+def _filter_was_requested(payload: dict[str, Any]) -> bool:
+    explicit = payload.get("filter_requested")
+    if isinstance(explicit, bool):
+        return explicit
+    if isinstance(explicit, str) and explicit.strip().lower() in {"true", "false"}:
+        return explicit.strip().lower() == "true"
+
+    summary = str(payload.get("filter_summary") or "").strip()
+    if not summary or summary.lower() == "all":
+        return False
+
+    return any(
+        "=" in part and part.split("=", 1)[1].strip().lower() != "all"
+        for part in summary.split(";")
+    )
 
 
 def _first_failure(failures: list[Any]) -> dict[str, Any]:
@@ -361,6 +385,8 @@ def _table_headers() -> list[str]:
         "passed",
         "failed",
         "skipped",
+        "test_verdict",
+        "filter_summary",
         "request_id",
         "lifecycle_churn_observed",
         "first_failure_class",

@@ -131,7 +131,7 @@ an existing helper, compare its version and .source_root with v0.3.45 and refres
 stale files from that release. On native Windows, migrate only the XUUnity client
 block to cmd.exe plus run_installed_or_refresh_xuunity_mcp.cmd. After any helper
 or client-config change, restart or refresh the client, list the live MCP tools,
-and run unity_status_summary. Require mcp_server_info.version=0.3.46 in that live
+and run unity_status_summary. Require mcp_server_info.version=0.3.47 in that live
 result. Only then run EditMode tests.
 ```
 
@@ -187,7 +187,7 @@ Agent defaults:
 9. After any helper or client-config change, restart or refresh the client,
    confirm that `xuunity_light_unity` appears in its MCP server list, list the
    live MCP tools, and run `unity_status_summary`; require
-   `mcp_server_info.version=0.3.46`. Helper-only validation does
+   `mcp_server_info.version=0.3.47`. Helper-only validation does
    not prove that the current MCP client session is connected.
 10. When the user requested tests, run EditMode tests only after the live status
     summary is healthy.
@@ -236,7 +236,7 @@ Preflight review
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no and which client>
-- Required live proof after restart: <server listed, tools listed, unity_status_summary healthy with mcp_server_info.version=0.3.46>
+- Required live proof after restart: <server listed, tools listed, unity_status_summary healthy with mcp_server_info.version=0.3.47>
 - Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 
 Do not run setup-apply, installer commands, helper sync, or client config edits
@@ -551,7 +551,7 @@ In Unity: `Window > Package Manager > + > Add package from git URL...`
 > Tip
 >
 > ```text
-> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.46
+> https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.47
 > ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -559,7 +559,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.46"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.47"
   }
 }
 ```

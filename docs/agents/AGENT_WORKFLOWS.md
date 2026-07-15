@@ -221,7 +221,7 @@ Minimum evidence object:
   "workflowId": "post_change_validation",
   "projectRoot": "$PROJECT_ROOT",
   "unityVersion": "6000.0.58f2",
-  "packageVersion": "0.3.46",
+  "packageVersion": "0.3.47",
   "packageSourceMode": "git",
   "verdict": "pass",
   "checks": [
@@ -480,8 +480,22 @@ Evidence to report:
 - lane: EditMode or PlayMode
 - filters used
 - total/passed/failed/skipped counts
+- `test_verdict` and `filter_summary`
 - failing test names and assertions
 - whether PlayMode returned to a settled Edit state
+
+If a filtered direct request reports `test_verdict=test_filter_no_match`, its
+transport delivery succeeded but validation did not: refresh once, wait for
+settle, then retry the exact same request once.
+
+```bash
+"$WRAPPER" request-project-refresh \
+  --project-root "$PROJECT_ROOT" \
+  --timeout-ms 180000
+```
+
+If the retry still selects zero tests, report a filter mismatch and stop. An
+unfiltered empty suite remains the distinct `no_tests` result.
 
 ## Workflow 5: Game View Visual Verification
 

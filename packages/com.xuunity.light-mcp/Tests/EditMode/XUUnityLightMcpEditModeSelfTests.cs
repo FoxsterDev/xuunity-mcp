@@ -54,13 +54,60 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 "EditMode",
                 out var filter,
                 out var summary,
+                out var filterRequested,
                 out var errorMessage);
 
             Assert.That(built, Is.True, errorMessage);
             Assert.That(filter.testMode, Is.EqualTo(TestMode.EditMode));
             CollectionAssert.AreEqual(new[] { "XUUnity.MCP.Fast" }, filter.categoryNames);
             CollectionAssert.AreEqual(new[] { "com.xuunity.light-mcp.Editor.Tests" }, filter.assemblyNames);
+            Assert.That(filterRequested, Is.True);
             Assert.That(summary, Does.Contain("categories=XUUnity.MCP.Fast"));
+        }
+
+        [Test]
+        public void RequestedEmptyTestFilter_UsesNonPassingValidationVerdict()
+        {
+            var payload = XUUnityLightMcpTestRunState.BuildPayloadForState(
+                new XUUnityLightMcpPersistedTestRunState
+                {
+                    project_root = "selftest",
+                    filter_summary = "tests=Missing.Namespace.Test; groups=all; categories=all; assemblies=all",
+                    filter_requested = true,
+                    total = 0,
+                    started_at_utc = "2026-01-01T00:00:00Z",
+                    completed_at_utc = "2026-01-01T00:00:01Z",
+                    run_phase = "completed"
+                });
+
+            Assert.That(payload.status, Is.EqualTo("test_filter_no_match"));
+            Assert.That(payload.test_verdict, Is.EqualTo("test_filter_no_match"));
+            Assert.That(payload.filter_requested, Is.True);
+            Assert.That(payload.filter_summary, Does.Contain("Missing.Namespace.Test"));
+            Assert.That(payload.total, Is.Zero);
+            Assert.That(payload.recommended_next_action, Is.EqualTo("refresh_project_once_then_retry_same_filter"));
+            Assert.That(payload.recommended_recovery_command, Does.Contain("request-project-refresh"));
+        }
+
+        [Test]
+        public void UnfilteredEmptyTestRun_UsesNoTestsVerdict()
+        {
+            var payload = XUUnityLightMcpTestRunState.BuildPayloadForState(
+                new XUUnityLightMcpPersistedTestRunState
+                {
+                    project_root = "selftest",
+                    filter_summary = "tests=all; groups=all; categories=all; assemblies=all",
+                    filter_requested = false,
+                    total = 0,
+                    started_at_utc = "2026-01-01T00:00:00Z",
+                    completed_at_utc = "2026-01-01T00:00:01Z",
+                    run_phase = "completed"
+                });
+
+            Assert.That(payload.status, Is.EqualTo("no_tests"));
+            Assert.That(payload.test_verdict, Is.EqualTo("no_tests"));
+            Assert.That(payload.recommended_next_action, Is.EqualTo("none"));
+            Assert.That(payload.recommended_recovery_command, Is.Empty);
         }
 
         [Test]
@@ -105,7 +152,9 @@ namespace XUUnity.LightMcp.Tests.EditMode
         [Category("XUUnity.MCP.Scene")]
         public void SceneOpenOperation_OpensProjectRelativeScene()
         {
-            var testDir = "Assets/XUUnityLightMcpGenerated/SceneOpenSelfTest";
+            const string generatedRoot = "Assets/XUUnityLightMcpGenerated";
+            var generatedRootExisted = AssetDatabase.IsValidFolder(generatedRoot) || Directory.Exists(generatedRoot);
+            var testDir = $"{generatedRoot}/SceneOpenSelfTest";
             var scenePath = $"{testDir}/SceneOpenSelfTest.unity";
             Directory.CreateDirectory(testDir);
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -138,6 +187,10 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 AssetDatabase.DeleteAsset(scenePath);
                 AssetDatabase.DeleteAsset(testDir);
+                if (!generatedRootExisted)
+                {
+                    AssetDatabase.DeleteAsset(generatedRoot);
+                }
             }
         }
 

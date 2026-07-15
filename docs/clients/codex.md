@@ -3,9 +3,9 @@
 Use the Codex-style config when the client reads MCP servers from
 `~/.codex/config.toml`.
 
-This guide is pinned to XUUnity release `v0.3.46` from the canonical repository
+This guide is pinned to XUUnity release `v0.3.47` from the canonical repository
 `https://github.com/FoxsterDev/xuunity-mcp`. Use the matching release README:
-`https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.46/README.md`.
+`https://github.com/FoxsterDev/xuunity-mcp/blob/v0.3.47/README.md`.
 
 When a short install request does not name a client explicitly, treat the
 current host client that is executing the request as the default wiring target.
@@ -38,7 +38,7 @@ Preflight review
 - Wiring target: Codex
 - Unity project root: <approved project root>
 - Additional discovered Unity projects: <none or list>
-- Requested package release: <v0.3.46>
+- Requested package release: <v0.3.47>
 - Current package pin: <missing | current | stale | custom>
 - Existing helper directory: <present | missing>
 - Helper state: <current | refresh required | missing> (<installed version and source root>)
@@ -47,7 +47,7 @@ Preflight review
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no>
-- Required live proof after restart: <server listed, tools listed, unity_status_summary healthy with mcp_server_info.version=0.3.46>
+- Required live proof after restart: <server listed, tools listed, unity_status_summary healthy with mcp_server_info.version=0.3.47>
 - Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 
 Do not run setup-apply, installer commands, helper sync, or Codex config edits
@@ -73,7 +73,7 @@ bash init_xuunity_light_unity_mcp.sh --target codex
 ```
 
 On native Windows, install or refresh the Codex helper from the approved
-v0.3.46 source through the native wrapper instead of executing an old helper or
+v0.3.47 source through the native wrapper instead of executing an old helper or
 requiring Git Bash:
 
 ```powershell
@@ -94,8 +94,8 @@ export XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET=codex
 
 If `${CODEX_TOOLS_HOME:-$HOME/.codex-tools}/xuunity-mcp` already exists, reuse
 the directory only after comparing the installed helper version and
-`.source_root` with v0.3.46. Do not execute stale helper files. Refresh them
-from the approved v0.3.46 source after the preflight review is approved.
+`.source_root` with v0.3.47. Do not execute stale helper files. Refresh them
+from the approved v0.3.47 source after the preflight review is approved.
 
 Enable the bridge for the Unity project without changing package mode:
 
@@ -171,7 +171,7 @@ server. Keep `run.cmd` as a low-level fallback, not the default client command.
 
 The refresh launcher is source-relative. If `.source_root` points at an older
 checkout, it can keep an older helper current relative to that checkout. Verify
-the installed version/source against v0.3.46 before executing it for this setup.
+the installed version/source against v0.3.47 before executing it for this setup.
 
 Manual or automatic Codex config only wires the client to the host helper. It
 does not prove that a specific Unity project has the MCP package dependency,
@@ -269,7 +269,7 @@ Use xuunity_light_unity MCP and list tools.
 
 Then verify a concrete Unity project:
 
-1. `unity_status_summary` and require `mcp_server_info.version=0.3.46`
+1. `unity_status_summary` and require `mcp_server_info.version=0.3.47`
 2. `unity_capabilities`
 3. `unity_health_probe`
 4. `unity_console_tail`

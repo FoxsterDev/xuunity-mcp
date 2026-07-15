@@ -67,6 +67,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 ? null
                 : new HashSet<string>(requestedAssemblies, StringComparer.OrdinalIgnoreCase);
 
+            EnsureRequestedAssembliesLoaded(requestedAssemblies);
+
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 if (assembly == null || assembly.IsDynamic)
@@ -108,6 +110,36 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             return catalog;
+        }
+
+        static void EnsureRequestedAssembliesLoaded(string[] requestedAssemblies)
+        {
+            if (requestedAssemblies == null)
+            {
+                return;
+            }
+
+            var loadedAssemblies = new HashSet<string>(
+                AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(assembly => assembly != null && !assembly.IsDynamic)
+                    .Select(assembly => assembly.GetName().Name),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var requestedAssembly in requestedAssemblies)
+            {
+                if (string.IsNullOrWhiteSpace(requestedAssembly) || loadedAssemblies.Contains(requestedAssembly))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    Assembly.Load(new AssemblyName(requestedAssembly));
+                }
+                catch
+                {
+                }
+            }
         }
 
         static IReadOnlyList<Type> GetLoadableTypes(Assembly assembly)

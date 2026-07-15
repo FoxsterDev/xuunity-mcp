@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+## 0.3.47
+
+Release tag: `v0.3.47`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.47
+```
+
+### Changed
+
+- Released `v0.3.47` package metadata, server metadata, package manifests, and Git UPM examples.
+- Requested EditMode and PlayMode filters that select zero tests now report the
+  non-passing `test_filter_no_match` verdict with the requested-filter summary,
+  direct counts, and one-refresh recovery guidance; unfiltered zero-test runs
+  remain `no_tests`.
+- The EditMode resolver safely attempts to load an explicitly requested test
+  assembly before cataloguing its test names, and the public cold-discovery
+  smoke refreshes once before requiring its fully qualified target.
+
+### Fixed
+
+- Removed catastrophic regex backtracking from Unity-process classification on
+  long non-Unity command lines.
+- Kept package self-tests from overwriting an active bridge test-run state and
+  removed their temporary generated scene root when the test created it.
+
+### Validation
+
+- Consumer-project Unity validation passed the package self-test lane: EditMode
+  `16/16`, PlayMode `5/5`, and the cold-discovery targeted EditMode smoke
+  selected and passed `1/1` fully qualified test after one refresh.
+- Host Python unittest suite passed: `466` tests with `13` expected platform
+  skips.
+- Public site Playwright checks passed: `42/42`.
+- Release metadata consistency, documentation freshness, and public-release
+  safety checks passed for `0.3.47`.
+
 ## 0.3.46
 
 Release tag: `v0.3.46`

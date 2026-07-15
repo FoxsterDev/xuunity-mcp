@@ -151,6 +151,11 @@ namespace XUUnity.LightMcp.Editor.Core
             public string last_progress_at_utc = "";
             public string timeout_classification = "";
             public int runtime_timeout_ms;
+            public string filter_summary = "";
+            public bool filter_requested;
+            public string test_verdict = "";
+            public string recommended_next_action = "";
+            public string recommended_recovery_command = "";
             public string last_started_test = "";
             public string last_finished_test = "";
             public bool lifecycle_churn_observed;
@@ -181,6 +186,11 @@ namespace XUUnity.LightMcp.Editor.Core
             public string timeout_classification = "";
             public string completed_at_utc = "";
             public string filter_summary = "";
+            public bool filter_requested;
+            public string status = "";
+            public string test_verdict = "";
+            public string recommended_next_action = "";
+            public string recommended_recovery_command = "";
             public string response_handoff_state = "pending";
             public int total;
             public int passed;

@@ -234,6 +234,29 @@ Pass criteria:
   `applied_mutation_settle_summary`. Treat the mutation as applied and the
   settle as unproven; verify the editor is settled before the next mutation.
 
+### 4a. Filtered Test Zero-Match Recovery
+
+When a direct EditMode or PlayMode request supplies one or more test, group,
+category, or assembly filters, `total=0` is not passing validation even if the
+outer MCP request completed successfully. Inspect the persisted test-result
+artifact for the counts and filter summary.
+
+After C# test sources were added or changed outside the Unity editor, run one
+`request-project-refresh`, wait for the editor to settle, and retry the exact
+same filtered request once. If it still selects zero tests, stop and report a
+filter mismatch; do not turn repeated refreshes or a transport `ok` result into
+validation evidence. An unfiltered request for a project with no tests remains
+the separate `no_tests` case.
+
+The reproducible cold-discovery regression creates an EditMode test source,
+refreshes once, then requires its fully qualified target to select exactly one
+passing leaf:
+
+```bash
+bash templates/smoke/run_editmode_targeted_filter_cold_discovery_suite.sh \
+  --project-root /path/to/UnityProject
+```
+
 ### 5. PlayMode Result Parity Smoke
 
 Use a representative direct `unity.tests.run_playmode` request and a scenario
@@ -531,6 +554,7 @@ Generic example scenario JSON templates live under:
 - `templates/scenarios/compile_contract_smoke.json`
 - `templates/smoke/run_playmode_settled_state_regression.sh`
 - `templates/smoke/run_playmode_lifecycle_retry_smoke.sh`
+- `templates/smoke/run_editmode_targeted_filter_cold_discovery_suite.sh`
 - `templates/smoke/run_request_abandoned_fault_suite.sh`
 - `templates/smoke/run_transport_matrix_suite.sh`
 - `templates/smoke/run_lifecycle_stress_suite.sh`

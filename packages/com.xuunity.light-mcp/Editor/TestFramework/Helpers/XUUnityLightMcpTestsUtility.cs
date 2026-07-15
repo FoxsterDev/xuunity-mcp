@@ -20,10 +20,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
             bool requireEditModeState,
             out Filter filter,
             out string filterSummary,
+            out bool filterRequested,
             out XUUnityLightMcpResponse errorResponse)
         {
             filter = null;
             filterSummary = "";
+            filterRequested = false;
             errorResponse = null;
             var operationName = testMode == TestMode.PlayMode
                 ? XUUnityLightMcpPlayModeTestRunner.OperationName
@@ -77,7 +79,14 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return false;
             }
 
-            if (!TryBuildFilter(request.args_json, testMode, modeLabel, out filter, out filterSummary, out var errorMessage))
+            if (!TryBuildFilter(
+                    request.args_json,
+                    testMode,
+                    modeLabel,
+                    out filter,
+                    out filterSummary,
+                    out filterRequested,
+                    out var errorMessage))
             {
                 errorResponse = XUUnityLightMcpResponseWriter.Error(request.request_id, "invalid_args", errorMessage);
                 return false;
@@ -92,6 +101,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             string modeLabel,
             out Filter filter,
             out string filterSummary,
+            out bool filterRequested,
             out string errorMessage)
         {
             filter = new Filter
@@ -99,6 +109,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 testMode = testMode
             };
             filterSummary = "all";
+            filterRequested = false;
             errorMessage = "";
 
             XUUnityLightMcpTestsArgs args;
@@ -118,8 +129,17 @@ namespace XUUnity.LightMcp.Editor.Helpers
             filter.groupNames = NormalizeOptionalStringArray(args.groupNames);
             filter.categoryNames = NormalizeOptionalStringArray(args.categoryNames);
             filter.assemblyNames = NormalizeOptionalStringArray(args.assemblyNames);
+            filterRequested = XUUnityLightMcpTestArgsUtility.HasRequestedFilters(
+                filter.testNames,
+                filter.groupNames,
+                filter.categoryNames,
+                filter.assemblyNames);
+            filterSummary = XUUnityLightMcpTestArgsUtility.BuildFilterSummary(
+                filter.testNames,
+                filter.groupNames,
+                filter.categoryNames,
+                filter.assemblyNames);
             XUUnityLightMcpEditModeFilterResolver.ResolveTestNames(filter);
-            filterSummary = BuildFilterSummary(filter);
             return true;
         }
 
@@ -131,24 +151,6 @@ namespace XUUnity.LightMcp.Editor.Helpers
         public static string[] NormalizeOptionalStringArray(string[] values)
         {
             return XUUnityLightMcpTestArgsUtility.NormalizeOptionalStringArray(values);
-        }
-
-        static string BuildFilterSummary(Filter filter)
-        {
-            return string.Join(
-                "; ",
-                new[]
-                {
-                    $"tests={JoinOrAll(filter.testNames)}",
-                    $"groups={JoinOrAll(filter.groupNames)}",
-                    $"categories={JoinOrAll(filter.categoryNames)}",
-                    $"assemblies={JoinOrAll(filter.assemblyNames)}",
-                });
-        }
-
-        static string JoinOrAll(string[] values)
-        {
-            return values == null || values.Length == 0 ? "all" : string.Join(",", values);
         }
 
         static List<Scene> GetDirtyOpenScenes()

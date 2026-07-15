@@ -40,5 +40,39 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             return normalized.Length == 0 ? null : normalized;
         }
+
+        public static bool HasRequestedFilters(
+            string[] testNames,
+            string[] groupNames,
+            string[] categoryNames,
+            string[] assemblyNames)
+        {
+            return testNames != null && testNames.Length > 0
+                   || groupNames != null && groupNames.Length > 0
+                   || categoryNames != null && categoryNames.Length > 0
+                   || assemblyNames != null && assemblyNames.Length > 0;
+        }
+
+        public static string BuildFilterSummary(
+            string[] testNames,
+            string[] groupNames,
+            string[] categoryNames,
+            string[] assemblyNames)
+        {
+            return string.Join(
+                "; ",
+                new[]
+                {
+                    $"tests={JoinOrAll(testNames)}",
+                    $"groups={JoinOrAll(groupNames)}",
+                    $"categories={JoinOrAll(categoryNames)}",
+                    $"assemblies={JoinOrAll(assemblyNames)}",
+                });
+        }
+
+        static string JoinOrAll(string[] values)
+        {
+            return values == null || values.Length == 0 ? "all" : string.Join(",", values);
+        }
     }
 }

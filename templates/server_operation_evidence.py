@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from server_core import render_launcher_cli
+
 
 ARTIFACT_GROUP_NAMES = (
     "request_journal",
@@ -106,7 +108,29 @@ def _first_failures(value: Any, limit: int = 3) -> list[dict[str, str]]:
     return failures
 
 
-def _attach_direct_test_verdict(enriched: dict[str, Any], *, operation: str) -> None:
+def _test_filter_was_requested(payload: dict[str, Any]) -> bool:
+    explicit = payload.get("filter_requested")
+    if isinstance(explicit, bool):
+        return explicit
+    if isinstance(explicit, str) and explicit.strip().lower() in {"true", "false"}:
+        return explicit.strip().lower() == "true"
+
+    summary = str(payload.get("filter_summary") or "").strip()
+    if not summary or summary.lower() == "all":
+        return False
+
+    return any(
+        "=" in part and part.split("=", 1)[1].strip().lower() != "all"
+        for part in summary.split(";")
+    )
+
+
+def _attach_direct_test_verdict(
+    enriched: dict[str, Any],
+    *,
+    operation: str,
+    project_root: Path,
+) -> None:
     if operation not in {"unity.tests.run_playmode", "unity.tests.run_editmode"}:
         return
 
@@ -114,16 +138,31 @@ def _attach_direct_test_verdict(enriched: dict[str, Any], *, operation: str) -> 
     failed = max(0, int(enriched.get("failed") or 0))
     passed = max(0, int(enriched.get("passed") or 0))
     skipped = max(0, int(enriched.get("skipped") or 0))
-    status = str(enriched.get("status") or "")
+    status = str(enriched.get("status") or "").strip().lower()
+    filter_requested = _test_filter_was_requested(enriched)
+    filter_summary = str(enriched.get("filter_summary") or "")
 
     if str(enriched.get("run_phase") or "") in {"timed_out", "settled_after_timeout"}:
         test_verdict = "runtime_timeout"
+    elif status == "test_filter_no_match" or (total <= 0 and filter_requested):
+        test_verdict = "test_filter_no_match"
     elif total <= 0 or status == "no_tests":
         test_verdict = "no_tests"
     elif failed > 0 or status == "failed":
         test_verdict = "failed"
     else:
         test_verdict = "passed"
+
+    recommended_next_action = (
+        "refresh_project_once_then_retry_same_filter"
+        if test_verdict == "test_filter_no_match"
+        else str(enriched.get("recommended_next_action") or "none")
+    )
+    recommended_recovery_command = (
+        render_launcher_cli("request-project-refresh", project_root, "--timeout-ms", "180000")
+        if test_verdict == "test_filter_no_match"
+        else str(enriched.get("recommended_recovery_command") or "")
+    )
 
     summary = {
         "result_payload_available": True,
@@ -135,6 +174,8 @@ def _attach_direct_test_verdict(enriched: dict[str, Any], *, operation: str) -> 
         "passed": passed,
         "failed": failed,
         "skipped": skipped,
+        "filter_requested": filter_requested,
+        "filter_summary": filter_summary,
         "first_failures": _first_failures(enriched.get("failures")),
         "last_started_test": str(enriched.get("last_started_test") or ""),
         "last_finished_test": str(enriched.get("last_finished_test") or ""),
@@ -144,6 +185,8 @@ def _attach_direct_test_verdict(enriched: dict[str, Any], *, operation: str) -> 
         "lifecycle_churn_observed": bool(enriched.get("lifecycle_churn_observed")),
         "editor_cleanup_recommended": False,
         "cleanup_command": "",
+        "recommended_next_action": recommended_next_action,
+        "recommended_recovery_command": recommended_recovery_command,
     }
     enriched.update(summary)
     enriched["playmode_verdict_summary"] = dict(summary)
@@ -401,7 +444,7 @@ def attach_operation_evidence_to_payload(
     host_completed_unix: float | None,
 ) -> dict[str, Any]:
     enriched = dict(payload or {})
-    _attach_direct_test_verdict(enriched, operation=operation)
+    _attach_direct_test_verdict(enriched, operation=operation, project_root=project_root)
     enriched["structured_timing"] = build_structured_timing(
         operation=operation,
         request_id=request_id,

@@ -163,6 +163,14 @@ def build_operator_verdict(
     recommended_next_action: str,
     terminal_disposition: str = "",
 ) -> dict[str, Any]:
+    if result_trust_class == "unity_completed_filter_no_match":
+        return {
+            "status": "test_filter_no_match",
+            "message": "Unity completed the request but the requested test filter selected zero tests.",
+            "should_retry": False,
+            "next_action": recommended_next_action or "refresh_project_once_then_retry_same_filter",
+        }
+
     if (
         terminal_disposition == "unity_completed_host_delivery_unproven"
         and result_trust_class == "unity_completed_confirmed"
@@ -267,6 +275,19 @@ def build_compact_final_status_projection(final_status: dict[str, Any]) -> dict[
             "should_retry": bool(operator_verdict.get("should_retry")),
             "next_action": str(operator_verdict.get("next_action") or ""),
         }
+    if str(final_status.get("operation") or "") in {"unity.tests.run_editmode", "unity.tests.run_playmode"}:
+        for key in (
+            "test_verdict",
+            "total",
+            "passed",
+            "failed",
+            "skipped",
+            "filter_requested",
+            "filter_summary",
+            "recommended_recovery_command",
+        ):
+            if key in final_status:
+                compact[key] = final_status.get(key)
     return compact
 
 
@@ -780,6 +801,8 @@ def build_test_verdict_summary(
         reason = "request_not_observed_in_unity_journal"
 
     total, passed, failed, skipped = _counts_from_test_payload(source_payload)
+    filter_requested = _test_filter_was_requested(source_payload)
+    filter_summary = str((source_payload or {}).get("filter_summary") or "")
     run_phase = str((source_payload or {}).get("run_phase") or "")
     source_completed = bool(str((source_payload or {}).get("completed_at_utc") or ""))
     explicit_timeout_classification = str((source_payload or {}).get("timeout_classification") or "")
@@ -805,7 +828,7 @@ def build_test_verdict_summary(
         test_verdict = "runtime_timeout"
     elif source_payload is not None and (request_completed or source_completed):
         if total <= 0:
-            test_verdict = "no_tests"
+            test_verdict = "test_filter_no_match" if filter_requested else "no_tests"
         elif failed > 0:
             test_verdict = "failed"
         else:
@@ -835,7 +858,10 @@ def build_test_verdict_summary(
         "transitioning",
     }
 
-    if test_verdict == "runtime_timeout":
+    if test_verdict == "test_filter_no_match":
+        recommended_next_action = "refresh_project_once_then_retry_same_filter"
+        trust_class = "unity_completed_filter_no_match"
+    elif test_verdict == "runtime_timeout":
         recommended_next_action = "inspect_test_timeout_or_raise_budget"
         trust_class = "unity_failed_confirmed"
     elif test_verdict == "failed":
@@ -869,6 +895,12 @@ def build_test_verdict_summary(
     if baseline_unix > 0:
         elapsed_runtime_seconds = round(max(0.0, time.time() - baseline_unix), 3)
 
+    recommended_recovery_command = (
+        render_launcher_cli("request-project-refresh", project_root, "--timeout-ms", "180000")
+        if test_verdict == "test_filter_no_match"
+        else str((source_payload or {}).get("recommended_recovery_command") or "")
+    )
+
     return {
         "result_payload_available": source_payload is not None,
         "result_payload_source": source,
@@ -879,6 +911,8 @@ def build_test_verdict_summary(
         "passed": passed,
         "failed": failed,
         "skipped": skipped,
+        "filter_requested": filter_requested,
+        "filter_summary": filter_summary,
         "first_failures": _first_failures((source_payload or {}).get("failures")),
         "last_started_test": str((source_payload or {}).get("last_started_test") or ""),
         "last_finished_test": str((source_payload or {}).get("last_finished_test") or ""),
@@ -896,8 +930,29 @@ def build_test_verdict_summary(
         ),
         "playmode_state": playmode_state,
         "recommended_next_action": recommended_next_action,
+        "recommended_recovery_command": recommended_recovery_command,
         "result_trust_class": trust_class,
     }
+
+
+def _test_filter_was_requested(payload: dict[str, Any] | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+
+    explicit = payload.get("filter_requested")
+    if isinstance(explicit, bool):
+        return explicit
+    if isinstance(explicit, str) and explicit.strip().lower() in {"true", "false"}:
+        return explicit.strip().lower() == "true"
+
+    summary = str(payload.get("filter_summary") or "").strip()
+    if not summary or summary.lower() == "all":
+        return False
+
+    return any(
+        "=" in part and part.split("=", 1)[1].strip().lower() != "all"
+        for part in summary.split(";")
+    )
 
 
 def try_recover_completed_response_after_reset(

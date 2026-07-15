@@ -13,6 +13,8 @@ if str(TEMPLATES_DIR) not in sys.path:
 
 import server_bridge_runtime
 import server_bridge_state
+import server_bridge_final_status
+import server_operation_evidence
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -1269,6 +1271,149 @@ class BridgeRuntimeTests(unittest.TestCase):
         self.assertTrue(error.details["full_payload_available"])
         self.assertIn("request-status-summary", error.details["full_payload_recovery_command"])
         self.assertNotIn("bridge_state", error.details)
+
+    def test_filtered_zero_match_is_not_a_completed_test_success(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir) / "Project With Spaces"
+            request_id = "req-editmode-filter-no-match"
+            journal_dir = project_root / "Library" / "XUUnityLightMcp" / "journal" / "requests"
+            result_dir = project_root / "Library" / "XUUnityLightMcp" / "state" / "test_results"
+            write_json(
+                journal_dir / "01_submitted.json",
+                {
+                    "event_type": "request_submitted",
+                    "event_at_utc": "2026-07-15T10:00:00Z",
+                    "request_id": request_id,
+                    "operation": "unity.tests.run_editmode",
+                },
+            )
+            write_json(
+                journal_dir / "02_started.json",
+                {
+                    "event_type": "request_started",
+                    "event_at_utc": "2026-07-15T10:00:01Z",
+                    "request_id": request_id,
+                    "operation": "unity.tests.run_editmode",
+                },
+            )
+            write_json(
+                journal_dir / "03_completed.json",
+                {
+                    "event_type": "request_completed",
+                    "event_at_utc": "2026-07-15T10:00:02Z",
+                    "operation_status": "ok",
+                    "request_id": request_id,
+                    "operation": "unity.tests.run_editmode",
+                },
+            )
+            write_json(
+                result_dir / f"{request_id}.json",
+                {
+                    "request_id": request_id,
+                    "operation": "unity.tests.run_editmode",
+                    "test_mode": "editmode",
+                    "run_phase": "completed",
+                    "started_at_utc": "2026-07-15T10:00:01Z",
+                    "completed_at_utc": "2026-07-15T10:00:02Z",
+                    "filter_requested": True,
+                    "filter_summary": "tests=Missing.Namespace.Test; groups=all; categories=all; assemblies=all",
+                    "total": 0,
+                    "passed": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                },
+            )
+
+            summary = server_bridge_runtime.build_request_final_status(
+                project_root,
+                request_id,
+                "unity.tests.run_editmode",
+                current_state={
+                    "transport": "tcp_loopback",
+                    "transport_listener_state": "listening",
+                    "health_status": "healthy",
+                    "pending_request_count": 0,
+                },
+                poll_timeout_ms=0,
+            )
+
+        self.assertEqual("test_filter_no_match", summary["test_verdict"])
+        self.assertEqual("unity_completed_filter_no_match", summary["result_trust_class"])
+        self.assertEqual("test_filter_no_match", summary["operator_verdict"]["status"])
+        self.assertFalse(summary["operator_verdict"]["should_retry"])
+        self.assertEqual("refresh_project_once_then_retry_same_filter", summary["recommended_next_action"])
+        self.assertIn("request-project-refresh", summary["recommended_recovery_command"])
+        self.assertIn(f'"{project_root}"', summary["recommended_recovery_command"])
+        self.assertTrue(summary["filter_requested"])
+        self.assertEqual(0, summary["total"])
+
+        compact = server_bridge_final_status.build_compact_final_status_projection(summary)
+        self.assertEqual("test_filter_no_match", compact["test_verdict"])
+        self.assertEqual(0, compact["total"])
+        self.assertIn("Missing.Namespace.Test", compact["filter_summary"])
+
+    def test_unfiltered_zero_match_remains_no_tests(self) -> None:
+        summary = server_bridge_runtime.build_test_verdict_summary(
+            project_root=Path("/tmp/FakeProject"),
+            request_id="req-unfiltered-no-tests",
+            operation="unity.tests.run_editmode",
+            response_payload={
+                "run_phase": "completed",
+                "completed_at_utc": "2026-07-15T10:00:02Z",
+                "filter_requested": False,
+                "filter_summary": "tests=all; groups=all; categories=all; assemblies=all",
+                "total": 0,
+            },
+            persisted_test_result=None,
+            request_submitted=True,
+            request_started=True,
+            request_completed=True,
+            completion_status="ok",
+            operation_outcome="completed_ok",
+            active_state=None,
+            bridge_changed_since_submission=False,
+        )
+
+        self.assertEqual("no_tests", summary["test_verdict"])
+        self.assertEqual("unity_completed_confirmed", summary["result_trust_class"])
+        self.assertEqual("none", summary["recommended_next_action"])
+
+    def test_direct_filtered_zero_match_exposes_compact_validation_counts(self) -> None:
+        project_root = Path("/tmp/Project With Spaces")
+        payload = server_operation_evidence.attach_operation_evidence_to_payload(
+            {
+                "status": "test_filter_no_match",
+                "run_phase": "completed",
+                "filter_requested": True,
+                "filter_summary": "tests=Missing.Namespace.Test; groups=all; categories=all; assemblies=all",
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "skipped": 0,
+            },
+            project_root=project_root,
+            operation="unity.tests.run_editmode",
+            request_id="req-direct-filter-no-match",
+            request_submitted_at_utc="2026-07-15T10:00:00Z",
+            request_started_at_utc="2026-07-15T10:00:01Z",
+            request_completed_at_utc="2026-07-15T10:00:02Z",
+            response_completed_at_utc="2026-07-15T10:00:02Z",
+            editor_log_path=None,
+            journal_event_paths=[],
+            lifecycle=None,
+            host_started_unix=None,
+            host_completed_unix=None,
+        )
+
+        self.assertEqual("test_filter_no_match", payload["test_verdict"])
+        self.assertEqual(0, payload["total"])
+        self.assertEqual(0, payload["passed"])
+        self.assertEqual(0, payload["failed"])
+        self.assertEqual(0, payload["skipped"])
+        self.assertTrue(payload["filter_requested"])
+        self.assertIn("Missing.Namespace.Test", payload["filter_summary"])
+        self.assertEqual("refresh_project_once_then_retry_same_filter", payload["recommended_next_action"])
+        self.assertIn("request-project-refresh", payload["recommended_recovery_command"])
 
 
 if __name__ == "__main__":

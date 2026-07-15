@@ -25,9 +25,15 @@ namespace XUUnity.LightMcp.Editor.Helpers
             _onCompleted = onCompleted ?? throw new ArgumentNullException(nameof(onCompleted));
         }
 
-        public void Begin(string requestId, string filterSummary, int requestTimeoutMs)
+        public void Begin(string requestId, string filterSummary, bool filterRequested, int requestTimeoutMs)
         {
-            var state = XUUnityLightMcpTestRunState.Begin(requestId, _operationName, _testMode, filterSummary, requestTimeoutMs);
+            var state = XUUnityLightMcpTestRunState.Begin(
+                requestId,
+                _operationName,
+                _testMode,
+                filterSummary,
+                filterRequested,
+                requestTimeoutMs);
             Restore(state);
         }
 

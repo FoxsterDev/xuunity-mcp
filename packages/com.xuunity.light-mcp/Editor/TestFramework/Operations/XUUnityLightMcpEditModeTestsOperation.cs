@@ -21,12 +21,13 @@ namespace XUUnity.LightMcp.Editor.Operations
                     requireEditModeState: false,
                     out var filter,
                     out var filterSummary,
+                    out var filterRequested,
                     out var errorResponse))
             {
                 return errorResponse;
             }
 
-            return XUUnityLightMcpEditModeTestRunner.Start(request, filter, filterSummary);
+            return XUUnityLightMcpEditModeTestRunner.Start(request, filter, filterSummary, filterRequested);
         }
     }
 
@@ -48,7 +49,11 @@ namespace XUUnity.LightMcp.Editor.Operations
             RestoreActiveRunIfNeeded();
         }
 
-        public static XUUnityLightMcpResponse Start(XUUnityLightMcpRequest request, Filter filter, string filterSummary)
+        public static XUUnityLightMcpResponse Start(
+            XUUnityLightMcpRequest request,
+            Filter filter,
+            string filterSummary,
+            bool filterRequested)
         {
             lock (Mutex)
             {
@@ -74,7 +79,7 @@ namespace XUUnity.LightMcp.Editor.Operations
 
                 EnsureApi();
                 XUUnityLightMcpTestPreflight.RunBeforeTestExecution();
-                Callbacks.Begin(request.request_id, filterSummary, request.timeout_ms);
+                Callbacks.Begin(request.request_id, filterSummary, filterRequested, request.timeout_ms);
 
                 try
                 {
