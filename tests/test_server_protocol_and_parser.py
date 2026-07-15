@@ -134,6 +134,13 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertIn("unity_project_action_invoke", tool_names)
         self.assertIn("unity_artifact_register", tool_names)
         self.assertIn("unity_artifact_write_report", tool_names)
+        sdk_diff_guard_tool = next(
+            tool for tool in response["result"]["tools"] if tool["name"] == "unity_sdk_generated_diff_guard"
+        )
+        self.assertEqual(
+            "xml_structural",
+            sdk_diff_guard_tool["inputSchema"]["properties"]["diffMode"]["default"]["*.xml"],
+        )
         status_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_status_summary")
         self.assertIn("includeFullPayload", status_tool["inputSchema"]["properties"])
         compile_tool = next(tool for tool in response["result"]["tools"] if tool["name"] == "unity_compile_player_scripts")

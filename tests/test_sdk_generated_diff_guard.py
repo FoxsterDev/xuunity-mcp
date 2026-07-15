@@ -11,6 +11,7 @@ if str(TEMPLATES_DIR) not in sys.path:
     sys.path.insert(0, str(TEMPLATES_DIR))
 
 import server
+import server_core
 from server_sdk_diff_guard import run_sdk_generated_diff_guard
 
 
@@ -28,6 +29,13 @@ class SdkGeneratedDiffGuardTests(unittest.TestCase):
             "repositories { mavenCentral() }\nandroid { signingConfig signingConfigs.release }\nimplementation 'com.vendor:sdk:1.2.3'\n",
             encoding="utf-8",
         )
+        (source.parent / "AndroidResolverDependencies.xml").write_text(
+            "<dependencies><androidPackages>"
+            '<androidPackage spec="com.vendor:a:1.0"><repositories><repository>https://repo.example/a</repository></repositories></androidPackage>'
+            '<androidPackage spec="com.vendor:b:2.0"><repositories><repository>https://repo.example/b</repository></repositories></androidPackage>'
+            "</androidPackages></dependencies>\n",
+            encoding="utf-8",
+        )
         self._git(project, "init")
         self._git(project, "config", "user.email", "tests@example.invalid")
         self._git(project, "config", "user.name", "Test User")
@@ -36,7 +44,16 @@ class SdkGeneratedDiffGuardTests(unittest.TestCase):
         return project
 
     def _git(self, root: Path, *args: str) -> None:
-        subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True)
+        subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            **server_core.hidden_window_subprocess_kwargs(),
+        )
 
     def _config(self, **overrides: object) -> dict:
         config = {
@@ -63,9 +80,122 @@ class SdkGeneratedDiffGuardTests(unittest.TestCase):
             report_payload = json.loads(Path(result["report_path"]).read_text(encoding="utf-8"))
 
         self.assertEqual("passed", result["verdict"])
+        self.assertEqual("xuunity.sdk-generated-diff-guard.v2", result["schema_version"])
         self.assertEqual("expected_dependency_update", result["paths"][0]["change_class"])
+        self.assertEqual("gradle_tokenized", result["paths"][0]["diff_mode"])
+        self.assertTrue(result["paths"][0]["semantic_changed"])
         self.assertEqual("none", result["recommended_next_action"])
         self.assertEqual("passed", report_payload["verdict"])
+
+    def test_gradle_reformat_and_block_reorder_is_normalization_noise_without_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            source = project / "Assets" / "Plugins" / "Android" / "mainTemplate.gradle"
+            source.write_text(
+                "android {\n    signingConfig   signingConfigs.release\n}\n"
+                "// resolver reordered generated blocks\n"
+                "repositories {\n    mavenCentral ( )\n}\n"
+                "implementation    'com.vendor:sdk:1.2.3'\n",
+                encoding="utf-8",
+            )
+
+            result = run_sdk_generated_diff_guard(
+                project_root=project,
+                config=self._config(expectedVersionChanges=[]),
+            )
+
+        self.assertEqual("passed", result["verdict"])
+        self.assertEqual("resolver_normalization_noise", result["paths"][0]["change_class"])
+        self.assertFalse(result["paths"][0]["semantic_changed"])
+        self.assertEqual([], result["unexpected_changed_files"])
+
+    def test_xml_node_and_attribute_reorder_is_structural_noise(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            relative_path = "Assets/Plugins/Android/AndroidResolverDependencies.xml"
+            source = project / relative_path
+            source.write_text(
+                "<dependencies><androidPackages>"
+                "<!-- resolver output order is not semantic -->"
+                '<androidPackage spec="com.vendor:b:2.0"><repositories><repository>https://repo.example/b</repository></repositories></androidPackage>'
+                '<androidPackage spec="com.vendor:a:1.0"><repositories><repository>https://repo.example/a</repository></repositories></androidPackage>'
+                "</androidPackages></dependencies>\n",
+                encoding="utf-8",
+            )
+
+            result = run_sdk_generated_diff_guard(
+                project_root=project,
+                config={
+                    "trackedPaths": [relative_path],
+                    "requiredMarkersAfter": ["com.vendor:a:1.0", "https://repo.example/b"],
+                },
+            )
+
+        self.assertEqual("passed", result["verdict"])
+        self.assertEqual("xml_structural", result["paths"][0]["diff_mode"])
+        self.assertEqual("resolver_normalization_noise", result["paths"][0]["change_class"])
+        self.assertFalse(result["paths"][0]["semantic_changed"])
+
+    def test_required_marker_present_only_in_block_comment_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            source = project / "Assets" / "Plugins" / "Android" / "mainTemplate.gradle"
+            source.write_text(
+                "repositories { mavenCentral() }\n"
+                "/* signingConfig signingConfigs.release */\n"
+                "implementation 'com.vendor:sdk:1.3.0'\n",
+                encoding="utf-8",
+            )
+
+            result = run_sdk_generated_diff_guard(
+                project_root=project,
+                config=self._config(expectedChangedAllowlist=["Assets/Plugins/Android/mainTemplate.gradle"]),
+            )
+
+        self.assertEqual("failed", result["verdict"])
+        self.assertEqual(["signingConfig"], result["required_marker_missing"])
+        self.assertNotIn("signingConfig", result["paths"][0]["markers_present"])
+
+    def test_comment_delimiter_inside_quoted_url_remains_visible_to_marker_check(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            source = project / "Assets" / "Plugins" / "Android" / "mainTemplate.gradle"
+            source.write_text(
+                source.read_text(encoding="utf-8") + 'maven { url "https://repo.example/sdk" }\n',
+                encoding="utf-8",
+            )
+
+            result = run_sdk_generated_diff_guard(
+                project_root=project,
+                config=self._config(
+                    expectedVersionChanges=[],
+                    expectedChangedAllowlist=["Assets/Plugins/Android/mainTemplate.gradle"],
+                    requiredMarkersAfter=["https://repo.example/sdk"],
+                ),
+            )
+
+        self.assertEqual("passed", result["verdict"])
+        self.assertEqual(["https://repo.example/sdk"], result["paths"][0]["markers_present"])
+
+    def test_invalid_xml_fails_closed_with_typed_normalization_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            relative_path = "Assets/Plugins/Android/AndroidResolverDependencies.xml"
+            (project / relative_path).write_text("<dependencies><broken></dependencies>\n", encoding="utf-8")
+
+            result = run_sdk_generated_diff_guard(
+                project_root=project,
+                config={"trackedPaths": [relative_path], "requiredMarkersAfter": []},
+            )
+
+        self.assertEqual("failed", result["verdict"])
+        self.assertEqual("invalid_generated_file", result["paths"][0]["change_class"])
+        self.assertEqual("xml_structural", result["invalid_generated_files"][0]["diff_mode"])
+        self.assertTrue(result["invalid_generated_files"][0]["reason"].startswith("xml_parse_error:"))
+        self.assertEqual(
+            "repair_invalid_generated_files_or_select_conservative_diff_mode",
+            result["recommended_next_action"],
+        )
 
     def test_missing_required_marker_fails_even_when_change_is_allowlisted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

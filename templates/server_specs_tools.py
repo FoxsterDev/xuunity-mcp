@@ -442,7 +442,7 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_sdk_generated_diff_guard": {
         "bridgeOperation": "host.sdk.generated_diff_guard",
-        "description": "Compare Git-tracked generated SDK files to a named baseline and fail closed on missing critical markers, stale expected versions, or unexpected changes.",
+        "description": "Compare Git-tracked generated SDK files to a named baseline with structure-aware XML/Gradle normalization, and fail closed on missing critical markers, stale expected versions, invalid generated files, or unexpected changes.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -450,6 +450,18 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "baselineSource": {"type": "string", "enum": ["git_head"], "default": "git_head"},
                 "baselineRef": {"type": "string", "default": "HEAD"},
                 "trackedPaths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "diffMode": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                        "enum": ["xml_structural", "gradle_tokenized", "line_normalized"]
+                    },
+                    "default": {
+                        "*.xml": "xml_structural",
+                        "*.gradle": "gradle_tokenized",
+                        "*": "line_normalized"
+                    }
+                },
                 "expectedChangedAllowlist": {"type": "array", "items": {"type": "string"}, "default": []},
                 "requiredMarkersAfter": {"type": "array", "items": {"type": "string"}, "default": []},
                 "expectedVersionChanges": {

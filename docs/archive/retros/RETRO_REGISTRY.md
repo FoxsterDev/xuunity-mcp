@@ -33,7 +33,7 @@ validation through it. Value here is ranked by how much a lesson reduces
 false-positive validation, false-negative validation, token/result cost, or
 install/readiness failure.
 
-Re-checked against released `v0.3.44`, most of the prior
+Re-checked against released `v0.3.45` plus current source, most of the prior
 `active / needs-triage` list had actually shipped across `v0.3.32`-`v0.3.44`
 and was simply never re-triaged. Eleven rows graduated to completed history in
 this pass and two previously-unregistered 2026-06-09 Windows install artifacts
@@ -43,10 +43,11 @@ were added. Only **three themes remain genuinely open**, in priority order:
    `2026-05-14_sdk_rollout_mcp_portfolio_retro.md`. A typed SDK-resolver lane
    with an active-Android-target precondition and resolver-freshness check, a
    generated-Gradle diff guard, a GUI process pool with quit-and-wait closeout,
-   and a portfolio SDK-validation summary are all still unbuilt in `v0.3.44`.
-   Until then, portfolio SDK rollouts can silently over-trust resolver output
-   and damage generated build files - a live false-positive-validation risk.
-   This is the standout remaining end-user gap.
+   and a portfolio SDK-validation summary were the missing proof chain in
+   `v0.3.44`. The Git-tracked guard shipped in `v0.3.45`; current source hardens
+   it with XML/Gradle structure-aware comparison and comment-safe marker proof.
+   Typed resolver freshness, untracked-output provenance, and portfolio
+   orchestration remain the standout false-positive-validation risk.
 
 2. **P2 - Token-efficiency tail.**
    `2026-06-02_token_efficiency_response_envelope_retro.md` and
@@ -77,12 +78,12 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 
 | Date | File | Scope | Registry Status | Why It Is Not Completed History |
 | --- | --- | --- | --- | --- |
-| 2026-05-14 | `2026-05-14_sdk_rollout_mcp_portfolio_retro.md` | SDK/EDM4U rollout validation lane: typed resolver preconditions, generated-Gradle diff guard, GUI process pool + quit-and-wait closeout, portfolio SDK summary | **partially implemented - highest open end-user ROI (P1)** | Unreleased source now has the Git-tracked vertical slice `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard`: compact baseline comparison, required-marker and stale-version checks, unallowlisted-change failure, and ignored-library JSON evidence. Still open: structure-aware and untracked-output diff modes, typed Android resolver freshness/preconditions, GUI process pool, closeout contract, and portfolio summary. The referenced rollout plan remains retained-for-future; device lanes are ROADMAP Wave 5. |
+| 2026-05-14 | `2026-05-14_sdk_rollout_mcp_portfolio_retro.md` | SDK/EDM4U rollout validation lane: typed resolver preconditions, generated-Gradle diff guard, GUI process pool + quit-and-wait closeout, portfolio SDK summary | **partially implemented - highest open end-user ROI (P1)** | `v0.3.45` shipped the Git-tracked `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard`. Current source adds XML-structural, Gradle-tokenized, and line-normalized comparison, comment-safe marker checks, and typed malformed-output failure evidence. Still open: Git-untracked fingerprint-bound baselines, artifact-registry registration, typed Android resolver freshness/preconditions, GUI process pool, closeout contract, and portfolio summary. The referenced rollout plan remains retained-for-future; device lanes are ROADMAP Wave 5. |
 | 2026-06-02 | `2026-06-02_token_efficiency_response_envelope_retro.md` | Response-envelope token efficiency: compact-by-default across MCP tool surfaces | mostly implemented; P2 residual | Compact-by-default shipped `v0.3.32`-`v0.3.44` for scenario, refresh, compile, build-config compile, test, `unity_status_summary`, `ensure-ready`, and batch CLI, each with `includeFullPayload`/`--output` opt-in (STATUS.md "Compact MCP envelopes"). Remaining (ROADMAP.md "Phase 2" residual): broader multi-project compact ceilings, a token ledger, and fast-path profiles. |
 | 2026-06-11 | `2026-06-11_token_accounting_and_fast_path_retro.md` | Token-accounting ledger, one-shot package-pin verifier, fast-path prompt profile | partial; P2 | The biggest win (compact output) shipped through `v0.3.40`/`v0.3.44`, and the fast path is documented in `docs/agents/PACKAGE_BUMP_FAST_PATH.md`, but no token-accounting ledger, one-shot verify-package-pin verifier, or runner token-budget hints exist in source or ROADMAP/STATUS. Overlaps the response-envelope row above as the token-efficiency tail. |
 | 2026-06-17 | `2026-06-17_windows_setup_failure_retro.md` | Native Windows setup failure postmortem; residual = live Windows/Linux host proof | Windows root causes fixed + CI-exercised in `v0.3.43`; live-host proof still open (P2) | The concrete Windows helper failures (path-with-spaces, ExecutionPolicy, `python3` delegation, PID liveness, discovery) are fixed and CI-exercised end to end. STATUS.md still marks a live Windows/Linux host session with a real Unity editor as needing execution proof (ROADMAP Phase 3 breadth). This row now tracks that single remaining cross-platform proof item; the Windows install root-cause retros (2026-06-09 v1/v2, 2026-06-10) are completed history. |
 
-> Re-confirmed 2026-07-12 against `v0.3.44`: the response-envelope /
+> Re-confirmed 2026-07-15 against `v0.3.45` plus current source: the response-envelope /
 > token-efficiency backlog is no longer a blanket compile/refresh/test/status
 > MCP-tool issue. Scenario verdicts, refresh/compile/build-config-compile/direct
 > test responses, `unity_status_summary`, `ensure-ready`, and batch CLI output

@@ -1,8 +1,8 @@
 # XUUnity MCP SDK Rollout Gate — Implementation Plan
 
 Date: `2026-07-12`
-Status: `P0.1 Git-tracked generated-diff vertical slice implemented in unreleased source; broader plan remains open; hardened after adversarial review (§14)`
-Baseline: released source line `v0.3.44`
+Status: `P0.1 Git-tracked guard released in v0.3.45; structure-aware hardening implemented in current source; broader plan remains open; hardened after adversarial review (§14)`
+Baseline: released source line `v0.3.45`
 Elaborates: `XUUNITY_MCP_SDK_ROLLOUT_VALIDATION_DESIGN_2026-05-14.md` (direction) —
 this document turns that direction into a build-ready plan with exact
 registration seams, contracts, reuse targets, phasing, and validation.
@@ -29,7 +29,7 @@ layer, and isolates device/native depth into opt-in layers.
 
 ## 2. Problem, grounded in the current surface
 
-Verified against `v0.3.44` source:
+Verified against `v0.3.45` source:
 
 - `unity.edm4u.resolve` (`XUUnityLightMcpEdm4uResolveOperation`) only calls
   `EditorApplication.ExecuteMenuItem(...)` over the Android Resolver menu
@@ -498,7 +498,7 @@ reader does not mistake them for oversights.
 
 ## 15. Do-first
 
-The first release-ready vertical slice is now implemented in unreleased source:
+The first release-ready vertical slice shipped in `v0.3.45`:
 `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` compares explicit
 Git-tracked files against `HEAD` (or another named Git ref), returns a compact
 verdict, writes ignored-library JSON evidence, and fails closed on missing
@@ -508,13 +508,22 @@ and non-Git baseline sources rather than treating them as a pass. Host regressio
 coverage exercises an expected version update, missing marker, stale version,
 unexpected change, MCP exposure, and CLI registration.
 
-Remaining P0.1 work is the richer structure-aware XML/Gradle classification,
-Git-untracked fingerprint-bound Library fallback, and artifact-registry
-registration. P0.2+ remains unchanged.
+Current source completes the structure-aware portion of P0.1: default path
+policies compare XML as an order-insensitive canonical node tree, compare
+Gradle as a comment-free token/block representation, and conservatively
+line-normalize other text. Marker checks are token-aware and ignore XML,
+line, and block comments; invalid XML/Gradle fails closed with typed evidence.
 
-Ship **P0.1 (`unity.sdk.generated_diff_guard` + the shared helper)** first. It is
-the highest-ROI false-positive catch (destructive generated-file change while
-compile-green and dependency-present both pass), the smallest new surface, builds
-atop the already-shipped `dependency.verify`, and needs no new lifecycle or
-device dependency. `android_resolve`, the GUI pool, and `batch-edm4u-resolve`
-follow in that order.
+Validation for this hardening passed the focused guard/protocol/parity suite,
+the full `458`-test host regression, real Git-tracked XML/Gradle inspection in a
+Unity 6000 consumer, and a Unity 2022/Unity 6000 package + post-change regression
+pair. Negative/reorder behavior is covered in isolated Git fixtures so consumer
+working trees are not mutated to manufacture damage.
+
+Remaining P0.1 work is the Git-untracked fingerprint-bound Library fallback
+and artifact-registry registration. P0.2+ remains unchanged.
+
+Finish the two remaining P0.1 provenance/evidence pieces before broadening the
+gate: Git-untracked fingerprint-bound baselines, then artifact-registry
+registration. Typed `android_resolve`, the GUI pool, and
+`batch-edm4u-resolve` follow in that order.

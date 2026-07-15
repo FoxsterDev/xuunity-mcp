@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
-Date: `2026-07-12`
-Status: `current source after v0.3.44`
+Date: `2026-07-15`
+Status: `current source after v0.3.45`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
@@ -22,7 +22,7 @@ Provide a small generic baseline that proves:
 
 Current release evidence:
 
-- current-source host Python tests: `426` tests passed on macOS, with `13`
+- current-source host Python tests: `458` tests passed on macOS, with `13`
   expected native-Windows-only skips covered by the Windows CI leg
 - source package self-tests for the current release line: EditMode and PlayMode
   self-test lanes passed on runnable installed Unity `2021.3`, `2022.3`, and
@@ -95,13 +95,23 @@ For an SDK rollout, run `unity_sdk_generated_diff_guard` (or
 `sdk-generated-diff-guard --config-file <guard.json>`) after resolver work and
 before treating dependency presence or compile-green as rollout proof. The
 current source slice uses a Git-tracked baseline and returns a compact verdict.
+Its default `diffMode` maps `*.xml` to order-insensitive structural comparison,
+`*.gradle` to tokenized/comment-free comparison with adjacent generated-block
+order normalization, and other files to conservative line normalization. A
+caller can override those path patterns with `xml_structural`,
+`gradle_tokenized`, or `line_normalized` when a generated format needs a more
+conservative policy.
 
 Pass criteria:
 
 - every requested generated file has a readable baseline at `baselineRef`
   (default `HEAD`);
-- every `requiredMarkersAfter` value remains present outside comments;
+- every `requiredMarkersAfter` value remains present outside comments (Gradle
+  markers are token-aware, so harmless whitespace does not create a false
+  negative and a marker surviving only in `/* ... */` cannot pass);
 - every requested generated file still exists in the working tree;
+- every XML/Gradle file selected for structured comparison parses into a valid
+  normalized representation;
 - no configured previous native version remains after the resolve; and
 - no unallowlisted generated-file change is present when
   `failOnUnexpectedChangedFile=true`.

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Changed
+
+- Hardened `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` with
+  structure-aware defaults: XML comparison is order-insensitive, Gradle
+  comparison ignores comments/formatting and normalizes adjacent generated
+  block order, and other text uses conservative line normalization. Required
+  markers are token-aware and comment-safe, so reformatted calls do not fail
+  while markers that survive only in comments cannot pass. Malformed structured
+  outputs now fail with typed `invalid_generated_files` evidence, and per-path
+  rows report the selected diff mode, semantic-change state, and marker proof.
+
+### Validation
+
+- Host regression passed `458` tests with `13` expected platform skips.
+- The guard passed against real Git-tracked XML/Gradle generated files in a
+  Unity 6000 consumer and a tracked line-normalized file in a Unity 2022
+  consumer. The same projects passed the package EditMode/PlayMode self-test
+  lane and the compile/scenario/lifecycle post-change lane respectively.
+
 ## 0.3.45
 
 Release tag: `v0.3.45`
