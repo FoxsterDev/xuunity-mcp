@@ -442,13 +442,18 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_sdk_generated_diff_guard": {
         "bridgeOperation": "host.sdk.generated_diff_guard",
-        "description": "Compare Git-tracked generated SDK files to a named baseline with structure-aware XML/Gradle normalization, and fail closed on missing critical markers, stale expected versions, invalid generated files, or unexpected changes.",
+        "description": "Compare generated SDK files to a Git baseline or a fingerprint-bound Library baseline for Git-untracked outputs, with structure-aware XML/Gradle normalization and fail-closed provenance checks.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
                 "baselineSource": {"type": "string", "enum": ["git_head"], "default": "git_head"},
                 "baselineRef": {"type": "string", "default": "HEAD"},
+                "libraryBaselineDir": {
+                    "type": "string",
+                    "default": "Library/XUUnityLightMcp/sdk/baseline/default"
+                },
+                "captureBaseline": {"type": "boolean", "default": False},
                 "trackedPaths": {"type": "array", "items": {"type": "string"}, "minItems": 1},
                 "diffMode": {
                     "type": "object",
@@ -476,6 +481,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "required": ["path", "fromValue", "toValue"]
                     },
                     "default": []
+                },
+                "trackedSdkVersions": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "default": {}
                 },
                 "failOnUnexpectedChangedFile": {"type": "boolean", "default": True},
                 "reportFile": {"type": "string"}

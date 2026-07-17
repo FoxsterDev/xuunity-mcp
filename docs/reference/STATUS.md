@@ -72,14 +72,16 @@ OpenUPM status:
 SDK rollout safety (`v0.3.45` plus current-source hardening):
 
 - `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` provides the
-  Git-tracked generated-file vertical slice of the SDK rollout gate. It is a
-  host-side, compact proof that detects missing required markers, stale expected
-  versions, and unallowlisted changes without opening Unity. Current source adds
-  XML-structural, Gradle-tokenized, and conservative line-normalized diff modes,
-  comment-safe/token-aware marker proof, and typed invalid-structured-file
-  failures. Git-untracked fingerprint-bound baselines, artifact-registry
-  registration, resolver freshness, package restore, GUI admission control, and
-  portfolio orchestration remain separate open slices.
+  generated-file vertical slice of the SDK rollout gate. Git-tracked paths use
+  a named Git ref; Git-untracked paths can use an explicit `Library/` capture
+  bound to project path, Unity version, package-lock hash, and configured SDK
+  versions. Capture rejects dirty trees, and comparison rejects stale
+  fingerprints or tampered snapshots. The host-side compact proof also detects
+  missing required markers, stale expected versions, unallowlisted changes,
+  invalid structured files, and normalization-only XML/Gradle rewrites without
+  opening Unity. Artifact-registry registration, resolver freshness, package
+  restore, GUI admission control, and portfolio orchestration remain separate
+  open slices.
 
 Implemented Unity-side operations:
 

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+
+- Extended `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` to
+  cover Git-untracked generated outputs with an explicit, fingerprint-bound
+  `Library/` baseline. Capture refuses a dirty tree apart from the selected
+  untracked outputs; comparison fails closed when the project path, Unity
+  version, package-lock hash, configured SDK versions, or snapshot integrity
+  no longer matches the captured provenance.
+
+### Validation
+
+- Focused SDK guard, protocol/parity, launcher-flavor, and subprocess-contract
+  tests pass for the Git-tracked and Git-untracked baseline lanes.
+
 ## 0.3.47
 
 Release tag: `v0.3.47`

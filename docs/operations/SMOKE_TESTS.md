@@ -94,7 +94,21 @@ Pass criteria:
 For an SDK rollout, run `unity_sdk_generated_diff_guard` (or
 `sdk-generated-diff-guard --config-file <guard.json>`) after resolver work and
 before treating dependency presence or compile-green as rollout proof. The
-current source slice uses a Git-tracked baseline and returns a compact verdict.
+guard uses `baselineRef` (default `HEAD`) for Git-tracked paths. For a generated
+path absent from that ref, capture a fingerprint-bound baseline once from a
+clean tree with `captureBaseline=true`; only the selected Git-untracked outputs
+may be present outside Git. The default capture directory is
+`Library/XUUnityLightMcp/sdk/baseline/default`, and `libraryBaselineDir` can
+select a different label under the same baseline root. Re-run with
+`captureBaseline=false` for the rollout comparison.
+
+The Library fingerprint binds the project path, Unity version,
+`Packages/packages-lock.json` hash, configured `trackedSdkVersions`, and
+`expectedVersionChanges`. A mismatch reports `baseline_fingerprint_stale`
+instead of comparing against an unrelated snapshot. Snapshot hash mismatches
+also fail closed.
+
+The guard returns a compact verdict.
 Its default `diffMode` maps `*.xml` to order-insensitive structural comparison,
 `*.gradle` to tokenized/comment-free comparison with adjacent generated-block
 order normalization, and other files to conservative line normalization. A
@@ -104,8 +118,8 @@ conservative policy.
 
 Pass criteria:
 
-- every requested generated file has a readable baseline at `baselineRef`
-  (default `HEAD`);
+- every requested generated file has a readable Git or fingerprint-bound
+  Library baseline;
 - every `requiredMarkersAfter` value remains present outside comments (Gradle
   markers are token-aware, so harmless whitespace does not create a false
   negative and a marker surviving only in `/* ... */` cannot pass);

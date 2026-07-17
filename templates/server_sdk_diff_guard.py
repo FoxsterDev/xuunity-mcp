@@ -9,11 +9,15 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
-from server_core import ToolInvocationError, hidden_window_subprocess_kwargs, write_json
+from server_core import ToolInvocationError, hidden_window_subprocess_kwargs, read_json, write_json
 
 
 SDK_GENERATED_DIFF_GUARD_SCHEMA_VERSION = "xuunity.sdk-generated-diff-guard.v2"
+SDK_GENERATED_DIFF_BASELINE_SCHEMA_VERSION = "xuunity.sdk-generated-diff-baseline.v1"
 DEFAULT_REPORT_RELATIVE_PATH = "Library/XUUnityLightMcp/sdk/generated_diff_guard.json"
+DEFAULT_LIBRARY_BASELINE_DIR = "Library/XUUnityLightMcp/sdk/baseline/default"
+LIBRARY_BASELINE_ROOT = "Library/XUUnityLightMcp/sdk/baseline"
+LIBRARY_BASELINE_MANIFEST = "baseline_manifest.json"
 _SAFE_GIT_REF = re.compile(r"^[A-Za-z0-9._/@^~-]+$")
 _XML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _DIFF_MODES = {"xml_structural", "gradle_tokenized", "line_normalized"}
@@ -30,15 +34,55 @@ def run_sdk_generated_diff_guard(
     config: dict[str, Any],
     report_file: str = "",
 ) -> dict[str, Any]:
-    """Compare generated SDK files to a provenance-clean Git baseline.
-
-    This first vertical slice deliberately supports only Git-tracked baselines.
-    An unavailable baseline is unproven rather than a passing empty diff.
-    """
+    """Compare generated SDK files to provenance-clean Git or fingerprint-bound baselines."""
     root = project_root.expanduser().resolve()
     git_prefix = _git_worktree_prefix(root)
     normalized = _normalize_config(config)
     baseline_ref = normalized["baseline_ref"]
+    _git_assert_ref(root, baseline_ref)
+    git_tracked_by_path = {
+        relative_path: _git_blob_exists(root, baseline_ref, _git_path(git_prefix, relative_path))
+        for relative_path in normalized["tracked_paths"]
+    }
+    library_paths = [path for path, git_tracked in git_tracked_by_path.items() if not git_tracked]
+    library_baseline_dir = _resolve_library_baseline_dir(root, normalized["library_baseline_dir"])
+    baseline_fingerprint = ""
+    fingerprint_match: bool | None = None
+    library_manifest: dict[str, Any] = {}
+    if library_paths:
+        fingerprint_inputs = _build_baseline_fingerprint_inputs(root, normalized)
+        baseline_fingerprint = _baseline_fingerprint(fingerprint_inputs)
+        if normalized["capture_baseline"]:
+            _assert_baseline_capture_clean(root, library_paths)
+            library_manifest = _capture_library_baseline(
+                project_root=root,
+                baseline_dir=library_baseline_dir,
+                relative_paths=library_paths,
+                fingerprint=baseline_fingerprint,
+                fingerprint_inputs=fingerprint_inputs,
+                diff_modes=normalized["diff_modes"],
+                required_markers=normalized["required_markers_after"],
+                marker_paths=normalized["tracked_paths"],
+            )
+            fingerprint_match = True
+        else:
+            library_manifest = _load_library_baseline_manifest(library_baseline_dir)
+            recorded_fingerprint = str(library_manifest.get("baseline_fingerprint") or "")
+            fingerprint_match = recorded_fingerprint == baseline_fingerprint
+            if not fingerprint_match:
+                raise ToolInvocationError(
+                    "baseline_fingerprint_stale",
+                    "The Library baseline fingerprint does not match the current project, Unity, package-lock, and SDK-version inputs.",
+                    {
+                        "recorded_fingerprint": recorded_fingerprint,
+                        "current_fingerprint": baseline_fingerprint,
+                    },
+                )
+    elif normalized["capture_baseline"]:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_capture_baseline_not_needed",
+            "Every tracked path has a Git baseline; captureBaseline is only for Git-untracked generated outputs.",
+        )
     rows: list[dict[str, Any]] = []
     changed_paths: list[str] = []
     unexpected_changed_files: list[str] = []
@@ -51,7 +95,16 @@ def run_sdk_generated_diff_guard(
     diff_mode_by_path: dict[str, str] = {}
 
     for relative_path in normalized["tracked_paths"]:
-        baseline_text = _git_show(root, baseline_ref, _git_path(git_prefix, relative_path))
+        if git_tracked_by_path[relative_path]:
+            baseline_source = "git_head"
+            baseline_text = _git_show(root, baseline_ref, _git_path(git_prefix, relative_path))
+        else:
+            baseline_source = "library_fingerprint"
+            baseline_text = _read_library_baseline(
+                baseline_dir=library_baseline_dir,
+                manifest=library_manifest,
+                relative_path=relative_path,
+            )
         current_path = _safe_project_file(root, relative_path)
         current_exists = current_path.is_file()
         if not current_exists:
@@ -112,8 +165,8 @@ def run_sdk_generated_diff_guard(
         rows.append(
             {
                 "path": relative_path,
-                "baseline_source": "git_head",
-                "baseline_ref": baseline_ref,
+                "baseline_source": baseline_source,
+                "baseline_ref": baseline_ref if baseline_source == "git_head" else "",
                 "change_class": change_class,
                 "diff_mode": diff_mode,
                 "semantic_changed": semantic_changed,
@@ -144,16 +197,17 @@ def run_sdk_generated_diff_guard(
             marker for marker in normalized["required_markers_after"] if marker not in markers_present
         ]
 
-    for expected in normalized["expected_version_changes"]:
-        current_text = comment_free_current_text_by_path.get(expected["path"], "")
-        if expected["from_value"] and expected["from_value"] in current_text:
-            stale_versions.append(
-                {
-                    "path": expected["path"],
-                    "previous_value": expected["from_value"],
-                    "expected_value": expected["to_value"],
-                }
-            )
+    if not normalized["capture_baseline"]:
+        for expected in normalized["expected_version_changes"]:
+            current_text = comment_free_current_text_by_path.get(expected["path"], "")
+            if expected["from_value"] and expected["from_value"] in current_text:
+                stale_versions.append(
+                    {
+                        "path": expected["path"],
+                        "previous_value": expected["from_value"],
+                        "expected_value": expected["to_value"],
+                    }
+                )
 
     failed = bool(required_marker_missing or stale_versions or missing_current_files or invalid_generated_files)
     if normalized["fail_on_unexpected_changed_file"] and unexpected_changed_files:
@@ -162,10 +216,14 @@ def run_sdk_generated_diff_guard(
     result: dict[str, Any] = {
         "schema_version": SDK_GENERATED_DIFF_GUARD_SCHEMA_VERSION,
         "operation": "unity.sdk.generated_diff_guard",
-        "scope": "git_tracked_baseline",
+        "scope": _baseline_scope(git_tracked_by_path),
         "verdict": verdict,
-        "baseline_source": "git_head",
+        "baseline_source": _baseline_source(git_tracked_by_path),
         "baseline_ref": baseline_ref,
+        "baseline_captured": bool(normalized["capture_baseline"] and library_paths),
+        "library_baseline_dir": str(library_baseline_dir) if library_paths else "",
+        "baseline_fingerprint": baseline_fingerprint,
+        "fingerprint_match": fingerprint_match,
         "tracked_path_count": len(rows),
         "changed_path_count": len(changed_paths),
         "changed_paths": changed_paths,
@@ -193,16 +251,14 @@ def run_sdk_generated_diff_guard(
 def _normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(config, dict):
         raise ToolInvocationError("sdk_generated_diff_guard_config_invalid", "Diff guard configuration must be an object.")
-    if bool(config.get("captureBaseline", False)):
-        raise ToolInvocationError(
-            "sdk_generated_diff_guard_capture_baseline_unsupported",
-            "This Git-tracked slice compares against an existing Git ref and does not capture Library baselines.",
-        )
+    capture_baseline = config.get("captureBaseline", False)
+    if not isinstance(capture_baseline, bool):
+        raise ToolInvocationError("sdk_generated_diff_guard_config_invalid", "captureBaseline must be a boolean.")
     baseline_source = str(config.get("baselineSource", "git_head") or "git_head").strip().lower()
     if baseline_source != "git_head":
         raise ToolInvocationError(
             "sdk_generated_diff_guard_baseline_source_unsupported",
-            "This slice supports baselineSource=git_head only.",
+            "baselineSource must be git_head; Git-untracked paths automatically use the fingerprint-bound Library fallback.",
             {"baselineSource": baseline_source},
         )
     baseline_ref = str(config.get("baselineRef", "HEAD") or "HEAD").strip()
@@ -213,6 +269,7 @@ def _normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     allowlist = set(_string_list(config.get("expectedChangedAllowlist", []), "expectedChangedAllowlist"))
     markers = _string_list(config.get("requiredMarkersAfter", []), "requiredMarkersAfter")
     expected_versions = _normalize_expected_version_changes(config.get("expectedVersionChanges", []), tracked_paths)
+    tracked_sdk_versions = _normalize_tracked_sdk_versions(config.get("trackedSdkVersions", {}))
     diff_modes = _normalize_diff_modes(config.get("diffMode", _DEFAULT_DIFF_MODES))
     fail_on_unexpected = config.get("failOnUnexpectedChangedFile", True)
     if not isinstance(fail_on_unexpected, bool):
@@ -222,10 +279,14 @@ def _normalize_config(config: dict[str, Any]) -> dict[str, Any]:
         )
     return {
         "baseline_ref": baseline_ref,
+        "baseline_source": baseline_source,
+        "library_baseline_dir": str(config.get("libraryBaselineDir", DEFAULT_LIBRARY_BASELINE_DIR) or DEFAULT_LIBRARY_BASELINE_DIR),
+        "capture_baseline": capture_baseline,
         "tracked_paths": tracked_paths,
         "expected_changed_allowlist": allowlist,
         "required_markers_after": markers,
         "expected_version_changes": expected_versions,
+        "tracked_sdk_versions": tracked_sdk_versions,
         "diff_modes": diff_modes,
         "fail_on_unexpected_changed_file": fail_on_unexpected,
     }
@@ -267,6 +328,22 @@ def _normalize_expected_version_changes(value: Any, tracked_paths: list[str]) ->
     return result
 
 
+def _normalize_tracked_sdk_versions(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise ToolInvocationError("sdk_generated_diff_guard_config_invalid", "trackedSdkVersions must be an object.")
+    result: dict[str, str] = {}
+    for raw_name, raw_version in value.items():
+        name = str(raw_name or "").strip()
+        version = str(raw_version or "").strip()
+        if not name or not version:
+            raise ToolInvocationError(
+                "sdk_generated_diff_guard_config_invalid",
+                "trackedSdkVersions keys and values must be non-empty strings.",
+            )
+        result[name] = version
+    return dict(sorted(result.items()))
+
+
 def _normalize_diff_modes(value: Any) -> dict[str, str]:
     if not isinstance(value, dict) or not value:
         raise ToolInvocationError("sdk_generated_diff_guard_config_invalid", "diffMode must be a non-empty object.")
@@ -302,6 +379,24 @@ def _git_path(prefix: str, relative_path: str) -> str:
     return f"{prefix}/{relative_path}" if prefix else relative_path
 
 
+def _git_assert_ref(project_root: Path, baseline_ref: str) -> None:
+    _run_git(
+        project_root,
+        ["rev-parse", "--verify", f"{baseline_ref}^{{commit}}"],
+        "sdk_generated_diff_guard_baseline_unavailable",
+    )
+
+
+def _git_blob_exists(project_root: Path, baseline_ref: str, relative_path: str) -> bool:
+    result = _run_git_unchecked(project_root, ["cat-file", "-e", f"{baseline_ref}:{relative_path}"])
+    if result.returncode == 0:
+        return True
+    if result.returncode == 128:
+        return False
+    detail = (result.stderr or result.stdout or "Git could not inspect the baseline path.").strip()
+    raise ToolInvocationError("sdk_generated_diff_guard_baseline_unavailable", detail[:300])
+
+
 def _git_show(project_root: Path, baseline_ref: str, relative_path: str) -> str:
     result = _run_git(
         project_root,
@@ -312,6 +407,19 @@ def _git_show(project_root: Path, baseline_ref: str, relative_path: str) -> str:
 
 
 def _run_git(project_root: Path, args: list[str], error_code: str) -> subprocess.CompletedProcess[str]:
+    result = _run_git_unchecked(project_root, args, error_code=error_code)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "Git did not return baseline content.").strip()
+        raise ToolInvocationError(error_code, detail[:300])
+    return result
+
+
+def _run_git_unchecked(
+    project_root: Path,
+    args: list[str],
+    *,
+    error_code: str = "sdk_generated_diff_guard_git_unavailable",
+) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
             ["git", "-C", str(project_root), *args],
@@ -325,10 +433,224 @@ def _run_git(project_root: Path, args: list[str], error_code: str) -> subprocess
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise ToolInvocationError(error_code, f"Git baseline command could not run: {exc}") from exc
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "Git did not return baseline content.").strip()
-        raise ToolInvocationError(error_code, detail[:300])
     return result
+
+
+def _resolve_library_baseline_dir(project_root: Path, value: str) -> Path:
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        candidate = project_root / candidate
+    candidate = candidate.resolve()
+    allowed_root = (project_root / LIBRARY_BASELINE_ROOT).resolve()
+    try:
+        candidate.relative_to(allowed_root)
+    except ValueError as exc:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_library_baseline_dir_invalid",
+            f"libraryBaselineDir must stay under {LIBRARY_BASELINE_ROOT}.",
+        ) from exc
+    return candidate
+
+
+def _build_baseline_fingerprint_inputs(project_root: Path, normalized: dict[str, Any]) -> dict[str, Any]:
+    project_version_path = project_root / "ProjectSettings" / "ProjectVersion.txt"
+    packages_lock_path = project_root / "Packages" / "packages-lock.json"
+    project_version_text = _read_text(project_version_path)
+    match = re.search(r"^m_EditorVersion:\s*(\S+)\s*$", project_version_text, re.MULTILINE)
+    if match is None:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_fingerprint_input_unavailable",
+            "ProjectSettings/ProjectVersion.txt does not contain m_EditorVersion.",
+        )
+    try:
+        packages_lock_bytes = packages_lock_path.read_bytes()
+    except OSError as exc:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_fingerprint_input_unavailable",
+            "Packages/packages-lock.json is required for a fingerprint-bound Library baseline.",
+        ) from exc
+    expected_versions = [
+        {
+            "path": item["path"],
+            "from_value": item["from_value"],
+            "to_value": item["to_value"],
+        }
+        for item in normalized["expected_version_changes"]
+    ]
+    return {
+        "project_root": str(project_root),
+        "unity_version": match.group(1),
+        "packages_lock_sha256": hashlib.sha256(packages_lock_bytes).hexdigest(),
+        "tracked_sdk_versions": normalized["tracked_sdk_versions"],
+        "expected_version_changes": expected_versions,
+    }
+
+
+def _baseline_fingerprint(inputs: dict[str, Any]) -> str:
+    payload = json.dumps(inputs, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _assert_baseline_capture_clean(project_root: Path, library_paths: list[str]) -> None:
+    tracked_dirty = _run_git_unchecked(project_root, ["diff", "--quiet", "--", "."])
+    staged_dirty = _run_git_unchecked(project_root, ["diff", "--cached", "--quiet", "--", "."])
+    if tracked_dirty.returncode not in {0, 1} or staged_dirty.returncode not in {0, 1}:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_git_unavailable",
+            "Git could not determine whether the project tree is clean enough for baseline capture.",
+        )
+    untracked_result = _run_git(
+        project_root,
+        ["ls-files", "--others", "--exclude-standard", "-z", "--", "."],
+        "sdk_generated_diff_guard_git_unavailable",
+    )
+    allowed_untracked = {path.replace("\\", "/") for path in library_paths}
+    other_untracked = {
+        path.replace("\\", "/")
+        for path in untracked_result.stdout.split("\0")
+        if path and path.replace("\\", "/") not in allowed_untracked
+    }
+    if tracked_dirty.returncode == 1 or staged_dirty.returncode == 1 or other_untracked:
+        raise ToolInvocationError(
+            "baseline_capture_dirty_tree",
+            "Library baseline capture requires a clean project tree apart from the selected Git-untracked generated outputs.",
+            {
+                "tracked_changes_present": tracked_dirty.returncode == 1,
+                "staged_changes_present": staged_dirty.returncode == 1,
+                "other_untracked_count": len(other_untracked),
+            },
+        )
+
+
+def _capture_library_baseline(
+    *,
+    project_root: Path,
+    baseline_dir: Path,
+    relative_paths: list[str],
+    fingerprint: str,
+    fingerprint_inputs: dict[str, Any],
+    diff_modes: dict[str, str],
+    required_markers: list[str],
+    marker_paths: list[str],
+) -> dict[str, Any]:
+    entries: dict[str, dict[str, str]] = {}
+    marker_text_by_path = {
+        relative_path: _read_text(current_path)
+        for relative_path in marker_paths
+        if (current_path := _safe_project_file(project_root, relative_path)).is_file()
+    }
+    for relative_path in relative_paths:
+        current_path = _safe_project_file(project_root, relative_path)
+        if not current_path.is_file():
+            raise ToolInvocationError(
+                "sdk_generated_diff_guard_baseline_capture_file_missing",
+                f"Cannot capture missing Git-untracked generated file: {relative_path}",
+            )
+        current_text = _read_text(current_path)
+        diff_mode = _diff_mode_for_path(relative_path, diff_modes)
+        try:
+            _normalize_diff_text(current_text, diff_mode)
+        except ValueError as exc:
+            raise ToolInvocationError(
+                "sdk_generated_diff_guard_baseline_capture_invalid_generated_file",
+                f"Cannot capture an invalid {diff_mode} generated file: {relative_path} ({exc})",
+            ) from exc
+        snapshot_path = _safe_library_baseline_file(baseline_dir, relative_path)
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_path.write_text(current_text, encoding="utf-8")
+        entries[relative_path] = {
+            "snapshot_relative_path": f"files/{relative_path}",
+            "sha256": _sha256_text(current_text),
+        }
+    missing_markers = [
+        marker
+        for marker in required_markers
+        if not any(
+            _marker_present(marker, marker_text_by_path[path], _diff_mode_for_path(path, diff_modes))
+            for path in marker_text_by_path
+        )
+    ]
+    if missing_markers:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_baseline_capture_required_marker_missing",
+            "Cannot capture a baseline that is already missing required generated markers.",
+            {"required_marker_missing": missing_markers},
+        )
+    manifest = {
+        "schema_version": SDK_GENERATED_DIFF_BASELINE_SCHEMA_VERSION,
+        "baseline_fingerprint": fingerprint,
+        "fingerprint_inputs": fingerprint_inputs,
+        "paths": entries,
+    }
+    write_json(baseline_dir / LIBRARY_BASELINE_MANIFEST, manifest)
+    return manifest
+
+
+def _load_library_baseline_manifest(baseline_dir: Path) -> dict[str, Any]:
+    manifest_path = baseline_dir / LIBRARY_BASELINE_MANIFEST
+    try:
+        manifest = read_json(manifest_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_library_baseline_unavailable",
+            "No readable fingerprint-bound Library baseline exists; run once with captureBaseline=true from a clean tree.",
+        ) from exc
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != SDK_GENERATED_DIFF_BASELINE_SCHEMA_VERSION:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_library_baseline_unavailable",
+            "The Library baseline manifest schema is missing or unsupported.",
+        )
+    return manifest
+
+
+def _read_library_baseline(*, baseline_dir: Path, manifest: dict[str, Any], relative_path: str) -> str:
+    entries = manifest.get("paths")
+    entry = entries.get(relative_path) if isinstance(entries, dict) else None
+    if not isinstance(entry, dict):
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_library_baseline_unavailable",
+            f"The Library baseline does not contain: {relative_path}",
+        )
+    snapshot_path = _safe_library_baseline_file(baseline_dir, relative_path)
+    baseline_text = _read_text(snapshot_path)
+    recorded_sha256 = str(entry.get("sha256") or "")
+    if not recorded_sha256 or _sha256_text(baseline_text) != recorded_sha256:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_library_baseline_integrity_mismatch",
+            f"The Library baseline snapshot hash does not match its manifest: {relative_path}",
+        )
+    return baseline_text
+
+
+def _safe_library_baseline_file(baseline_dir: Path, relative_path: str) -> Path:
+    files_root = (baseline_dir / "files").resolve()
+    candidate = (files_root / relative_path).resolve()
+    try:
+        candidate.relative_to(files_root)
+    except ValueError as exc:
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_path_invalid",
+            "Library baseline paths must stay under the selected baseline directory.",
+        ) from exc
+    return candidate
+
+
+def _baseline_source(git_tracked_by_path: dict[str, bool]) -> str:
+    sources = set(git_tracked_by_path.values())
+    if sources == {True}:
+        return "git_head"
+    if sources == {False}:
+        return "library_fingerprint"
+    return "mixed"
+
+
+def _baseline_scope(git_tracked_by_path: dict[str, bool]) -> str:
+    source = _baseline_source(git_tracked_by_path)
+    if source == "git_head":
+        return "git_tracked_baseline"
+    if source == "library_fingerprint":
+        return "git_untracked_fingerprint_baseline"
+    return "mixed_git_and_library_baseline"
 
 
 def _safe_project_file(project_root: Path, relative_path: str) -> Path:

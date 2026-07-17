@@ -1,8 +1,8 @@
 # XUUnity Light Unity MCP Public Retro Registry
 
 Status: active public registry
-Last triage: 2026-07-12 (re-evaluated against released source line `v0.3.44`)
-Current released source line: `v0.3.44`
+Last triage: 2026-07-17 (re-evaluated against released source line `v0.3.47` plus current source)
+Current released source line: `v0.3.47`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
@@ -26,14 +26,14 @@ host-local registry.
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
 
-## Re-Evaluation 2026-07-12 (what is still actual for the end user)
+## Re-Evaluation 2026-07-17 (what is still actual for the end user)
 
 The end user of this MCP is the AI-agent operator/developer who drives Unity
 validation through it. Value here is ranked by how much a lesson reduces
 false-positive validation, false-negative validation, token/result cost, or
 install/readiness failure.
 
-Re-checked against released `v0.3.45` plus current source, most of the prior
+Re-checked against released `v0.3.47` plus current source, most of the prior
 `active / needs-triage` list had actually shipped across `v0.3.32`-`v0.3.44`
 and was simply never re-triaged. Eleven rows graduated to completed history in
 this pass and two previously-unregistered 2026-06-09 Windows install artifacts
@@ -44,9 +44,10 @@ were added. Only **three themes remain genuinely open**, in priority order:
    with an active-Android-target precondition and resolver-freshness check, a
    generated-Gradle diff guard, a GUI process pool with quit-and-wait closeout,
    and a portfolio SDK-validation summary were the missing proof chain in
-   `v0.3.44`. The Git-tracked guard shipped in `v0.3.45`; current source hardens
-   it with XML/Gradle structure-aware comparison and comment-safe marker proof.
-   Typed resolver freshness, untracked-output provenance, and portfolio
+   `v0.3.44`. The Git-tracked guard shipped in `v0.3.45`; `v0.3.46` added
+   XML/Gradle structure-aware comparison and comment-safe marker proof. Current
+   source adds fingerprint-bound capture/comparison for Git-untracked generated
+   outputs. Typed resolver freshness, artifact registration, and portfolio
    orchestration remain the standout false-positive-validation risk.
 
 2. **P2 - Token-efficiency tail.**
@@ -78,8 +79,7 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 
 | Date | File | Scope | Registry Status | Why It Is Not Completed History |
 | --- | --- | --- | --- | --- |
-| 2026-07-15 | `2026-07-15_editmode_targeted_filter_zero_match_retro.md` | Direct EditMode test filter returns zero selected tests after external source edits | implemented P1/P2 contract hardening; consumer-project Unity verification passed | Filtered zero totals now persist and report `test_filter_no_match`, including direct counts, requested-filter summary, and one-refresh recovery guidance while transport delivery remains distinct. The EditMode resolver attempts to load a requested assembly before cataloguing names. Source and wrapper coverage guard the contract; the cold-discovery smoke passed after selecting one fully-qualified leaf, and package self-tests passed `16/16` EditMode plus `5/5` PlayMode tests in a consumer project. |
-| 2026-05-14 | `2026-05-14_sdk_rollout_mcp_portfolio_retro.md` | SDK/EDM4U rollout validation lane: typed resolver preconditions, generated-Gradle diff guard, GUI process pool + quit-and-wait closeout, portfolio SDK summary | **partially implemented - highest open end-user ROI (P1)** | `v0.3.45` shipped the Git-tracked `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard`. Current source adds XML-structural, Gradle-tokenized, and line-normalized comparison, comment-safe marker checks, and typed malformed-output failure evidence. Still open: Git-untracked fingerprint-bound baselines, artifact-registry registration, typed Android resolver freshness/preconditions, GUI process pool, closeout contract, and portfolio summary. The referenced rollout plan remains retained-for-future; device lanes are ROADMAP Wave 5. |
+| 2026-05-14 | `2026-05-14_sdk_rollout_mcp_portfolio_retro.md` | SDK/EDM4U rollout validation lane: typed resolver preconditions, generated-Gradle diff guard, GUI process pool + quit-and-wait closeout, portfolio SDK summary | **partially implemented - highest open end-user ROI (P1)** | `v0.3.45` shipped the Git-tracked `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard`; `v0.3.46` shipped structure-aware/comment-safe hardening. Current source adds clean-tree capture plus project/Unity/package-lock/SDK-version fingerprinting for Git-untracked outputs, stale-fingerprint rejection, and snapshot-integrity proof. Still open: artifact-registry registration, typed Android resolver freshness/preconditions, GUI process pool, closeout contract, and portfolio summary. The referenced rollout plan remains retained-for-future; device lanes are ROADMAP Wave 5. |
 | 2026-06-02 | `2026-06-02_token_efficiency_response_envelope_retro.md` | Response-envelope token efficiency: compact-by-default across MCP tool surfaces | mostly implemented; P2 residual | Compact-by-default shipped `v0.3.32`-`v0.3.44` for scenario, refresh, compile, build-config compile, test, `unity_status_summary`, `ensure-ready`, and batch CLI, each with `includeFullPayload`/`--output` opt-in (STATUS.md "Compact MCP envelopes"). Remaining (ROADMAP.md "Phase 2" residual): broader multi-project compact ceilings, a token ledger, and fast-path profiles. |
 | 2026-06-11 | `2026-06-11_token_accounting_and_fast_path_retro.md` | Token-accounting ledger, one-shot package-pin verifier, fast-path prompt profile | partial; P2 | The biggest win (compact output) shipped through `v0.3.40`/`v0.3.44`, and the fast path is documented in `docs/agents/PACKAGE_BUMP_FAST_PATH.md`, but no token-accounting ledger, one-shot verify-package-pin verifier, or runner token-budget hints exist in source or ROADMAP/STATUS. Overlaps the response-envelope row above as the token-efficiency tail. |
 | 2026-06-17 | `2026-06-17_windows_setup_failure_retro.md` | Native Windows setup failure postmortem; residual = live Windows/Linux host proof | Windows root causes fixed + CI-exercised in `v0.3.43`; live-host proof still open (P2) | The concrete Windows helper failures (path-with-spaces, ExecutionPolicy, `python3` delegation, PID liveness, discovery) are fixed and CI-exercised end to end. STATUS.md still marks a live Windows/Linux host session with a real Unity editor as needing execution proof (ROADMAP Phase 3 breadth). This row now tracks that single remaining cross-platform proof item; the Windows install root-cause retros (2026-06-09 v1/v2, 2026-06-10) are completed history. |
@@ -97,6 +97,7 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 
 | Date | File | Scope | Registry Status | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-07-15 | `2026-07-15_editmode_targeted_filter_zero_match_retro.md` | Direct EditMode test filter returns zero selected tests after external source edits | implemented and released in `v0.3.47` | Filtered zero totals persist and report `test_filter_no_match`, including direct counts, requested-filter summary, and one-refresh recovery guidance while transport delivery remains distinct. Consumer-project proof passed the cold-discovery targeted smoke plus package EditMode `16/16` and PlayMode `5/5` lanes. |
 | 2026-07-10 | `2026-07-10_applied_mutation_settle_timeout_retro.md` | Scenario verdict: confirmed project-hook mutation vs immediately-following refresh-settle timeout | implemented and live-validated | Released in `v0.3.43` (`applied_mutation_settle_timeout`, `mutation_applied_unsettled`, mutation/settle summary in `templates/server_summary_scenario.py`; regression in `tests/test_scenario_decision_verdict.py` incl. non-applied/intervening-step guard). `v0.3.44` records live Unity validation passing (GUI-fallback compile matrix, EditMode/PlayMode), closing the prior "live validation pending" caveat. |
 | 2026-07-06 | `2026-07-06_first_open_6000_upgrade_apiupdate_modal_and_console_source_retro.md` | First-open Unity 6000 API-Updater modal deadlock + stale-prone Console-buffer compile diagnostics | implemented | `v0.3.44`: `relaunch_noninteractive_accept_apiupdate` recovery + `possible_interactive_dialog_block` health hypothesis (`server_health.py`), console `source=editor_log` + stale-buffer warning (`XUUnityLightMcpConsoleTailOperation.cs`), first-open `-accept-apiupdate` construction and batchmode gate docs, and compact default transport envelopes. All four priority items shipped. |
 | 2026-07-06 | `2026-07-06_bridge_declared_not_enabled_first_open_install_retro.md` | Package declared but bridge `bridge_disabled` on first open; separate `--enable-project` + reopen; setup-plan bundled user-scope client config | implemented | `ensure-ready --open-editor` now auto-enables the project-scoped bridge (CHANGELOG "auto-enable the project-scoped bridge"; `server_cli_commands.py` `reason="ensure_ready_open_editor_auto_enable"`; first-open bridge auto-enable regression). setup-plan/apply separate project config from user-scope client wiring; the manual-manifest/manual-open boundary is documented. |

@@ -25,6 +25,11 @@ class SdkGeneratedDiffGuardTests(unittest.TestCase):
             "m_EditorVersion: 2022.3.0f1\n",
             encoding="utf-8",
         )
+        (project / "Packages").mkdir()
+        (project / "Packages" / "packages-lock.json").write_text(
+            '{"dependencies":{"com.vendor.sdk":{"version":"1.2.3"}}}\n',
+            encoding="utf-8",
+        )
         source.write_text(
             "repositories { mavenCentral() }\nandroid { signingConfig signingConfigs.release }\nimplementation 'com.vendor:sdk:1.2.3'\n",
             encoding="utf-8",
@@ -268,6 +273,8 @@ class SdkGeneratedDiffGuardTests(unittest.TestCase):
             )
             (project / "ProjectSettings").mkdir()
             (project / "ProjectSettings" / "ProjectVersion.txt").write_text("m_EditorVersion: 2022.3.0f1\n", encoding="utf-8")
+            (project / "Packages").mkdir()
+            (project / "Packages" / "packages-lock.json").write_text("{}\n", encoding="utf-8")
             self._git(host_root, "init")
             self._git(host_root, "config", "user.email", "tests@example.invalid")
             self._git(host_root, "config", "user.name", "Test User")
@@ -277,6 +284,125 @@ class SdkGeneratedDiffGuardTests(unittest.TestCase):
             result = run_sdk_generated_diff_guard(project_root=project, config=self._config(expectedVersionChanges=[]))
 
         self.assertEqual("passed", result["verdict"])
+
+    def test_git_untracked_file_captures_and_reuses_fingerprint_bound_library_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            relative_path = "Assets/Plugins/Android/settingsTemplate.gradle"
+            generated = project / relative_path
+            generated.write_text(
+                "repositories { mavenCentral() }\nimplementation 'com.vendor:sdk:1.2.3'\n",
+                encoding="utf-8",
+            )
+            config = {
+                "trackedPaths": [relative_path],
+                "requiredMarkersAfter": ["mavenCentral()"],
+                "trackedSdkVersions": {"com.vendor.sdk": "1.2.3"},
+                "expectedVersionChanges": [
+                    {"path": relative_path, "fromValue": "1.2.3", "toValue": "1.3.0"}
+                ],
+                "captureBaseline": True,
+            }
+
+            captured = run_sdk_generated_diff_guard(project_root=project, config=config)
+            generated.write_text(generated.read_text(encoding="utf-8").replace("1.2.3", "1.3.0"), encoding="utf-8")
+            compared = run_sdk_generated_diff_guard(
+                project_root=project,
+                config={**config, "captureBaseline": False},
+            )
+
+        self.assertEqual("passed", captured["verdict"])
+        self.assertTrue(captured["baseline_captured"])
+        self.assertEqual("library_fingerprint", captured["baseline_source"])
+        self.assertEqual("git_untracked_fingerprint_baseline", captured["scope"])
+        self.assertTrue(captured["fingerprint_match"])
+        self.assertEqual("passed", compared["verdict"])
+        self.assertFalse(compared["baseline_captured"])
+        self.assertEqual(captured["baseline_fingerprint"], compared["baseline_fingerprint"])
+        self.assertEqual("expected_dependency_update", compared["paths"][0]["change_class"])
+
+    def test_git_untracked_baseline_refuses_fingerprint_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            relative_path = "Assets/Plugins/Android/settingsTemplate.gradle"
+            (project / relative_path).write_text("repositories { mavenCentral() }\n", encoding="utf-8")
+            config = {"trackedPaths": [relative_path], "captureBaseline": True}
+            run_sdk_generated_diff_guard(project_root=project, config=config)
+            (project / "Packages" / "packages-lock.json").write_text(
+                '{"dependencies":{"com.vendor.sdk":{"version":"1.3.0"}}}\n',
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(server_core.ToolInvocationError) as raised:
+                run_sdk_generated_diff_guard(
+                    project_root=project,
+                    config={**config, "captureBaseline": False},
+                )
+
+        self.assertEqual("baseline_fingerprint_stale", raised.exception.code)
+        self.assertNotEqual(
+            raised.exception.details["recorded_fingerprint"],
+            raised.exception.details["current_fingerprint"],
+        )
+
+    def test_git_untracked_baseline_capture_refuses_dirty_tracked_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            relative_path = "Assets/Plugins/Android/settingsTemplate.gradle"
+            (project / relative_path).write_text("repositories { mavenCentral() }\n", encoding="utf-8")
+            (project / "ProjectSettings" / "ProjectVersion.txt").write_text(
+                "m_EditorVersion: 2022.3.1f1\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(server_core.ToolInvocationError) as raised:
+                run_sdk_generated_diff_guard(
+                    project_root=project,
+                    config={"trackedPaths": [relative_path], "captureBaseline": True},
+                )
+
+        self.assertEqual("baseline_capture_dirty_tree", raised.exception.code)
+        self.assertTrue(raised.exception.details["tracked_changes_present"])
+
+    def test_git_untracked_baseline_refuses_tampered_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            relative_path = "Assets/Plugins/Android/settingsTemplate.gradle"
+            (project / relative_path).write_text("repositories { mavenCentral() }\n", encoding="utf-8")
+            config = {"trackedPaths": [relative_path], "captureBaseline": True}
+            captured = run_sdk_generated_diff_guard(project_root=project, config=config)
+            snapshot = Path(captured["library_baseline_dir"]) / "files" / relative_path
+            snapshot.write_text("repositories { mavenLocal() }\n", encoding="utf-8")
+
+            with self.assertRaises(server_core.ToolInvocationError) as raised:
+                run_sdk_generated_diff_guard(
+                    project_root=project,
+                    config={**config, "captureBaseline": False},
+                )
+
+        self.assertEqual("sdk_generated_diff_guard_library_baseline_integrity_mismatch", raised.exception.code)
+
+    def test_mixed_capture_preserves_per_path_provenance_and_global_marker_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            tracked_path = "Assets/Plugins/Android/mainTemplate.gradle"
+            untracked_path = "Assets/Plugins/Android/settingsTemplate.gradle"
+            (project / untracked_path).write_text("pluginManagement { }\n", encoding="utf-8")
+            config = {
+                "trackedPaths": [tracked_path, untracked_path],
+                "requiredMarkersAfter": ["signingConfig"],
+                "captureBaseline": True,
+            }
+
+            result = run_sdk_generated_diff_guard(project_root=project, config=config)
+
+        self.assertEqual("passed", result["verdict"])
+        self.assertEqual("mixed", result["baseline_source"])
+        self.assertEqual("mixed_git_and_library_baseline", result["scope"])
+        self.assertEqual("HEAD", result["paths"][0]["baseline_ref"])
+        self.assertEqual("", result["paths"][1]["baseline_ref"])
+        self.assertEqual("git_head", result["paths"][0]["baseline_source"])
+        self.assertEqual("library_fingerprint", result["paths"][1]["baseline_source"])
 
     def test_mcp_tool_returns_validation_failure_without_bridge_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
