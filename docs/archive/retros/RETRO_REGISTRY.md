@@ -37,7 +37,8 @@ Re-checked against released `v0.3.47` plus current source, most of the prior
 `active / needs-triage` list had actually shipped across `v0.3.32`-`v0.3.44`
 and was simply never re-triaged. Eleven rows graduated to completed history in
 this pass and two previously-unregistered 2026-06-09 Windows install artifacts
-were added. Only **three themes remain genuinely open**, in priority order:
+were added. Three themes remained open from prior triage, and **one new theme was
+added 2026-07-17** (item 4). Open themes, in priority order:
 
 1. **P1 - SDK / EDM4U rollout validation lane (highest open ROI).**
    `2026-05-14_sdk_rollout_mcp_portfolio_retro.md`. A typed SDK-resolver lane
@@ -65,6 +66,17 @@ were added. Only **three themes remain genuinely open**, in priority order:
    session with a real Unity editor still needs execution proof. This is a
    ROADMAP Phase 3 breadth item, not a code gap.
 
+4. **P0-candidate (new 2026-07-17) - Prefab/UI authoring + structure-read + isolated render.**
+   `2026-07-17_prefab_ui_authoring_and_visual_iteration_gap_retro.md`. Execution is
+   reliable, but the toolset can *validate* UI and not *author* or cheaply *preview*
+   it: no prefab-structure read (serialized fields/RectTransform), no prefab/scene
+   mutation surface, and no isolated prefab/Canvas render, so a UI rework degrades
+   into raw-YAML editing judged only through ~40 s full-boot screenshots. Smaller
+   reusable follow-ups from the same session: make `project_defined_hook_poll_until`
+   treat a passive `not_started` as keep-waiting (and document the status-termination
+   contract), and give mutating project actions an object/row delta with a
+   destructive-drop warning. Needs triage against current source.
+
 No longer active (shipped and moved to completed history this pass): PlayMode
 lifecycle-reset trust classification, UI-smoke semantic verdicts + path
 coverage, batch-compile reliability + operator ergonomics, devmode batch
@@ -83,6 +95,7 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 | 2026-06-02 | `2026-06-02_token_efficiency_response_envelope_retro.md` | Response-envelope token efficiency: compact-by-default across MCP tool surfaces | mostly implemented; P2 residual | Compact-by-default shipped `v0.3.32`-`v0.3.44` for scenario, refresh, compile, build-config compile, test, `unity_status_summary`, `ensure-ready`, and batch CLI, each with `includeFullPayload`/`--output` opt-in (STATUS.md "Compact MCP envelopes"). Remaining (ROADMAP.md "Phase 2" residual): broader multi-project compact ceilings, a token ledger, and fast-path profiles. |
 | 2026-06-11 | `2026-06-11_token_accounting_and_fast_path_retro.md` | Token-accounting ledger, one-shot package-pin verifier, fast-path prompt profile | partial; P2 | The biggest win (compact output) shipped through `v0.3.40`/`v0.3.44`, and the fast path is documented in `docs/agents/PACKAGE_BUMP_FAST_PATH.md`, but no token-accounting ledger, one-shot verify-package-pin verifier, or runner token-budget hints exist in source or ROADMAP/STATUS. Overlaps the response-envelope row above as the token-efficiency tail. |
 | 2026-06-17 | `2026-06-17_windows_setup_failure_retro.md` | Native Windows setup failure postmortem; residual = live Windows/Linux host proof | Windows root causes fixed + CI-exercised in `v0.3.43`; live-host proof still open (P2) | The concrete Windows helper failures (path-with-spaces, ExecutionPolicy, `python3` delegation, PID liveness, discovery) are fixed and CI-exercised end to end. STATUS.md still marks a live Windows/Linux host session with a real Unity editor as needing execution proof (ROADMAP Phase 3 breadth). This row now tracks that single remaining cross-platform proof item; the Windows install root-cause retros (2026-06-09 v1/v2, 2026-06-10) are completed history. |
+| 2026-07-17 | `2026-07-17_prefab_ui_authoring_and_visual_iteration_gap_retro.md` | Prefab/UI authoring + prefab-structure read + isolated prefab render gap; `poll_until` `not_started`-terminal contract; mutating project-action delta safety | **new — needs triage (P0-candidate authoring capability)** | Execution (compile/test/playmode/screenshot) was fully reliable, but there is no prefab authoring, no prefab-structure read (serialized fields/RectTransform), and no isolated prefab render, so a UI rework became raw-YAML surgery judged only through ~40 s full-boot screenshots. Also: `project_defined_hook_poll_until` treats a passive hook `status: not_started` as terminal (breaks snapshot-style readiness polls); a mutating catalog project action reported `catalog_built` success while dropping rows (no delta/warn). Nothing shipped against these yet. |
 
 > Re-confirmed 2026-07-15 against `v0.3.45` plus current source: the response-envelope /
 > token-efficiency backlog is no longer a blanket compile/refresh/test/status
