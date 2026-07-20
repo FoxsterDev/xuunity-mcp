@@ -143,7 +143,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
         },
         "continueWhen": {
             "type": "string",
-            "description": "Optional poll-until predicate using payload.<field> == 'value'.",
+            "description": "Optional poll-until predicate using payload.<field> == 'value'. A payload status of not_started also keeps waiting unless passWhen or failWhen explicitly matches it.",
         },
         "intervalSeconds": {"type": "number", "minimum": 0.0, "default": 2.0},
         "promotePayloadFields": {

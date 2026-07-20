@@ -1,8 +1,28 @@
 # XUUnity Light Unity MCP Chat Retro — Prefab/UI Authoring + Visual-Iteration Gap
 
 Date: `2026-07-17`
-Status: `active public retro — needs triage`
+Status: `active public retro — reliability slice implemented; authoring and mutation-delta follow-ups open`
 Session type: presenter-driven Home-screen UI widget rework in a consumer Unity project (Unity `6000.0.58f2`), heavy prefab + localization + play-mode-screenshot iteration.
+
+## 0. Grooming update — 2026-07-19
+
+The smallest verdict-quality slice is implemented in current source:
+`project_defined_hook_poll_until` now treats a passive `status: not_started`
+payload as keep-waiting after evaluating explicit `passWhen` and `failWhen`.
+Other unmatched statuses still fail closed, and timeout remains authoritative.
+This prevents the demonstrated readiness false-negative without broadening the
+predicate language or hiding explicit caller intent.
+
+Validation is complete in current source: host regression passes `471` tests
+with `13` expected platform skips; Unity `2022.3` package self-tests pass
+EditMode `18/18` and PlayMode `5/5`; and a Unity `6000.0` consumer passes its
+compile, scenario/contract, PlayMode lifecycle, final-health, and consistency
+route.
+
+The prefab structure-read/authoring/render capability remains open but is
+ranked below verdict correctness under the reliability-first grooming rubric.
+Mutation-delta safety also remains open as the stronger false-positive-success
+follow-up from this retro.
 
 ## 1. Executive summary
 

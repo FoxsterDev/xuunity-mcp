@@ -11,10 +11,25 @@
   version, package-lock hash, configured SDK versions, or snapshot integrity
   no longer matches the captured provenance.
 
+### Fixed
+
+- `project_defined_hook_poll_until` now treats a passive hook payload with
+  `status: not_started` as keep-waiting instead of an immediate unmatched-status
+  failure. Explicit `passWhen` and `failWhen` matches retain precedence, all
+  other unmatched statuses fail closed, and the existing timeout remains the
+  terminal bound.
+
 ### Validation
 
 - Focused SDK guard, protocol/parity, launcher-flavor, and subprocess-contract
   tests pass for the Git-tracked and Git-untracked baseline lanes.
+- Host regression passes all `471` tests with `13` expected platform skips.
+- Current-source package self-tests pass on a Unity `2022.3` consumer:
+  EditMode `18/18` and PlayMode `5/5`, including passive `not_started` polling
+  and explicit-failure precedence. A Unity `6000.0` consumer passes its compile
+  preflight `6/6`, acceptance scenario `10/10`, refresh/compile contract,
+  PlayMode lifecycle recovery, final-health, and project-action consistency
+  routes.
 
 ## 0.3.47
 

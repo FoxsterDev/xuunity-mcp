@@ -1,7 +1,7 @@
 # XUUnity MCP Project-Defined Hook Poll-Until Design
 
 Date: 2026-06-12
-Status: P0 design proposal
+Status: implemented in `v0.3.29`; passive `not_started` continuation hardened in current source
 
 ## Goal
 
@@ -51,6 +51,8 @@ Optional fields:
 
 - `passed`: scenario step passes and stores final payload
 - `failed`: scenario step fails as product/setup/tooling based on `failure_class`
+- `not_started`: keep polling by default for passive readiness snapshots; an
+  explicit matching `passWhen` or `failWhen` still takes precedence
 - timeout: scenario step fails with latest payload and timeout metadata
 - cleanup: scenario runner must continue declared cleanup steps when configured
 
@@ -88,3 +90,10 @@ Add a synthetic hook scenario that:
 4. verifies compact summary promotion
 5. verifies cleanup after a synthetic `failed` terminal state
 6. verifies timeout includes latest payload
+7. verifies passive `not_started` payloads keep waiting, while an explicit
+   `failWhen` for `not_started` remains terminal
+
+Current-source evidence: package self-tests pass EditMode `18/18` and PlayMode
+`5/5` on Unity `2022.3`; the two new poll cases persist the expected three-poll
+pass and first-poll explicit failure. A Unity `6000.0` consumer also passes the
+compile, acceptance, contract, PlayMode lifecycle, and final-health route.

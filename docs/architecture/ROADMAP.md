@@ -99,6 +99,8 @@ Already implemented:
 - scenario `scene_open` steps and direct `unity_scene_open` / `request-scene-open`
   for deterministic boot-flow validation before Play Mode entry
 - project-defined hook poll-until steps and catalog-backed project-action steps
+- passive project-hook readiness polls tolerate `status: not_started` until an
+  explicit pass/fail predicate or timeout, avoiding an early false-negative
 - public config-applying project-action build templates for projects whose
   representative build must call project-owned apply/build methods instead of
   raw `unity_build_player`
@@ -434,6 +436,9 @@ Current state:
 - current step surface is intentionally small
 - persisted result browsing and artifact surfacing are now in place
 - next gap is richer assertions and sharper failure interpretation rather than first-time scenario bring-up
+- current source closes the passive-readiness false-negative where
+  `project_defined_hook_poll_until` previously treated `status: not_started` as
+  an unmatched terminal state
 - this wave contributes to Phase 2 and Phase 4 of the proof-broadening plan
 
 Done when:

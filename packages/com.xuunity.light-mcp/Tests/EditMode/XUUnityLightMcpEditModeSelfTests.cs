@@ -367,6 +367,76 @@ namespace XUUnity.LightMcp.Tests.EditMode
         }
 
         [Test]
+        public void ScenarioRunner_PollUntilImplicitlyContinuesNotStartedPayloads()
+        {
+            XUUnityLightMcpSyntheticPollUntilHook.Reset("not_started_then_passed");
+            var scenario = new XUUnityLightMcpScenarioDefinition
+            {
+                name = "synthetic_poll_until_not_started",
+                steps = new List<XUUnityLightMcpScenarioStepDefinition>
+                {
+                    new()
+                    {
+                        stepId = "flow",
+                        kind = "project_defined_hook_poll_until",
+                        hookName = XUUnityLightMcpSyntheticPollUntilHook.Name,
+                        startPayloadJson = "{\"action\":\"start_flow\"}",
+                        pollPayloadJson = "{\"action\":\"snapshot_flow\"}",
+                        passWhen = "payload.status == 'passed'",
+                        failWhen = "payload.status == 'failed'",
+                        continueWhen = "payload.status == 'running'",
+                        intervalSeconds = 0.0d,
+                        timeoutSeconds = 5.0d,
+                    },
+                },
+            };
+
+            var queued = XUUnityLightMcpScenarioRunner.QueueRun(scenario);
+            TickScenarioUntilIdle();
+
+            Assert.That(XUUnityLightMcpScenarioRunner.TryReadResult(queued.run_id, "", out var payload, out var errorCode, out var errorMessage), Is.True, $"{errorCode}: {errorMessage}");
+            Assert.That(payload.status, Is.EqualTo("passed"));
+            Assert.That(payload.steps[0].status, Is.EqualTo("passed"));
+            Assert.That(payload.steps[0].poll_count, Is.EqualTo(3));
+            Assert.That(payload.steps[0].payload_json, Does.Contain("\"status\":\"passed\""));
+        }
+
+        [Test]
+        public void ScenarioRunner_PollUntilExplicitFailureOverridesNotStartedContinuation()
+        {
+            XUUnityLightMcpSyntheticPollUntilHook.Reset("not_started_then_passed");
+            var scenario = new XUUnityLightMcpScenarioDefinition
+            {
+                name = "synthetic_poll_until_not_started_is_failure",
+                steps = new List<XUUnityLightMcpScenarioStepDefinition>
+                {
+                    new()
+                    {
+                        stepId = "flow",
+                        kind = "project_defined_hook_poll_until",
+                        hookName = XUUnityLightMcpSyntheticPollUntilHook.Name,
+                        startPayloadJson = "{\"action\":\"start_flow\"}",
+                        pollPayloadJson = "{\"action\":\"snapshot_flow\"}",
+                        passWhen = "payload.status == 'passed'",
+                        failWhen = "payload.status == 'not_started'",
+                        continueWhen = "payload.status == 'running'",
+                        intervalSeconds = 0.0d,
+                        timeoutSeconds = 5.0d,
+                    },
+                },
+            };
+
+            var queued = XUUnityLightMcpScenarioRunner.QueueRun(scenario);
+            TickScenarioUntilIdle();
+
+            Assert.That(XUUnityLightMcpScenarioRunner.TryReadResult(queued.run_id, "", out var payload, out var errorCode, out var errorMessage), Is.True, $"{errorCode}: {errorMessage}");
+            Assert.That(payload.status, Is.EqualTo("failed"));
+            Assert.That(payload.steps[0].status, Is.EqualTo("failed"));
+            Assert.That(payload.steps[0].poll_count, Is.EqualTo(1));
+            Assert.That(payload.steps[0].terminal_status, Is.EqualTo("not_started"));
+        }
+
+        [Test]
         public void ScenarioRunner_PollUntilFailureContinuesToCleanup()
         {
             XUUnityLightMcpSyntheticPollUntilHook.Reset("failed_terminal");
@@ -531,7 +601,9 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 };
             }
 
-            var status = s_mode == "always_running" || s_pollCount < 3 ? "running" : "passed";
+            var status = s_mode == "not_started_then_passed"
+                ? (s_pollCount < 3 ? "not_started" : "passed")
+                : (s_mode == "always_running" || s_pollCount < 3 ? "running" : "passed");
             return new XUUnityLightMcpScenarioHookResult
             {
                 outcome = $"flow_{status}",

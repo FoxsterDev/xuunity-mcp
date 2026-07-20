@@ -209,11 +209,17 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return true;
             }
 
-            if (PredicateMatches(step.continueWhen, payloadJson))
+            var implicitlyContinueNotStarted = string.Equals(
+                payloadStatus,
+                "not_started",
+                StringComparison.OrdinalIgnoreCase);
+            if (PredicateMatches(step.continueWhen, payloadJson) || implicitlyContinueNotStarted)
             {
                 stepResult.status = "running";
                 stepResult.outcome = string.IsNullOrWhiteSpace(pollResult.outcome)
-                    ? "hook_poll_until_running"
+                    ? (implicitlyContinueNotStarted
+                        ? "hook_poll_until_waiting_not_started"
+                        : "hook_poll_until_running")
                     : pollResult.outcome;
                 var intervalSeconds = Math.Max(0.0d, step.intervalSeconds);
                 state.pollUntilNextPollUtc = DateTime.UtcNow.AddSeconds(intervalSeconds).ToString("yyyy-MM-ddTHH:mm:ssZ");

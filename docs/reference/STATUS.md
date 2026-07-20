@@ -1,6 +1,6 @@
 # Status
 
-Date: `2026-07-10`
+Date: `2026-07-19`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
@@ -48,6 +48,10 @@ Migration note:
 - Current source also keeps a terminal scenario inconclusive when a confirmed
   project-hook `*_applied` mutation is followed by a refresh-settle timeout,
   while explicitly separating the applied mutation from the unproven settle.
+- Current source keeps passive `project_defined_hook_poll_until` readiness
+  snapshots running through `status: not_started`; explicit pass/fail
+  predicates still win, unmatched statuses still fail closed, and timeout stays
+  authoritative.
 - `v0.3.38+` makes `unity_status_summary` compact by default for MCP callers,
   with `payload_mode` markers and full nested diagnostics available through
   `includeFullPayload=true`.
@@ -201,14 +205,15 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest source validation for `v0.3.47`:
+Latest release and current-source validation above `v0.3.47`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
 | Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.47`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `python3 -m unittest discover -s tests` | `466` tests passed for `v0.3.47`, with `13` expected skips |
+| Host Python tests | `python3 -m unittest discover -s tests` | Current source passes `471` tests with `13` expected skips |
 | Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.47` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, PlayMode already-playing stale-risk summaries, deterministic scene-open setup, opt-in compact batch helper output, safer `Editor.log` console grep/tail defaults, compact transport/idle timeout errors, compile-first post-change validation, lane-agnostic GUI-fallback compile evidence, and requested-filter zero-match verdicts are documented with full-payload recovery. |
-| Package self-tests | Clean devmode projects on installed Unity editors | Current release-line source validation passed package EditMode `16/16` and PlayMode `5/5` self-test lanes on a Unity `6000.x` consumer project, including deterministic scene-open and zero-match classification self-tests; the cold-discovery targeted smoke passed `1/1` after one refresh. |
+| Package self-tests | Clean devmode projects on installed Unity editors | Current source passes EditMode `18/18` and PlayMode `5/5` on a Unity `2022.3` consumer, including passive `not_started` poll continuation and explicit-failure precedence. Release-line validation previously passed EditMode `16/16` and PlayMode `5/5` on Unity `6000.x`, including deterministic scene-open and zero-match classification. |
+| Current-source consumer route | Compile preflight + scenario/contract + PlayMode lifecycle + consistency | Unity `6000.0` passes compile preflight `6/6`, acceptance `10/10`, refresh/compile contract, settled-state and lifecycle recovery, healthy final Edit Mode with zero compiler errors/unrecovered abandons, and project-action consistency. |
 | Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.47`: `42/42`. |
 | Historical Git UPM release smoke | Clean Unity project pinned to an earlier public tag | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package self-tests passed, and closeout verified process exit. |
 | Multi-project compile matrix | Public summary evidence from consumer validation | `9/9` projects, `38/38` compile lanes, `0` failures |

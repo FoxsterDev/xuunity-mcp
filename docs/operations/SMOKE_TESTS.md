@@ -271,6 +271,23 @@ bash templates/smoke/run_editmode_targeted_filter_cold_discovery_suite.sh \
   --project-root /path/to/UnityProject
 ```
 
+### 4b. Passive Readiness Poll Contract
+
+Use `project_defined_hook_poll_until` when a project hook exposes a passive
+readiness snapshot. The hook may report `status: not_started` while the target
+flow or asynchronous model has not initialized yet. That status keeps polling
+by default; `passWhen` and `failWhen` are evaluated first, so a caller can still
+make `not_started` terminal explicitly. Any other unmatched status fails closed,
+and repeated `not_started` payloads still end at the configured timeout.
+
+Pass criteria:
+
+- at least one `not_started` poll is observed before the passing payload;
+- the scenario does not terminate with `project_hook_poll_until_unmatched_status`;
+- a matching `failWhen` for `not_started` fails on the first poll;
+- a never-ready hook ends with `project_hook_poll_until_timeout` and preserves
+  the latest payload.
+
 ### 5. PlayMode Result Parity Smoke
 
 Use a representative direct `unity.tests.run_playmode` request and a scenario
