@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Roadmap
 
-Date: `2026-07-21`
+Date: `2026-07-23`
 Status: `active public roadmap`
 
 ## North Star

@@ -47,6 +47,15 @@ skips, a Unity `2022.3` consumer passes package EditMode `14/14` and PlayMode
 `5/5`, and a Unity `6000.0` consumer passes compile `6/6`, acceptance `10/10`,
 contract, PlayMode lifecycle/final-health, and project-action consistency.
 
+## 0b. Grooming revalidation — 2026-07-23
+
+The slice is committed at `4e16389` and remains unreleased after a fresh
+status audit; `v0.3.47` is still the newest tag. The full host suite and both
+Unity consumer lanes were rerun with the same passing counts recorded above.
+No candidate status changed: typed resolver freshness remains the larger P1
+follow-up, while existing hook adoption/raw-scenario mutation warnings and the
+prefab authoring/render surface remain open.
+
 ## 1. Executive summary
 
 The MCP was **reliable and trustworthy for every operation it exposes**: compile

@@ -1,6 +1,6 @@
 # Status
 
-Date: `2026-07-21`
+Date: `2026-07-23`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service

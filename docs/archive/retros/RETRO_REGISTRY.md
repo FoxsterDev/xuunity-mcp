@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Public Retro Registry
 
 Status: active public registry
-Last triage: 2026-07-21 (re-evaluated against released source line `v0.3.47` plus clean current source at `7056894` before this run's changes)
+Last triage: 2026-07-23 (re-evaluated against released source line `v0.3.47` plus current source at `4e16389`)
 Current released source line: `v0.3.47`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
@@ -25,6 +25,19 @@ host-local registry.
 - `Completed Public History` is the place to find reusable lessons already
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
+
+## Re-Evaluation 2026-07-23
+
+- The typed project-action mutation-delta trust contract is now committed at
+  `4e16389`; no release tag newer than `v0.3.47` exists.
+- Fresh validation passes `475/475` host tests with 13 expected platform skips,
+  Unity `2022.3` package EditMode `14/14` plus PlayMode `5/5`, and the Unity
+  `6000.0` compile `6/6`, acceptance `10/10`, contract, lifecycle/final-health,
+  and project-action consistency route.
+- The candidate ordering is unchanged: typed SDK resolver freshness and SDK
+  artifact registration remain the larger P1 follow-ups; project-hook
+  mutation-delta adoption/raw-scenario warnings remain bounded follow-ups; and
+  prefab authoring/render plus token polish remain lower priority.
 
 ## Re-Evaluation 2026-07-21
 
