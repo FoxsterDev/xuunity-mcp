@@ -4,6 +4,11 @@
 
 ### Added
 
+- Added a standardized `xuunity.mutation-delta.v1` trust contract for mutating
+  project actions. Hook summaries promote before/after/added/removed/changed
+  counts, while `unity_project_action_invoke` distinguishes successful Unity
+  execution from decision readiness and warns on missing, invalid, or
+  destructive-drop evidence. Mutating hook scaffolds now emit the contract.
 - Extended `unity_sdk_generated_diff_guard` / `sdk-generated-diff-guard` to
   cover Git-untracked generated outputs with an explicit, fingerprint-bound
   `Library/` baseline. Capture refuses a dirty tree apart from the selected
@@ -21,6 +26,13 @@
 
 ### Validation
 
+- Focused mutation-delta/protocol/parity tests pass, and the full host suite
+  passes all `475` tests with `13` expected platform skips.
+- A Unity `2022.3` development-system consumer passes package EditMode `14/14`
+  and PlayMode `5/5`. A Unity `6000.0` consumer passes compile matrix `6/6`,
+  acceptance scenario `10/10`, refresh/compile contract, PlayMode settled-state
+  and lifecycle recovery, healthy final status, and project-action catalog
+  consistency. Consumer package manifests and locks remain byte-identical.
 - Focused SDK guard, protocol/parity, launcher-flavor, and subprocess-contract
   tests pass for the Git-tracked and Git-untracked baseline lanes.
 - Host regression passes all `471` tests with `13` expected platform skips.

@@ -263,7 +263,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         }
     },
     "unity_project_action_invoke": {
-        "description": "Invoke a typed project action from project_actions.yaml through a one-step Unity scenario.",
+        "description": "Invoke a typed project action from project_actions.yaml through a one-step Unity scenario. Completed mutating actions are decision-ready only when their hook payload reports a valid xuunity.mutation-delta.v1; missing, invalid, or destructive-drop deltas produce an explicit operator warning without rewriting Unity execution success.",
         "inputSchema": {
             "type": "object",
             "properties": {

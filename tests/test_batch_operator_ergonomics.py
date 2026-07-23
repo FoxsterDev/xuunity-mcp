@@ -194,6 +194,96 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
         self.assertEqual(2, hook["payload_scalars"]["changed_file_count"])
         self.assertNotIn("api_token", hook.get("payload_scalars", {}))
 
+    def test_project_defined_hook_summary_promotes_valid_mutation_delta(self) -> None:
+        summary = server_summaries.build_scenario_result_summary(
+            {
+                "project_root": "/tmp/FakeProject",
+                "run_id": "run-mutation",
+                "scenario_name": "MutationSmoke",
+                "status": "passed",
+                "steps": [
+                    {
+                        "stepId": "rebuild_catalog",
+                        "kind": "project_defined_hook",
+                        "status": "passed",
+                        "hook_name": "example.catalog",
+                        "payload_json": json.dumps(
+                            {
+                                "outcome": "catalog_built",
+                                "mutation_delta": {
+                                    "schema_version": "xuunity.mutation-delta.v1",
+                                    "unit": "rows",
+                                    "target": "catalog",
+                                    "before_count": 22,
+                                    "after_count": 16,
+                                    "added_count": 0,
+                                    "removed_count": 6,
+                                    "changed_count": 4,
+                                },
+                            }
+                        ),
+                    }
+                ],
+            },
+            {"passed", "failed"},
+        )
+
+        delta = summary["project_defined_hook_summary"]["hooks"][0]["mutation_delta"]
+        self.assertEqual("valid", delta["proof_status"])
+        self.assertTrue(delta["count_consistent"])
+        self.assertTrue(delta["destructive_drop_detected"])
+        self.assertEqual(-6, delta["net_count_change"])
+
+    def test_mutating_project_action_verdict_is_not_clean_without_safe_delta(self) -> None:
+        missing = server_project_actions.build_project_action_mutation_verdict(
+            {
+                "succeeded": True,
+                "project_defined_hook_summary": {"hooks": [{"status": "passed"}]},
+            }
+        )
+        destructive = server_project_actions.build_project_action_mutation_verdict(
+            {
+                "succeeded": True,
+                "project_defined_hook_summary": {
+                    "hooks": [
+                        {
+                            "status": "passed",
+                            "mutation_delta": {
+                                "proof_status": "valid",
+                                "removed_count": 2,
+                                "destructive_drop_detected": True,
+                            },
+                        }
+                    ]
+                },
+            }
+        )
+        safe = server_project_actions.build_project_action_mutation_verdict(
+            {
+                "succeeded": True,
+                "project_defined_hook_summary": {
+                    "hooks": [
+                        {
+                            "status": "passed",
+                            "mutation_delta": {
+                                "proof_status": "valid",
+                                "removed_count": 0,
+                                "destructive_drop_detected": False,
+                            },
+                        }
+                    ]
+                },
+            }
+        )
+
+        self.assertEqual("passed_unverified_mutation_delta", missing["operator_verdict"])
+        self.assertFalse(missing["mutation_decision_ready"])
+        self.assertEqual("passed_with_destructive_drop_warning", destructive["operator_verdict"])
+        self.assertTrue(destructive["destructive_drop_detected"])
+        self.assertFalse(destructive["mutation_decision_ready"])
+        self.assertEqual("passed_with_verified_mutation_delta", safe["operator_verdict"])
+        self.assertTrue(safe["mutation_decision_ready"])
+
     def test_profile_mutation_summary_warns_when_restore_is_missing(self) -> None:
         summary = server_summaries.build_scenario_result_summary(
             {
@@ -241,6 +331,25 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
             scenario = json.loads(scenario_files[0].read_text(encoding="utf-8"))
             self.assertEqual("project_action", scenario["steps"][0]["kind"])
             self.assertIn("run_project_action_list", result["activation_order"])
+
+    def test_mutating_project_hook_scaffold_includes_mutation_delta_contract(self) -> None:
+        result = server_project_actions.scaffold_project_hook(
+            hook_name="example.catalog",
+            action_id="example.catalog.rebuild",
+            class_name="ExampleCatalogHook",
+            namespace="Example.Project.Editor",
+            output_dir=Path("scaffold"),
+            mutating=True,
+            write_files=False,
+        )
+        files = {item["path"]: item["content"] for item in result["files"]}
+
+        self.assertIn("xuunity.mutation-delta.v1", files["ExampleCatalogHook.cs"])
+        self.assertIn("removed_count", files["ExampleCatalogHook.cs"])
+        self.assertIn("- mutation_delta", files["project_actions.fragment.yaml"])
+        self.assertIn("measured before/after/added/removed/changed counts", files["ACTIVATION_CHECKLIST.md"])
+        self.assertIn("leaves it null", files["ACTIVATION_CHECKLIST.md"])
+        self.assertNotIn("mutation_delta = new MutationDelta", files["ExampleCatalogHook.cs"])
 
     def test_config_applying_build_project_action_template_is_generic(self) -> None:
         template_dir = Path(__file__).resolve().parents[1] / "templates" / "project_actions"

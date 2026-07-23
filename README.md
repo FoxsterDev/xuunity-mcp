@@ -814,6 +814,13 @@ Scenario JSON may use Unity-native `project_action` steps for catalog-backed
 project actions. Unity resolves `project_actions.yaml`, enforces mutation
 approval, and executes the matching `project_defined_hook`; the host wrapper
 also performs the same normalization before dispatch as an early diagnostic.
+For `unity_project_action_invoke`, a mutating action's `succeeded` field means
+the Unity hook executed successfully, not that its output is safe to accept.
+Decision-ready mutating hooks should return a `mutation_delta` object using
+schema `xuunity.mutation-delta.v1` with `unit`, `before_count`, `after_count`,
+`added_count`, `removed_count`, and `changed_count`. Missing or invalid proof,
+or any reported removal/count shrink, produces a compact mutation trust verdict
+and review action; generated mutating-hook scaffolds include this contract.
 Scenario JSON may also use `scene_open` with `scenePath` to make boot-flow and
 scene-normalization validation independent of the editor's currently open
 scene; dirty scene discard must be requested explicitly.

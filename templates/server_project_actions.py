@@ -633,7 +633,72 @@ def build_project_action_invocation_payload(
     payload["result_path"] = str(summary.get("result_path") or "")
     if "project_defined_hook_summary" in summary:
         payload["project_defined_hook_summary"] = summary["project_defined_hook_summary"]
+    if bool(action_record.get("mutation")):
+        payload.update(build_project_action_mutation_verdict(summary))
     return payload
+
+
+def build_project_action_mutation_verdict(scenario_summary: dict[str, Any]) -> dict[str, Any]:
+    if not bool(scenario_summary.get("succeeded")):
+        return {
+            "operator_verdict": "mutation_not_completed",
+            "mutation_trust_class": "not_evaluated",
+            "mutation_decision_ready": False,
+            "destructive_drop_detected": False,
+            "recommended_next_action": "resolve_project_action_failure_before_assessing_mutation",
+        }
+
+    hook_summary = scenario_summary.get("project_defined_hook_summary")
+    hooks = list(hook_summary.get("hooks") or []) if isinstance(hook_summary, dict) else []
+    delta = next(
+        (
+            dict(hook.get("mutation_delta") or {})
+            for hook in hooks
+            if isinstance(hook, dict) and isinstance(hook.get("mutation_delta"), dict)
+        ),
+        {},
+    )
+    if not delta:
+        return {
+            "operator_verdict": "passed_unverified_mutation_delta",
+            "mutation_trust_class": "unverified_mutation",
+            "mutation_decision_ready": False,
+            "destructive_drop_detected": False,
+            "mutation_warning": "The mutating action passed but did not report a standardized mutation_delta.",
+            "recommended_next_action": "inspect_git_diff_and_update_hook_to_emit_mutation_delta",
+        }
+
+    proof_status = str(delta.get("proof_status") or "")
+    if proof_status != "valid":
+        return {
+            "operator_verdict": "passed_invalid_mutation_delta",
+            "mutation_trust_class": "unverified_mutation",
+            "mutation_decision_ready": False,
+            "destructive_drop_detected": bool(delta.get("destructive_drop_detected")),
+            "mutation_delta": delta,
+            "mutation_warning": "The mutating action passed but its mutation_delta does not satisfy the v1 contract.",
+            "recommended_next_action": "fix_mutation_delta_contract_and_inspect_git_diff",
+        }
+
+    if bool(delta.get("destructive_drop_detected")):
+        return {
+            "operator_verdict": "passed_with_destructive_drop_warning",
+            "mutation_trust_class": "destructive_drop_risk",
+            "mutation_decision_ready": False,
+            "destructive_drop_detected": True,
+            "mutation_delta": delta,
+            "mutation_warning": "The mutating action passed but reported removed entities or a lower post-action count.",
+            "recommended_next_action": "review_removed_entities_and_git_diff_before_accepting_result",
+        }
+
+    return {
+        "operator_verdict": "passed_with_verified_mutation_delta",
+        "mutation_trust_class": "mutation_delta_confirmed",
+        "mutation_decision_ready": True,
+        "destructive_drop_detected": False,
+        "mutation_delta": delta,
+        "recommended_next_action": "none",
+    }
 
 
 def sanitize_action_name(value: str) -> str:
@@ -677,6 +742,7 @@ def scaffold_project_hook(
             action_id=action_id,
             class_name=class_name,
             namespace=namespace,
+            mutating=mutating,
         ),
         "project_actions.fragment.yaml": render_project_actions_fragment(
             hook_name=hook_name,
@@ -735,7 +801,30 @@ def scaffold_project_hook(
     }
 
 
-def render_project_hook_class(*, hook_name: str, action_id: str, class_name: str, namespace: str) -> str:
+def render_project_hook_class(
+    *,
+    hook_name: str,
+    action_id: str,
+    class_name: str,
+    namespace: str,
+    mutating: bool = False,
+) -> str:
+    mutation_delta_field = "            public MutationDelta mutation_delta;\n" if mutating else ""
+    mutation_delta_type = "" if not mutating else """
+        [Serializable]
+        private sealed class MutationDelta
+        {
+            public string schema_version = "xuunity.mutation-delta.v1";
+            public string unit = "objects";
+            public string target = "project_specific_state";
+            public int before_count;
+            public int after_count;
+            public int added_count;
+            public int removed_count;
+            public int changed_count;
+        }
+
+"""
     return f"""using System;
 using UnityEngine;
 using XUUnity.LightMcp.Editor.ScenarioHooks;
@@ -757,9 +846,9 @@ namespace {namespace}
             public string outcome = "";
             public string executed_at_utc = "";
             public string[] available_actions = Array.Empty<string>();
-        }}
+{mutation_delta_field}        }}
 
-        public string HookName => "{hook_name}";
+{mutation_delta_type}        public string HookName => "{hook_name}";
 
         public XUUnityLightMcpScenarioHookResult Execute(string payloadJson)
         {{
@@ -818,6 +907,7 @@ namespace {namespace}
 
 def render_project_actions_fragment(*, hook_name: str, action_id: str, mutating: bool) -> str:
     mutates = "[project_specific_state]" if mutating else "[]"
+    mutation_evidence = "    - mutation_delta\n" if mutating else ""
     return f"""# Merge this action into <HostOutput>/Projects/<Project>/Operations/XUUnityLightUnityMcp/project_actions.yaml.
 {action_id}:
   hookName: {hook_name}
@@ -826,7 +916,7 @@ def render_project_actions_fragment(*, hook_name: str, action_id: str, mutating:
   evidence:
     - outcome
     - available_actions
-  validationModes:
+{mutation_evidence}  validationModes:
     - project_action_contract
 """
 
@@ -857,7 +947,7 @@ def render_project_hook_activation_checklist(
     mutating: bool,
 ) -> str:
     mutating_note = (
-        "- This action declares mutations. Keep a non-mutating list/preflight action nearby and require explicit approval before real mutation.\n"
+        "- This action declares mutations. Keep a non-mutating list/preflight action nearby, require explicit approval before real mutation, and populate `mutation_delta` with measured before/after/added/removed/changed counts. The scaffold leaves it null so placeholder zeros cannot be trusted.\n"
         if mutating
         else "- This activation action is non-mutating; keep it as the first validation path for the hook.\n"
     )

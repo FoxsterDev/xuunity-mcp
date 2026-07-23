@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Chat Retro — Prefab/UI Authoring + Visual-Iteration Gap
 
 Date: `2026-07-17`
-Status: `active public retro — reliability slice implemented; authoring and mutation-delta follow-ups open`
+Status: `active public retro — reliability and typed-invoke mutation-delta slices implemented; authoring and broader scenario adoption open`
 Session type: presenter-driven Home-screen UI widget rework in a consumer Unity project (Unity `6000.0.58f2`), heavy prefab + localization + play-mode-screenshot iteration.
 
 ## 0. Grooming update — 2026-07-19
@@ -23,6 +23,29 @@ The prefab structure-read/authoring/render capability remains open but is
 ranked below verdict correctness under the reliability-first grooming rubric.
 Mutation-delta safety also remains open as the stronger false-positive-success
 follow-up from this retro.
+
+## 0a. Grooming update — 2026-07-21
+
+The typed-invoke mutation-delta vertical slice is implemented in current
+source. Project hooks can return a versioned `mutation_delta` containing the
+entity unit plus before/after/added/removed/changed counts. Compact hook
+summaries validate and promote that proof. `unity_project_action_invoke` keeps
+the hook's `succeeded` value as execution truth, but reports a separate operator
+verdict, mutation trust class, and `mutation_decision_ready` flag. Missing or
+invalid proof remains unverified; any removal or count shrink becomes an
+explicit destructive-drop warning with a diff-review action.
+
+This closes the reusable false-positive-success gap for the typed project-action
+tool without claiming that existing project hooks already emit the new proof.
+Remaining work is project-hook adoption, applying the same catalog-aware
+missing-proof verdict to arbitrary raw `project_action` scenario envelopes,
+and the lower-priority prefab structure-read/author/render capability.
+
+Validation is complete for this host-side slice: focused protocol/summary/parity
+tests pass, the full host suite passes `475/475` with `13` expected platform
+skips, a Unity `2022.3` consumer passes package EditMode `14/14` and PlayMode
+`5/5`, and a Unity `6000.0` consumer passes compile `6/6`, acceptance `10/10`,
+contract, PlayMode lifecycle/final-health, and project-action consistency.
 
 ## 1. Executive summary
 

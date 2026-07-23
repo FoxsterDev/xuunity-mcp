@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Roadmap
 
-Date: `2026-07-06`
+Date: `2026-07-21`
 Status: `active public roadmap`
 
 ## North Star
@@ -101,6 +101,9 @@ Already implemented:
 - project-defined hook poll-until steps and catalog-backed project-action steps
 - passive project-hook readiness polls tolerate `status: not_started` until an
   explicit pass/fail predicate or timeout, avoiding an early false-negative
+- mutating `unity_project_action_invoke` results promote a versioned
+  before/after/add/remove/change delta and remain non-decision-ready when that
+  proof is missing, invalid, or reports destructive removal
 - public config-applying project-action build templates for projects whose
   representative build must call project-owned apply/build methods instead of
   raw `unity_build_player`
@@ -548,6 +551,12 @@ Second-wave mutation capabilities:
 2. controlled menu-item execution
 3. project-defined hook execution
 4. temporary instrumentation toggle
+
+Mutation proof baseline now implemented: typed project-action invocation
+separates hook execution success from acceptance and surfaces standardized
+mutation-delta/destructive-drop evidence. Remaining work is project-hook
+adoption and extending the same catalog-aware trust verdict to arbitrary raw
+`project_action` scenario envelopes.
 
 ## Architecture Direction
 

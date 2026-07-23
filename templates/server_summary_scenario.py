@@ -163,6 +163,10 @@ def build_project_defined_hook_summary(steps: list[Any]) -> dict[str, Any]:
         if path_coverage_summary:
             hook_summary["path_coverage_summary"] = path_coverage_summary
 
+        mutation_delta = _extract_mutation_delta_summary(payload)
+        if mutation_delta:
+            hook_summary["mutation_delta"] = mutation_delta
+
         console_tail_payload = _parse_json_string(raw_step.get("terminal_console_tail_payload_json"))
         if console_tail_payload:
             entries = console_tail_payload.get("entries")
@@ -184,6 +188,67 @@ def build_project_defined_hook_summary(steps: list[Any]) -> dict[str, Any]:
         "all_hooks_succeeded": bool(hooks) and all(str(item.get("status") or "") == "passed" for item in hooks),
         "hooks": hooks,
     }
+
+
+def _extract_mutation_delta_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    raw = payload.get("mutation_delta")
+    if raw is None:
+        raw = payload.get("mutationDelta")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        return {
+            "schema_version": "",
+            "proof_status": "invalid",
+            "destructive_drop_detected": False,
+            "validation_errors": ["mutation_delta_must_be_an_object"],
+        }
+
+    schema_version = str(raw.get("schema_version") or raw.get("schemaVersion") or "").strip()
+    unit = truncate_text(raw.get("unit") or "", 80).strip()
+    target = truncate_text(raw.get("target") or "", 160).strip()
+    validation_errors: list[str] = []
+    if schema_version != "xuunity.mutation-delta.v1":
+        validation_errors.append("unsupported_or_missing_schema_version")
+    if not unit:
+        validation_errors.append("missing_unit")
+
+    counts: dict[str, int] = {}
+    for key in ("before_count", "after_count", "added_count", "removed_count", "changed_count"):
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            validation_errors.append(f"invalid_{key}")
+            continue
+        counts[key] = value
+
+    before_count = counts.get("before_count")
+    after_count = counts.get("after_count")
+    added_count = counts.get("added_count")
+    removed_count = counts.get("removed_count")
+    count_consistent = False
+    if None not in (before_count, after_count, added_count, removed_count):
+        count_consistent = after_count == before_count + added_count - removed_count
+        if not count_consistent:
+            validation_errors.append("inconsistent_counts")
+
+    destructive_drop_detected = bool(
+        (removed_count is not None and removed_count > 0)
+        or (before_count is not None and after_count is not None and after_count < before_count)
+    )
+    result: dict[str, Any] = {
+        "schema_version": schema_version,
+        "proof_status": "invalid" if validation_errors else "valid",
+        "unit": unit,
+        **counts,
+        "count_consistent": count_consistent,
+        "destructive_drop_detected": destructive_drop_detected,
+        "validation_errors": validation_errors,
+    }
+    if target:
+        result["target"] = target
+    if before_count is not None and after_count is not None:
+        result["net_count_change"] = after_count - before_count
+    return result
 
 
 def _parse_json_string(value: Any) -> dict[str, Any]:

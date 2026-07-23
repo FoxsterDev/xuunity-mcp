@@ -1,6 +1,6 @@
 # Status
 
-Date: `2026-07-19`
+Date: `2026-07-21`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
@@ -52,6 +52,12 @@ Migration note:
   snapshots running through `status: not_started`; explicit pass/fail
   predicates still win, unmatched statuses still fail closed, and timeout stays
   authoritative.
+- Current source promotes the standardized `xuunity.mutation-delta.v1` payload
+  from project-defined hooks. `unity_project_action_invoke` keeps Unity
+  execution success separate from acceptance: a completed mutating action is
+  decision-ready only with a valid, non-destructive delta; missing/invalid
+  proof or removals/count shrink produce an explicit mutation trust class,
+  operator verdict, warning, and review action.
 - `v0.3.38+` makes `unity_status_summary` compact by default for MCP callers,
   with `payload_mode` markers and full nested diagnostics available through
   `includeFullPayload=true`.

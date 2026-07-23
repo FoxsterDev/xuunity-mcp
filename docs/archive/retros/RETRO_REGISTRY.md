@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Public Retro Registry
 
 Status: active public registry
-Last triage: 2026-07-19 (re-evaluated against released source line `v0.3.47` plus current source at `e4777a8` before this run's changes)
+Last triage: 2026-07-21 (re-evaluated against released source line `v0.3.47` plus clean current source at `7056894` before this run's changes)
 Current released source line: `v0.3.47`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
@@ -25,6 +25,21 @@ host-local registry.
 - `Completed Public History` is the place to find reusable lessons already
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
+
+## Re-Evaluation 2026-07-21
+
+- The prior passive-readiness slice is committed at `7056894`; no tag newer
+  than `v0.3.47` exists.
+- Current-source `unity_project_action_invoke` now requires a valid,
+  non-destructive `xuunity.mutation-delta.v1` for a passed mutating action to be
+  decision-ready. Missing/invalid proof and removals/count shrink are explicit
+  trust warnings while Unity execution success remains factual.
+- Validation passes `475/475` host tests (13 expected platform skips), Unity
+  `2022.3` package EditMode `14/14` + PlayMode `5/5`, and the Unity `6000.0`
+  compile/scenario/lifecycle/project-action route.
+- Project-hook adoption and catalog-aware warnings on arbitrary raw
+  `project_action` scenario envelopes remain open. Prefab read/author/render
+  remains P2; typed SDK resolver freshness remains the larger P1 follow-up.
 
 ## Re-Evaluation 2026-07-19 (what is still actual for the end user)
 
@@ -51,7 +66,7 @@ added 2026-07-17 and triaged in this pass** (item 4). Open themes, in priority o
    outputs. Typed resolver freshness, artifact registration, and portfolio
    orchestration remain the standout false-positive-validation risk.
 
-2. **P1/P2 (triaged 2026-07-19) - Mutation-delta safety, then prefab/UI authoring.**
+2. **P1/P2 (updated 2026-07-21) - Mutation-delta adoption, then prefab/UI authoring.**
    `2026-07-17_prefab_ui_authoring_and_visual_iteration_gap_retro.md`. Execution is
    reliable, but the toolset can *validate* UI and not *author* or cheaply *preview*
    it: no prefab-structure read (serialized fields/RectTransform), no prefab/scene
@@ -59,9 +74,11 @@ added 2026-07-17 and triaged in this pass** (item 4). Open themes, in priority o
    into raw-YAML editing judged only through ~40 s full-boot screenshots. Current
    source implements the smaller false-negative fix: passive `not_started` poll
    payloads keep waiting, explicit pass/fail predicates retain precedence, and
-   timeout remains authoritative. Still open: P1 mutation-delta/destructive-drop
-   proof for mutating project actions, then the broader P2 prefab read/author/render
-   capability because verdict correctness outranks authoring convenience.
+   timeout remains authoritative. Current source also implements the typed-invoke
+   mutation-delta/destructive-drop trust contract. Still open: project-hook
+   adoption and raw-scenario catalog-aware warnings, then the broader P2 prefab
+   read/author/render capability because verdict correctness outranks authoring
+   convenience.
 
 3. **P2 - Token-efficiency tail.**
    `2026-06-02_token_efficiency_response_envelope_retro.md` and
@@ -96,7 +113,7 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 | 2026-06-02 | `2026-06-02_token_efficiency_response_envelope_retro.md` | Response-envelope token efficiency: compact-by-default across MCP tool surfaces | mostly implemented; P2 residual | Compact-by-default shipped `v0.3.32`-`v0.3.44` for scenario, refresh, compile, build-config compile, test, `unity_status_summary`, `ensure-ready`, and batch CLI, each with `includeFullPayload`/`--output` opt-in (STATUS.md "Compact MCP envelopes"). Remaining (ROADMAP.md "Phase 2" residual): broader multi-project compact ceilings, a token ledger, and fast-path profiles. |
 | 2026-06-11 | `2026-06-11_token_accounting_and_fast_path_retro.md` | Token-accounting ledger, one-shot package-pin verifier, fast-path prompt profile | partial; P2 | The biggest win (compact output) shipped through `v0.3.40`/`v0.3.44`, and the fast path is documented in `docs/agents/PACKAGE_BUMP_FAST_PATH.md`, but no token-accounting ledger, one-shot verify-package-pin verifier, or runner token-budget hints exist in source or ROADMAP/STATUS. Overlaps the response-envelope row above as the token-efficiency tail. |
 | 2026-06-17 | `2026-06-17_windows_setup_failure_retro.md` | Native Windows setup failure postmortem; residual = live Windows/Linux host proof | Windows root causes fixed + CI-exercised in `v0.3.43`; live-host proof still open (P2) | The concrete Windows helper failures (path-with-spaces, ExecutionPolicy, `python3` delegation, PID liveness, discovery) are fixed and CI-exercised end to end. STATUS.md still marks a live Windows/Linux host session with a real Unity editor as needing execution proof (ROADMAP Phase 3 breadth). This row now tracks that single remaining cross-platform proof item; the Windows install root-cause retros (2026-06-09 v1/v2, 2026-06-10) are completed history. |
-| 2026-07-17 | `2026-07-17_prefab_ui_authoring_and_visual_iteration_gap_retro.md` | Prefab/UI authoring + prefab-structure read + isolated prefab render gap; passive readiness polling; mutating project-action delta safety | **triaged — passive-poll reliability slice implemented and live-validated; P1 delta safety and P2 authoring capability open** | Current source makes passive `status:not_started` poll payloads keep waiting after explicit pass/fail predicates and before the authoritative timeout, closing the demonstrated false-negative. Host `471` tests, Unity `2022.3` package `18/18` + `5/5`, and the Unity `6000.0` consumer route pass. Still open: mutation deltas/destructive-drop warnings for mutating actions, plus the broader prefab structure-read/author/render surface. |
+| 2026-07-17 | `2026-07-17_prefab_ui_authoring_and_visual_iteration_gap_retro.md` | Prefab/UI authoring + prefab-structure read + isolated prefab render gap; passive readiness polling; mutating project-action delta safety | **triaged — passive-poll and typed-invoke mutation-delta slices implemented/live-validated; adoption and P2 authoring open** | Current source makes passive `status:not_started` polls wait and adds a versioned mutation-delta trust verdict to typed project-action invocation, so missing/invalid/destructive proof no longer reads as decision-ready success. Host `475/475`, Unity `2022.3` `14/14` + `5/5`, and the Unity `6000.0` route pass. Still open: existing hook adoption, catalog-aware missing-proof warnings for arbitrary raw `project_action` scenarios, and prefab structure-read/author/render. |
 
 > Re-confirmed 2026-07-15 against `v0.3.45` plus current source: the response-envelope /
 > token-efficiency backlog is no longer a blanket compile/refresh/test/status

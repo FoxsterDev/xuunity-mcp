@@ -288,6 +288,42 @@ Pass criteria:
 - a never-ready hook ends with `project_hook_poll_until_timeout` and preserves
   the latest payload.
 
+### 4c. Mutating Project-Action Delta Contract
+
+For a mutating action invoked through `unity_project_action_invoke`, distinguish
+Unity execution from acceptance. A passed hook should return:
+
+```json
+{
+  "mutation_delta": {
+    "schema_version": "xuunity.mutation-delta.v1",
+    "unit": "rows",
+    "target": "generated_catalog",
+    "before_count": 22,
+    "after_count": 22,
+    "added_count": 2,
+    "removed_count": 2,
+    "changed_count": 4
+  }
+}
+```
+
+The counts must be non-negative integers and satisfy
+`after_count == before_count + added_count - removed_count`. The wrapper keeps
+`succeeded` as Unity execution truth and adds the acceptance verdict:
+
+- valid, no removals/count shrink: `mutation_decision_ready=true` and
+  `mutation_trust_class=mutation_delta_confirmed`;
+- missing or invalid delta: non-decision-ready `unverified_mutation` plus an
+  inspect-diff/update-hook action;
+- removals or count shrink: non-decision-ready `destructive_drop_risk` plus a
+  review-removed-entities-and-diff action.
+
+Do not interpret `succeeded=true` alone as permission to accept generated
+assets or catalogs. Raw `project_action` scenario envelopes promote a reported
+delta through the hook summary, but catalog-aware missing-proof verdicts remain
+a follow-up outside the typed invoke tool.
+
 ### 5. PlayMode Result Parity Smoke
 
 Use a representative direct `unity.tests.run_playmode` request and a scenario

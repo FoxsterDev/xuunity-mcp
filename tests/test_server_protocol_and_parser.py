@@ -921,6 +921,37 @@ actions:
         )
         invoke_mock.assert_not_called()
 
+    def test_mutating_project_action_invoke_surfaces_missing_delta_as_unverified(self) -> None:
+        payload = server_project_actions.build_project_action_invocation_payload(
+            project_root=Path("/tmp/FakeProject"),
+            catalog={"catalog_path": "/tmp/project_actions.yaml"},
+            action_record={
+                "action_id": "project.rebuild",
+                "hook_name": "example.project",
+                "mutation": True,
+                "mutates": ["catalog"],
+            },
+            requested_action="project.rebuild",
+            action_payload={},
+            scenario={"name": "MutationSmoke"},
+            run_payload={"run_id": "run-mutation", "status": "queued"},
+            scenario_summary={
+                "status": "passed",
+                "succeeded": True,
+                "terminal": True,
+                "project_defined_hook_summary": {
+                    "hooks": [{"status": "passed", "outcome": "catalog_built"}],
+                },
+            },
+            wait_for_result=True,
+        )
+
+        self.assertTrue(payload["succeeded"])
+        self.assertEqual("passed_unverified_mutation_delta", payload["operator_verdict"])
+        self.assertEqual("unverified_mutation", payload["mutation_trust_class"])
+        self.assertFalse(payload["mutation_decision_ready"])
+        self.assertIn("mutation_delta", payload["mutation_warning"])
+
     def test_scenario_run_and_wait_expands_project_action_steps_before_unity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace_root = Path(temp_dir)
