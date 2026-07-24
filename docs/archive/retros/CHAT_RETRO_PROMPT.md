@@ -106,7 +106,8 @@ Promotion rule:
 - reusable lifecycle, transport, retry, status-summary, smoke-order, and operator-guidance improvements should be promoted into public AIRoot docs or wrapper surfaces
 - choose the retro storage destination before writing:
   - public-safe reusable MCP retros and lessons go under `AIRoot/Operations/XUUnityLightUnityMcp/docs/archive/retros/`
-  - host-private, project-specific, or raw-evidence MCP retros go under the host's single `Operations/XUUnityLightUnityMcp/Retros/`
+  - host-private, project-specific, or raw-evidence MCP retros go under
+    `<host-output-root>/Operations/XUUnityLightUnityMcp/Retros/`
   - do not create per-project MCP retro folders
   - do not use a broad host report bucket for MCP retros
   - whenever a durable retro is added, moved, renamed, or deleted, update the registry in the same destination
@@ -142,7 +143,7 @@ When the retrospective finds reusable value, prefer promoting into:
 - docs and operator contracts under `AIRoot/Operations/XUUnityLightUnityMcp/`
 - public-safe feature retros and lessons under `AIRoot/Operations/XUUnityLightUnityMcp/docs/archive/retros/`
 - wrapper/runtime templates under `AIRoot/Operations/XUUnityLightUnityMcp/templates/`
-- host-local `Operations/XUUnityLightUnityMcp/Retros/` only for private,
+- host-local `<host-output-root>/Operations/XUUnityLightUnityMcp/Retros/` only for private,
   project-specific, or raw evidence that is not public-safe as-is
 
 Registry rule:

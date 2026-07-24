@@ -329,7 +329,8 @@ When the retro contains host-private or consumer-project evidence, keep the raw
 retro in the host's single MCP-specific retro area instead of a broad report
 bucket or a per-project retro folder:
 
-- private, project-specific, or raw evidence: `Operations/XUUnityLightUnityMcp/Retros/`
+- private, project-specific, or raw evidence:
+  `<host-output-root>/Operations/XUUnityLightUnityMcp/Retros/`
 
 Only sanitized reusable lessons should be copied into `../archive/retros/`.
 Whenever a durable retro is added, moved, renamed, or deleted, update the

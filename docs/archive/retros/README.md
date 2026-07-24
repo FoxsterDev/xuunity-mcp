@@ -15,7 +15,7 @@ Storage rule:
 
 - Public-safe reusable MCP retros live here.
 - Host-private, project-specific, or raw-evidence MCP retros belong in the
-  host's single `Operations/XUUnityLightUnityMcp/Retros/` folder.
+  host's single `<host-output-root>/Operations/XUUnityLightUnityMcp/Retros/` folder.
 - Do not create per-project MCP retro folders.
 - Do not place MCP retros in a broad host report bucket.
 - Whenever a public retro is added, moved, renamed, or deleted, update

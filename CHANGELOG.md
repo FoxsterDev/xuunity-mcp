@@ -219,7 +219,7 @@ https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-m
 - Release metadata, documentation freshness, public-release safety, and public
   site checks passed for `0.3.44`.
 - Host Python unittest suite passed: `430` tests with `13` expected skips.
-- Live Unity validation against ApperfunHub passed the GUI-fallback compile
+- Live Unity validation in a representative host project passed the GUI-fallback compile
   matrix (`6/6`) and the selected GUI subset: EditMode `778/778`, PlayMode
   `279/279`.
 

@@ -6,7 +6,7 @@ Current released source line: `v0.3.47`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
-`Operations/XUUnityLightUnityMcp/Retros/` folder and must be tracked by that
+`<host-output-root>/Operations/XUUnityLightUnityMcp/Retros/` folder and must be tracked by that
 host-local registry.
 
 ## Storage Rule
