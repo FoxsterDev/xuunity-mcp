@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.3.73
+
+Release tag: `v0.3.73`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.73
+```
+
+### Changed
+
+- Released `v0.3.73` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ### Why
 
 - A passing compile matrix could not say whether Unity rebuilt the assemblies under test or reused cached
@@ -17,11 +31,25 @@
 - Compact MCP, batch, and multi-project summaries preserve the same rebuild/cache counts. Matrix compact
   output also keeps a bounded per-configuration evidence list, while the full result retains every row.
 
+### Validation
+
+- The full host suite passed `1058/1058` tests with `14` expected platform skips, and the public-site
+  Playwright suite passed `42/42` checks.
+- Current-source package EditMode tests passed `161/161` on Unity `2022.3.62f3` and `161/161` on Unity
+  `6000.0.58f2`. Live player-script compile responses reported `9` rebuilt / `30` cached assemblies on
+  Unity `2022.3.62f3` and `76` rebuilt / `181` cached assemblies on Unity `6000.0.58f2`, each with zero
+  compiler errors or warnings and `rebuild_evidence_status: measured`.
+- Work-commit Integration Tests, Discovery Checks, Site UI Checks, and GitHub Pages deployment passed for
+  `1f836abfaae0cd2d07b29fe1ace69f97e14171a1` before the release sweep.
+
 ### Known limitations
 
 - Unity `2021.3` exposes the rebuild-start event but not the cache-not-required event used by this evidence
   lane. It reports `rebuild_evidence_status: rebuilt_only_cache_status_unavailable`; cache-hit counts become
   decision-grade on Unity `2022.1+`.
+- Hosted Unity Package CI remains waived because no Unity license secrets are configured for the runners.
+  This release has live Unity `2022.3` and Unity `6000.0` consumer evidence, but not CI-recorded package
+  EditMode/PlayMode proof for the release SHA.
 
 ## 0.3.72
 
