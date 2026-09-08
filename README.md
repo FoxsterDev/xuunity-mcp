@@ -828,11 +828,16 @@ Host helper commands include `setup-plan`, `setup-apply`, `uninstall-plan`,
 project version, package alignment, licensing admission, editor ownership,
 terminal request lifecycle, restore ownership, and relevant log excerpts.
 
-The `v0.3.72` compile summaries retain warning evidence end to end:
+The `v0.3.70` compile summaries retain warning evidence end to end:
 `warning_count` counts occurrences, `unique_warning_count` deduplicates
 diagnostics, and `warnings` carries a bounded file/line/code/severity/message
 sample. Warnings remain non-fatal, so a passing compile is not automatically a
 warning-free compile; read the warning fields explicitly.
+
+Current source also separates assemblies Unity rebuilt from assemblies it
+accepted from cache. Read `rebuilt_assembly_count`, `cached_assembly_count`,
+and `rebuild_evidence_status` before treating a green compile as proof that a
+recent source edit was compiled.
 
 For local PlayMode, start with the project-owned Unity version and the licensed
 GUI bridge:

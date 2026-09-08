@@ -385,6 +385,39 @@ class ReleaseVersioningTests(unittest.TestCase):
             errors = release_consistency.check_release_version_consistency(root)
             self.assertFalse([error for error in errors if "v0.3.70" in error], errors)
 
+    def test_warning_release_claims_are_not_relabelled_by_future_sweeps(self) -> None:
+        import sys as _sys
+
+        tools_dir = REPO_ROOT / "scripts" / "tools"
+        if str(tools_dir) not in _sys.path:
+            _sys.path.insert(0, str(tools_dir))
+        import sync_release_version as sync
+
+        claims = (
+            (Path("README.md"), "The `v0.3.70` compile summaries retain warning evidence end to end:\n"),
+            (
+                Path("docs/architecture/ROADMAP.md"),
+                "- `v0.3.70` compiler-warning evidence across direct, matrix, batch, and\n",
+            ),
+            (
+                Path("docs/operations/SMOKE_TESTS.md"),
+                "- The `v0.3.70` compile summaries also expose `warning_count`,\n",
+            ),
+            (
+                Path("docs/reference/FEATURES.md"),
+                "| Compile | current source plus `v0.3.70` warning occurrence/unique counts |\n",
+            ),
+            (
+                Path("docs/reference/FEATURES.md"),
+                "| Compile | current source plus `v0.3.70` aggregated warning evidence |\n",
+            ),
+        )
+
+        for relative_path, line in claims:
+            with self.subTest(relative_path=relative_path, line=line):
+                swept = sync.sweep_release_doc_versions(relative_path, line, "0.3.73")
+                self.assertEqual(line, swept)
+
     def test_the_sweep_never_rewrites_a_unity_editor_version(self) -> None:
         """Unity's own `6000.0.58f2` contains `0.0.58`. An unanchored sweep rewrote it to `6000.3.55f2`."""
 

@@ -1575,6 +1575,10 @@ class CompactEnvelopeTests(unittest.TestCase):
             {
                 "result": {
                     "status": "passed",
+                    "rebuilt_assembly_count": 6,
+                    "cached_assembly_count": 64,
+                    "rebuild_evidence_status": "measured",
+                    "rebuild_evidence_basis": "compilation_pipeline_started_and_not_required_events",
                     "warning_count": 2,
                     "unique_warning_count": 1,
                     "warning_sample_limit": 20,
@@ -1589,6 +1593,10 @@ class CompactEnvelopeTests(unittest.TestCase):
         matrix = server_bridge_payloads.compact_operation_payload(
             {
                 "status": "passed",
+                "rebuilt_assembly_count": 8,
+                "cached_assembly_count": 130,
+                "rebuild_evidence_status": "measured",
+                "rebuild_evidence_basis": "per_configuration_compilation_pipeline_events",
                 "total": 2,
                 "passed": 2,
                 "failed": 0,
@@ -1603,24 +1611,42 @@ class CompactEnvelopeTests(unittest.TestCase):
                         "name": "Android",
                         "target": "Android",
                         "status": "passed",
+                        "rebuilt_assembly_count": 6,
+                        "cached_assembly_count": 64,
+                        "rebuild_evidence_status": "measured",
                         "warning_count": 2,
                         "unique_warning_count": 1,
                         "warnings_truncated": False,
                         "warnings": [warning],
                         "output_directory": "/tmp/bulk",
                     },
-                    {"name": "iOS", "target": "iOS", "status": "passed", "warning_count": 0},
+                    {
+                        "name": "iOS",
+                        "target": "iOS",
+                        "status": "passed",
+                        "rebuilt_assembly_count": 2,
+                        "cached_assembly_count": 66,
+                        "rebuild_evidence_status": "measured",
+                        "warning_count": 0,
+                    },
                 ],
             },
             "unity.compile.matrix",
         )
 
         self.assertEqual(2, direct["warning_count"])
+        self.assertEqual(6, direct["rebuilt_assembly_count"])
+        self.assertEqual(64, direct["cached_assembly_count"])
+        self.assertEqual("measured", direct["rebuild_evidence_status"])
         self.assertEqual("CS0618", direct["warnings"][0]["code"])
         self.assertNotIn("output_directory", direct)
         self.assertEqual(2, matrix["warning_count"])
         self.assertEqual(1, matrix["unique_warning_count"])
         self.assertEqual(2, matrix["configuration_count"])
+        self.assertEqual(8, matrix["rebuilt_assembly_count"])
+        self.assertEqual(130, matrix["cached_assembly_count"])
+        self.assertEqual(2, len(matrix["configuration_rebuild_evidence"]))
+        self.assertFalse(matrix["configuration_rebuild_evidence_truncated"])
         self.assertEqual("Android", matrix["first_warning_configurations"][0]["name"])
         self.assertNotIn("output_directory", matrix["first_warning_configurations"][0])
 

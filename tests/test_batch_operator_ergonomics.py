@@ -549,6 +549,10 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
                     "passed": 2,
                     "failed": 0,
                     "skipped": 0,
+                    "rebuilt_assembly_count": 4,
+                    "cached_assembly_count": 136,
+                    "rebuild_evidence_status": "measured",
+                    "rebuild_evidence_basis": "per_configuration_compilation_pipeline_events",
                     "warning_count": 3,
                     "unique_warning_count": 1,
                     "warnings_truncated": False,
@@ -562,6 +566,9 @@ class BatchOperatorErgonomicsTests(unittest.TestCase):
         )
 
         self.assertEqual(3, summary["matrix"]["warning_count"])
+        self.assertEqual(4, summary["matrix"]["rebuilt_assembly_count"])
+        self.assertEqual(136, compact["matrix"]["cached_assembly_count"])
+        self.assertEqual("measured", compact["matrix"]["rebuild_evidence_status"])
         self.assertEqual(1, summary["matrix"]["unique_warning_count"])
         self.assertEqual([warning], compact["matrix"]["warnings"])
 

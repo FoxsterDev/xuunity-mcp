@@ -141,6 +141,7 @@ HISTORICAL_VERSION_TOKENS = ("0.3.11", "0.3.12", "0.3.14", "0.3.15")
 # release gate fails on anything stale that is not listed. A version paired with a measured result belongs here,
 # because bumping it without re-running the measurement replaces a stale truth with a fresh lie.
 HISTORICAL_VERSION_CLAIMS = (
+    (Path("README.md"), "compile summaries retain warning evidence"),
     (Path("docs") / "reference" / "STATUS.md", "SDK rollout safety ("),
     (Path("docs") / "reference" / "STATUS.md", "Compact MCP envelopes"),
     (Path("docs") / "reference" / "STATUS.md", "release package tests"),
@@ -150,6 +151,10 @@ HISTORICAL_VERSION_CLAIMS = (
     (Path("docs") / "reference" / "COMPARISON.md", "superseding the"),
     (Path("docs") / "operations" / "PACKAGE_PATH_MIGRATION.md", "moved the package"),
     (Path("docs") / "architecture" / "ROADMAP.md", "adds opt-in compact batch helper CLI output"),
+    (Path("docs") / "architecture" / "ROADMAP.md", "compiler-warning evidence across direct"),
+    (Path("docs") / "operations" / "SMOKE_TESTS.md", "compile summaries also expose"),
+    (Path("docs") / "reference" / "FEATURES.md", "warning occurrence/unique counts"),
+    (Path("docs") / "reference" / "FEATURES.md", "aggregated warning evidence"),
 )
 
 

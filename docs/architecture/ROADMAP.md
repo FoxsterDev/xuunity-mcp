@@ -85,9 +85,11 @@ Already implemented:
 - deterministic Edit Mode scene open for boot-flow and scenario setup
 - edit-mode tests
 - compile validation without active platform switch
-- `v0.3.72` compiler-warning evidence across direct, matrix, batch, and
+- `v0.3.70` compiler-warning evidence across direct, matrix, batch, and
   multi-project compact summaries, with occurrence counts, deduplicated counts,
-  and bounded diagnostic rows; rebuilt-versus-cache-hit evidence remains open
+  and bounded diagnostic rows
+- current source reports Unity-measured rebuilt-versus-cache-hit assembly
+  counts through the same direct, matrix, batch, and multi-project surfaces
 - authoritative post-settle refresh, compile, and test verdict fields in
   compact MCP operation summaries
 - condition-specific readiness failures that keep log observations separate

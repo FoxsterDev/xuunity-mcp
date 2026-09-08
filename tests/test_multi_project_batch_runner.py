@@ -298,6 +298,9 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
                             "passed": 6,
                             "failed": 0,
                             "skipped": 0,
+                            "rebuilt_assembly_count": 4,
+                            "cached_assembly_count": 136,
+                            "rebuild_evidence_status": "measured",
                             "warning_count": 3,
                             "unique_warning_count": 2,
                         },
@@ -330,6 +333,9 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
             self.assertEqual(0, status["failed"])
             self.assertEqual(3, status["warning_count"])
             self.assertEqual(2, status["unique_warning_count"])
+            self.assertEqual(4, status["rebuilt_assembly_count"])
+            self.assertEqual(136, status["cached_assembly_count"])
+            self.assertEqual("measured", status["rebuild_evidence_status"])
 
     def test_compact_gui_fallback_recovers_summary_file_evidence(self) -> None:
         with TemporaryDirectory() as temp_dir:

@@ -663,6 +663,10 @@ def _compact_compile_payload(payload: dict[str, Any], operation: str) -> dict[st
             "warning_sample_limit",
             "warnings_truncated",
             "compiled_assembly_count",
+            "rebuilt_assembly_count",
+            "cached_assembly_count",
+            "rebuild_evidence_status",
+            "rebuild_evidence_basis",
             "duration_seconds",
             "total",
             "passed",
@@ -690,6 +694,24 @@ def _compact_compile_payload(payload: dict[str, Any], operation: str) -> dict[st
     )
     if isinstance(configurations, list):
         compact["configuration_count"] = len(configurations)
+        rebuild_rows = [
+            {
+                key: item.get(key)
+                for key in (
+                    "name",
+                    "target",
+                    "rebuilt_assembly_count",
+                    "cached_assembly_count",
+                    "rebuild_evidence_status",
+                )
+                if key in item
+            }
+            for item in configurations
+            if isinstance(item, dict) and "rebuild_evidence_status" in item
+        ]
+        if rebuild_rows:
+            compact["configuration_rebuild_evidence"] = rebuild_rows[:20]
+            compact["configuration_rebuild_evidence_truncated"] = len(rebuild_rows) > 20
         failed_rows = [
             item for item in configurations
             if isinstance(item, dict) and str(item.get("status") or "") not in {"", "passed", "ok"}

@@ -26,12 +26,15 @@ Current package path:
 packages/com.xuunity.light-mcp
 ```
 
-Release `v0.3.72` adds first-class compiler-warning evidence to direct,
-matrix, batch, and multi-project compile summaries. `warning_count` counts
-occurrences, `unique_warning_count` deduplicates diagnostic identities, and a
-bounded `warnings` sample preserves file/line/code/severity/message details.
-Warnings remain non-fatal; `status` continues to reflect compile errors. The
-separate rebuilt-versus-cache-hit evidence gap remains open.
+Release `v0.3.72` fixes Game View group resolution on iOS and Unity 6, carries
+live raycast identity through guarded UI clicks, refuses clicks occluded by a
+different handler when the raycast proves it, and enforces split work/release
+commits.
+
+Current source closes the separate rebuilt-versus-cache-hit evidence gap.
+Direct, matrix, batch, and multi-project compile summaries report how many
+assemblies Unity rebuilt and how many it accepted from cache, plus a status and
+basis that make unsupported evidence explicit.
 
 Migration note:
 
@@ -408,8 +411,9 @@ Latest release and current-source validation for `v0.3.72`:
 | Area | Evidence | Result |
 | --- | --- | --- |
 | Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.72`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `scripts/testing/run_host_python_tests.sh` (release checks plus full discovery) | Full discovery passed `1057` tests with `14` expected platform skips, including live TCP loopback transport coverage. |
+| Host Python tests | `scripts/testing/run_host_python_tests.sh` (release checks plus full discovery) | Full discovery passed `1058` tests with `14` expected platform skips, including live TCP loopback transport coverage. |
 | `v0.3.72` Unity release lanes | A consumer project on Unity `6000.0.58f2` whose active build target is iOS — the configuration the Game View defect required | Package EditMode `159/159` and PlayMode `23` total (`21` passed, `2` conditional skips, `0` failed); a six-resolution Game View sweep scenario passed `19/19` steps with every capture's PNG header matching the requested size; a live identity-guarding button click delivered its production path with `pointer_raycast_evidence=event_system_raycast_resolves_to_handler`; authoritative post-settle compilation and verified editor closeout. Unity `2022.3.62f3` was not re-run for this release. |
+| Current-source rebuilt/cache compile evidence | Consumer editors on Unity `2022.3.62f3` and `6000.0.58f2` | Both versions passed package EditMode `161/161`. Live player-script compile returned `9` rebuilt / `30` cached assemblies on Unity `2022.3.62f3` and `76` rebuilt / `181` cached assemblies on Unity `6000.0.58f2`, each `measured` with zero compiler errors or warnings; original package pins and editor ownership were restored. |
 | Historical play-mode liveness measurement | Interactive MCP observation of an unfocused editor in Play Mode | With `playmode_state=playing` and `health_status=healthy`, the payload reports `playmode_loop_liveness=throttled`, `playmode_frames_advanced_last_interval=0`, `editor_application_focused=false`, `playmode_liveness_warning=playmode_throttled_editor_unfocused`, and the focus/no-throttling remediation; `unity_status_summary` carries the same fields. |
 | Current-source structural compile diagnostics | Focused host contract plus a live duplicate-reference fault injection on Unity `2022.3.62f3` | Focused refresh/compile/test envelope coverage passes `129/129`. A real duplicate `.asmdef` reference produced `assembly_definition_error` with session-scoped `Editor.log` evidence and recovered to authoritative compile green after probe removal. Package tests passed EditMode `68/68` and PlayMode `18` passed with one expected skip; the editor was closed and consumer manifest/lock bytes were restored. |
 | Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.53` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, PlayMode already-playing stale-risk summaries, deterministic scene-open setup, opt-in compact batch helper output, safer `Editor.log` console grep/tail defaults, compact transport/idle timeout errors, compile-first post-change validation, lane-agnostic GUI-fallback compile evidence, and requested-filter zero-match verdicts are documented with full-payload recovery. |

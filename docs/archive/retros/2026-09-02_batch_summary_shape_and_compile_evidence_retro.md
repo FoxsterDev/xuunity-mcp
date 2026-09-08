@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Chat Retro — Batch Summary Shape and Compile-Warning Evidence
 
 Date: `2026-09-02`
-Status: `P0 and summary-artifact P2 released in v0.3.67; warning-evidence P1 released in v0.3.70; rebuild/cache P1 and dead-flag P2 remain`
+Status: `P0 and summary-artifact P2 released in v0.3.67; warning-evidence P1 released in v0.3.70; rebuild/cache P1 implemented in current source; output-shape P2 remains`
 Lane: `batch-build-config-compile-matrix` via the multi-project sweep runner, GUI fallback throughout
 Server metadata observed in session: `xuunity-mcp 0.3.65`
 
@@ -246,3 +246,25 @@ this lane exists to serve.
   closeout.
 - P1-2 rebuilt-versus-cache-hit evidence and P2-2's dead `--output` flag remain
   open. This retro is therefore still active.
+
+## Re-Evaluation 2026-09-08
+
+- P1-2 is implemented in current source. Each compile configuration listens to
+  Unity's `assemblyCompilationStarted` and (on Unity `2022.1+`)
+  `assemblyCompilationNotRequired` events, deduplicates assembly paths, and
+  reports `rebuilt_assembly_count`, `cached_assembly_count`,
+  `rebuild_evidence_status`, and `rebuild_evidence_basis`.
+- Matrix results aggregate the counts, compact MCP output retains bounded
+  per-configuration rows, and batch plus multi-project summaries preserve the
+  same evidence instead of requiring raw-log grep.
+- Unity `2021.3` exposes rebuild-start evidence but not the native
+  not-required event, so it reports the limitation explicitly rather than a
+  decision-grade cache count.
+- Current-source validation passed all `161` package EditMode tests on both
+  Unity `2022.3.62f3` and `6000.0.58f2`. Live compile responses reported
+  `9` rebuilt / `30` cached assemblies on Unity `2022.3.62f3` and `76`
+  rebuilt / `181` cached assemblies on Unity `6000.0.58f2`, each with zero
+  compiler errors or warnings and `rebuild_evidence_status: measured`.
+- P2-2 is narrower than first recorded: direct batch commands now consume
+  `--output`; the remaining work is to pin a lane-independent output shape
+  through the multi-project runner. This retro stays active only for that P2.

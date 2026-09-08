@@ -70,6 +70,33 @@ namespace XUUnity.LightMcp.Tests.EditMode
         }
 
         [Test]
+        public void CompileRebuildEvidence_DeduplicatesAssembliesAndLetsARebuildOverrideACacheHit()
+        {
+            var rebuilt = new HashSet<string>(StringComparer.Ordinal);
+            var cached = new HashSet<string>(StringComparer.Ordinal);
+
+            XUUnityLightMcpCompileUtility.RecordAssemblyExecution("Game.dll", rebuilt, cached, rebuilt: false);
+            XUUnityLightMcpCompileUtility.RecordAssemblyExecution("Game.dll", rebuilt, cached, rebuilt: true);
+            XUUnityLightMcpCompileUtility.RecordAssemblyExecution("Game.dll", rebuilt, cached, rebuilt: true);
+            XUUnityLightMcpCompileUtility.RecordAssemblyExecution("Game.Editor.dll", rebuilt, cached, rebuilt: false);
+            XUUnityLightMcpCompileUtility.RecordAssemblyExecution("Game.Editor.dll", rebuilt, cached, rebuilt: false);
+
+            var payload = new XUUnityLightMcpCompileConfigPayload();
+            XUUnityLightMcpCompileUtility.PopulateRebuildEvidence(payload, rebuilt, cached);
+
+            Assert.That(payload.rebuilt_assembly_count, Is.EqualTo(1));
+            Assert.That(payload.cached_assembly_count, Is.EqualTo(1));
+#if UNITY_2022_1_OR_NEWER
+            Assert.That(payload.rebuild_evidence_status, Is.EqualTo("measured"));
+            Assert.That(
+                payload.rebuild_evidence_basis,
+                Is.EqualTo("compilation_pipeline_started_and_not_required_events"));
+#else
+            Assert.That(payload.rebuild_evidence_status, Is.EqualTo("rebuilt_only_cache_status_unavailable"));
+#endif
+        }
+
+        [Test]
         public void CompilerDiagnosticCode_IsReadFromTheDiagnosticNotThePath()
         {
             Assert.That(
@@ -125,6 +152,52 @@ namespace XUUnity.LightMcp.Tests.EditMode
             Assert.That(payload.warnings.Count, Is.EqualTo(2));
             Assert.That(payload.warning_sample_limit, Is.EqualTo(XUUnityLightMcpCompileUtility.WarningSampleLimit));
             Assert.That(payload.warnings_truncated, Is.False);
+        }
+
+        [Test]
+        public void CompileMatrixRebuildEvidence_AggregatesMeasuredConfigurationCounts()
+        {
+            var payload = new XUUnityLightMcpCompileMatrixPayload
+            {
+                results = new List<XUUnityLightMcpCompileConfigPayload>
+                {
+                    new()
+                    {
+                        rebuilt_assembly_count = 3,
+                        cached_assembly_count = 5,
+                        rebuild_evidence_status = "measured",
+                    },
+                    new()
+                    {
+                        rebuilt_assembly_count = 2,
+                        cached_assembly_count = 7,
+                        rebuild_evidence_status = "measured",
+                    },
+                },
+            };
+
+            XUUnityLightMcpCompileUtility.PopulateMatrixRebuildEvidenceSummary(payload);
+
+            Assert.That(payload.rebuilt_assembly_count, Is.EqualTo(5));
+            Assert.That(payload.cached_assembly_count, Is.EqualTo(12));
+            Assert.That(payload.rebuild_evidence_status, Is.EqualTo("measured"));
+            Assert.That(payload.rebuild_evidence_basis, Is.EqualTo("per_configuration_compilation_pipeline_events"));
+
+            var legacyPayload = new XUUnityLightMcpCompileMatrixPayload
+            {
+                results = new List<XUUnityLightMcpCompileConfigPayload>
+                {
+                    new() { rebuilt_assembly_count = 3, rebuild_evidence_status = "rebuilt_only_cache_status_unavailable" },
+                },
+            };
+            XUUnityLightMcpCompileUtility.PopulateMatrixRebuildEvidenceSummary(legacyPayload);
+
+            Assert.That(
+                legacyPayload.rebuild_evidence_status,
+                Is.EqualTo("rebuilt_only_cache_status_unavailable"));
+            Assert.That(
+                legacyPayload.rebuild_evidence_basis,
+                Is.EqualTo("per_configuration_compilation_pipeline_started_event"));
         }
 
         [Test]

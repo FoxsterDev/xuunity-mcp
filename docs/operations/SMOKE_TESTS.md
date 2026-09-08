@@ -91,11 +91,16 @@ Pass criteria:
   `includeFullPayload=true`; ordinary pass/fail gates should stay on the compact
   default and read `status`, counts, `post_settle_compile`, `settle_phase`, and
   `completion_basis`.
-- The `v0.3.72` compile summaries also expose `warning_count`,
+- The `v0.3.70` compile summaries also expose `warning_count`,
   `unique_warning_count`, and a bounded `warnings` sample. A warning-cleanup
   smoke must assert those fields explicitly; `status: passed` alone proves only
   that no compile error occurred. `warnings_truncated: true` means the counts
   remain authoritative while the sample is incomplete.
+- Current-source compile summaries expose `rebuilt_assembly_count`,
+  `cached_assembly_count`, and `rebuild_evidence_status`. Assert a measured
+  nonzero rebuild count when the smoke is meant to prove a recent source edit;
+  a green error/warning verdict with only cache hits does not prove that edit
+  was compiled.
 - If new `.cs` files were created outside the Unity editor and direct compile
   reports missing namespaces or types, run `request-project-refresh` once and
   retry before treating the result as a code failure.

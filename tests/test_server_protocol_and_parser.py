@@ -652,6 +652,10 @@ class ServerProtocolAndParserTests(unittest.TestCase):
                         "error_count": 0,
                         "warning_count": 1,
                         "compiled_assembly_count": 70,
+                        "rebuilt_assembly_count": 6,
+                        "cached_assembly_count": 64,
+                        "rebuild_evidence_status": "measured",
+                        "rebuild_evidence_basis": "compilation_pipeline_started_and_not_required_events",
                         "duration_seconds": 4.25,
                         "post_settle_compile": "passed",
                         "post_settle_error_count": 0,
@@ -698,6 +702,9 @@ class ServerProtocolAndParserTests(unittest.TestCase):
         self.assertEqual("unity.compile.player_scripts", structured["operation"])
         self.assertEqual("passed", structured["status"])
         self.assertEqual("passed", structured["post_settle_compile"])
+        self.assertEqual(6, structured["rebuilt_assembly_count"])
+        self.assertEqual(64, structured["cached_assembly_count"])
+        self.assertEqual("measured", structured["rebuild_evidence_status"])
         self.assertEqual(0, structured["post_settle_error_count"])
         self.assertEqual(1, structured["artifact_count"])
         self.assertNotIn("_xuunity_lifecycle", structured)

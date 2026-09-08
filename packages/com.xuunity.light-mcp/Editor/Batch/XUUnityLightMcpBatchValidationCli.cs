@@ -238,6 +238,7 @@ namespace XUUnity.LightMcp.Editor.Batch
             matrixPayload.playmode_state_after_settle = "edit";
             matrixPayload.duration_seconds = Math.Round((DateTime.UtcNow - startedAtUtc).TotalSeconds, 6);
             XUUnityLightMcpCompileUtility.PopulateMatrixWarningSummary(matrixPayload);
+            XUUnityLightMcpCompileUtility.PopulateMatrixRebuildEvidenceSummary(matrixPayload);
 
             result.matrix = matrixPayload;
             result.succeeded = matrixPayload.status == "passed";

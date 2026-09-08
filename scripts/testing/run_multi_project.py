@@ -232,7 +232,12 @@ def normalized_matrix(raw_matrix) -> dict:
     if any(value < 0 for value in counters.values()):
         return {}
     normalized = {"status": status, **counters}
-    for key in ("warning_count", "unique_warning_count"):
+    for key in (
+        "warning_count",
+        "unique_warning_count",
+        "rebuilt_assembly_count",
+        "cached_assembly_count",
+    ):
         if key not in raw_matrix:
             continue
         try:
@@ -241,6 +246,8 @@ def normalized_matrix(raw_matrix) -> dict:
             continue
         if value >= 0:
             normalized[key] = value
+    if isinstance(raw_matrix.get("rebuild_evidence_status"), str):
+        normalized["rebuild_evidence_status"] = raw_matrix["rebuild_evidence_status"]
     if isinstance(raw_matrix.get("warnings_truncated"), bool):
         normalized["warnings_truncated"] = raw_matrix["warnings_truncated"]
     warnings = raw_matrix.get("warnings")
@@ -572,6 +579,9 @@ def build_batch_status(
         "skipped": int(matrix["skipped"]) if matrix else None,
         "warning_count": int(matrix["warning_count"]) if "warning_count" in matrix else None,
         "unique_warning_count": int(matrix["unique_warning_count"]) if "unique_warning_count" in matrix else None,
+        "rebuilt_assembly_count": int(matrix["rebuilt_assembly_count"]) if "rebuilt_assembly_count" in matrix else None,
+        "cached_assembly_count": int(matrix["cached_assembly_count"]) if "cached_assembly_count" in matrix else None,
+        "rebuild_evidence_status": str(matrix.get("rebuild_evidence_status") or "") if matrix else "",
         "summary_file": str(payload.get("summary_file", "")) if isinstance(payload, dict) else "",
         "summary_file_loaded": bool(summary_artifact),
         "result_file": str(payload.get("result_file", "")) if isinstance(payload, dict) else "",
@@ -699,6 +709,9 @@ def emit_batch_final_summary(results_dir: str) -> int:
             f"skipped={rendered_counter('skipped')}",
             f"warning_count={rendered_counter('warning_count')}",
             f"unique_warning_count={rendered_counter('unique_warning_count')}",
+            f"rebuilt_assembly_count={rendered_counter('rebuilt_assembly_count')}",
+            f"cached_assembly_count={rendered_counter('cached_assembly_count')}",
+            f"rebuild_evidence_status={item.get('rebuild_evidence_status', '')}",
             f"result_file={item.get('result_file', '')}",
         ]
         print("|".join(fields))
@@ -719,6 +732,16 @@ def emit_batch_final_summary(results_dir: str) -> int:
         "unique_warning_count_sum": (
             sum(int(item["unique_warning_count"]) for item in statuses if item.get("unique_warning_count") is not None)
             if statuses and all(item.get("unique_warning_count") is not None for item in statuses)
+            else None
+        ),
+        "rebuilt_assembly_count_sum": (
+            sum(int(item["rebuilt_assembly_count"]) for item in statuses if item.get("rebuilt_assembly_count") is not None)
+            if statuses and all(item.get("rebuilt_assembly_count") is not None for item in statuses)
+            else None
+        ),
+        "cached_assembly_count_sum": (
+            sum(int(item["cached_assembly_count"]) for item in statuses if item.get("cached_assembly_count") is not None)
+            if statuses and all(item.get("cached_assembly_count") is not None for item in statuses)
             else None
         ),
     }

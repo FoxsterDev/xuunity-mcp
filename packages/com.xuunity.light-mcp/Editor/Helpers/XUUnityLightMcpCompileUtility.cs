@@ -81,6 +81,20 @@ namespace XUUnity.LightMcp.Editor.Helpers
             var uniqueWarnings = new List<XUUnityLightMcpCompileErrorItem>();
             var uniqueWarningKeys = new HashSet<string>(StringComparer.Ordinal);
             var warningCount = 0;
+            var rebuiltAssemblies = new HashSet<string>(StringComparer.Ordinal);
+            var cachedAssemblies = new HashSet<string>(StringComparer.Ordinal);
+
+            void HandleAssemblyCompilationStarted(string assemblyName)
+            {
+                RecordAssemblyExecution(assemblyName, rebuiltAssemblies, cachedAssemblies, rebuilt: true);
+            }
+
+#if UNITY_2022_1_OR_NEWER
+            void HandleAssemblyCompilationNotRequired(string assemblyName)
+            {
+                RecordAssemblyExecution(assemblyName, rebuiltAssemblies, cachedAssemblies, rebuilt: false);
+            }
+#endif
 
             void HandleAssemblyCompilationFinished(string assemblyName, CompilerMessage[] compilerMessages)
             {
@@ -95,6 +109,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             try
             {
+                CompilationPipeline.assemblyCompilationStarted -= HandleAssemblyCompilationStarted;
+                CompilationPipeline.assemblyCompilationStarted += HandleAssemblyCompilationStarted;
+#if UNITY_2022_1_OR_NEWER
+                CompilationPipeline.assemblyCompilationNotRequired -= HandleAssemblyCompilationNotRequired;
+                CompilationPipeline.assemblyCompilationNotRequired += HandleAssemblyCompilationNotRequired;
+#endif
                 CompilationPipeline.assemblyCompilationFinished -= HandleAssemblyCompilationFinished;
                 CompilationPipeline.assemblyCompilationFinished += HandleAssemblyCompilationFinished;
                 var result = PlayerBuildInterface.CompilePlayerScripts(compilationSettings, outputDirectory);
@@ -102,11 +122,16 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
             finally
             {
+                CompilationPipeline.assemblyCompilationStarted -= HandleAssemblyCompilationStarted;
+#if UNITY_2022_1_OR_NEWER
+                CompilationPipeline.assemblyCompilationNotRequired -= HandleAssemblyCompilationNotRequired;
+#endif
                 CompilationPipeline.assemblyCompilationFinished -= HandleAssemblyCompilationFinished;
                 stopwatch.Stop();
                 EditorUtility.ClearProgressBar();
             }
 
+            PopulateRebuildEvidence(payload, rebuiltAssemblies, cachedAssemblies);
             payload.duration_seconds = Math.Round(stopwatch.Elapsed.TotalSeconds, 6);
             payload.errors = errors;
             payload.error_count = errors.Count;
@@ -118,6 +143,46 @@ namespace XUUnity.LightMcp.Editor.Helpers
             payload.warnings_truncated = uniqueWarnings.Count > payload.warnings.Count;
             payload.status = errors.Count > 0 ? "failed" : "passed";
             return payload;
+        }
+
+        internal static void RecordAssemblyExecution(
+            string assemblyName,
+            HashSet<string> rebuiltAssemblies,
+            HashSet<string> cachedAssemblies,
+            bool rebuilt)
+        {
+            if (string.IsNullOrWhiteSpace(assemblyName))
+            {
+                return;
+            }
+
+            if (rebuilt)
+            {
+                rebuiltAssemblies.Add(assemblyName);
+                cachedAssemblies.Remove(assemblyName);
+                return;
+            }
+
+            if (!rebuiltAssemblies.Contains(assemblyName))
+            {
+                cachedAssemblies.Add(assemblyName);
+            }
+        }
+
+        internal static void PopulateRebuildEvidence(
+            XUUnityLightMcpCompileConfigPayload payload,
+            HashSet<string> rebuiltAssemblies,
+            HashSet<string> cachedAssemblies)
+        {
+            payload.rebuilt_assembly_count = rebuiltAssemblies?.Count ?? 0;
+            payload.cached_assembly_count = cachedAssemblies?.Count ?? 0;
+#if UNITY_2022_1_OR_NEWER
+            payload.rebuild_evidence_status = "measured";
+            payload.rebuild_evidence_basis = "compilation_pipeline_started_and_not_required_events";
+#else
+            payload.rebuild_evidence_status = "rebuilt_only_cache_status_unavailable";
+            payload.rebuild_evidence_basis = "compilation_pipeline_started_event";
+#endif
         }
 
         internal static void CollectCompilerMessages(
@@ -241,6 +306,30 @@ namespace XUUnity.LightMcp.Editor.Helpers
             payload.warning_sample_limit = WarningSampleLimit;
             payload.warnings = uniqueWarnings.Take(WarningSampleLimit).ToList();
             payload.warnings_truncated = uniqueWarnings.Count > payload.warnings.Count;
+        }
+
+        internal static void PopulateMatrixRebuildEvidenceSummary(XUUnityLightMcpCompileMatrixPayload payload)
+        {
+            var results = payload.results ?? new List<XUUnityLightMcpCompileConfigPayload>();
+            payload.rebuilt_assembly_count = results.Sum(result => result?.rebuilt_assembly_count ?? 0);
+            payload.cached_assembly_count = results.Sum(result => result?.cached_assembly_count ?? 0);
+            var measured = results.Count(result => result?.rebuild_evidence_status == "measured");
+            var rebuiltOnly = results.Count(
+                result => result?.rebuild_evidence_status == "rebuilt_only_cache_status_unavailable");
+            payload.rebuild_evidence_status = results.Count == 0
+                ? "not_run"
+                : measured == results.Count
+                    ? "measured"
+                    : measured > 0
+                        ? "partial"
+                        : rebuiltOnly == results.Count
+                            ? "rebuilt_only_cache_status_unavailable"
+                            : "unmeasured";
+            payload.rebuild_evidence_basis = measured > 0
+                ? "per_configuration_compilation_pipeline_events"
+                : rebuiltOnly > 0
+                    ? "per_configuration_compilation_pipeline_started_event"
+                    : "";
         }
 
         static List<string> NormalizeStrings(string[] values)

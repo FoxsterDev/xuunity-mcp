@@ -514,8 +514,11 @@ changing the error-only compile verdict:
 
 Compact bridge, batch, and multi-project summaries carry these fields forward.
 Do not read `status: passed` as warning-free, and do not read a zero warning
-count as proof that assemblies rebuilt rather than hitting cache; rebuild/cache
-evidence is a separate open contract.
+count as proof that assemblies rebuilt rather than hitting cache. Current
+source carries `rebuilt_assembly_count`, `cached_assembly_count`,
+`rebuild_evidence_status`, and `rebuild_evidence_basis` through direct, matrix,
+batch, and multi-project summaries; require `measured` evidence when the result
+must prove a recent source edit was compiled.
 
 ## Structural Compile Errors
 

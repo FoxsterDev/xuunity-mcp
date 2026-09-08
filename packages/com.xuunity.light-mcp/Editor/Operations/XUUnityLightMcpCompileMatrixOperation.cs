@@ -81,6 +81,7 @@ namespace XUUnity.LightMcp.Editor.Operations
                     results = results
                 };
                 XUUnityLightMcpCompileUtility.PopulateMatrixWarningSummary(payload);
+                XUUnityLightMcpCompileUtility.PopulateMatrixRebuildEvidenceSummary(payload);
 
                 return XUUnityLightMcpResponseWriter.Success(
                     request.request_id,

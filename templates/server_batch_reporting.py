@@ -39,10 +39,14 @@ COMPACT_BATCH_SUMMARY_KEYS = (
 COMPACT_BATCH_NESTED_SUMMARY_KEYS = {
     "matrix": (
         "status", "total", "passed", "failed", "skipped",
+        "rebuilt_assembly_count", "cached_assembly_count",
+        "rebuild_evidence_status", "rebuild_evidence_basis",
         "warning_count", "unique_warning_count", "warnings_truncated", "warnings",
     ),
     "compile": (
         "status", "compiled_assembly_count", "error_count",
+        "rebuilt_assembly_count", "cached_assembly_count",
+        "rebuild_evidence_status", "rebuild_evidence_basis",
         "warning_count", "unique_warning_count", "warnings_truncated", "warnings",
     ),
     "tests": ("status", "total", "passed", "failed", "skipped"),
@@ -358,6 +362,10 @@ def summarize_batch_result_payload(
             summary["compile"] = {
                 "status": compile_result.get("status"),
                 "compiled_assembly_count": compile_result.get("compiled_assembly_count"),
+                "rebuilt_assembly_count": compile_result.get("rebuilt_assembly_count"),
+                "cached_assembly_count": compile_result.get("cached_assembly_count"),
+                "rebuild_evidence_status": compile_result.get("rebuild_evidence_status"),
+                "rebuild_evidence_basis": compile_result.get("rebuild_evidence_basis"),
                 "error_count": compile_result.get("error_count"),
             }
             if "warning_count" in compile_result and compile_result.get("warning_count") is not None:
@@ -371,6 +379,10 @@ def summarize_batch_result_payload(
             "passed": matrix_payload.get("passed"),
             "failed": matrix_payload.get("failed"),
             "skipped": matrix_payload.get("skipped"),
+            "rebuilt_assembly_count": matrix_payload.get("rebuilt_assembly_count"),
+            "cached_assembly_count": matrix_payload.get("cached_assembly_count"),
+            "rebuild_evidence_status": matrix_payload.get("rebuild_evidence_status"),
+            "rebuild_evidence_basis": matrix_payload.get("rebuild_evidence_basis"),
             "warning_count": matrix_payload.get("warning_count"),
             "unique_warning_count": matrix_payload.get("unique_warning_count"),
             "warnings_truncated": matrix_payload.get("warnings_truncated"),

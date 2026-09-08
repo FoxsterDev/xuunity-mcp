@@ -44,6 +44,10 @@ namespace XUUnity.LightMcp.Editor.Core
             public double duration_seconds;
             public string status = "infrastructure_error";
             public int compiled_assembly_count;
+            public int rebuilt_assembly_count;
+            public int cached_assembly_count;
+            public string rebuild_evidence_status = "unmeasured";
+            public string rebuild_evidence_basis = "";
             public List<XUUnityLightMcpCompileErrorItem> errors = new();
             public int error_count;
             public List<XUUnityLightMcpCompileErrorItem> warnings = new();
@@ -95,6 +99,10 @@ namespace XUUnity.LightMcp.Editor.Core
             public int passed;
             public int failed;
             public int skipped;
+            public int rebuilt_assembly_count;
+            public int cached_assembly_count;
+            public string rebuild_evidence_status = "unmeasured";
+            public string rebuild_evidence_basis = "";
             public int warning_count;
             public int unique_warning_count;
             public int warning_sample_limit;

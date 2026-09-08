@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Why
+
+- A passing compile matrix could not say whether Unity rebuilt the assemblies under test or reused cached
+  results. That made a green error/warning report easy to overread as proof that a recent source edit had
+  actually been compiled.
+
+### Added
+
+- Direct and matrix compile results now report `rebuilt_assembly_count`, `cached_assembly_count`,
+  `rebuild_evidence_status`, and `rebuild_evidence_basis`. Unity `2022.1+` uses its native
+  `assemblyCompilationStarted` and `assemblyCompilationNotRequired` events, so the evidence follows Unity's
+  own rebuild decision instead of guessing from output files or log text.
+- Compact MCP, batch, and multi-project summaries preserve the same rebuild/cache counts. Matrix compact
+  output also keeps a bounded per-configuration evidence list, while the full result retains every row.
+
+### Known limitations
+
+- Unity `2021.3` exposes the rebuild-start event but not the cache-not-required event used by this evidence
+  lane. It reports `rebuild_evidence_status: rebuilt_only_cache_status_unavailable`; cache-hit counts become
+  decision-grade on Unity `2022.1+`.
+
 ## 0.3.72
 
 Release tag: `v0.3.72`
