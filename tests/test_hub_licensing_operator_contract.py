@@ -19,6 +19,8 @@ import server_editor_host
 import server_host_platform
 import server_hub_licensing
 import server_launcher
+import server_licensing_state
+import server_cli_parser
 
 
 def process_report(platform_kind: str, processes: list[dict]) -> dict:
@@ -33,6 +35,64 @@ def process_report(platform_kind: str, processes: list[dict]) -> dict:
 
 
 class HubLicensingResolutionTests(unittest.TestCase):
+    def test_explicit_channel_forms_normalize_once_and_preserve_source(self):
+        for channel in ("Unity-LicenseClient-abc", "LicenseClient-abc"):
+            args, resolution = server_hub_licensing.prepare_hub_licensing_unity_args(["-licensingIpc", channel])
+            self.assertEqual(["-licensingIpc", "LicenseClient-abc"], args)
+            self.assertEqual("explicit_unity_argument", resolution["source"])
+            self.assertNotIn(channel, json.dumps(resolution))
+            self.assertEqual(args, server_hub_licensing.prepare_hub_licensing_unity_args(args)[0])
+
+    def test_connection_mechanism_requires_exact_forwarded_channel_and_no_missing_line(self):
+        fingerprint = server_hub_licensing._fingerprint("LicenseClient-abc")
+        wrong = 'Successfully connected to: "LicenseClient-fallback"'
+        exact = 'Successfully connected to: "LicenseClient-abc"'
+        missing = "Channel LicenseClient-abc doesn't exist"
+        for log, expected in [(wrong, False), (exact, True), (missing + "\n" + exact, False), (missing + "\n" + wrong, False)]:
+            result = server_licensing_state.licensing_connection_evidence(log, fingerprint)
+            self.assertEqual(expected, result["licensing_forwarded_channel_connected"])
+            self.assertNotIn("LicenseClient-abc", json.dumps(result))
+
+    def test_live_hub_process_requires_matching_editor_entitlement_before_probe_skip(self):
+        import server_host_platform
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "Editor.log"
+            report = process_report("linux", [
+                {"pid": 10, "ppid": 1, "command": "/opt/unityhub/unityhub"},
+                {"pid": 11, "ppid": 10, "command": "/opt/unityhub/Unity.Licensing.Client --namedPipe Unity-LicenseClient-abc"},
+                {"pid": 20, "ppid": 1, "command": f'/opt/Unity -projectPath "{tmp}" -logFile "{log}"'},
+            ])
+            adapter = mock.Mock(platform_kind="linux")
+            adapter.list_process_commands_report.return_value = report
+            adapter.pid_is_alive.return_value = True
+            with (mock.patch.object(server_host_platform, "current_host_platform_adapter", return_value=adapter),
+                  mock.patch.object(server_hub_licensing, "current_host_platform_adapter", return_value=adapter)):
+                for text, licensed in [
+                    ("", False),
+                    ('Successfully connected to: "LicenseClient-abc"', False),
+                    ('Successfully connected to: "LicenseClient-fallback"\nSuccessfully resolved entitlement details', False),
+                    ('Successfully connected to: "LicenseClient-abc"\nSuccessfully resolved entitlement details', True),
+                    ("packages were not registered because your license doesn't allow it", False),
+                ]:
+                    log.write_text(text, encoding="utf-8")
+                    evidence = server_licensing_state.live_editor_licensing_evidence()
+                    self.assertTrue(evidence["editor_live"])
+                    self.assertEqual(licensed, evidence["licensed_editor_live"])
+
+    def test_shared_bridge_recovery_uses_only_accepted_helper_verbs(self):
+        import argparse
+        parser = server_cli_parser.build_parser()
+        choices = next(action.choices for action in parser._actions if isinstance(action, argparse._SubParsersAction))
+        recipe = server_core.BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root="<path>")
+        for command in recipe.split("; then "):
+            self.assertIn(command.split()[0], choices)
+        self.assertIn("--plan-file <plan>", recipe)
+        for path in TEMPLATES_DIR.glob("server*.py"):
+            source = path.read_text(encoding="utf-8")
+            self.assertNotIn("--enable-project", source, path.name)
+            self.assertNotRegex(source, r"(?:server\.py|run\.sh|xuunity-mcp) init ", path.name)
+
+
     def test_single_live_hub_candidate_resolves_on_each_platform_without_public_channel(self) -> None:
         shapes = {
             "macos": (
@@ -119,7 +179,7 @@ class HubLicensingResolutionTests(unittest.TestCase):
             adapter_factory.return_value.platform_kind = "macos"
             args, public = server_hub_licensing.prepare_hub_licensing_unity_args([], report)
 
-        self.assertEqual(["-licensingIpc", "Unity-LicenseClient-one"], args)
+        self.assertEqual(["-licensingIpc", "LicenseClient-one"], args)
         self.assertTrue(public["unity_argument_forwarded"])
         self.assertNotIn("Unity-LicenseClient-one", json.dumps(public))
 

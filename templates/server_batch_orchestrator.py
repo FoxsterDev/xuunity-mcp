@@ -5,6 +5,8 @@ import sys
 import json
 import time
 import subprocess
+from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Callable, TypeVar
@@ -934,7 +936,7 @@ def recover_project_bridge_for_reconciliation(
                 "bridge_disabled",
                 (
                     "Unity bridge is disabled for this project. "
-                    "Enable it with init_xuunity_light_unity_mcp.sh --project-root <path> --enable-project "
+                    f"Enable it with {BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} "
                     "and reopen Unity."
                 ),
             ),

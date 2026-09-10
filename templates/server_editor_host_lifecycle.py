@@ -10,6 +10,8 @@ import signal
 import subprocess
 import sys
 import time
+from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+
 from pathlib import Path
 from typing import Any, Callable
 
@@ -51,6 +53,8 @@ from server_hub_licensing import (
     sanitize_unity_args,
 )
 
+from server_licensing_state import guard_editor_licensing_launch, editor_license_evidence
+
 ACTIVATION_DELAY_SECONDS = 0.35
 UNITY_EDITOR_ROOTS_ENV = "XUUNITY_UNITY_EDITOR_ROOTS"
 HOST_EDITOR_LAUNCH_IN_PROGRESS_MAX_AGE_SECONDS = 90.0
@@ -58,6 +62,13 @@ TASKKILL_TIMEOUT_SECONDS = 15.0
 LAUNCH_HELPER_TIMEOUT_SECONDS = 30.0
 TRANSIENT_LICENSING_BLOCKER_GRACE_SECONDS = 5.0
 STARTUP_BLOCKER_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "licensing_connection_lost",
+        re.compile(
+            r"connection with (?:the )?Unity Licensing Client has been lost|re-connection attempt was UN-successful",
+            re.IGNORECASE,
+        ),
+    ),
     (
         "licensing_channel_unavailable",
         re.compile(r"Channel\s+[^\r\n]+\s+doesn't exist", re.IGNORECASE),
@@ -74,7 +85,8 @@ STARTUP_BLOCKER_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "invalid_editor_license",
         re.compile(
             r"No valid Unity Editor license found|Unity has not been activated with a valid License|"
-            r"No valid Unity license|No ULF license found|Access token is unavailable",
+            r"No valid Unity license|No ULF license found|Access token is unavailable|"
+            r"packages were not registered because your license doesn't allow it",
             re.IGNORECASE,
         ),
     ),
@@ -144,6 +156,7 @@ def _command_contains_unity_launch_args(command: str, unity_args: list[str]) -> 
     return False
 
 
+@guard_editor_licensing_launch
 def open_unity_editor(
     project_root: Path,
     log_path: Path,
@@ -502,6 +515,9 @@ def open_unity_editor(
         "licensing_ipc_channel_redacted": bool(_unity_launch_argument_value(extra_unity_args, "-licensingIpc")),
         "licensing_ipc_resolution": licensing_ipc_resolution,
         "owned_licensing_child_count": len(completed_session.get("owned_licensing_children") or []),
+        "license_state": "unknown",
+        "license_probe_active": False,
+        "licensing_channel_fingerprint": licensing_ipc_resolution.get("selected_candidate_fingerprint", ""),
         "opened_by_host": True,
         "editor_pid": launched_pid,
         "launch_command": sanitize_launch_command([str(part) for part in launch_command]),
@@ -1209,7 +1225,7 @@ def _startup_blocker_observation(
         if not stripped:
             continue
         if LICENSING_RECOVERY_PATTERN.search(stripped):
-            last_licensing_recovery_line = stripped[-500:]
+            last_licensing_recovery_line = _redact_licensing_channels(stripped[-500:])
             if last_match_kind.startswith("licensing_") or last_match_kind == "invalid_editor_license":
                 last_match_kind = ""
                 last_match_line = ""
@@ -1230,6 +1246,9 @@ def _startup_blocker_observation(
             "current_wait" if log_observation_during_wait else "stale_tail_for_live_project_editor"
         ),
     }
+    session = try_read_host_editor_session_state(project_root) or {}
+    observation["opened_by_host"] = bool(session.get("opened_by_host")) and int(session.get("editor_pid") or 0) in live_editor_pids
+    observation.update(editor_license_evidence(editor_log_path, session))
     if last_match_line:
         observation["startup_blocker_kind"] = last_match_kind
         observation["last_matched_startup_blocker_line"] = last_match_line
@@ -1267,6 +1286,9 @@ def _launch_blocked_error(observation: dict[str, Any]) -> ToolInvocationError:
         details["recommended_next_action"] = "complete_terms_sign_in_or_activation_in_unity_hub"
     else:
         details["recommended_next_action"] = "dismiss_startup_dialog_or_relaunch_with_noninteractive_arguments"
+    if (blocker_kind.startswith("licensing_") or blocker_kind in {"invalid_editor_license", "terms_or_activation_ui_required"}) and observation.get("opened_by_host") is False:
+        details["licensing_handoff_classification"] = "licensing_ipc_not_forwarded_external_launch"
+        details["recommended_next_action"] = "Reopen using open-editor --unity-arg=<argument> so the wrapper forwards the Hub licensing channel."
     return ToolInvocationError(
         "launch_blocked_probable_modal",
         (
@@ -1292,7 +1314,7 @@ def wait_for_ready(
             "bridge_disabled",
             (
                 "Unity bridge is disabled for this project. "
-                "Enable it with init_xuunity_light_unity_mcp.sh --project-root <path> --enable-project "
+                f"Enable it with {BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} "
                 "and reopen Unity."
             ),
         )
@@ -1304,6 +1326,13 @@ def wait_for_ready(
     while time.time() < deadline:
         state = try_read_bridge_state(project_root)
         if bridge_state_is_ready(state, heartbeat_max_age_seconds):
+            session = try_read_host_editor_session_state(project_root) or {}
+            license_evidence = editor_license_evidence(editor_log_path, session)
+            if license_evidence["license_state"] == "unlicensed":
+                observation = _startup_blocker_observation(project_root, editor_log_path, started_at)
+                observation.setdefault("startup_blocker_kind", "invalid_editor_license")
+                raise _launch_blocked_error(observation)
+            state.update(license_evidence)
             age_seconds = heartbeat_age_seconds(state)
             state["startup_policy"] = startup_policy
             state["editor_log_path"] = str(editor_log_path)

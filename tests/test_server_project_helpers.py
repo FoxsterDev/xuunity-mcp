@@ -1455,7 +1455,7 @@ class ServerProjectHelperTests(unittest.TestCase):
 
         self.assertEqual("bridge_disabled", details["discovery_classification"])
         self.assertEqual("enable_bridge_and_retry", details["recommended_next_action"])
-        self.assertIn("init_xuunity_light_unity_mcp.sh", details["recommended_recovery_command"])
+        self.assertIn("setup-plan", details["recommended_recovery_command"])
         self.assertEqual(["bridge_disabled"], details["host_prerequisites"]["blocking_codes"])
 
     def test_enrich_error_details_aligns_readiness_error_with_host_prerequisites(self) -> None:
@@ -1606,7 +1606,7 @@ class ServerProjectHelperTests(unittest.TestCase):
 
         self.assertEqual("bridge_disabled", ctx.exception.code)
         self.assertEqual("enable_bridge_and_retry", ctx.exception.details["recommended_next_action"])
-        self.assertIn("init_xuunity_light_unity_mcp.sh", ctx.exception.details["recommended_recovery_command"])
+        self.assertIn("setup-apply", ctx.exception.details["recommended_recovery_command"])
 
     def test_recover_project_bridge_for_reconciliation_activates_live_process_only_editor(self) -> None:
         context = types.SimpleNamespace(

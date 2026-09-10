@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server_bridge_runtime import build_bridge_stabilization_summary, compiler_diagnostics_trust_from_state
+from server_licensing_state import editor_license_evidence
 
 
 def truncate_text(value: Any, max_length: int = 240) -> str:
@@ -313,6 +314,24 @@ def build_status_summary(
                 ),
             }
         )
+    session = dict(host_editor_session_state or {})
+    if int(session.get("editor_pid") or 0) not in (0, editor_pid):
+        session = {}
+    evidence = editor_license_evidence(
+        summary.get("active_editor_log_path") or effective.get("editor_log_path") or session.get("editor_log_path") or "",
+        session,
+    )
+    if not editor_running:
+        evidence["license_state"] = "unknown"
+    summary.update(evidence)
+    if evidence["license_state"] == "unlicensed":
+        summary.update({"health_status": "unlicensed", "state_summary": "Editor licensing failed; reopen after restoring entitlement.", "runtime_execution_allowed": False,
+                        "stabilized": False, "safe_to_retry": False,
+                        "transport_ready_for_requests": False, "request_flow_state": "not_ready"})
+        summary["blocking_reasons"] = sorted(set(summary.get("blocking_reasons", []) + ["unlicensed"]))
+        if not session.get("opened_by_host"):
+            summary["licensing_handoff_classification"] = "licensing_ipc_not_forwarded_external_launch"
+            summary["recommended_next_action"] = "Reopen using open-editor --unity-arg=<argument> so the wrapper forwards the Hub licensing channel."
     return summary
 
 

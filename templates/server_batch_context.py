@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import sys
 import time
+from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Callable, TypeVar
@@ -411,7 +413,7 @@ SCENARIO_RECOVERY_ERROR_CODES = frozenset(
 
 
 DISCOVERY_NEXT_ACTION_COMMANDS = {
-    "enable_bridge_and_retry": "init_xuunity_light_unity_mcp.sh --project-root {project_root} --enable-project",
+    "enable_bridge_and_retry": BRIDGE_ENABLE_RECOVERY_COMMAND,
     "open_editor_or_ensure_ready": "{launcher} ensure-ready --project-root {project_root} --open-editor",
     "ensure_ready_or_recover_bridge": "{launcher} ensure-ready --project-root {project_root} --open-editor",
     "wait_for_bridge_or_recover_editor": "{launcher} recover-editor-session --project-root {project_root} --timeout-ms 180000",

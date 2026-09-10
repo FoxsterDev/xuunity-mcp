@@ -218,6 +218,10 @@ def batch_lane_preflight_blocker_data(
     )
     attach_license_lane_fields(payload, license_capabilities)
     batchmode_supported = license_capabilities.get("batchmode_supported")
+    if mode == "auto" and license_capabilities.get("probe_skipped_reason") == "licensed_editor_live":
+        payload["effective_execution_lane"] = "gui"
+        payload["lane_fallback_reason"] = "licensed_editor_live"
+        return "gui", license_capabilities
     if mode == "require-batch" and batchmode_supported is not True:
         blocker_code = str(license_capabilities.get("batchmode_blocker_code") or "batchmode_not_proven")
         details = {

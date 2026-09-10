@@ -193,3 +193,9 @@ def reconfigure_stdio_utf8() -> None:
             reconfigure(encoding="utf-8", errors="replace")
         except (ValueError, OSError):
             pass
+
+
+BRIDGE_ENABLE_RECOVERY_COMMAND = (
+    "setup-plan --project-root {project_root} > <plan>; then "
+    "setup-apply --plan-file <plan> --project-root {project_root} --yes"
+)

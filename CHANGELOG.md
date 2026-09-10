@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+### Why
+
+- Concurrent project checks could launch several Unity license probes at once, while a GUI editor launch
+  could race those probes. On macOS, Hub discovery could also forward the operating-system pipe name even
+  though the editor expects its normalized channel name. The resulting failures looked like missing or
+  lost licensing connections and made multi-project automation unreliable.
+
+### Fixed
+
+- Hub licensing discovery now preserves a redacted fingerprint of the discovered pipe while forwarding the
+  normalized editor channel. Launch evidence verifies that the editor connected to that exact channel.
+- Batch license probes now share a per-user host lock and executable/version cache across projects and helper
+  processes. Waiting callers reuse the completed probe, and GUI launches fail promptly with
+  `licensing_busy` while a probe owns the lane.
+- A verified licensed editor can satisfy GUI admission without being misreported as proof of batch
+  entitlement. Status, readiness, and launch summaries expose `license_state`, the redacted channel
+  fingerprint, and whether a probe is active.
+- Licensing-client connection loss and failed reconnection now make readiness fail closed until fresh
+  entitlement evidence confirms recovery. Externally launched editors receive an explicit recovery route.
+- Bridge recovery uses the supported `setup-plan` / `setup-apply` flow, and build summaries separate recovered
+  licensing startup errors from build errors while retaining Unity's original total.
+
+### Validation
+
+- The full host suite passed 1,074 tests with 14 expected platform skips; focused licensing regressions passed
+  44 tests.
+- Live Unity `6000.0.58f2` validation restored two GUI editors with licensed entitlement and an exact forwarded
+  channel match. A 12-project contention sweep launched one real probe, served 11 waiters from its cache, and
+  refused a competing GUI launch with `licensing_busy` in 0.0019 seconds.
+
+### Known limitations
+
+- The real batch probe timed out on this host, so batch entitlement remains unproven. The licensed GUI lane
+  remains the verified fallback, and four-project operation is supported through serialized admission rather
+  than four simultaneous license probes.
+- Hosted Unity Package CI remains waived because no Unity license secrets are configured for the runners.
+
 ## 0.3.73
 
 Release tag: `v0.3.73`

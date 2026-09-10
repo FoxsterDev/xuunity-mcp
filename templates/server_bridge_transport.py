@@ -5,6 +5,8 @@ import json
 import socket
 import time
 import uuid
+from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+
 from pathlib import Path
 from typing import Any
 
@@ -752,7 +754,7 @@ def invoke_bridge_transport(
             "bridge_disabled",
             (
                 "Unity bridge is disabled for this project. "
-                "Enable it with init_xuunity_light_unity_mcp.sh --project-root <path> --enable-project "
+                f"Enable it with {BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} "
                 "and reopen Unity."
             ),
             {

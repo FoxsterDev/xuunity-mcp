@@ -93,13 +93,17 @@ def _live_licensing_candidates(
         if not live:
             continue
         parent = by_pid.get(int(entry.get("ppid") or 0), {})
+        try:
+            parent_live = int(parent.get("pid") or 0) > 0 and bool(pid_is_alive_fn(int(parent["pid"])))
+        except Exception:
+            parent_live = False
         candidates.append(
             {
                 **entry,
                 "channel": channel,
                 "channel_fingerprint": _fingerprint(channel),
                 "command_fingerprint": _fingerprint(str(entry.get("command") or "")),
-                "hub_owned": _is_unity_hub_command(str(parent.get("command") or "")),
+                "hub_owned": parent_live and _is_unity_hub_command(str(parent.get("command") or "")),
                 "parent_pid": int(parent.get("pid") or 0),
             }
         )
@@ -171,6 +175,11 @@ def resolve_hub_licensing_ipc(
     return public, ""
 
 
+def editor_licensing_channel(channel: str) -> str:
+    """The editor omits Unity- from the OS named pipe; discovery retains it."""
+    return channel[len("Unity-"):] if channel.startswith("Unity-LicenseClient-") else channel
+
+
 def unity_argument_value(unity_args: list[str], option_name: str) -> str:
     for index, value in enumerate(unity_args[:-1]):
         if str(value).lower() == option_name.lower():
@@ -197,7 +206,12 @@ def prepare_hub_licensing_unity_args(
     normalized = [str(value) for value in unity_args]
     explicit_channel = unity_argument_value(normalized, "-licensingIpc")
     if explicit_channel:
+        for index, value in enumerate(normalized[:-1]):
+            if value.lower() == "-licensingipc":
+                normalized[index + 1] = editor_licensing_channel(normalized[index + 1])
         return normalized, {
+            "unity_argument_forwarded": True,
+            "forwarded_channel_fingerprint": _fingerprint(editor_licensing_channel(explicit_channel)),
             "source": "explicit_unity_argument",
             "status": "resolved",
             "candidate_count": 1,
@@ -217,7 +231,8 @@ def prepare_hub_licensing_unity_args(
             {"licensing_ipc_resolution": resolution},
         )
     if channel:
-        normalized.extend(["-licensingIpc", channel])
+        normalized.extend(["-licensingIpc", editor_licensing_channel(channel)])
+        resolution["forwarded_channel_fingerprint"] = _fingerprint(editor_licensing_channel(channel))
         resolution["unity_argument_forwarded"] = True
     else:
         resolution["unity_argument_forwarded"] = False

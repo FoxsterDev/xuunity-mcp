@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -8,7 +9,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from server_core import ToolInvocationError, read_json, write_json
+from server_core import ToolInvocationError, read_json, write_json, hidden_window_subprocess_kwargs
+from server_licensing_state import licensing_host_lock, licensing_host_state_dir, live_editor_licensing_evidence
 from server_editor_host import (
     detect_unity_app_path_for_project,
     resolve_unity_app_version,
@@ -18,7 +20,8 @@ from server_host_platform import current_host_platform_adapter, is_wsl, wsl_to_w
 from server_hub_licensing import resolve_hub_licensing_ipc
 
 
-LICENSE_CAPABILITIES_CACHE_SCHEMA = 4
+LICENSE_CAPABILITIES_CACHE_SCHEMA = 5
+HOST_LICENSE_CACHE_TTL_SECONDS = 300
 LICENSE_PROBE_DEFAULT_TIMEOUT_MS = 30000
 BATCHMODE_SUPPORT_OVERRIDE_ENV = "XUUNITY_LIGHT_UNITY_MCP_BATCHMODE_SUPPORT_OVERRIDE"
 GUI_ADMISSION_OVERRIDE_ENV = "XUUNITY_LIGHT_UNITY_MCP_GUI_ADMISSION_OVERRIDE"
@@ -58,7 +61,8 @@ def classify_license_log(text: str, exit_code: int | None = None, timed_out: boo
         ),
         (
             "licensing_client_ipc_failure",
-            r"Licensing Client.*IPC|LicensingClient.*IPC|IPC.*Licensing|licensing.*IPC|Failed to connect.*Licensing Client",
+            r"Licensing Client.*IPC|LicensingClient.*IPC|IPC.*Licensing|licensing.*IPC|Failed to connect.*Licensing Client|"
+            r"connection with (?:the )?Unity Licensing Client has been lost|re-connection attempt was UN-successful",
         ),
     ]
     for code, pattern in patterns:
@@ -208,89 +212,124 @@ def build_license_capabilities(
                     cached["manual_user_action_required"] = True
             return cached
 
-    timeout_ms = max(1000, int(timeout_ms or LICENSE_PROBE_DEFAULT_TIMEOUT_MS))
-    probe_log_path = default_license_probe_log_path(project_root)
-    probe_log_path.parent.mkdir(parents=True, exist_ok=True)
-    project_path_str = wsl_to_windows_path(project_root) if is_wsl() else str(project_root)
-    probe_log_path_str = wsl_to_windows_path(probe_log_path) if is_wsl() else str(probe_log_path)
-    command = [
-        str(unity_executable),
-        "-batchmode",
-        "-quit",
-        "-projectPath",
-        project_path_str,
-        "-logFile",
-        probe_log_path_str,
-    ]
-
-    stdout = ""
-    stderr = ""
-    batch_exit_code: int | None = None
-    timed_out = False
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_ms / 1000.0,
+    requested_at = time.time()
+    with licensing_host_lock(max(1.0, timeout_ms / 1000.0) + 5.0) as waited:
+        host_cache_path = licensing_host_state_dir() / (
+            hashlib.sha256(json.dumps(cache_key, sort_keys=True).encode("utf-8")).hexdigest() + ".json"
         )
-        batch_exit_code = int(completed.returncode)
-        stdout = completed.stdout or ""
-        stderr = completed.stderr or ""
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        batch_exit_code = 124
-        stdout = exc.stdout.decode("utf-8", errors="ignore") if isinstance(exc.stdout, bytes) else str(exc.stdout or "")
-        stderr = exc.stderr.decode("utf-8", errors="ignore") if isinstance(exc.stderr, bytes) else str(exc.stderr or "")
-    except OSError as exc:
-        batch_exit_code = 127
-        stderr = str(exc)
+        cached = read_cached_license_capabilities(host_cache_path, cache_key)
+        if cached is not None:
+            completed_at = float(cached.get("probe_completed_at") or 0)
+            if (not refresh and time.time() - completed_at < HOST_LICENSE_CACHE_TTL_SECONDS) or completed_at >= requested_at:
+                cached.update({"project_root": str(project_root), "cache_path": str(cache_path),
+                               "from_cache": True, "probe_lock_hit": waited,
+                               "probe_skipped_reason": "host_probe_cache"})
+                write_json(cache_path, cached)
+                return cached
+        live = live_editor_licensing_evidence()
+        if live.get("licensed_editor_live"):
+            payload = build_capabilities_payload(
+                project_root=project_root, unity_app=resolved_unity_app,
+                unity_executable=unity_executable, unity_version=unity_version, cache_key=cache_key,
+                probe_log_path=default_license_probe_log_path(project_root), batch_exit_code=None,
+                timed_out=False, batchmode_supported=None, blocker_code="",
+                source_evidence=["live_hub_client_and_editor_entitlement"], from_cache=False,
+                stderr="", stdout="", matched_text="",
+            )
+            payload.update({"probe_skipped_reason": "licensed_editor_live", "license_state": "licensed",
+                            "license_probe_active": False, "editor_ui_supported": True,
+                            "recommended_execution_lane": "gui", "probe_lock_hit": waited,
+                            "licensing_ipc_resolution": live["resolution"]})
+            return payload
+        if live.get("editor_live") or live.get("visibility_unknown"):
+            raise ToolInvocationError("licensing_busy", "Cannot safely probe licensing while an editor is live or process visibility is unavailable.")
+        timeout_ms = max(1000, int(timeout_ms or LICENSE_PROBE_DEFAULT_TIMEOUT_MS))
+        probe_log_path = default_license_probe_log_path(project_root)
+        probe_log_path.parent.mkdir(parents=True, exist_ok=True)
+        project_path_str = wsl_to_windows_path(project_root) if is_wsl() else str(project_root)
+        probe_log_path_str = wsl_to_windows_path(probe_log_path) if is_wsl() else str(probe_log_path)
+        command = [
+            str(unity_executable),
+            "-batchmode",
+            "-quit",
+            "-projectPath",
+            project_path_str,
+            "-logFile",
+            probe_log_path_str,
+        ]
 
-    log_text = ""
-    if probe_log_path.is_file():
+        stdout = ""
+        stderr = ""
+        batch_exit_code: int | None = None
+        timed_out = False
         try:
-            log_text = probe_log_path.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            log_text = ""
-    combined_text = "\n".join(part for part in (stdout, stderr, log_text) if part)
-    classification = classify_license_log(combined_text, batch_exit_code, timed_out)
-    blocker_code = str(classification.get("batchmode_blocker_code") or "")
-    matched_text = str(classification.get("matched_text") or "")
-    if batch_exit_code == 0 and not blocker_code and not timed_out:
-        batchmode_supported: bool | None = True
-    elif blocker_code and blocker_code != "unknown_batch_failure":
-        batchmode_supported = False
-    else:
-        batchmode_supported = None
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout_ms / 1000.0,
+                **hidden_window_subprocess_kwargs(),
+            )
+            batch_exit_code = int(completed.returncode)
+            stdout = completed.stdout or ""
+            stderr = completed.stderr or ""
+        except subprocess.TimeoutExpired as exc:
+            timed_out = True
+            batch_exit_code = 124
+            stdout = exc.stdout.decode("utf-8", errors="ignore") if isinstance(exc.stdout, bytes) else str(exc.stdout or "")
+            stderr = exc.stderr.decode("utf-8", errors="ignore") if isinstance(exc.stderr, bytes) else str(exc.stderr or "")
+        except OSError as exc:
+            batch_exit_code = 127
+            stderr = str(exc)
 
-    source_evidence = ["unity_batch_probe"]
-    if blocker_code:
-        source_evidence.append(f"log_pattern:{blocker_code}")
-    if batchmode_supported is None:
-        source_evidence.append("batch_probe_inconclusive")
+        log_text = ""
+        if probe_log_path.is_file():
+            try:
+                log_text = probe_log_path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                log_text = ""
+        combined_text = "\n".join(part for part in (stdout, stderr, log_text) if part)
+        classification = classify_license_log(combined_text, batch_exit_code, timed_out)
+        blocker_code = str(classification.get("batchmode_blocker_code") or "")
+        matched_text = str(classification.get("matched_text") or "")
+        if batch_exit_code == 0 and not blocker_code and not timed_out:
+            batchmode_supported: bool | None = True
+        elif blocker_code and blocker_code != "unknown_batch_failure":
+            batchmode_supported = False
+        else:
+            batchmode_supported = None
 
-    payload = build_capabilities_payload(
-        project_root=project_root,
-        unity_app=resolved_unity_app,
-        unity_executable=unity_executable,
-        unity_version=unity_version,
-        cache_key=cache_key,
-        probe_log_path=probe_log_path,
-        batch_exit_code=batch_exit_code,
-        timed_out=timed_out,
-        batchmode_supported=batchmode_supported,
-        blocker_code=blocker_code,
-        source_evidence=source_evidence,
-        from_cache=False,
-        stderr=stderr,
-        stdout=stdout,
-        matched_text=matched_text,
-    )
-    write_json(cache_path, payload)
-    return payload
+        source_evidence = ["unity_batch_probe"]
+        if blocker_code:
+            source_evidence.append(f"log_pattern:{blocker_code}")
+        if batchmode_supported is None:
+            source_evidence.append("batch_probe_inconclusive")
+
+        payload = build_capabilities_payload(
+            project_root=project_root,
+            unity_app=resolved_unity_app,
+            unity_executable=unity_executable,
+            unity_version=unity_version,
+            cache_key=cache_key,
+            probe_log_path=probe_log_path,
+            batch_exit_code=batch_exit_code,
+            timed_out=timed_out,
+            batchmode_supported=batchmode_supported,
+            blocker_code=blocker_code,
+            source_evidence=source_evidence,
+            from_cache=False,
+            stderr=stderr,
+            stdout=stdout,
+            matched_text=matched_text,
+        )
+        payload["probe_completed_at"] = time.time()
+        payload["license_probe_active"] = False
+        write_json(cache_path, payload)
+        write_json(host_cache_path, payload)
+        return payload
 
 
 def build_capabilities_payload(

@@ -179,6 +179,11 @@ Migration note:
   enforced apply-then-gate sequencing, poll-until default continuation,
   `--json-only`, fixed Game View guidance, and identity-verified
   `request-editor-quit --force-after-ms` escalation.
+- Current source serializes licensing probes and GUI admission across projects
+  and helper processes with a per-user host lock. It normalizes discovered Hub
+  pipe names before forwarding them to Unity, verifies the exact channel in
+  Editor.log, caches one probe per executable/version, and makes an unrecovered
+  licensing-client disconnect block readiness.
 - Current source closes the reusable 2026-09-03 greenfield-authoring retro
   backlog. UI reads/clicks, screenshots, and persisted scenario steps now carry
   point-of-use player-loop liveness and trust; UI/screenshot payloads separate
@@ -438,8 +443,8 @@ Cross-platform status:
 | Native Windows clients | `templates provided; CI-exercised` | `run.cmd`, `run.ps1`, and Windows client configs exist; the Windows CI leg drives the real `.cmd` launcher through MCP stdio `initialize`/`tools/list`/`tools/call` end to end (`tests/test_mcp_stdio_e2e.py`), incl. a Cyrillic+spaces project path, plus: a real install through the refresh launcher serving MCP from the installed copy and a spawn of the exact command written by `--install-claude-config` (`tests/test_installed_delegate_e2e.py`), the verbatim README PowerShell 5.1 quickstart with a UTF-16 plan file (`tests/test_readme_quickstart_windows_e2e.py`), the file-IPC transport against a live editor-simulator process incl. a two-process torn-read stress (`tests/test_file_ipc_bridge_simulator_e2e.py`), and cp866/cp1252 hostile-codepage legs (`tests/test_ru_console_codepage_e2e.py`); a live Windows host session with a real Unity editor still needs execution proof. |
 | Unity 2021.3+ | `default package line` | Checked-in package metadata targets Unity `2021.3`; setup wizard chooses optional Test Framework recommendations per project. |
 | Optional Test Framework | `capability-gated` | Core readiness stays healthy when missing; tests report `disabled_missing_dependency`, `disabled_dependency_too_old`, or supported with `upgrade_recommended` when an existing dependency should be reviewed. |
-| License-aware batch fallback | `implemented; host validated` | `license-capabilities` reports batchmode support, blocker code, probe log, and recommended lane. `batch-*` commands default to `--batch-fallback-mode auto` and emit lane summary fields. Live installed-editor matrix remains follow-up evidence. |
-| Hub-aware GUI admission | `implemented; host-unit validated` | Platform-native process parsing accepts exactly one live Hub-owned licensing client, redacts channel provenance, refuses ambiguity, and guards explicit Unity version mismatch. A live post-change macOS Hub acceptance run remains required for runtime proof. |
+| License-aware batch fallback | `implemented; host + contention validated` | `license-capabilities` reports batchmode support, blocker code, probe log, recommended lane, cache provenance, and active-probe state. One 12-project live contention sweep launched one probe and served 11 waiters from cache; that probe timed out, so batch entitlement remains unproven on this host. |
+| Hub-aware GUI admission | `implemented; macOS live validated` | Platform-native process parsing accepts exactly one live Hub-owned licensing client, normalizes the editor channel, reports only redacted fingerprints, and verifies the exact connection in Editor.log. Two Unity `6000.0.58f2` GUI editors were restored licensed after contention validation. |
 | Bounded compact terminal envelope | `implemented; host-unit validated` | Wrapper `--compact-summary` suppresses nested stdout/stderr and emits one JSON envelope capped at 8192 bytes. |
 | PlayMode lifecycle terminalization | `implemented; host-unit validated` | A passed suite plus a fresh healthy post-reload Edit Mode state returns `confirmed_success_after_lifecycle_churn` with retry disabled. |
 
@@ -542,7 +547,9 @@ Current limitations:
 - native OS autofocus is intentionally not implemented; runtime background
   execution reduces focus dependence, while liveness evidence remains required
 - License-aware batch fallback is host-capability based; unknown probe failures
-  keep batch as a diagnostic path instead of pretending GUI fallback is safe
+  keep batch as a diagnostic path. A verified licensed editor proves only the
+  GUI lane, while the host lock prevents concurrent projects from starting a
+  probe storm or racing a GUI launch against an active probe
 - device/runtime automation is outside the base package
 - broad unrestricted editor mutation is intentionally out of scope
 

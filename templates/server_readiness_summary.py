@@ -24,6 +24,9 @@ def _compact_bridge_state(state: dict[str, Any]) -> dict[str, Any]:
         "editor_pid": _int_or_zero(state.get("editor_pid")),
         "unity_version": str(state.get("unity_version") or ""),
         "health_status": str(state.get("health_status") or ""),
+        "license_state": str(state.get("license_state") or "unknown"),
+        "licensing_channel_fingerprint": str(state.get("licensing_channel_fingerprint") or ""),
+        "license_probe_active": bool(state.get("license_probe_active")),
         "transport": str(state.get("transport") or state.get("transport_requested") or ""),
         "transport_listener_state": str(state.get("transport_listener_state") or ""),
         "playmode_state": str(state.get("playmode_state") or ""),
@@ -59,6 +62,9 @@ def _compact_launch(payload: dict[str, Any]) -> dict[str, Any]:
         "reused_existing_editor": bool(launch.get("reused_existing_editor")),
         "reused_via": str(launch.get("reused_via") or ""),
         "opened_by_host": bool(launch.get("opened_by_host")),
+        "license_state": str(launch.get("license_state") or "unknown"),
+        "licensing_channel_fingerprint": str(launch.get("licensing_channel_fingerprint") or ""),
+        "license_probe_active": bool(launch.get("license_probe_active")),
         "editor_pid": _int_or_zero(launch.get("editor_pid")),
         "unity_app": str(launch.get("unity_app") or ""),
         "editor_log_path": str(launch.get("editor_log_path") or ""),
@@ -92,11 +98,16 @@ def build_ensure_ready_summary(
     package_import_state = dict(payload.get("package_import_state") or {})
     package_before = dict(payload.get("package_import_state_before_ready") or {})
     health_status = str(bridge_state.get("health_status") or "unknown")
+    if bridge_state.get("license_state") == "unlicensed":
+        health_status = "unlicensed"
     playmode_state = str(bridge_state.get("playmode_state") or "")
     next_action = _next_action_for_ready(bridge_state, discovery)
 
     summary: dict[str, Any] = {
         "action": "ensure_ready",
+        "license_state": str(bridge_state.get("license_state") or "unknown"),
+        "licensing_channel_fingerprint": str(bridge_state.get("licensing_channel_fingerprint") or ""),
+        "license_probe_active": bool(bridge_state.get("license_probe_active")),
         "project_root": str(project_root),
         "payload_mode": "compact_ensure_ready",
         "full_payload_available": True,

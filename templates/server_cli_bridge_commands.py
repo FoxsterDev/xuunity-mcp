@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+
 from server_cli_shared import *
 from server_bridge_final_status import build_compact_final_status_projection
 
@@ -145,7 +147,7 @@ def cmd_bridge_state(args):
     if not bridge_enabled(project_root):
         raise SystemExit(
             "Bridge is disabled for this project. Enable it with "
-            "init_xuunity_light_unity_mcp.sh --project-root <path> --enable-project and reopen Unity."
+            f"{BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} and reopen Unity."
         )
     state_path = bridge_state_path(project_root)
     if not state_path.is_file():
@@ -941,6 +943,9 @@ def cmd_ensure_ready(args):
         )
 
     payload["bridge_state"] = state
+    if payload.get("launch"):
+        for key in ("license_state", "licensing_channel_fingerprint", "license_probe_active"):
+            payload["launch"][key] = state.get(key)
     if payload.get("launch") and not bool(payload["launch"].get("reused_existing_editor")):
         update_host_editor_session_pid(project_root, int(state.get("editor_pid") or 0))
     refresh_project_context(project_root)

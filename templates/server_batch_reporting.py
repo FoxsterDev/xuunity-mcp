@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server_bridge_constants import COMPILE_WARNING_SAMPLE_LIMIT
+from server_licensing_state import ENTITLEMENT_SUCCESS, read_license_log
 
 
 DEFAULT_BATCH_PROGRESS_INTERVAL_SECONDS = 30.0
@@ -21,6 +22,9 @@ COMPACT_BATCH_SUMMARY_KEYS = (
     "unity_outcome",
     "succeeded",
     "batch_exit_code",
+    "total_errors",
+    "build_errors",
+    "startup_errors",
     "requested_execution_lane",
     "effective_execution_lane",
     "batch_fallback_mode",
@@ -347,6 +351,8 @@ def summarize_batch_result_payload(
         "build_result",
         "requested_build_target",
         "total_errors",
+        "build_errors",
+        "startup_errors",
         "total_warnings",
         "total_size_bytes",
         "output_path",
@@ -442,9 +448,33 @@ def build_batch_execution_summary(
             truncate_text=truncate_text,
         )
     )
+    if "total_errors" in summary:
+        summary.update(classify_build_error_counts(summary["total_errors"], read_license_log(log_path)))
     if log_excerpt_hint and "top_actionable_error" not in summary:
         summary["log_excerpt_hint"] = log_excerpt_hint
     return summary
+
+
+def classify_build_error_counts(total_errors: int, log_text: str) -> dict[str, Any]:
+    """Separate recovered licensing startup lines; preserve Unity's original count."""
+    pending = 0
+    recovered = 0
+    startup_error = re.compile(
+        r"LicensingClient has failed validation; ignoring|Access token is unavailable", re.IGNORECASE
+    )
+    for line in log_text.splitlines():
+        if ENTITLEMENT_SUCCESS.search(line):
+            recovered += pending
+            pending = 0
+        elif startup_error.search(line):
+            pending += 1
+    startup = min(max(0, int(total_errors)), recovered)
+    return {
+        "total_errors": total_errors,
+        "build_errors": max(0, int(total_errors) - startup),
+        "startup_errors": startup,
+        "error_count_classification_basis": "recovered_licensing_lines_in_build_log",
+    }
 
 
 def build_batch_prepare_failure_summary(
