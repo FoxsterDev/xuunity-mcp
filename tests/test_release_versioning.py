@@ -385,6 +385,61 @@ class ReleaseVersioningTests(unittest.TestCase):
             errors = release_consistency.check_release_version_consistency(root)
             self.assertFalse([error for error in errors if "v0.3.70" in error], errors)
 
+    def test_explicit_historical_evidence_marker_prevents_release_relabelling(self) -> None:
+        """New measured claims can opt out without growing a path-and-phrase allowlist."""
+
+        import sys as _sys
+
+        tools_dir = REPO_ROOT / "scripts" / "tools"
+        if str(tools_dir) not in _sys.path:
+            _sys.path.insert(0, str(tools_dir))
+        import sync_release_version as sync
+
+        claims = (
+            (
+                Path("docs/reference/STATUS.md"),
+                "| `v0.3.73` rebuilt/cache evidence | `161/161` passed. | "
+                "<!-- release-version: historical -->\n",
+            ),
+            (
+                Path("docs/architecture/ROADMAP.md"),
+                "- `v0.3.67` fixed compact batch verdicts. "
+                "<!-- release-version: historical -->\n",
+            ),
+        )
+
+        for relative_path, line in claims:
+            with self.subTest(relative_path=relative_path):
+                swept = sync.sweep_release_doc_versions(relative_path, line, "0.3.75")
+                self.assertEqual(line, swept)
+                self.assertTrue(sync.line_records_history(relative_path, line))
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self.create_minimal_release_tree(root)
+                    target = root / relative_path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(line, encoding="utf-8")
+                    errors = release_consistency.release_doc_version_sweep(root)
+                    self.assertFalse(
+                        [error for error in errors if relative_path.as_posix() in error.replace("\\", "/")],
+                        errors,
+                    )
+
+    def test_unmarked_historical_looking_claim_still_follows_current_release(self) -> None:
+        """The escape hatch is explicit; ordinary release-facing claims still advance."""
+
+        import sys as _sys
+
+        tools_dir = REPO_ROOT / "scripts" / "tools"
+        if str(tools_dir) not in _sys.path:
+            _sys.path.insert(0, str(tools_dir))
+        import sync_release_version as sync
+
+        line = "- Release `v0.3.74` adds a capability.\n"
+        swept = sync.sweep_release_doc_versions(Path("docs/reference/STATUS.md"), line, "0.3.75")
+
+        self.assertEqual("- Release `v0.3.75` adds a capability.\n", swept)
+
     def test_warning_release_claims_are_not_relabelled_by_future_sweeps(self) -> None:
         import sys as _sys
 

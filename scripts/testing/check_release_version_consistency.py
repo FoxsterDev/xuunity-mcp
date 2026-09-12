@@ -186,9 +186,10 @@ def release_doc_version_sweep(source_root: Path) -> list[str]:
     behind, was invisible to both: the public site told visitors to set up `v0.3.45` for ten releases.
 
     This sweep inverts that. Every `0.x.y` token in a release-facing doc must equal the current version, unless
-    it uses the `vX.Y.Z+` "since this version" convention or its line is recorded in the sync tool's
-    HISTORICAL_VERSION_CLAIMS. A version paired with a measured result belongs in that list, because bumping it
-    without re-running the measurement replaces a stale truth with a fresh lie.
+    it uses the `vX.Y.Z+` "since this version" convention, carries the sync tool's explicit historical-evidence
+    marker, or its legacy line is recorded in HISTORICAL_VERSION_CLAIMS. A version paired with a measured result
+    must be marked historical, because bumping it without re-running the measurement replaces a stale truth with
+    a fresh lie.
     """
 
     # Import the sweep's rules from this checkout, not from the tree under inspection: a minimal fixture tree

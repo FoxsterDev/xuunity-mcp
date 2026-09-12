@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Why
+
+- Release version synchronization could relabel older measured validation rows as evidence for the new release
+  even when those Unity checks had not been rerun. That turned a stale documentation label into a false public
+  test claim.
+
+### Fixed
+
+- Release docs can now mark a line as historical evidence so future version bumps preserve the release that
+  actually produced its measurements. The rebuilt/cache and compact-batch rows that exposed the defect are
+  corrected and protected by regression tests.
+
+### Validation
+
+- Focused release-version and release-commit coverage passed `40/40`. The full host suite passed `1076` tests
+  with `14` expected platform skips, and both desktop and narrow site lanes passed `42/42` checks.
+
 ## 0.3.74
 
 Release tag: `v0.3.74`

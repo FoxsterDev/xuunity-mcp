@@ -135,11 +135,13 @@ RELEASE_DOC_VERSION_TOKEN = re.compile(
 # Versions that are always about the past: the package-path migration and its pre-migration template pins.
 # Mirrors DOC_ALLOWLIST in scripts/testing/check_release_version_consistency.py.
 HISTORICAL_VERSION_TOKENS = ("0.3.11", "0.3.12", "0.3.14", "0.3.15")
+HISTORICAL_RELEASE_EVIDENCE_MARKER = "<!-- release-version: historical -->"
 
-# A version reference that is deliberately about the past. Each entry is (release doc, substring identifying the
-# line). Adding a line here records a decision that it is history and must not follow the current release; the
-# release gate fails on anything stale that is not listed. A version paired with a measured result belongs here,
-# because bumping it without re-running the measurement replaces a stale truth with a fresh lie.
+# A version reference that is deliberately about the past. New claims should carry
+# HISTORICAL_RELEASE_EVIDENCE_MARKER on their own line so their intent stays visible beside the evidence. The
+# legacy entries below are (release doc, substring identifying the line). A version paired with a measured result
+# belongs here or carries the marker, because bumping it without re-running the measurement replaces a stale truth
+# with a fresh lie.
 HISTORICAL_VERSION_CLAIMS = (
     (Path("README.md"), "compile summaries retain warning evidence"),
     (Path("docs") / "reference" / "STATUS.md", "SDK rollout safety ("),
@@ -159,6 +161,8 @@ HISTORICAL_VERSION_CLAIMS = (
 
 
 def line_records_history(relative_path: Path, line: str) -> bool:
+    if HISTORICAL_RELEASE_EVIDENCE_MARKER in line:
+        return True
     if any(relative_path == doc and marker in line for doc, marker in HISTORICAL_VERSION_CLAIMS):
         return True
     return "templates/unity-package#" in line or "Historical migration" in line
@@ -171,8 +175,8 @@ def sweep_release_doc_versions(relative_path: Path, text: str, version: str) -> 
     previous* version. Any claim worded differently, or already more than one release behind, froze permanently:
     the public site told visitors to set up `v0.3.45` for ten releases that way.
 
-    Two things are left alone on purpose: the `vX.Y.Z+` "since this version" convention, and the lines recorded
-    in HISTORICAL_VERSION_CLAIMS.
+    Three things are left alone on purpose: the `vX.Y.Z+` "since this version" convention, lines carrying the
+    explicit historical-evidence marker, and legacy lines recorded in HISTORICAL_VERSION_CLAIMS.
     """
 
     def replace(match: "re.Match[str]") -> str:

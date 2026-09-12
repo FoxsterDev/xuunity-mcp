@@ -16,6 +16,9 @@ Release is blocked until all of the following are true:
 
 - `python3 scripts/tools/sync_release_version.py --version <next-version>` has
   been run
+- measured evidence that was not rerun for this release retains its original
+  version and carries `<!-- release-version: historical -->`; the version sync
+  and consistency gate preserve marked lines instead of relabelling old results
 - the work and the release are separate commits, and
   `python3 scripts/testing/check_release_commit_shape.py --range origin/master..HEAD`
   passes: work commits carry the product change, its tests and its docs and bump no

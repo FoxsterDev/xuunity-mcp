@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Chat Retro — Batch Summary Shape and Compile-Warning Evidence
 
 Date: `2026-09-02`
-Status: `P0 and summary-artifact P2 released in v0.3.67; warning-evidence P1 released in v0.3.70; rebuild/cache P1 implemented in current source; output-shape P2 remains`
+Status: `P0 and summary-artifact P2 released in v0.3.67; warning-evidence P1 released in v0.3.70; rebuild/cache P1 released in v0.3.73; output-shape P2 remains`
 Lane: `batch-build-config-compile-matrix` via the multi-project sweep runner, GUI fallback throughout
 Server metadata observed in session: `xuunity-mcp 0.3.65`
 
@@ -268,3 +268,15 @@ this lane exists to serve.
 - P2-2 is narrower than first recorded: direct batch commands now consume
   `--output`; the remaining work is to pin a lane-independent output shape
   through the multi-project runner. This retro stays active only for that P2.
+
+## Re-Evaluation 2026-09-12
+
+- The `v0.3.74` release sweep incorrectly relabelled this retro's measured
+  rebuilt/cache evidence and the older compact batch implementation row as if
+  those Unity checks had been rerun for the new release.
+- Current source adds an explicit historical-evidence marker to release docs;
+  both the synchronizer and release-consistency gate preserve marked versions.
+  Regression coverage proves marked rows stay fixed while ordinary
+  current-release claims still advance.
+- The remaining product backlog is unchanged: the multi-project runner still
+  needs to pin a lane-independent full/compact worker output shape.

@@ -371,7 +371,7 @@ Current progress:
   `operator_verdict` final-status wording
 - `v0.3.39` adds opt-in compact batch helper CLI output through
   `--output compact`, preserving full output as the default compatibility mode
-- `v0.3.74` keeps compact batch output bounded to whitelisted decision fields
+- `v0.3.67` keeps compact batch output bounded to whitelisted decision fields <!-- release-version: historical -->
   plus artifact pointers and makes the multi-project runner consume nested,
   compact, summary-file, and confirmed result-file evidence without a false
   failure or false-zero matrix counters
