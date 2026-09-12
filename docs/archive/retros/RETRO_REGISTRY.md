@@ -2,7 +2,7 @@
 
 Status: active public registry
 Last triage: 2026-09-12 (historical release evidence protected from relabelling)
-Current release: `v0.3.74`
+Current release: `v0.3.75`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
@@ -37,7 +37,7 @@ host-local registry.
   and infrastructure-versus-product failure clusters remain implemented. The
   complete licensing contention/channel/state cluster is released in `v0.3.74`;
   its host-private row was stale as active backlog.
-- The highest-return current slice prevents the release-version synchronizer
+- Release `v0.3.75` prevents the release-version synchronizer
   from relabelling older measured evidence as proof for a newer tag. Release
   docs now have an explicit historical-evidence marker, and the escaped
   rebuilt/cache plus compact-batch rows retain the releases that measured them.

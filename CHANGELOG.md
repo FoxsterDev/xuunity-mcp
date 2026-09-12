@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.3.75
+
+Release tag: `v0.3.75`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.75
+```
+
+### Changed
+
+- Released `v0.3.75` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ### Why
 
 - Release version synchronization could relabel older measured validation rows as evidence for the new release
@@ -14,10 +28,23 @@
   actually produced its measurements. The rebuilt/cache and compact-batch rows that exposed the defect are
   corrected and protected by regression tests.
 
+### What this gives developers
+
+- Validation tables keep pointing to the release that actually ran each measurement, so maintainers and Unity
+  developers can distinguish current release proof from useful historical evidence.
+
 ### Validation
 
 - Focused release-version and release-commit coverage passed `40/40`. The full host suite passed `1076` tests
   with `14` expected platform skips, and both desktop and narrow site lanes passed `42/42` checks.
+
+### Known limitations
+
+- Historical evidence still needs an explicit maintainer marker; the tooling cannot infer whether an arbitrary
+  versioned sentence records a measurement or describes the current release.
+- Unity Package CI remains waived because the hosted runners do not have Unity license secrets. This release
+  changes release tooling and documentation, not Unity package runtime behavior; no new Unity editor run was
+  claimed for this slice.
 
 ## 0.3.74
 
