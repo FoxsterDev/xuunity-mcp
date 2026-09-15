@@ -21,8 +21,17 @@ def parse_utc_timestamp(value: Any) -> float | None:
     text = str(value or "").strip()
     if not text:
         return None
+    fraction_seconds = 0.0
+    if "." in text:
+        if not text.endswith("Z"):
+            return None
+        whole_seconds, fraction = text[:-1].split(".", 1)
+        if not 1 <= len(fraction) <= 9 or any(char < "0" or char > "9" for char in fraction):
+            return None
+        fraction_seconds = float("0." + fraction)
+        text = whole_seconds + "Z"
     try:
-        return float(calendar.timegm(time.strptime(text, "%Y-%m-%dT%H:%M:%SZ")))
+        return float(calendar.timegm(time.strptime(text, "%Y-%m-%dT%H:%M:%SZ"))) + fraction_seconds
     except (TypeError, ValueError, OverflowError):
         return None
 

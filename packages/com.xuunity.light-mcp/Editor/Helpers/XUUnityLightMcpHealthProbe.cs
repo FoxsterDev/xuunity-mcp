@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.Build.Player;
 using UnityEngine;
 using XUUnity.LightMcp.Editor.Core;
+using XUUnity.LightMcp.Editor.Bridge;
 using XUUnity.LightMcp.Editor.Operations;
 
 namespace XUUnity.LightMcp.Editor.Helpers
@@ -86,6 +87,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             var report = new XUUnityLightMcpCapabilitiesReport
             {
                 probe_version = ProbeVersion,
+                probe_bridge_generation = XUUnityLightMcpBridgeRuntimeState.BridgeGeneration,
                 project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath,
                 unity_version = Application.unityVersion,
                 active_build_target = EditorUserBuildSettings.activeBuildTarget.ToString(),
@@ -164,6 +166,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
         {
             return report != null &&
                    report.probe_version == ProbeVersion &&
+                   report.probe_bridge_generation == XUUnityLightMcpBridgeRuntimeState.BridgeGeneration &&
                    string.Equals(report.unity_version, Application.unityVersion, StringComparison.Ordinal) &&
                    string.Equals(report.project_root, XUUnityLightMcpFileIpcPaths.ProjectRootPath, StringComparison.Ordinal) &&
                    string.Equals(
@@ -291,15 +294,43 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return registered;
             }
 
+            var installedVersion = XUUnityLightMcpCompatibilityPolicy.InstalledPackageVersion("com.unity.ugui");
+            var declaredVersion = "";
+            var manifestReadable = false;
+            try
+            {
+                var manifestPath = Path.Combine(XUUnityLightMcpFileIpcPaths.ProjectRootPath, "Packages", "manifest.json");
+                if (LightJsonNode.TryParse(File.ReadAllText(manifestPath), out var manifest, out _)
+                    && manifest.TryGetObject("dependencies", out var dependencies))
+                {
+                    manifestReadable = true;
+                    declaredVersion = dependencies.GetString("com.unity.ugui");
+                }
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            var dependencyPresent = !string.IsNullOrWhiteSpace(installedVersion) || !string.IsNullOrWhiteSpace(declaredVersion);
+            var evidence = !string.IsNullOrWhiteSpace(declaredVersion)
+                ? $"com.unity.ugui {declaredVersion} is declared in Packages/manifest.json"
+                : $"com.unity.ugui {installedVersion} is installed";
+
             return new XUUnityLightMcpCapabilityRecord
             {
                 capability_id = capabilityId,
                 adapter_id = "unity_ugui_unavailable",
                 supported = false,
-                status = "disabled_missing_dependency",
-                reason = $"com.unity.ugui is not installed, so {label} is unavailable.",
+                status = dependencyPresent ? "disabled_unregistered"
+                    : manifestReadable ? "disabled_missing_dependency" : "disabled_dependency_unknown",
+                reason = dependencyPresent
+                    ? $"{evidence}, but the optional MCP uGUI assembly did not register in this domain; {label} is unavailable."
+                    : manifestReadable
+                        ? $"com.unity.ugui is not installed or declared, so {label} is unavailable."
+                        : $"The optional MCP uGUI assembly did not register; dependency state could not be read for {label}.",
                 dependency = "com.unity.ugui",
-                recommended_action = "Install com.unity.ugui so the optional uGUI module compiles.",
+                installed_dependency_version = installedVersion,
+                recommended_action = dependencyPresent || !manifestReadable
+                    ? "Wait for package resolve/domain reload or inspect Unity compile errors and Packages/manifest.json."
+                    : "Install com.unity.ugui so the optional uGUI module compiles.",
                 operations = new List<string> { operationName }
             };
         }
@@ -319,7 +350,10 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     : "No uGUI component reader is registered; nodes report hierarchy, bounds, and canvas state only.",
                 recommended_action = hasReaders
                     ? ""
-                    : "Install com.unity.ugui so the optional uGUI and TextMeshPro readers compile.",
+                    : BuildOptionalUguiCapability(
+                        XUUnityLightMcpCapabilityRegistry.UiReadCapability,
+                        "unity.ui.tree_snapshot",
+                        "uGUI component details").recommended_action,
                 operations = new List<string>
                 {
                     "unity.ui.tree_snapshot",

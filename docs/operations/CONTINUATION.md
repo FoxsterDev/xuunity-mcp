@@ -251,6 +251,27 @@ open_editor_or_ensure_ready`), but the two steps are easy to conflate:
 Both are needed after a stale-bridge classification. Only the second one gives
 you a working interactive lane.
 
+### Alive Editor Without an Attached Bridge
+
+A running editor may predate package installation. Setup plan/apply report
+`unity_editor_bridge_attachment_pending` and explain the boundary: until package import
+and domain reload attach a bridge, `request-editor-quit` has no receiver.
+`recover-editor-session` cannot restart an unbridged live process. Check
+`same_project_editor_process_without_live_bridge_state` and project discovery.
+Allow the editor to import/refresh; if the bridge still does not attach, save
+work and close/reopen that editor out of band. An attachment warning is not authority
+to force-kill a process or discard unsaved work.
+
+### A Frozen Heartbeat Is Not a Current Busy Reason
+
+An idle timeout reports PID liveness, `state_frozen`, `busy_reason_detail` and
+`busy_reason_as_of_utc`. A dead PID or heartbeat beyond the waiter's freshness
+limit yields `editor_state_frozen` and a `recover-editor-session` command.
+Read `busy_reason` as the last observation at that timestamp. A live process
+with a frozen heartbeat may be blocked, compiling, or otherwise unable to pump;
+the snapshot does not prove a crash. Inspect current process/log evidence before
+choosing a restart. Recovery refuses a live PID; do not bypass that safety gate.
+
 ### Lanes That Refuse During Play Mode
 
 These refuse with `editor_in_play_mode` and name both valid next actions (exit

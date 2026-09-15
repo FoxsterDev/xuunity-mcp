@@ -481,7 +481,8 @@ namespace XUUnity.LightMcp.Editor.Operations
                         state.status,
                         state.started_at_utc,
                         state.completed_at_utc,
-                        0);
+                        0,
+                        response);
                 }
                 catch
                 {

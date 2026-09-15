@@ -149,12 +149,21 @@ class BridgeRuntimeTests(unittest.TestCase):
             "compiler_diagnostics_source": "compilation_pipeline",
         }
 
-        with self.assertRaises(server_bridge_runtime.ToolInvocationError) as raised:
-            server_bridge_runtime.fail_if_compile_broken_for_operation(
-                Path("/tmp/FakeProject"),
-                "unity.tests.run_editmode",
-                state,
-            )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir)
+            source = project_root / "Assets" / "Foo.cs"
+            source.parent.mkdir()
+            source.write_text("broken source", encoding="utf-8")
+            os.utime(source, (1700000000, 1700000000))
+            state.update({
+                "compiler_diagnostics_captured_utc": "2026-01-01T00:00:00Z",
+                "compiler_diagnostics_bridge_generation": 1,
+                "bridge_generation": 1,
+            })
+            with self.assertRaises(server_bridge_runtime.ToolInvocationError) as raised:
+                server_bridge_runtime.fail_if_compile_broken_for_operation(
+                    project_root, "unity.tests.run_editmode", state,
+                )
 
         self.assertEqual("compile_broken", raised.exception.code)
         self.assertEqual(1, raised.exception.details["compiler_error_count"])
@@ -170,6 +179,9 @@ class BridgeRuntimeTests(unittest.TestCase):
     def test_compiler_diagnostics_carry_a_trust_class(self) -> None:
         confirmed = server_bridge_runtime.compiler_diagnostics_from_state(
             {
+                "compiler_diagnostics_captured_utc": "2026-01-01T00:00:00Z",
+                "compiler_diagnostics_bridge_generation": 1,
+                "bridge_generation": 1,
                 "script_compilation_failed": True,
                 "compiler_error_count": 1,
                 "compiler_diagnostics_source": "compilation_pipeline",
@@ -212,12 +224,21 @@ class BridgeRuntimeTests(unittest.TestCase):
             "playmode_state": "playing",
         }
 
-        with self.assertRaises(server_bridge_runtime.ToolInvocationError) as raised:
-            server_bridge_runtime.fail_if_compile_broken_for_operation(
-                Path("/tmp/FakeProject"),
-                "unity.tests.run_editmode",
-                state,
-            )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir)
+            source = project_root / "Assets" / "Foo.cs"
+            source.parent.mkdir()
+            source.write_text("broken source", encoding="utf-8")
+            os.utime(source, (1700000000, 1700000000))
+            state.update({
+                "compiler_diagnostics_captured_utc": "2026-01-01T00:00:00Z",
+                "compiler_diagnostics_bridge_generation": 1,
+                "bridge_generation": 1,
+            })
+            with self.assertRaises(server_bridge_runtime.ToolInvocationError) as raised:
+                server_bridge_runtime.fail_if_compile_broken_for_operation(
+                    project_root, "unity.tests.run_editmode", state,
+                )
 
         self.assertEqual(
             "deferred_during_playmode",

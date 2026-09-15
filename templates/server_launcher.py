@@ -835,58 +835,11 @@ def dispatch_arrange_unity_windows(paths: LauncherPaths, args: list) -> None:
 
 
 WRAPPER_HELP_TEMPLATE = """Usage: {name} [--compact-summary] <command> [args]
-
-Wrapper commands:
-  help | --help
-      Show this wrapper command list.
-  server-help
-      Show the installed server CLI help.
-  devmode --project-root PATH
-      Point com.xuunity.light-mcp at the local packages/com.xuunity.light-mcp source
-      and remove its package-lock entry so Unity can re-resolve it.
-  prodmode --project-root PATH
-      Pin com.xuunity.light-mcp to the published release tag matching the
-      package version and remove its package-lock entry. Refuses missing
-      release tags.
-  arrange-unity-windows [args]
-      Arrange Unity and agent windows on macOS.
-
-Server commands:
-  setup-plan, uninstall-plan, and uninstall-apply run from the source checkout
-  and do not refresh or write the installed helper. Other server commands
-  refresh the installed helper from this source checkout and delegate to
-  server.py. Common commands include:
-    setup-plan
-    setup-apply
-    uninstall-plan
-    uninstall-apply
-    validate-setup
-    install-test-framework
-    ensure-ready
-    request-status-summary
-    request-capabilities
-    request-health-probe
-    request-project-refresh
-    request-console-grep
-    request-loading-timing
-    request-install-test-framework
-    request-compile
-    request-editmode-tests
-    request-playmode-tests
-    request-final-status
-    diagnostic-retro-bundle
-    restore-editor-state
-    batch-compile
-    batch-editmode-tests
-
-Mode notes:
-  devmode is for local MCP package iteration only.
-  prodmode is for published release state only; push the package release tag
-  before switching a project back to prodmode.
-  After devmode or prodmode, let Unity re-resolve packages by reopen, focus, or
-  explicit project refresh.
-  --compact-summary emits one bounded terminal JSON envelope and suppresses the
-  nested child payload. Rerun without it for full command output.
+Wrapper commands: help | --help; server-help; devmode --project-root PATH; prodmode --project-root PATH; arrange-unity-windows [args]
+Setup/uninstall plans run from source; other server commands refresh the installed helper.
+Modes: devmode uses local source; prodmode requires a published release tag. See <mode> --help.
+--compact-summary prints one bounded terminal JSON envelope; omit it for full output.
+{server_commands}
 """
 
 DEVMODE_HELP_TEMPLATE = """Usage: {name} devmode --project-root PATH
@@ -916,8 +869,40 @@ validation.
 """
 
 
+def server_command_help() -> str:
+    import argparse
+    from server_cli_parser import build_parser
+
+    parser = build_parser()
+    sub = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
+    descriptions = {action.dest: action.help for action in sub._choices_actions}
+    groups = {name: [] for name in ("setup", "status", "request", "lifecycle", "batch", "project-action", "other")}
+    for name, command in sub.choices.items():
+        if name.startswith(("setup-", "uninstall-", "validate-setup", "install-")):
+            group = "setup"
+        elif name.startswith("batch-"):
+            group = "batch"
+        elif name.startswith(("project-action-", "project-hook-")):
+            group = "project-action"
+        elif name in {"open-editor", "recover-editor-session", "restore-editor-state", "ensure-ready", "request-editor-quit"}:
+            group = "lifecycle"
+        elif name.startswith(("request-status", "request-capabilities", "request-health", "project-discovery")):
+            group = "status"
+        elif name.startswith("request-"):
+            group = "request"
+        else:
+            group = "other"
+        required = " ".join(
+            (action.option_strings[0] if action.option_strings else action.dest) +
+            (" " + str(action.metavar or action.dest.upper()) if action.nargs != 0 else "")
+            for action in command._actions if action.required
+        )
+        groups[group].append(f"  {name}{' ' + required if required else ''} — {descriptions.get(name, '')}")
+    return "\n".join(group + ":\n" + "\n".join(lines) for group, lines in groups.items() if lines)
+
+
 def print_wrapper_help() -> None:
-    sys.stdout.write(WRAPPER_HELP_TEMPLATE.format(name=launcher_display_name()))
+    sys.stdout.write(WRAPPER_HELP_TEMPLATE.format(name=launcher_display_name(), server_commands=server_command_help()))
 
 
 def print_mode_help(mode: str) -> None:

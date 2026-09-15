@@ -12,6 +12,18 @@ from typing import Any
 
 from server_core import ToolInvocationError, read_json, render_launcher_cli, write_json
 from server_project_context import inspect_light_mcp_import_state, project_not_found_error
+from server_editor_host_processes import find_running_unity_editors_for_project
+
+UNITY_EDITOR_ATTACHMENT_MESSAGE = (
+    "A Unity editor is already running for a project receiving its first MCP package declaration. "
+    "It must import the package and load the bridge before MCP requests can reach it. "
+    "If refresh does not attach the bridge, save work, close and reopen that editor out of band; "
+    "request-editor-quit requires an attached bridge."
+)
+
+
+def unity_editor_bridge_attachment_pending(project_root: Path) -> bool:
+    return not manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME) and bool(find_running_unity_editors_for_project(project_root))
 
 LIGHT_MCP_PACKAGE_NAME = "com.xuunity.light-mcp"
 TEST_FRAMEWORK_PACKAGE_NAME = "com.unity.test-framework"

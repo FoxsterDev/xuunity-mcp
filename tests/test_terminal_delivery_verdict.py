@@ -450,7 +450,6 @@ class LifecycleRetrySafetyTests(unittest.TestCase):
                 "current_project_context_bridge_state",
                 return_value={},
             ),
-            mock.patch.object(server_batch_orchestrator, "fail_if_compile_broken_for_operation"),
             mock.patch.object(
                 server_batch_orchestrator,
                 "invoke_bridge_transport",

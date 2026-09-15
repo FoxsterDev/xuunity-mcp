@@ -48,8 +48,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
                     requestId = "";
                 }
                 XUUnityLightMcpResponseWriter.Write(
-                    XUUnityLightMcpResponseWriter.Error(requestId, "bridge_request_failed", ex.Message)
-                );
+                    XUUnityLightMcpResponseWriter.Error(requestId, "bridge_request_failed", ex.Message));
                 Debug.LogException(ex);
             }
             finally
@@ -71,6 +70,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
             string operationStatus = "error";
             string startedAtUtc = "";
             bool deferredCompletion = false;
+            XUUnityLightMcpResponse completedResponse = null;
 
             try
             {
@@ -89,31 +89,24 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 if (XUUnityLightMcpCapabilityRegistry.TryGetRequiredCapability(request.operation, out _)
                     && !XUUnityLightMcpHealthProbe.IsOperationSupported(request.operation, out var unavailableReason))
                 {
-                    XUUnityLightMcpResponseWriter.Write(
-                        XUUnityLightMcpResponseWriter.Error(
-                            request.request_id,
-                            "operation_unavailable",
-                            unavailableReason
-                        )
-                    );
+                    completedResponse = XUUnityLightMcpResponseWriter.Error(
+                        request.request_id, "operation_unavailable", unavailableReason);
+                    XUUnityLightMcpResponseWriter.Write(completedResponse);
                     operationStatus = "operation_unavailable";
                     return;
                 }
 
                 if (!XUUnityLightMcpOperationRegistry.TryGet(request.operation, out var operation))
                 {
-                    XUUnityLightMcpResponseWriter.Write(
-                        XUUnityLightMcpResponseWriter.Error(
-                            request.request_id,
-                            "tool_unsupported",
-                            $"Unsupported operation: {request.operation}"
-                        )
-                    );
+                    completedResponse = XUUnityLightMcpResponseWriter.Error(
+                        request.request_id, "tool_unsupported", $"Unsupported operation: {request.operation}");
+                    XUUnityLightMcpResponseWriter.Write(completedResponse);
                     operationStatus = "tool_unsupported";
                 }
                 else
                 {
                     var response = operation.Execute(request);
+                    completedResponse = response;
                     if (response != null)
                     {
                         XUUnityLightMcpResponseWriter.Write(response);
@@ -129,9 +122,8 @@ namespace XUUnity.LightMcp.Editor.Bridge
             catch (Exception ex)
             {
                 requestId = request?.request_id ?? "";
-                XUUnityLightMcpResponseWriter.Write(
-                    XUUnityLightMcpResponseWriter.Error(requestId, "bridge_request_failed", ex.Message)
-                );
+                completedResponse = XUUnityLightMcpResponseWriter.Error(requestId, "bridge_request_failed", ex.Message);
+                XUUnityLightMcpResponseWriter.Write(completedResponse);
                 operationStatus = "bridge_request_failed";
                 Debug.LogException(ex);
             }
@@ -159,7 +151,8 @@ namespace XUUnity.LightMcp.Editor.Bridge
                             operationStatus,
                             startedAtUtc,
                             completedAtUtc,
-                            remainingPendingRequests);
+                            remainingPendingRequests,
+                            completedResponse);
                     }
                     catch
                     {

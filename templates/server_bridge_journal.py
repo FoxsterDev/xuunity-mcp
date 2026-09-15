@@ -132,6 +132,29 @@ def emit_operation_progress_phase(
         pass
 
 
+def record_request_refused_event(project_root: Path, operation: str, error: Any, state: dict[str, Any] | None) -> Path:
+    from server_recovery_commands import recommended_recovery_command_for_project
+
+    details = dict(error.details or {})
+    next_action = str(details.get("recommended_next_action") or "")
+    effective = state or {}
+    return write_host_request_journal_event(project_root, "request_refused", {
+        "request_id": "",
+        "request_submitted": False,
+        "operation": operation,
+        "code": error.code,
+        "reason": error.message,
+        "recommended_next_action": next_action,
+        "recommended_recovery_command": details.get("recommended_recovery_command") or recommended_recovery_command_for_project(project_root, next_action),
+        "state_fingerprint": {key: effective.get(key) for key in (
+            "editor_pid", "bridge_generation", "bridge_session_id", "heartbeat_utc", "busy_reason",
+            "busy_reason_detail", "compiler_diagnostics_captured_utc", "compiler_diagnostics_bridge_generation",
+            "script_compilation_failed", "compiler_error_count",
+        )},
+        "details": details,
+    })
+
+
 def record_operation_progress_event(
     *,
     project_root: Path,

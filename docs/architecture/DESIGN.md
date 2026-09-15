@@ -504,6 +504,27 @@ Gating boundary (compile-red fail-fast):
 - the direct tool and the scenario step for the same operation must agree on
   gating, or the divergence must be recorded here as deliberate
 
+### Diagnostics Have an Age
+
+Compiler diagnostics describe the compilation inputs captured at
+`compiler_diagnostics_captured_utc`, with
+`compiler_diagnostics_bridge_generation` identifying their bridge domain.
+The timestamp belongs to the compilation cycle, not each heartbeat. Diagnostics
+from another generation, with unknown capture metadata, or naming a file changed
+since capture are `stale`; they are not a current compile verdict.
+
+Before a compile-gated operation, stale pipeline diagnostics trigger one
+`unity.project.refresh` through the existing lifecycle path, inside the same
+project request lock. Only a confirmed, passed post-settle verdict admits the
+original request. A confirmed failed verdict yields `compile_broken`; a missing
+or deferred verdict yields `compile_verdict_unavailable`. Recovery does not
+re-enter the public lock or repeat a refresh loop. Play Mode exit remains ungated.
+
+Host compile/idle refusals write `request_refused` with their error, recovery
+command and state fingerprint. They are not submitted requests. Unity completion
+events retain `operation_status` and also carry the error `reason` and, for test
+runs, `test_verdict`; transport success alone is not a passing test verdict.
+
 ## Capability Probe Model
 
 Version-sensitive operations are not trusted by default.

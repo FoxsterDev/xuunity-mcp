@@ -4,6 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using XUUnity.LightMcp.Editor.Core;
+using XUUnity.LightMcp.Editor.Helpers;
 
 namespace XUUnity.LightMcp.Editor.Bridge
 {
@@ -52,11 +53,33 @@ namespace XUUnity.LightMcp.Editor.Bridge
             string operationStatus,
             string startedAtUtc,
             string completedAtUtc,
-            int pendingRequestCount)
+            int pendingRequestCount,
+            XUUnityLightMcpResponse response = null)
         {
+            var reason = response?.error?.message ?? "";
+            if (string.IsNullOrWhiteSpace(reason) && !string.Equals(operationStatus, "ok", StringComparison.Ordinal))
+            {
+                reason = response?.error?.code;
+                if (string.IsNullOrWhiteSpace(reason))
+                {
+                    reason = string.IsNullOrWhiteSpace(operationStatus) ? "operation_failed" : operationStatus;
+                }
+            }
+            var testVerdict = "";
+            if ((operation == "unity.tests.run_editmode" || operation == "unity.tests.run_playmode")
+                && LightJsonNode.TryParse(response?.payload_json, out var payload, out _))
+            {
+                testVerdict = payload.GetString("test_verdict");
+                if (string.IsNullOrWhiteSpace(testVerdict))
+                {
+                    testVerdict = payload.GetString("status");
+                }
+            }
             WriteEvent(new XUUnityLightMcpRequestJournalEvent
             {
                 event_type = "request_completed",
+                reason = reason,
+                test_verdict = testVerdict,
                 event_at_utc = UtcNow(),
                 request_id = requestId ?? "",
                 operation = operation ?? "",

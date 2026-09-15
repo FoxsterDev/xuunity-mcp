@@ -2,6 +2,65 @@
 
 ## Unreleased
 
+### Why
+
+- A Unity project could remain blocked by a compiler error captured before the
+  developer fixed the named source file. The host treated that undated cache as
+  current, while idle timeouts repeated an old busy reason without saying when
+  it was observed or whether the editor process and heartbeat were still live.
+- Recovery output was also incomplete: wrapper help omitted supported commands,
+  readiness could recommend running readiness again, pre-submission refusals
+  were absent from the journal, and a successfully delivered zero-test run could
+  look like a passing test from completion status alone.
+
+### Fixed
+
+- Compiler diagnostics now carry their capture time and bridge generation.
+  Source changes, unknown capture metadata, and prior-generation diagnostics
+  trigger one project refresh; the original compile-gated operation runs only
+  after a confirmed clean post-settle verdict. Fresh compiler errors still stop
+  before submission with a literal recovery command.
+- Idle timeouts now report editor PID liveness, frozen-state classification,
+  the last busy detail and its timestamp. Host-side compile and idle refusals
+  write atomic `request_refused` events without pretending that Unity received
+  a request.
+- Completion journal events retain the actual error reason and a separate test
+  verdict, so transport success cannot hide `test_filter_no_match` or a failed
+  test result.
+- Wrapper help is generated from all 77 parser commands and includes their
+  required arguments. Readiness, compile and idle guidance use one recovery
+  command renderer, while missing or empty project-action catalogs point to the
+  existing hook scaffold.
+- Optional uGUI capabilities now distinguish a missing dependency from an
+  installed package whose optional MCP assembly did not register. That optional
+  failure stays local instead of degrading unrelated bridge operations, and the
+  probe is invalidated when the bridge generation changes.
+- Setup reports when a running editor still needs to import and attach a newly
+  declared bridge package. It recommends an out-of-band restart only when a
+  normal import or refresh does not attach the bridge.
+
+### Validation
+
+- The final host suite passed `1093` tests with `14` expected platform skips.
+- Unity `6000.0.58f2` passed `121/121` package EditMode tests in a clean
+  no-uGUI project. A separate uGUI fixture reproduced the old false
+  missing-dependency diagnosis, verified the corrected
+  `disabled_unregistered` state with healthy core operations, and returned to
+  supported after the optional assembly was restored.
+- A live bridge refused one fresh compiler error, then—after the source was
+  fixed without a manual refresh—performed one refresh and passed the requested
+  test. An isolated mutation check proved that removing the source-mtime gate
+  makes the intended regression test fail.
+
+### Known limitations
+
+- Hosted Unity Package CI remains waived because its runners do not have Unity
+  license secrets. The local Unity run covers `6000.0.58f2`; this change does not
+  add current editor evidence for every supported Unity version or host OS.
+- The historical evidence establishes an inline Android build crash context,
+  but it does not establish the native fault's root cause or explain why a
+  previously reported build artifact was later absent.
+
 ## 0.3.75
 
 Release tag: `v0.3.75`

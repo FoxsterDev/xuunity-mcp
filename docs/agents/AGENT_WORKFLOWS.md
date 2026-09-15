@@ -61,6 +61,34 @@ Stop immediately when:
 - Unity is in Safe Mode and the selected startup policy is fail-fast
 - a validation failure is already specific enough to act on
 
+## Discover Commands Before Writing Editor Automation
+
+Read wrapper `--help` once when choosing a Unity workflow; it lists all parser
+commands with required flags. Map the requested evidence to supported operations:
+scene wiring to `unity.scene.snapshot` / `unity.scene.assert`, rendered output
+to `unity.game_view.screenshot`, ordered transitions to scenarios, and build
+artifacts to `batch-build-player`. Check capabilities and record why any required
+evidence is skipped. A command's existence is not proof that its check ran.
+
+Use `project-hook-scaffold` then the reviewed project-action catalog and
+`project-action-invoke` for custom editor work. The scaffold recovery command
+writes into `Temp/XUUnityHookScaffold`; follow its checklist to place and register
+the hook. Generating a scaffold does not activate it. Never run a long build
+inline in `[InitializeOnLoad]`: editor main-thread blocking stops heartbeat and
+request processing. Inspect `application_run_in_background` and actual progress
+before inferring that deferred editor work cannot run.
+
+For a degraded, blocked or timed-out result, follow the literal
+`recommended_recovery_command` (readiness also retains `recovery_command`), and
+read its prerequisite or manual-action explanation. Do not repeatedly execute a
+state token or blindly repeat `ensure-ready`. The typed `test_filter_no_match`
+result with a concrete refresh command is the reference pattern.
+
+Before calling a build a deliverable, verify both its structured result summary
+and the referenced non-empty artifact on disk at handoff time. Record its path,
+size and identity. If it was deleted or replaced, preserve the historical build
+result but report the deliverable as missing or changed.
+
 ## Placeholders
 
 Command examples use:

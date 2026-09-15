@@ -1,0 +1,51 @@
+{
+  "provenance": {
+    "source": "private evidence bundle dated 2026-09-15",
+    "kind": "sanitized field projection, not an original artifact",
+    "transforms": [
+      "Consumer paths/names and process/request identities removed.",
+      "Legacy diagnostic location replaced with a generic fixture file.",
+      "Heartbeat time is reconstructed at test time from the observed age; it is not an archived timestamp."
+    ]
+  },
+  "legacy_compile_refusal": {
+    "script_compilation_failed": true,
+    "compiler_error_count": 1,
+    "compiler_diagnostics_source": "compilation_pipeline",
+    "compiler_diagnostics_trust_class": "confirmed",
+    "recommended_next_action": "run_compile_gate_and_fix_errors",
+    "recent_compiler_diagnostics": [
+      {
+        "file": "Assets/ExampleTests.cs",
+        "message": "CS1061: ExampleComponent does not define the referenced member."
+      }
+    ]
+  },
+  "frozen_live_editor": {
+    "observed_heartbeat_age_seconds": 1522.871,
+    "legacy_classification": "editor_idle_timeout",
+    "legacy_transport_ready": true,
+    "pid_alive": true,
+    "state": {
+      "health_status": "healthy",
+      "unity_version": "6000.0.58f2",
+      "playmode_state": "edit",
+      "is_playing": false,
+      "is_paused": false,
+      "is_updating": false,
+      "is_compiling": false,
+      "busy_reason": "asset_import",
+      "busy_reason_detail": "AssetPostprocessor activity",
+      "asset_import_in_progress": true,
+      "domain_reload_in_progress": false,
+      "compile_settle_pending": false
+    }
+  },
+  "zero_match_result": {
+    "status": "test_filter_no_match",
+    "test_verdict": "test_filter_no_match",
+    "total": 0,
+    "passed": 0,
+    "failed": 0
+  }
+}

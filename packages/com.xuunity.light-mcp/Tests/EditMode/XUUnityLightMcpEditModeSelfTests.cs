@@ -33,6 +33,54 @@ namespace XUUnity.LightMcp.Tests.EditMode
             }
         }
 
+        [TestCase("error", "disk full", "{}", "disk full", "")]
+        [TestCase("error", "", "{}", "operation_failed", "")]
+        [TestCase("ok", "", "{\"test_verdict\":\"test_filter_no_match\",\"status\":\"completed\"}", "", "test_filter_no_match")]
+        [TestCase("ok", "", "{\"test_verdict\":\"failed\",\"status\":\"completed\"}", "", "failed")]
+        [TestCase("ok", "", "{\"test_verdict\":\"passed\",\"status\":\"completed\"}", "", "passed")]
+        public void RequestJournal_PreservesFailureReasonAndTestVerdict(
+            string status, string errorMessage, string payload, string expectedReason, string expectedVerdict)
+        {
+            var requestId = $"journal-self-test-{Guid.NewGuid():N}";
+            var response = new XUUnityLightMcpResponse
+            {
+                request_id = requestId,
+                status = status,
+                payload_json = payload,
+                error = status == "error"
+                    ? new XUUnityLightMcpError { code = "operation_failed", message = errorMessage }
+                    : null
+            };
+            var ownedPaths = new List<string>();
+            try
+            {
+                XUUnityLightMcpRequestJournal.WriteRequestCompleted(
+                    requestId, "unity.tests.run_editmode", status, "", "", 0, response);
+                var events = new List<XUUnityLightMcpRequestJournalEvent>();
+                foreach (var path in Directory.GetFiles(XUUnityLightMcpFileIpcPaths.RequestJournalDirectory, "*_request_completed.json"))
+                {
+                    var journalEvent = JsonUtility.FromJson<XUUnityLightMcpRequestJournalEvent>(File.ReadAllText(path));
+                    if (journalEvent.request_id != requestId)
+                    {
+                        continue;
+                    }
+                    ownedPaths.Add(path);
+                    events.Add(journalEvent);
+                }
+                Assert.That(events, Has.Count.EqualTo(1));
+                Assert.That(events[0].operation_status, Is.EqualTo(status));
+                Assert.That(events[0].reason, Is.EqualTo(expectedReason));
+                Assert.That(events[0].test_verdict, Is.EqualTo(expectedVerdict));
+            }
+            finally
+            {
+                foreach (var path in ownedPaths)
+                {
+                    File.Delete(path);
+                }
+            }
+        }
+
         [Test]
         public void TestFilter_NormalizesEmptyAndDuplicateValues()
         {

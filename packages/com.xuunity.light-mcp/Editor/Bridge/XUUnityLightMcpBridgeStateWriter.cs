@@ -86,6 +86,8 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 compiler_error_count = XUUnityLightMcpCompilerDiagnostics.ErrorCount,
                 recent_compiler_diagnostics = XUUnityLightMcpCompilerDiagnostics.Snapshot(5),
                 compiler_diagnostics_source = ResolveCompilerDiagnosticsSource(),
+                compiler_diagnostics_captured_utc = XUUnityLightMcpCompilerDiagnostics.CapturedUtc,
+                compiler_diagnostics_bridge_generation = XUUnityLightMcpCompilerDiagnostics.CaptureBridgeGeneration,
                 compiler_diagnostics_process_class = BridgeProcessClass,
                 is_playing = EditorApplication.isPlaying,
                 is_paused = EditorApplication.isPaused,

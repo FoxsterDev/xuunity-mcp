@@ -23,7 +23,7 @@ from server_registry import (
 
 # Core imports
 from server_core import ToolInvocationError, launcher_command_name, quoted_shell_path, read_json, write_json
-from server_bridge_journal import summarize_request_attribution
+from server_bridge_journal import summarize_request_attribution, record_request_refused_event
 from server_specs import (
     OPERATION_LIFECYCLE_POLICIES,
     SCENARIO_DEFINITION_SCHEMA,
@@ -1154,6 +1154,12 @@ def resolve_operation_lifecycle_policy(project_root: Path, operation: str) -> di
 
 def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
     context = get_project_context(project_root_value)
+    return run_in_project_request_lock(
+        context, operation, lambda: _invoke_bridge_locked(context, operation, args, timeout_ms)
+    )
+
+
+def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
     project_root = context.project_root
     discovery = dict(getattr(context, "discovery_details", {}) or {})
     if bool(discovery.get("bridge_owned_by_non_main_process")):
@@ -1200,6 +1206,8 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                 },
             }
 
+            dispatch_started = False
+            pre_idle_state = pre_request_state
             try:
                 if policy["activate_unity"]:
                     report_operation_progress_phase(
@@ -1221,7 +1229,31 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                     )
 
                 pre_idle_state = try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root)
-                fail_if_compile_broken_for_operation(project_root, operation, pre_idle_state, args)
+                if fail_if_compile_broken_for_operation(project_root, operation, pre_idle_state, args):
+                    refresh_response = _invoke_bridge_locked(context, "unity.project.refresh", {}, timeout_ms)
+                    try:
+                        refresh_payload = json.loads(str(refresh_response.get("payload_json") or "{}"))
+                    except ValueError:
+                        refresh_payload = {}
+                    if not isinstance(refresh_payload, dict):
+                        refresh_payload = {}
+                    verdict = refresh_payload.get("post_settle_compile")
+                    trust = refresh_payload.get("post_settle_compile_trust_class")
+                    lifecycle["stale_diagnostics_refresh"] = {
+                        "post_settle_compile": verdict,
+                        "post_settle_compile_trust_class": trust,
+                        "post_settle_error_count": refresh_payload.get("post_settle_error_count"),
+                        "post_settle_diagnostics": refresh_payload.get("post_settle_diagnostics") or [],
+                    }
+                    if refresh_response.get("status") != "ok" or trust != "confirmed" or verdict != "passed":
+                        next_action = "run_compile_gate_and_fix_errors" if verdict == "failed" and trust == "confirmed" else "refresh_stale_compiler_diagnostics"
+                        raise ToolInvocationError(
+                            "compile_broken" if verdict == "failed" and trust == "confirmed" else "compile_verdict_unavailable",
+                            "Project refresh did not establish a clean post-settle compile verdict; request was not submitted.",
+                            {"operation": operation, **lifecycle["stale_diagnostics_refresh"],
+                             "recommended_next_action": next_action,
+                             "recommended_recovery_command": recommended_recovery_command_for_project(project_root, next_action)},
+                        )
 
                 if policy["wait_for_idle_before"]:
                     report_operation_progress_phase(
@@ -1252,6 +1284,7 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                         phase="waiting_for_response",
                         state=dispatch_state,
                     )
+                dispatch_started = True
                 response, request_id, request_started_at, transport_metadata = invoke_bridge_transport(
                     project_root,
                     operation,
@@ -1396,6 +1429,11 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
                 refresh_project_context(project_root)
                 return response
             except ToolInvocationError as exc:
+                if not dispatch_started:
+                    try:
+                        record_request_refused_event(project_root, operation, exc, pre_idle_state)
+                    except (OSError, ValueError) as journal_error:
+                        exc.details = {**(exc.details or {}), "refusal_journal_error": str(journal_error)}
                 if (
                     exc.code == "request_lifecycle_reset"
                     and bool(policy.get("retry_on_lifecycle_reset"))
@@ -1456,7 +1494,7 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
 
         raise ToolInvocationError("unreachable", f"Unexpected lifecycle retry state for {operation}.")
 
-    return run_in_project_request_lock(context, operation, perform_invoke)
+    return perform_invoke()
 
 def bridge_response_to_tool_result(response: dict[str, Any], *, include_full_payload: bool = True) -> dict[str, Any]:
     return bridge_response_to_tool_result_data(

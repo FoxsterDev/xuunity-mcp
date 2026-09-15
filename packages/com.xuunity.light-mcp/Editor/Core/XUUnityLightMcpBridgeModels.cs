@@ -70,6 +70,8 @@ namespace XUUnity.LightMcp.Editor.Core
             public int compiler_error_count;
             public List<XUUnityLightMcpCompileErrorItem> recent_compiler_diagnostics = new();
             public string compiler_diagnostics_source = "";
+            public string compiler_diagnostics_captured_utc = "";
+            public int compiler_diagnostics_bridge_generation;
             public string compiler_diagnostics_process_class = "";
             public bool is_playing;
             public bool is_paused;
@@ -215,6 +217,8 @@ namespace XUUnity.LightMcp.Editor.Core
             public int compiler_error_count;
             public List<XUUnityLightMcpCompileErrorItem> recent_compiler_diagnostics = new();
             public string compiler_diagnostics_source = "";
+            public string compiler_diagnostics_captured_utc = "";
+            public int compiler_diagnostics_bridge_generation;
             public bool is_playing;
             public bool is_paused;
             public bool is_updating;
@@ -284,6 +288,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public string client_session_id = "";
             public string operation = "";
             public string operation_status = "";
+            public string test_verdict = "";
             public int pending_request_count;
             public string started_at_utc = "";
             public string completed_at_utc = "";

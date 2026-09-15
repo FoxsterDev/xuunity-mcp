@@ -25,6 +25,7 @@ namespace XUUnity.LightMcp.Editor.Core
         internal sealed class XUUnityLightMcpCapabilitiesReport
         {
             public int probe_version = 1;
+            public int probe_bridge_generation;
             public string project_root = "";
             public string unity_version = "";
             public string active_build_target = "";

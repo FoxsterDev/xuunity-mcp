@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from server_core import render_launcher_cli
+from server_recovery_commands import recommended_recovery_command_for_project
 
 
 def _int_or_zero(value: Any) -> int:
@@ -193,12 +194,8 @@ def build_ensure_ready_summary(
         }
 
     if next_action and next_action != "none":
-        if next_action == "exit_playmode_before_editing":
-            summary["recovery_command"] = summary["playmode_hint"]["command"]
-        else:
-            summary["recovery_command"] = render_launcher_cli(
-                "ensure-ready", project_root, "--open-editor"
-            )
+        summary["recovery_command"] = recommended_recovery_command_for_project(project_root, next_action)
+    summary["recommended_recovery_command"] = summary["recovery_command"]
 
     return summary
 

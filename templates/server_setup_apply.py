@@ -94,12 +94,18 @@ def apply_setup_plan(
 
     applied_projects: list[dict[str, Any]] = []
     skipped_project_roots: list[str] = []
+    editor_attachment_roots: list[str] = []
     for project in plan_projects:
         project_root = normalize_project_root(str(project.get("project_root") or ""))
         if allowed_roots and str(project_root) not in allowed_roots:
             skipped_project_roots.append(str(project_root))
             continue
         applied_actions: list[dict[str, Any]] = []
+        if unity_editor_bridge_attachment_pending(project_root) and any(
+            action.get("kind") == "set_manifest_dependency" and action.get("package") == LIGHT_MCP_PACKAGE_NAME
+            for action in project.get("planned_actions") or []
+        ):
+            editor_attachment_roots.append(str(project_root))
         for action in project.get("planned_actions") or []:
             kind = str(action.get("kind") or "")
             if kind == "set_manifest_dependency":
@@ -161,6 +167,8 @@ def apply_setup_plan(
     return {
         "action": "setup_apply",
         "approved": True,
+        "unity_editor_bridge_attachment_pending": editor_attachment_roots,
+        "unity_editor_bridge_attachment_message": UNITY_EDITOR_ATTACHMENT_MESSAGE if editor_attachment_roots else "",
         "selected_project_roots": [item["project_root"] for item in applied_projects],
         "skipped_project_roots": skipped_project_roots,
         "projects": applied_projects,

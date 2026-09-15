@@ -13,6 +13,7 @@ from server_bridge_constants import (
 from server_bridge_paths import bridge_config_path, bridge_state_path
 from server_core import ToolInvocationError, parse_utc_timestamp as parse_core_utc_timestamp, read_json, render_launcher_cli
 from server_host_platform import current_host_platform_adapter
+from server_recovery_commands import recommended_recovery_command_for_project
 
 def bridge_enabled(project_root: Path) -> bool:
     config_path = bridge_config_path(project_root)
@@ -207,6 +208,8 @@ def idle_wait_blocking_reasons(
         return ["bridge_state_missing"]
 
     reasons: list[str] = []
+    if not pid_is_alive(int(state.get("editor_pid") or 0)):
+        reasons.append("editor_pid_not_alive")
     age_seconds = heartbeat_age_seconds(state)
     if age_seconds is None:
         reasons.append("heartbeat_missing")
@@ -290,17 +293,22 @@ def build_editor_idle_timeout_details(
         after_request_id=after_request_id,
         not_before_unix=not_before_unix,
     )
+    pid_alive = bool(last_state) and pid_is_alive(int(last_state.get("editor_pid") or 0))
+    frozen = bool(last_state) and (not pid_alive or age_seconds is None or age_seconds > heartbeat_max_age_seconds)
+    next_action = "recover_editor_session" if frozen else "wait_for_editor_idle_or_inspect_busy_state"
     return {
-        "classification": "editor_idle_timeout",
-        "result_trust_class": "editor_state_not_idle",
+        "classification": "editor_state_frozen" if frozen else "editor_idle_timeout",
+        "editor_pid_alive": pid_alive,
+        "state_frozen": frozen,
+        "busy_reason_detail": str((last_state or {}).get("busy_reason_detail") or ""),
+        "busy_reason_as_of_utc": str((last_state or {}).get("heartbeat_utc") or ""),
+        "result_trust_class": "stale_snapshot" if frozen else "editor_state_not_idle",
         "heartbeat_age_seconds": None if age_seconds is None else round(age_seconds, 3),
         "busy_reason": derive_busy_reason(last_state),
         "blocking_reasons": blocking_reasons,
         "safe_to_retry": False,
-        "recommended_next_action": "wait_for_editor_idle_or_inspect_busy_state",
-        "recommended_recovery_command": render_launcher_cli(
-            "request-status-summary", project_root, "--include-full-payload"
-        ),
+        "recommended_next_action": next_action,
+        "recommended_recovery_command": recommended_recovery_command_for_project(project_root, next_action),
         "request_id": str(after_request_id or ""),
         "operation": str(reason or ""),
         "idle_wait_reason": str(reason or ""),
@@ -455,7 +463,7 @@ def wait_for_editor_idle(
 
     details = build_editor_idle_timeout_details(
         project_root,
-        last_state=last_state,
+        last_state=try_read_bridge_state(project_root) or last_state,
         reason=reason,
         timeout_ms=timeout_ms,
         heartbeat_max_age_seconds=heartbeat_max_age_seconds,
@@ -474,7 +482,8 @@ def wait_for_editor_idle(
         "editor_idle_timeout",
         (
             f"Timed out waiting for Unity editor idle ({reason})."
-            f"{request_summary} busy_reason={details['busy_reason']} "
+            f"{request_summary} last_observed_busy_reason={details['busy_reason']} "
+            f"as_of={details['busy_reason_as_of_utc'] or 'unknown'} "
             f"heartbeat_age={heartbeat_summary} blocking_reasons={blocking_summary} "
             f"recommended_next_action={details['recommended_next_action']}"
         ),

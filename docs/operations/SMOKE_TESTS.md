@@ -1211,3 +1211,32 @@ Scenario payload contract:
   `build.log` tailing
 - treat a smoke workflow as failed if it repeatedly dumps raw scenario results
   or raw build logs before exhausting the compact summary surfaces
+
+
+## Diagnostics Freshness and Recovery Regression
+
+Host fixtures: `python3 -m unittest tests.test_retro_recovery`.
+These exercise host behavior against an editor transport boundary; they are not
+live Unity proof. Run the following separately on a disposable Unity project
+using this package revision before claiming editor lifecycle validation:
+
+1. Introduce a compile error, refresh, and capture a diagnostic timestamp and
+   bridge generation. A test request must refuse the current error and journal
+   exactly one `request_refused` for the original operation.
+2. Fix the named source on disk without a manual refresh. The next test request
+   must classify the old error as `stale`, refresh once, settle and then run.
+   If the error remains after refresh, it must refuse; deferred or missing
+   compile evidence must never dispatch the test.
+3. With the editor closed, use an isolated copied state fixture with a dead PID
+   and old heartbeat. The idle timeout must identify `editor_state_frozen`,
+   preserve the timestamp/detail of the last busy reason, and name
+   `recover-editor-session`. Do not replace a live editor's state file.
+4. Run a well-formed filter matching zero tests and a failing test. Inspect the
+   completion journal: `test_verdict` must distinguish no-match from pass;
+   an error completion must have a non-empty `reason`.
+5. In an isolated package fixture, declare uGUI but disable its optional MCP
+   assembly. Probe must report declared-but-unregistered, not missing dependency.
+   The optional failure must not degrade unrelated core bridge health. Restore
+   the assembly and reload; verify the new probe generation and support.
+6. Preserve the existing play-mode reload recovery and batch-to-GUI build
+   fallback smoke cases. Verify the build output still exists before handoff.

@@ -156,7 +156,8 @@ namespace XUUnity.LightMcp.Editor.Operations
                         response?.status ?? "ok",
                         Callbacks.StartedAtUtc,
                         completedAtUtc,
-                        0);
+                        0,
+                        response);
                 }
                 catch
                 {

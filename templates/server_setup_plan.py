@@ -106,6 +106,8 @@ def build_setup_plan(
         "intended_wiring_target": intended_wiring_target_for_detected_client(str(client_context["detected_client"])),
         "helper_install_targets": helper_install_targets(normalized_package_version),
         "projects": [],
+        "unity_editor_bridge_attachment_pending": [],
+        "unity_editor_bridge_attachment_message": "",
     }
     primary_project_root = explicit_project_roots[0] if explicit_project_roots else (projects[0] if projects else None)
     client_config_targets = build_client_config_targets(primary_project_root)
@@ -113,6 +115,9 @@ def build_setup_plan(
     for project_root in projects:
         unity_version = parse_unity_version(project_root)
         package_dependency = manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME)
+        if unity_editor_bridge_attachment_pending(project_root):
+            result["unity_editor_bridge_attachment_pending"].append(str(project_root))
+            result["unity_editor_bridge_attachment_message"] = UNITY_EDITOR_ATTACHMENT_MESSAGE
         tf_state = classify_test_framework_state(project_root, unity_version)
         bridge_state = bridge_config_state(project_root)
         planned_actions: list[dict[str, Any]] = []
@@ -374,6 +379,8 @@ def build_setup_plan(
         restart_or_refresh_required=list(result["preflight_review"]["client_wiring_review"]["restart_or_refresh_required"]),
         recommended_next_step=str(result["preflight_review"]["recommended_next_step"]),
     )
+    if result["unity_editor_bridge_attachment_pending"]:
+        result["preflight_review"]["preferred_review_summary"] += "\n" + UNITY_EDITOR_ATTACHMENT_MESSAGE
     return result
 
 

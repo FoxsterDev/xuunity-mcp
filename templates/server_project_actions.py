@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from server_core import ToolInvocationError
+from server_recovery_commands import recommended_recovery_command_for_project
 
 
 PROJECT_ACTION_SCHEMA_VERSION = "xuunity.project-actions.v1"
@@ -173,7 +174,8 @@ def resolve_project_action_catalog_path(project_root: Path, catalog_path: str = 
             raise ToolInvocationError(
                 "project_action_catalog_not_found",
                 f"Project action catalog file not found: {candidate}",
-                {"catalog_path": str(candidate)},
+                {"catalog_path": str(candidate), "recommended_next_action": "scaffold_project_hook",
+                 "recommended_recovery_command": recommended_recovery_command_for_project(project_root, "scaffold_project_hook")},
             )
         return candidate
 
@@ -204,7 +206,8 @@ def resolve_project_action_catalog_path(project_root: Path, catalog_path: str = 
     raise ToolInvocationError(
         "project_action_catalog_not_found",
         f"Project action catalog not found for project root: {project_root}",
-        {"candidate_paths": [str(candidate) for candidate in candidates[:8]]},
+        {"candidate_paths": [str(candidate) for candidate in candidates[:8]], "recommended_next_action": "scaffold_project_hook",
+         "recommended_recovery_command": recommended_recovery_command_for_project(project_root, "scaffold_project_hook")},
     )
 
 
@@ -224,6 +227,12 @@ def normalize_project_action_catalog(
     project_root: Path,
     catalog_path: Path,
 ) -> dict[str, Any]:
+    if not raw:
+        raise ToolInvocationError(
+            "project_action_catalog_empty", "Project action catalog must declare at least one action.",
+            {"catalog_path": str(catalog_path), "recommended_next_action": "scaffold_project_hook",
+             "recommended_recovery_command": recommended_recovery_command_for_project(project_root, "scaffold_project_hook")},
+        )
     schema_version = str(raw.get("schemaVersion") or "")
     if schema_version != PROJECT_ACTION_SCHEMA_VERSION:
         raise ToolInvocationError(
@@ -237,7 +246,8 @@ def normalize_project_action_catalog(
         raise ToolInvocationError(
             "project_action_catalog_empty",
             "Project action catalog must declare at least one action.",
-            {"catalog_path": str(catalog_path)},
+            {"catalog_path": str(catalog_path), "recommended_next_action": "scaffold_project_hook",
+             "recommended_recovery_command": recommended_recovery_command_for_project(project_root, "scaffold_project_hook")},
         )
 
     default_hook_name = str(raw.get("hookName") or "").strip()

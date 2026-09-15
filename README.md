@@ -38,6 +38,20 @@
 
 ---
 
+## Recovery and Project Automation
+
+Use `--help` for the complete command list, including required arguments.
+Recovery guidance should carry a literal next command; inspect its result before
+retrying the original operation. See [Agent Workflows](docs/agents/AGENT_WORKFLOWS.md)
+for evidence selection, recovery prerequisites and build-artifact handoff checks.
+
+The bridge ticks from `EditorApplication.update`. Long work run inline in
+`[InitializeOnLoad]` blocks its heartbeat and request processing. Use
+`project-hook-scaffold` and `project-action-invoke` for project-owned actions,
+and supported batch/build operations for builds. Check background execution and
+actual progress before assuming a deferred callback cannot run.
+
+
 ## Why Use It
 
 Use XUUnity MCP when you want a local-first, validation-first Unity MCP for

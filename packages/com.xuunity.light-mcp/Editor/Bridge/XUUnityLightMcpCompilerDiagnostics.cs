@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor.Compilation;
 using XUUnity.LightMcp.Editor.Core;
@@ -9,6 +10,9 @@ namespace XUUnity.LightMcp.Editor.Bridge
         const int MaxRecentErrors = 20;
         static readonly object Gate = new();
         static readonly List<XUUnityLightMcpCompileErrorItem> RecentErrors = new();
+
+        public static string CapturedUtc { get; private set; } = "";
+        public static int CaptureBridgeGeneration { get; private set; }
 
         public static int ErrorCount
         {
@@ -37,6 +41,8 @@ namespace XUUnity.LightMcp.Editor.Bridge
             lock (Gate)
             {
                 RecentErrors.Clear();
+                CapturedUtc = DateTime.UtcNow.ToString("O");
+                CaptureBridgeGeneration = XUUnityLightMcpBridgeRuntimeState.BridgeGeneration;
             }
         }
 
