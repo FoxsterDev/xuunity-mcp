@@ -1,7 +1,7 @@
 # MCP Retro — `interactive_compile_block_detected` Asserts A Compile Fact Nothing Measured
 
 Date: `2026-08-20`
-Status: `P0 and both P1 product items implemented in current source; P2 heuristic and side-effect follow-ups remain open`
+Status: `P0, both P1 items, and the P2 heuristic item implemented in current source; P2 side-effect notice remains open`
 Session shape: a long Unity feature-implementation session (compile + EditMode + PlayMode + portfolio batch matrix, no scenario runs), driven entirely through the MCP wrapper and tools.
 
 ## 1. Executive summary
@@ -118,5 +118,14 @@ contract, PlayMode-lifecycle, churn, and project-action suite on a Unity 6000 co
 also reproduced the old-log/new-bridge race and then passed readiness after the
 bridge attached, directly proving the wait no longer returns the false verdict.
 
-The two P2 items remain intentionally open: heuristic confidence/API-updater
-suppression and an explicit wrapper notice when a batch lane closes an editor.
+The explicit wrapper notice when a batch lane closes an editor remains open.
+
+## 13. Heuristic diagnosis closeout — 2026-09-16
+
+Editor-log diagnoses now expose `diagnosis_confidence=heuristic` and
+`diagnosis_basis=editor_log_pattern_match`. The literal `-accept-apiupdate`
+launch flag is no longer an API Updater activity pattern, while real
+`[API Updater]`, `API Update Required`, and `UnityUpgradable` evidence remains
+detectable. Regression coverage proves both the flag-only negative and the
+real-marker-plus-flag positive, so the cure is no longer reported as the
+disease.

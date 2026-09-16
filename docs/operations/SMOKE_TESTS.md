@@ -207,6 +207,11 @@ Log-presence checks:
   `editor_log_diagnosis.freshness_class=prior_session_or_unverified` as stale
   evidence. Verify current source or reopen through `ensure-ready --open-editor`
   before treating that diagnosis as current compile truth.
+- Treat every `editor_log_diagnosis` with
+  `diagnosis_confidence=heuristic` as a pattern-based lead, not a measured
+  compile or dialog verdict. A launch line containing `-accept-apiupdate` alone
+  must not produce `api_updater_activity_observed`; an updater marker such as
+  `[API Updater]` must still be detected when the flag is also present.
 
 First open after a Unity version upgrade:
 

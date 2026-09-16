@@ -1,6 +1,6 @@
 # XUUnity Light Unity MCP Retros
 
-Date: `2026-09-01`
+Date: `2026-09-16`
 Status: `active public retro index`
 
 This folder holds public-safe retrospectives, lessons reports, and retro action
@@ -39,16 +39,16 @@ write or update a post-retro note that states:
 - what follow-up remains
 
 See `RETRO_REGISTRY.md` for the full triage and per-file status. The lists below
-mirror its `2026-08-23` re-evaluation; the registry is authoritative.
+mirror its `2026-09-16` re-evaluation; the registry is authoritative.
 
 ## Active Backlog / Needs Triage
 
-The active public backlog after re-triage against released `v0.3.63` is:
+The active public backlog after re-triage against released `v0.3.76` is:
 
 - `2026-08-19_anchored_scope_truncation_and_verdict_field_ranking_retro.md`
   (P1 implemented in current source; P2/P3 residuals)
-- `2026-08-20_readiness_verdict_false_positive_retro.md` (P0/P1 implemented;
-  P2 heuristic/side-effect residuals)
+- `2026-08-20_readiness_verdict_false_positive_retro.md` (P0/P1 plus the P2
+  heuristic fix implemented; batch editor-close notice remains)
 - `2026-08-26_import_worker_bridge_ownership_retro.md` (P0 released; UI
   selector truncation implemented in current source; click-causality,
   readiness-log, package-removal, and operator-contention residuals remain)

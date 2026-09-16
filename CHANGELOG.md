@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Editor-log health diagnoses now identify themselves as heuristic pattern
+  matches. The `-accept-apiupdate` launch flag no longer counts as evidence of
+  an API Updater dialog, while real updater markers beside that flag still do.
+  This prevents the non-interactive recovery flag from being reported as the
+  startup problem it was supplied to avoid.
+
 ## 0.3.76
 
 Release tag: `v0.3.76`

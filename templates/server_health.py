@@ -1309,6 +1309,8 @@ def build_editor_log_diagnosis(
         session_start_mtime=session_start_mtime,
     )
     if diagnosis:
+        diagnosis.setdefault("diagnosis_confidence", "heuristic")
+        diagnosis.setdefault("diagnosis_basis", "editor_log_pattern_match")
         idle_seconds = _editor_log_idle_seconds(log_path)
         if idle_seconds is not None:
             diagnosis["log_idle_seconds"] = round(idle_seconds, 3)
@@ -1340,7 +1342,6 @@ def _build_editor_log_diagnosis_core(
             "[ApiUpdater]",
             "[API Updater]",
             "UnityUpgradable",
-            "-accept-apiupdate",
         ],
     )
     if api_updater_lines:

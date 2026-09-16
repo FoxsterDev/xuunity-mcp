@@ -157,6 +157,10 @@ Migration note:
   `compile_state=unmeasured`. Recovery stays non-destructive, and the embedded
   readiness prerequisite becomes blocking with the same code instead of
   simultaneously claiming `ready=true`.
+- Current source labels Editor.log health diagnoses as heuristic pattern
+  matches. The non-interactive `-accept-apiupdate` launch flag is excluded from
+  API Updater activity evidence, so the recovery flag cannot by itself imply an
+  interactive updater dialog.
 - Current source prevents Unity Asset Import Workers from attaching the MCP
   bridge before any session, transport, heartbeat, or journal file is created.
   Host discovery also rejects older worker-owned state as

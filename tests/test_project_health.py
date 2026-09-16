@@ -206,6 +206,51 @@ class ProjectHealthTests(unittest.TestCase):
 
         self.assertEqual("api_updater_activity_observed", diagnosis["code"])
         self.assertEqual("warning", diagnosis["severity"])
+        self.assertEqual("heuristic", diagnosis["diagnosis_confidence"])
+        self.assertEqual("editor_log_pattern_match", diagnosis["diagnosis_basis"])
+
+    def test_build_editor_log_diagnosis_does_not_treat_accept_flag_as_api_updater_activity(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            log_path = Path(tmp_dir) / "accepted_api_update.log"
+            log_path.write_text(
+                "Command line arguments: -batchmode -quit -accept-apiupdate\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = build_editor_log_diagnosis(
+                log_path,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                classify_editor_log=classify_editor_log,
+            )
+
+        self.assertEqual("log_tail_present_no_known_blocker", diagnosis["code"])
+        self.assertNotEqual("api_updater_activity_observed", diagnosis["code"])
+        self.assertEqual("info", diagnosis["severity"])
+        self.assertEqual("heuristic", diagnosis["diagnosis_confidence"])
+        self.assertEqual("editor_log_pattern_match", diagnosis["diagnosis_basis"])
+
+    def test_build_editor_log_diagnosis_keeps_real_api_marker_beside_accept_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            log_path = Path(tmp_dir) / "real_api_update.log"
+            log_path.write_text(
+                "Command line arguments: -batchmode -quit -accept-apiupdate\n"
+                "[API Updater] Updated Files: Assets/Vendor/Foo.cs\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = build_editor_log_diagnosis(
+                log_path,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                classify_editor_log=classify_editor_log,
+            )
+
+        self.assertEqual("api_updater_activity_observed", diagnosis["code"])
+        self.assertEqual(
+            ["[API Updater] Updated Files: Assets/Vendor/Foo.cs"],
+            diagnosis["evidence_lines"],
+        )
 
     def test_build_editor_log_diagnosis_detects_unity_version_upgrade_activity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
