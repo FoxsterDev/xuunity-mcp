@@ -43,7 +43,7 @@ mirror its `2026-09-20` re-evaluation; the registry is authoritative.
 
 ## Active Backlog / Needs Triage
 
-The active public backlog after re-triage against released `v0.3.77` is:
+The active public backlog after re-triage against released `v0.3.78` is:
 
 - `2026-08-19_anchored_scope_truncation_and_verdict_field_ranking_retro.md`
   (P1 implemented in current source; P2/P3 residuals)

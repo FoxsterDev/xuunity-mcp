@@ -2,7 +2,7 @@
 
 Status: active public registry
 Last triage: 2026-09-20 (readiness/editor-close retro fully closed in current source)
-Current release: `v0.3.77`
+Current release: `v0.3.78`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
