@@ -386,6 +386,75 @@ LIVE_EDITOR_CONFLICT_CODE = "editor_running_batch_conflict"
 BLOCKED_BY_LIVE_EDITOR_VERDICT = "blocked_by_live_editor"
 
 
+def recovery_closeout_facts(recover_output_file: Path | None) -> dict:
+    """Extract explicit editor-close evidence from recover-editor-session output."""
+
+    facts = {
+        "recovery_evidence_status": "not_requested" if recover_output_file is None else "unavailable",
+        "recovery_parse_error": "",
+        "recovery_closeout_attempted": None,
+        "editor_closed_before_batch": None,
+        "closed_editor_pid": None,
+        "editor_closeout_classification": "",
+        "editor_close_path": "",
+    }
+    if recover_output_file is None:
+        return facts
+    if not recover_output_file.is_file():
+        facts["recovery_parse_error"] = "recover output file is missing"
+        return facts
+
+    payload, parse_error = parse_last_json_document(
+        recover_output_file.read_text(encoding="utf-8", errors="replace")
+    )
+    if not payload:
+        facts["recovery_parse_error"] = parse_error or "recover output did not contain a JSON object"
+        return facts
+
+    closeout = payload.get("closeout") if isinstance(payload.get("closeout"), dict) else {}
+    closed_editor_pid = closeout.get("closed_editor_pid")
+    try:
+        closed_editor_pid = int(closed_editor_pid) if closed_editor_pid is not None else None
+    except (TypeError, ValueError):
+        closed_editor_pid = None
+    if closed_editor_pid is not None and closed_editor_pid <= 0:
+        closed_editor_pid = None
+
+    closeout_attempted = bool(payload.get("closeout_attempted"))
+    if not closeout_attempted:
+        editor_closed = False
+    elif not closeout or not isinstance(closeout.get("restored"), bool) or not isinstance(
+        closeout.get("same_project_editor_closed"), bool
+    ):
+        facts["recovery_evidence_status"] = "incomplete"
+        facts["recovery_parse_error"] = "recovery closeout evidence is incomplete"
+        editor_closed = None
+    elif closeout.get("restored") is True and closeout.get("same_project_editor_closed") is True:
+        if closed_editor_pid is None:
+            facts["recovery_evidence_status"] = "incomplete"
+            facts["recovery_parse_error"] = "closed editor process id is unavailable"
+            editor_closed = None
+        else:
+            editor_closed = True
+    else:
+        editor_closed = False
+    facts.update(
+        {
+            "recovery_evidence_status": (
+                facts["recovery_evidence_status"]
+                if facts["recovery_evidence_status"] == "incomplete"
+                else "parsed"
+            ),
+            "recovery_closeout_attempted": closeout_attempted,
+            "editor_closed_before_batch": editor_closed,
+            "closed_editor_pid": closed_editor_pid if editor_closed is True else None,
+            "editor_closeout_classification": str(closeout.get("closeout_classification") or ""),
+            "editor_close_path": str(closeout.get("close_path") or ""),
+        }
+    )
+    return facts
+
+
 def batch_error_code(payload) -> str:
     """Error code of a batch run that never reached Unity, or '' when the run produced no error envelope."""
 
@@ -430,6 +499,7 @@ def build_batch_status(
     recover_rc: int,
     batch_rc: int,
     invoked_batch_fallback_mode: str,
+    recovery_closeout: dict | None = None,
 ) -> None:
     payload = {}
     parse_error = ""
@@ -547,10 +617,12 @@ def build_batch_status(
 
     license_from_cache, license_probed_at_utc, license_probe_age = license_probe_facts(payload, result_summary)
 
+    recovery_closeout = dict(recovery_closeout or recovery_closeout_facts(None))
     status = {
         "project": project_name,
         "project_root": project_root,
         "recover_rc": recover_rc,
+        **recovery_closeout,
         "batch_rc": batch_rc,
         "json_parse_ok": bool(payload),
         "parse_error": parse_error,
@@ -618,6 +690,20 @@ def run_batch_worker(
             timeout_seconds=timeout,
         )
 
+    closeout_facts = recovery_closeout_facts(
+        Path(recover_output_file) if close_live_editors else None
+    )
+    if closeout_facts.get("editor_closed_before_batch") is True:
+        notice = {
+            "project": project_name,
+            "project_root": project_root,
+            "closed_editor_pid": closeout_facts.get("closed_editor_pid"),
+            "closeout_classification": closeout_facts.get("editor_closeout_classification", ""),
+            "close_path": closeout_facts.get("editor_close_path", ""),
+        }
+        print("BATCH_EDITOR_CLOSE_NOTICE " + json.dumps(notice, separators=(",", ":")))
+        sys.stdout.flush()
+
     batch_rc = run_to_files(
         wrapper_command()
         + [
@@ -641,6 +727,7 @@ def run_batch_worker(
         recover_rc,
         batch_rc,
         batch_fallback_mode,
+        closeout_facts,
     )
 
 
@@ -653,6 +740,7 @@ def emit_batch_final_summary(results_dir: str) -> int:
     overall_failed = 0
     overall_blocked = 0
     blocked_projects = []
+    editor_close_side_effects = []
     verdict_counts = {}
     for item in statuses:
         compile_evidence = compile_evidence_from_status(item)
@@ -682,6 +770,16 @@ def emit_batch_final_summary(results_dir: str) -> int:
             )
         elif not ok:
             overall_failed += 1
+        if item.get("editor_closed_before_batch") is True:
+            editor_close_side_effects.append(
+                {
+                    "project": item.get("project", ""),
+                    "project_root": item.get("project_root", ""),
+                    "closed_editor_pid": item.get("closed_editor_pid"),
+                    "closeout_classification": item.get("editor_closeout_classification", ""),
+                    "close_path": item.get("editor_close_path", ""),
+                }
+            )
         def rendered_counter(key):
             value = item.get(key)
             return "unavailable" if value is None else value
@@ -689,6 +787,10 @@ def emit_batch_final_summary(results_dir: str) -> int:
         fields = [
             item.get("project", ""),
             f"recover_rc={item.get('recover_rc', 0)}",
+            f"recovery_evidence={item.get('recovery_evidence_status', 'unavailable')}",
+            f"editor_closed_before_batch={str(item.get('editor_closed_before_batch')).lower() if item.get('editor_closed_before_batch') is not None else 'unavailable'}",
+            f"closed_editor_pid={item.get('closed_editor_pid') or ''}",
+            f"editor_closeout={item.get('editor_closeout_classification', '')}",
             f"batch_rc={item.get('batch_rc', 0)}",
             f"succeeded={str(bool(item.get('succeeded'))).lower()}",
             f"verdict={operator_verdict}",
@@ -723,6 +825,8 @@ def emit_batch_final_summary(results_dir: str) -> int:
         "projects_blocked": overall_blocked,
         "operator_verdict_counts": verdict_counts,
         "blocked_projects": blocked_projects,
+        "editors_closed_before_batch": len(editor_close_side_effects),
+        "editor_close_side_effects": editor_close_side_effects,
         "results_dir": str(results_path),
         "warning_count_sum": (
             sum(int(item["warning_count"]) for item in statuses if item.get("warning_count") is not None)
@@ -751,6 +855,12 @@ def emit_batch_final_summary(results_dir: str) -> int:
             f"{overall_blocked} project(s) were not compiled because an editor is open on them: {names}. "
             "This is environmental, not a compile failure. Verify them through the interactive lane, or close "
             "the editors with recover-editor-session and rerun the batch lane."
+        )
+    if editor_close_side_effects:
+        names = ", ".join(str(entry.get("project") or "") for entry in editor_close_side_effects)
+        aggregate["side_effect_notice"] = (
+            f"The batch runner closed {len(editor_close_side_effects)} host-opened Unity editor(s) "
+            f"before compiling: {names}."
         )
     print(json.dumps(aggregate, indent=2))
     return 1 if (overall_failed or overall_blocked) else 0

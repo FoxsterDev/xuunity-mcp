@@ -1,7 +1,7 @@
 # MCP Retro — `interactive_compile_block_detected` Asserts A Compile Fact Nothing Measured
 
 Date: `2026-08-20`
-Status: `P0, both P1 items, and the P2 heuristic item implemented in current source; P2 side-effect notice remains open`
+Status: `all P0-P2 items implemented in current source`
 Session shape: a long Unity feature-implementation session (compile + EditMode + PlayMode + portfolio batch matrix, no scenario runs), driven entirely through the MCP wrapper and tools.
 
 ## 1. Executive summary
@@ -118,7 +118,8 @@ contract, PlayMode-lifecycle, churn, and project-action suite on a Unity 6000 co
 also reproduced the old-log/new-bridge race and then passed readiness after the
 bridge attached, directly proving the wait no longer returns the false verdict.
 
-The explicit wrapper notice when a batch lane closes an editor remains open.
+The readiness slice did not yet close the explicit wrapper notice when a batch
+lane closes an editor. That final item is closed below.
 
 ## 13. Heuristic diagnosis closeout — 2026-09-16
 
@@ -129,3 +130,18 @@ launch flag is no longer an API Updater activity pattern, while real
 detectable. Regression coverage proves both the flag-only negative and the
 real-marker-plus-flag positive, so the cure is no longer reported as the
 disease.
+
+## 14. Batch editor-close notice closeout — 2026-09-20
+
+The multi-project batch compile runner now parses the existing
+`recover-editor-session` closeout receipt. When that receipt proves the runner
+closed a host-opened editor, stdout emits `BATCH_EDITOR_CLOSE_NOTICE` before the
+compile command starts. The per-project row and final aggregate keep the same
+process id, closeout classification, and close path, plus a plain-language
+side-effect notice.
+
+The runner does not infer a close from a successful recovery exit code. A
+missing or malformed recovery payload stays `recovery_evidence=unavailable`,
+and only an explicit restored/closed receipt with a positive editor process id
+sets `editor_closed_before_batch=true`. Focused runner coverage proves the
+immediate notice, persisted status, and aggregate summary.

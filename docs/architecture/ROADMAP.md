@@ -375,6 +375,10 @@ Current progress:
   plus artifact pointers and makes the multi-project runner consume nested,
   compact, summary-file, and confirmed result-file evidence without a false
   failure or false-zero matrix counters
+- current source closes the remaining readiness-retro side-effect gap: a
+  verified host-opened editor close is announced before the batch compile and
+  preserved in per-project plus aggregate output; absent recovery evidence
+  stays unavailable rather than becoming a false negative
 - compact-by-default scenario, refresh, compile, build-config compile, direct
   test, and MCP status-summary envelopes are now shipped with full-payload
   recovery paths

@@ -30,6 +30,27 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
     def setUp(self) -> None:
         skip_if_prior_subprocess_timeout(self)
 
+    def test_recovery_closeout_facts_do_not_infer_a_negative_from_missing_evidence(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            malformed_path = Path(temp_dir) / "recover.log"
+            malformed_path.write_text("not json\n", encoding="utf-8")
+            incomplete_path = Path(temp_dir) / "incomplete-recover.log"
+            incomplete_path.write_text('{"closeout_attempted":true}\n', encoding="utf-8")
+
+            not_requested = run_multi_project.recovery_closeout_facts(None)
+            unavailable = run_multi_project.recovery_closeout_facts(malformed_path)
+            incomplete = run_multi_project.recovery_closeout_facts(incomplete_path)
+
+        self.assertEqual("not_requested", not_requested["recovery_evidence_status"])
+        self.assertIsNone(not_requested["editor_closed_before_batch"])
+        self.assertEqual("unavailable", unavailable["recovery_evidence_status"])
+        self.assertIsNone(unavailable["editor_closed_before_batch"])
+        self.assertTrue(unavailable["recovery_parse_error"])
+        self.assertEqual("incomplete", incomplete["recovery_evidence_status"])
+        self.assertTrue(incomplete["recovery_closeout_attempted"])
+        self.assertIsNone(incomplete["editor_closed_before_batch"])
+        self.assertTrue(incomplete["recovery_parse_error"])
+
     def test_jsonl_progress_plus_final_json_stdout_counts_as_success(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -94,7 +115,7 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
                     JSON
                         ;;
                       recover-editor-session)
-                        printf '{"recovery_classification":"not_needed"}\\n'
+                        printf '{"recovery_classification":"recovered","closeout_attempted":true,"closeout":{"restored":true,"same_project_editor_closed":true,"closed_editor_pid":4242,"closeout_classification":"closed_via_unity_editor_quit","close_path":"unity.editor.quit"}}\\n'
                         ;;
                       *)
                         echo "unexpected command: $command_name" >&2
@@ -121,7 +142,6 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
                     project_root.as_posix(),
                     "--parallelism",
                     "1",
-                    "--no-close-live-editors",
                     "--results-dir",
                     results_dir.as_posix(),
                 ],
@@ -138,6 +158,12 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
             self.assertEqual("batch", status["effective_execution_lane"])
             self.assertEqual("auto", status["batch_fallback_mode"])
             self.assertEqual("passed_via_batch", status["operator_verdict"])
+            self.assertEqual("parsed", status["recovery_evidence_status"])
+            self.assertTrue(status["recovery_closeout_attempted"])
+            self.assertTrue(status["editor_closed_before_batch"])
+            self.assertEqual(4242, status["closed_editor_pid"])
+            self.assertEqual("closed_via_unity_editor_quit", status["editor_closeout_classification"])
+            self.assertEqual("unity.editor.quit", status["editor_close_path"])
             self.assertEqual("passed", status["matrix_status"])
             self.assertEqual(4, status["total"])
             self.assertEqual(4, status["passed"])
@@ -145,6 +171,16 @@ class MultiProjectBatchRunnerTests(unittest.TestCase):
             self.assertIn('"projects_failed": 0', completed.stdout)
             self.assertIn("batch_fallback_mode=auto", completed.stdout)
             self.assertIn("verdict=passed_via_batch", completed.stdout)
+            self.assertIn('BATCH_EDITOR_CLOSE_NOTICE {"project":"ConsumerProject"', completed.stdout)
+            self.assertLess(
+                completed.stdout.index("BATCH_EDITOR_CLOSE_NOTICE"),
+                completed.stdout.index("MULTI_PROJECT_BATCH_COMPILE_MATRIX_SUMMARY_BEGIN"),
+            )
+            aggregate_text = completed.stdout.split("MULTI_PROJECT_BATCH_COMPILE_MATRIX_SUMMARY_END\n", 1)[1]
+            aggregate = json.loads(aggregate_text)
+            self.assertEqual(1, aggregate["editors_closed_before_batch"])
+            self.assertEqual(4242, aggregate["editor_close_side_effects"][0]["closed_editor_pid"])
+            self.assertIn("closed 1 host-opened Unity editor", aggregate["side_effect_notice"])
 
     def test_gui_fallback_success_counts_as_success(self) -> None:
         with TemporaryDirectory() as temp_dir:

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Why
+
+- The multi-project batch compile runner can intentionally close an editor that
+  it previously opened so a closed-project batch lane can start. That behavior
+  was described in help, but the live output and final summary did not say when
+  it actually happened.
+
+### Changed
+
+- Multi-project batch compile output now emits a
+  `BATCH_EDITOR_CLOSE_NOTICE` immediately after a verified editor close and
+  before compilation continues. Per-project and aggregate summaries retain the
+  editor process id, closeout classification, close path, and a readable
+  side-effect notice. Missing recovery evidence remains `unavailable` instead
+  of being reported as no close.
+
 ## 0.3.77
 
 Release tag: `v0.3.77`

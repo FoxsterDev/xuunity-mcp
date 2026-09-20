@@ -227,6 +227,11 @@ Migration note:
   without losing Unity or transport outcomes. It falls back to named summary
   and Unity-confirmed result artifacts, records the chosen evidence source, and
   reports absent matrix counters as unavailable rather than zero.
+- Current source makes the default multi-project recovery side effect explicit:
+  if the runner proves that it closed a host-opened editor, it emits
+  `BATCH_EDITOR_CLOSE_NOTICE` before compile and retains the editor process id,
+  closeout classification, and close path in each result and the aggregate.
+  Missing recovery evidence is reported as unavailable, not as a negative.
 - `v0.3.36+` makes `ensure-ready` compact by default,
   adds active editor-log identity and path-backed `editor_log` grep, removes
   duplicated scenario `run_start.steps` unless `includeStepPayloads=true`,
@@ -527,6 +532,11 @@ scripts/testing/run_multi_project_batch_compile_matrix.sh \
   --repo-root /path/to/repo-with-unity-projects \
   --parallelism 4
 ```
+
+With its default `--close-live-editors` policy, the runner prints
+`BATCH_EDITOR_CLOSE_NOTICE` before continuing whenever recovery proves that it
+closed a host-opened Unity editor. The final JSON repeats every verified close
+under `editor_close_side_effects`.
 
 ## Safety Status
 
