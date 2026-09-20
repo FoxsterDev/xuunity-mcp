@@ -2,21 +2,55 @@
 
 ## Unreleased
 
-### Why
+## 0.3.78
+
+Release tag: `v0.3.78`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.78
+```
+
+### Why this matters
 
 - The multi-project batch compile runner can intentionally close an editor that
   it previously opened so a closed-project batch lane can start. That behavior
   was described in help, but the live output and final summary did not say when
   it actually happened.
 
-### Changed
+### What changed
 
-- Multi-project batch compile output now emits a
+- Released `v0.3.78` package metadata, server metadata, package manifests, and
+  Git URL package manager examples.
+- Multi-project batch compile output now prints a
   `BATCH_EDITOR_CLOSE_NOTICE` immediately after a verified editor close and
   before compilation continues. Per-project and aggregate summaries retain the
   editor process id, closeout classification, close path, and a readable
   side-effect notice. Missing recovery evidence remains `unavailable` instead
   of being reported as no close.
+
+### What this gives developers
+
+- Developers can see an editor-close side effect as soon as it happens and can
+  trace the exact process in the saved batch results instead of discovering the
+  close after the compile has already started.
+
+### Validation
+
+- The full host suite passed `1096` tests with `14` expected platform skips;
+  focused runner and process-contract coverage passed `21/21`; and public site
+  checks passed `42/42` across desktop, mobile, and narrow browser profiles.
+- A Unity `6000.0.58f2` package consumer passed the live batch compile matrix
+  `6/6` with no warnings. That run also proved that an explicit no-close receipt
+  is reported as `editor_closed_before_batch=false`.
+
+### Known limitations
+
+- This release does not infer editor-close results from a successful recovery
+  exit code. Missing, malformed, or incomplete closeout evidence stays
+  unavailable. The actual close-notice path is covered deterministically; the
+  live Unity run did not need to close an editor.
 
 ## 0.3.77
 

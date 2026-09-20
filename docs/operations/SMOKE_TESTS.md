@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Smoke Tests
 
 Date: `2026-07-15`
-Status: `current source after v0.3.77`
+Status: `current source after v0.3.78`
 
 This file defines the public reusable smoke-test contract for the lightweight
 Unity MCP lane.
