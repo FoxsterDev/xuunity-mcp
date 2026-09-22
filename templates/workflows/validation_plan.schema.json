@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/FoxsterDev/xuunity-mcp/templates/workflows/validation_plan.schema.json",
+  "title": "XUUnity Light Unity MCP Validation Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "planId",
+    "projectId",
+    "sourceIdentity",
+    "requirements"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        "xuunity.light-mcp.validation-plan.v1"
+      ]
+    },
+    "planId": {
+      "type": "string"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "digest"
+      ],
+      "properties": {
+        "algorithm": {
+          "enum": [
+            "sha256"
+          ]
+        },
+        "digest": {
+          "type": "string"
+        },
+        "manifestRef": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dirtyPaths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "required",
+          "stage",
+          "executionChannel",
+          "dimensions",
+          "scene",
+          "artifactRequired"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "stage": {
+            "enum": [
+              "static",
+              "resolve",
+              "compile",
+              "editmode",
+              "playmode",
+              "build",
+              "export",
+              "player-runtime",
+              "device-runtime",
+              "client-integration"
+            ]
+          },
+          "executionChannel": {
+            "enum": [
+              "native-mcp",
+              "helper-cli",
+              "direct-unity",
+              "any"
+            ]
+          },
+          "dimensions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "unityVersion",
+              "target",
+              "scriptingBackend",
+              "inputMode"
+            ],
+            "properties": {
+              "unityVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scriptingBackend": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "inputMode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "scene": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifactRequired": {
+            "type": "boolean"
+          },
+          "executionLane": {
+            "enum": [
+              "batch",
+              "gui",
+              "none",
+              null
+            ]
+          },
+          "policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "warningBudget": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "diagnosticsScope": {
+                "enum": [
+                  "all",
+                  "package"
+                ]
+              },
+              "requireMeasuredRebuild": {
+                "type": "boolean"
+              },
+              "minTests": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "semanticAssertions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "receiptId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "runId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evidenceRoots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "description": {
+      "type": "string"
+    }
+  }
+}

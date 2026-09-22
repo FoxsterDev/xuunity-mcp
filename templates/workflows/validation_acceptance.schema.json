@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/FoxsterDev/xuunity-mcp/templates/workflows/validation_acceptance.schema.json",
+  "title": "XUUnity Light Unity MCP Validation Acceptance Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "evaluatorVersion",
+    "planId",
+    "planSha256",
+    "projectId",
+    "sourceIdentity",
+    "verdict",
+    "required",
+    "optional",
+    "reusedCount",
+    "rows",
+    "validationGaps",
+    "reportRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        "xuunity.light-mcp.validation-acceptance.v1"
+      ]
+    },
+    "evaluatorVersion": {
+      "type": "string"
+    },
+    "planId": {
+      "type": "string"
+    },
+    "planSha256": {
+      "type": "string"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "digest"
+      ],
+      "properties": {
+        "algorithm": {
+          "enum": [
+            "sha256"
+          ]
+        },
+        "digest": {
+          "type": "string"
+        },
+        "manifestRef": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dirtyPaths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "blocked",
+        "partial"
+      ]
+    },
+    "required": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "pass",
+        "fail",
+        "blocked",
+        "not_run"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "pass": {
+          "type": "integer"
+        },
+        "fail": {
+          "type": "integer"
+        },
+        "blocked": {
+          "type": "integer"
+        },
+        "not_run": {
+          "type": "integer"
+        }
+      }
+    },
+    "optional": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "pass",
+        "fail",
+        "blocked",
+        "not_run"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "pass": {
+          "type": "integer"
+        },
+        "fail": {
+          "type": "integer"
+        },
+        "blocked": {
+          "type": "integer"
+        },
+        "not_run": {
+          "type": "integer"
+        }
+      }
+    },
+    "reusedCount": {
+      "type": "integer"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirementId",
+          "required",
+          "stage",
+          "executionChannel",
+          "dimensions",
+          "scene",
+          "matchedReceiptIds",
+          "operationOutcome",
+          "outcome",
+          "reused",
+          "originalRunAt",
+          "reasons",
+          "details"
+        ],
+        "properties": {
+          "requirementId": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "stage": {
+            "enum": [
+              "static",
+              "resolve",
+              "compile",
+              "editmode",
+              "playmode",
+              "build",
+              "export",
+              "player-runtime",
+              "device-runtime",
+              "client-integration"
+            ]
+          },
+          "executionChannel": {
+            "enum": [
+              "native-mcp",
+              "helper-cli",
+              "direct-unity",
+              "any"
+            ]
+          },
+          "dimensions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "unityVersion",
+              "target",
+              "scriptingBackend",
+              "inputMode"
+            ],
+            "properties": {
+              "unityVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scriptingBackend": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "inputMode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "scene": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matchedReceiptIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "operationOutcome": {
+            "enum": [
+              "passed",
+              "failed",
+              "blocked",
+              "not_run",
+              null
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "pass",
+              "fail",
+              "blocked",
+              "not_run"
+            ]
+          },
+          "reused": {
+            "type": "boolean"
+          },
+          "originalRunAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "warningBudget": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "diagnosticsScope": {
+                "enum": [
+                  "all",
+                  "package"
+                ]
+              },
+              "requireMeasuredRebuild": {
+                "type": "boolean"
+              },
+              "minTests": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "semanticAssertions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "evidenceRef": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "sha256"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  }
+                }
+              },
+              "evidenceKind": {
+                "enum": [
+                  "raw",
+                  "helper_response",
+                  null
+                ]
+              },
+              "producer": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "version",
+                  "route"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "route": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "requestId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "fieldPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validationGaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reportRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "runId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generatedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

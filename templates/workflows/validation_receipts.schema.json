@@ -1,0 +1,465 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/FoxsterDev/xuunity-mcp/templates/workflows/validation_receipts.schema.json",
+  "title": "XUUnity Light Unity MCP Validation Receipts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "receipts"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        "xuunity.light-mcp.validation-receipts.v1"
+      ]
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptId",
+          "requirementId",
+          "sourceIdentity",
+          "dimensions",
+          "stage",
+          "executionChannel",
+          "evidenceRef"
+        ],
+        "properties": {
+          "receiptId": {
+            "type": "string"
+          },
+          "requirementId": {
+            "type": "string"
+          },
+          "sourceIdentity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "algorithm",
+              "digest"
+            ],
+            "properties": {
+              "algorithm": {
+                "enum": [
+                  "sha256"
+                ]
+              },
+              "digest": {
+                "type": "string"
+              },
+              "manifestRef": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "dirtyPaths": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "commit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "dimensions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "unityVersion",
+              "target",
+              "scriptingBackend",
+              "inputMode"
+            ],
+            "properties": {
+              "unityVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "scriptingBackend": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "inputMode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "stage": {
+            "enum": [
+              "static",
+              "resolve",
+              "compile",
+              "editmode",
+              "playmode",
+              "build",
+              "export",
+              "player-runtime",
+              "device-runtime",
+              "client-integration"
+            ]
+          },
+          "executionChannel": {
+            "enum": [
+              "native-mcp",
+              "helper-cli",
+              "direct-unity",
+              "any"
+            ]
+          },
+          "evidenceRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            }
+          },
+          "evidenceKind": {
+            "enum": [
+              "raw",
+              "helper_response"
+            ]
+          },
+          "producer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version",
+              "route"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "route": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operationOutcome": {
+            "enum": [
+              "passed",
+              "failed",
+              "blocked",
+              "not_run"
+            ]
+          },
+          "executionLane": {
+            "enum": [
+              "batch",
+              "gui",
+              "none",
+              null
+            ]
+          },
+          "requestId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clientReceiptRef": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            }
+          },
+          "clientKind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scene": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "artifact": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              }
+            }
+          },
+          "diagnostics": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "complete"
+            ],
+            "properties": {
+              "scope": {
+                "enum": [
+                  "all",
+                  "package"
+                ]
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "warningCount": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "uniqueWarningCount": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "truncated": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "samples": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rebuild": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rebuiltAssemblyCount": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "cachedAssemblyCount": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          },
+          "tests": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "verdict"
+            ],
+            "properties": {
+              "verdict": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "total": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "passed": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "failed": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "skipped": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "postSettleErrorCount": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          },
+          "semanticAssertions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "passed"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "passed": {
+                  "type": "boolean"
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "executionBlocker": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "reused": {
+            "type": "boolean"
+          },
+          "originalRunAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "supersedes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
