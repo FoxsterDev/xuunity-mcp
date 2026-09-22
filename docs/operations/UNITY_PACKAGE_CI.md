@@ -1,7 +1,7 @@
 # Unity Package CI And Release Tag Gate
 
 Date: `2026-08-14`
-Status: `current for v0.3.78`
+Status: `current for v0.3.79`
 
 This document describes the automated Unity package CI gates and the release
 tag gate that blocks tag preparation on failed or missing gates.

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.3.79
+
+Release tag: `v0.3.79`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.79
+```
+
+### Changed
+
+- Released `v0.3.79` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ### Added
 
 - Offline validation-acceptance evaluator
@@ -29,6 +43,16 @@
   re-evaluated to its own denominator (`40` platform rows: `23` pass of which
   `15` reused, `17` blocked). Unity was not launched; this change has no
   bridge or transport effect.
+- Public site checks passed `42/42` across desktop, mobile, and narrow browser
+  profiles. The source installer also completed the required Codex and Claude
+  launcher refresh before the final test run.
+
+### Known limitations
+
+- Hosted Unity Package CI remains waived because its runners do not have Unity
+  license secrets. This release has no CI-recorded EditMode or PlayMode proof
+  for the release SHA; the change itself is an offline evidence evaluator and
+  did not launch Unity.
 
 ## 0.3.78
 

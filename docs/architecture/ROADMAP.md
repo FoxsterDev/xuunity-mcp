@@ -67,7 +67,7 @@ survival and more about:
 
 Already implemented:
 
-- standalone public repository and current `v0.3.78` Git UPM package path under
+- standalone public repository and current `v0.3.79` Git UPM package path under
   `packages/com.xuunity.light-mcp`
 - bridge enable/disable lifecycle
 - status and capability probing
@@ -180,7 +180,7 @@ This is enough for:
 - controlled screenshot capture
 - early automation experiments
 - repeatable same-host multi-project routing and recovery
-- production Git UPM consumption through `v0.3.78`
+- production Git UPM consumption through `v0.3.79`
 
 This is not yet enough for:
 
@@ -264,7 +264,7 @@ Most valuable next milestone:
 
 Why this is next:
 
-- `v0.3.12` moved the package to the registry-native path and `v0.3.78` is the
+- `v0.3.12` moved the package to the registry-native path and `v0.3.79` is the
   current public Git UPM line
 - macOS validation is strong enough for current same-host use
 - Linux and Windows claims should remain conservative until executed on those hosts
