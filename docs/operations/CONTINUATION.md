@@ -541,6 +541,35 @@ source carries `rebuilt_assembly_count`, `cached_assembly_count`,
 batch, and multi-project summaries; require `measured` evidence when the result
 must prove a recent source edit was compiled.
 
+## Validation Acceptance Evaluator
+
+`scripts/testing/evaluate_validation_evidence.py` joins an owner plan
+(`templates/workflows/validation_plan.schema.json`) with evidence receipts
+(`validation_receipts.schema.json`) and writes one acceptance report
+(`validation_acceptance.schema.json`). It is offline and read-only apart from
+the report: no Unity launch, no network, no retries. The strict validators
+live in `scripts/testing/validation_acceptance.py`; the schema files are
+generated from the same specs and a test fails when they drift.
+
+Default output is one compact envelope through the launcher's bounded
+encoder:
+
+```json
+{"payload_mode":"compact_validation_acceptance","verdict":"blocked",
+ "required":{"total":2,"pass":1,"fail":0,"blocked":1,"not_run":0},
+ "reused_count":0,"first_reasons":[{"requirementId":"android-device",
+ "outcome":"blocked","reasons":["capability_unavailable"]}],
+ "artifacts":["release/acceptance/report.json"],"full_payload_cli_argument":"--output full"}
+```
+
+Rules a new chat must keep: stages are exact capabilities (`build` never
+satisfies `device-runtime`); a native-client row needs the
+`unity_status_summary` result captured inside the client session as
+`clientReceiptRef`; compile `status: passed` plus a warning under a
+zero-warning policy is `operationOutcome: passed`, `outcome: fail`; exit `2`
+is invalid input and must not be recorded as a blocked row. Design record:
+`../architecture/designs/XUUNITY_MCP_VALIDATION_EVIDENCE_ACCEPTANCE_DESIGN_2026-09-21.md`.
+
 ## Structural Compile Errors
 
 Unity can stop before `csc.exe` runs when an assembly definition has duplicate

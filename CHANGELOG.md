@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Added
+
+- Offline validation-acceptance evaluator
+  `scripts/testing/evaluate_validation_evidence.py` with strict plan, receipt
+  and acceptance-report schemas under `templates/workflows/`. It joins an
+  owner plan with saved helper responses or a consumer release verdict,
+  matches rows on exact stage, dimensions, scene and execution channel,
+  applies warning/rebuild/test/semantic policy separately from the operation
+  outcome, keeps the full required denominator, marks reused evidence, and
+  prints one bounded compact envelope. Exit `2` is invalid input and is never
+  a blocked row.
+
+### What this gives developers
+
+- A compile with one warning under a zero-warning policy, an APK build
+  offered for a device-runtime row, or helper health offered as native
+  MCP-client proof can no longer be summarized as release acceptance; the
+  report says `1/2 pass, 1 blocked` with a stable reason code.
+
+### Validation
+
+- Host suite: `1132` tests OK with `14` expected platform skips, including
+  `36` focused validation-acceptance tests (policy, path safety, adapters,
+  compact bound, CLI exit contract). A reference consumer release verdict
+  re-evaluated to its own denominator (`40` platform rows: `23` pass of which
+  `15` reused, `17` blocked). Unity was not launched; this change has no
+  bridge or transport effect.
+
 ## 0.3.78
 
 Release tag: `v0.3.78`

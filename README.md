@@ -697,7 +697,11 @@ that `xuunity_light_unity` is listed, list its live tools, and run
 `unity_status_summary`. Only that live tool call proves the current MCP client
 session is connected. After it reports a healthy bridge, confirm
 `unity_capabilities` and `unity_health_probe` before moving on to tests or
-builds. Until then, report `MCP client connection unverified`.
+builds. Until then, report `MCP client connection unverified`. When a release
+plan carries a native-client row, save that live tool result to a file: the
+offline evaluator (`scripts/testing/evaluate_validation_evidence.py`) accepts
+it as `clientReceiptRef` and reports `channel_unverified` for helper-only or
+`client_kind=cli` evidence.
 
 If `ensure-ready --open-editor` reports `opened_by_host: true`, the install or
 test workflow owns that editor session. Before the final report, restore it:

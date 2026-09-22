@@ -597,6 +597,44 @@ Pass criteria:
   first unproven project, artifact paths, and next action; full evidence stays
   behind `--output full`.
 
+### 5d. Validation Acceptance Ledger Smoke
+
+Run `scripts/testing/evaluate_validation_evidence.py` over a plan whose rows
+deliberately include one compile with a warning under a zero-warning policy,
+one build receipt supplied for a device-runtime row, one helper-labelled
+receipt for a native-client row, and one row without a receipt.
+
+Pass criteria:
+
+- the compile row reports `operationOutcome: passed` and `outcome: fail` with
+  `warning_budget_exceeded`; missing counts give `diagnostics_unmeasured`
+- the device-runtime row stays `blocked` with `stage_mismatch`; no stage is
+  promoted
+- the native-client row stays `blocked` with `channel_unverified` until a
+  `clientReceiptRef` captured inside the MCP client session is supplied
+- the receipt-less row is `not_run`; required counts still sum to the plan
+  denominator and the verdict is `fail` (fail outranks blocked, blocked
+  outranks not_run)
+- reused receipts stay visible through `reused=true` and `reusedCount`
+- the compact envelope stays within 8192 UTF-8 bytes while the full report
+  keeps every row; malformed input exits `2` with `reason: evaluation_invalid`
+
+Recommended order before an expensive matrix, so fixture and orchestration
+defects surface on the cheap path first:
+
+1. read-only capability inventory (Unity versions, modules, SDKs, runners,
+   devices); report unavailable rows before any build
+2. static fixture checks: absolute output paths, unique test names,
+   idempotent probe insertion, dependency availability, expected scene
+3. compile changed scripts with measured rebuild and the warning policy
+4. one focused sample PlayMode scenario on the real input route with
+   observable UI assertions; restore modified settings in teardown
+5. repeat the setup and one sequential target transition to catch duplicate
+   fixture state
+6. expand the declared input/version matrix, then build, runtime and device
+   rows
+7. aggregate receipts and verify deliverable identity at handoff
+
 ### 6. PlayMode Lifecycle Retry Smoke
 
 Use a representative direct `unity.tests.run_playmode` request while the editor

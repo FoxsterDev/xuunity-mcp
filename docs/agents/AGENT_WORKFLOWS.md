@@ -264,6 +264,13 @@ Each completed workflow should report:
 - relevant artifact paths
 - request id when available
 - validation gaps and skipped checks
+- execution channel per proof (`native-mcp`, `helper-cli`, `direct-unity`) and
+  the Unity lane (`batch`/`gui`) when it matters
+- exact stage per proof: a build or export never stands in for player or
+  device runtime, and helper readiness never stands in for a native client call
+- warning counts and rebuild evidence whenever a warning or rebuild policy applies
+- the full required denominator with pass/fail/blocked/not_run counts, never
+  only the passing rows
 - whether the host-opened editor was restored
 - design-plan or retro artifact updated when the work came from a plan
 - self-review notes for code/docs changes
@@ -1016,6 +1023,37 @@ Unity validation:
 - residual risk:
 ```
 
+### Machine-checked acceptance
+
+When the release owner has written an explicit validation plan, evaluate the
+saved evidence offline instead of summarizing it by hand:
+
+```bash
+python3 scripts/testing/evaluate_validation_evidence.py \
+  --plan release/validation-plan.json \
+  --receipts release/validation-receipts.json \
+  --report release/acceptance/report.json
+```
+
+The evaluator matches every plan row on requirement id, exact dimensions,
+scene, stage and execution channel, applies the warning, rebuild, test-count
+and semantic-assertion policy separately from the operation outcome, and
+prints one compact envelope (`payload_mode=compact_validation_acceptance`,
+at most 8192 bytes). Exit `0` means accepted, `1` means a valid evaluation
+with failed, blocked or not-run required rows, `2` means invalid input; never
+record exit `2` as a blocked row. Receipts with
+`evidenceKind: helper_response` point at saved helper responses, and the
+evaluator decodes `payload_json` itself. A consumer release verdict can be
+evaluated directly with `--consumer-verdict`.
+
+Example: an Android APK build row passes while its device-runtime row is
+blocked by a missing device. The envelope reports
+`required: {total: 2, pass: 1, fail: 0, blocked: 1, not_run: 0}` and
+`verdict: blocked`; the APK stays a valid artifact and publication stays
+blocked. A native-client row passes only with a `clientReceiptRef` that
+points at the `unity_status_summary` result captured inside the client
+session; helper health or `client_kind=cli` yields `channel_unverified`.
+
 ## Workflow 13: MCP Package Source Mode Switching
 
 Use when the agent is changing this MCP package or validating unpublished MCP
@@ -1104,6 +1142,10 @@ Reusable templates live under `templates/workflows/`:
   - readiness, package refresh, compile, and EditMode validation
 - `package_mode_switch.workflow.json`
   - wrapper-only `devmode` and `prodmode` source switching
+- `validation_plan.schema.json`, `validation_receipts.schema.json`,
+  `validation_acceptance.schema.json`
+  - owner plan, evidence receipts and the acceptance report consumed and
+    emitted by `scripts/testing/evaluate_validation_evidence.py`
 
 These files are machine-readable planning artifacts for agents and wrappers.
 They are not Unity scenario JSON and are not executed directly by the MCP server.
@@ -1120,6 +1162,9 @@ Avoid these agent behaviors:
 - leaving a release-bound project in `devmode`
 - hand-editing `Packages/manifest.json` to fake `prodmode` around a missing release tag
 - hiding skipped Windows/Linux/client smoke validation
+- relabeling helper or CLI evidence as native MCP-client verification
+- promoting a build or export result to a player-runtime or device-runtime claim
+- shrinking a release denominator by dropping blocked or not-run rows
 - storing credentials in scenario files, expectation files, logs, or generated reports
 - using project-private details in public docs or examples
 
