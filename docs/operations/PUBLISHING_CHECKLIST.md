@@ -1,5 +1,9 @@
 # Publishing Checklist
 
+For the full manual/scheduled sequence and downstream closeout, start with
+[RELEASE_FLOW.md](RELEASE_FLOW.md). This checklist owns the SDK release gates;
+the private closeout profile owns consumers, the external website and social delivery.
+
 Date: `2026-07-01`
 Status: `manual follow-up after repo commit`
 

@@ -42,6 +42,7 @@ this router plus the local docs as the source of truth.
 - Longer knowledge, review, skill, and reference files are valid only when trigger-loaded; they are not default entrypoints.
 
 ## Routing Rules
+- For manual release of existing changes, scheduled retro-to-release, or downstream release closeout, first read `docs/operations/RELEASE_FLOW.md`. Use the same gates for both modes; the owner's private closeout profile supplies external repositories and account permissions without adding private paths here.
 - For any task involving process management (process listing, checking liveness, or terminating processes/editors), load the safe process management skill: [SKILL.md](skills/safe_process_management/SKILL.md).
 - For any task that writes or edits Python under `templates/`, the root `*.py` launchers, or tests asserting rendered commands/paths, load the cross-platform python skill: [SKILL.md](skills/cross_platform_python/SKILL.md). Windows/Ubuntu/macOS parity is a hard compatibility requirement for every Python change.
 - For any task that writes or edits bash scripts, the shell wrapper, `.cmd`/`.ps1` launcher flavors, `templates/run.sh`, `scripts/testing/*.sh`, CI workflows, or tests that spawn shell processes — and for any failure that reproduces only on the Windows CI leg or only in CI — load the cross-platform shell skill: [SKILL.md](skills/cross_platform_shell/SKILL.md). Windows Git Bash support is a hard compatibility requirement for every shell change.
