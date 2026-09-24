@@ -128,7 +128,12 @@ exact capabilities, not a ladder. Channels: `native-mcp`, `helper-cli`,
 3. With more than one candidate receipt, the plan's `receiptId` pin or a
    receipt's `supersedes` list decides; otherwise `receipt_conflict`.
 4. Helper responses are decoded by the evaluator; a compile payload offered for
-   a test row is `stage_mismatch`.
+   a test row is `stage_mismatch`. The saved response is authoritative for
+   diagnostics, rebuild measurements, test counts, post-settle errors and
+   execution blockers. Receipt metadata cannot override or fill absent helper
+   measurements. Raw receipts retain their explicit producer-supplied facts;
+   package-scoped diagnostics require a separate raw receipt with ownership
+   evidence, not an override of the helper's global warning count.
 5. Tests pass only with `test_verdict == passed`, `failed == 0` and the plan
    minimum; `runtime_timeout` blocks; `no_tests`, `test_filter_no_match` and
    `failed` fail. Post-settle errors fail the row.

@@ -1,8 +1,8 @@
 # XUUnity Light Unity MCP Public Retro Registry
 
 Status: active public registry
-Last triage: 2026-09-20 (readiness/editor-close retro fully closed in current source)
-Current release: `v0.3.78`
+Last triage: 2026-09-24 (saved helper evidence authority correction)
+Current release: `v0.3.79`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
@@ -25,6 +25,20 @@ host-local registry.
 - `Completed Public History` is the place to find reusable lessons already
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
+
+## Re-Evaluation 2026-09-24 (saved helper evidence authority)
+
+- The offline evaluator shipped in `v0.3.79`; its acceptance design remains
+  partial for consumer adoption and independent acceptance. A source audit found
+  that receipt metadata could replace helper warning/rebuild/test measurements,
+  including post-settle errors. The focused regression reproduces false passes.
+- Current source gives saved helper measurements authority, including missing
+  measurements. This bounded false-positive fix outranks the open batch-output,
+  compact build/EDM4U and advisory-deduplication convenience work. Broader SDK
+  orchestration remains partial and outside this slice.
+- Verdict envelopes, post-settle truth, UI semantic/path proof and separation of
+  infrastructure from product failure remain existing behavior; their baseline
+  regression results are recorded with this cycle's validation evidence.
 
 ## Re-Evaluation 2026-09-20 (batch editor-close side-effect truth)
 

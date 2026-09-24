@@ -310,6 +310,61 @@ class EvaluationPolicyTests(unittest.TestCase):
         self.assertEqual(["payload_json.result", "payload_json.completion_basis", "payload_json.post_settle_error_count"], row["provenance"]["fieldPaths"])
         self.assertEqual("fail", report["verdict"])
 
+    def test_helper_measurements_cannot_be_overridden_by_receipt_metadata(self) -> None:
+        post_settle = compile_response()
+        payload = json.loads(post_settle["payload_json"])
+        payload["post_settle_error_count"] = 1
+        post_settle["payload_json"] = json.dumps(payload)
+        cases = [
+            ("warnings", compile_response(warning_count=1), "compile",
+             {"warningBudget": 0}, "fail", "warning_budget_exceeded"),
+            ("warnings_missing", compile_response(warning_count=None), "compile",
+             {"warningBudget": 0}, "blocked", "diagnostics_unmeasured"),
+            ("cached", compile_response(rebuilt=0), "compile",
+             {"requireMeasuredRebuild": True}, "blocked", "rebuild_cached_only"),
+            ("unmeasured", compile_response(rebuild_status="unavailable"), "compile",
+             {"requireMeasuredRebuild": True}, "blocked", "rebuild_unmeasured"),
+            ("settle", post_settle, "compile", {}, "fail", "post_settle_errors"),
+            ("minimum", tests_response(), "playmode",
+             {"minTests": 2}, "fail", "test_count_insufficient"),
+            ("failed_count", tests_response(failed=1), "playmode",
+             {}, "fail", "test_verdict_not_passed"),
+            ("timeout", tests_response(verdict="runtime_timeout"), "playmode",
+             {}, "blocked", "runtime_timeout"),
+        ]
+        for name, response, stage, policy, outcome, reason in cases:
+            with self.subTest(name=name):
+                ref = evidence(self.root, name + ".json", response)
+                report = run_eval(
+                    plan(requirement("r", stage=stage, policy=policy)),
+                    receipts(receipt(
+                        "c", "r", ref, stage=stage, evidenceKind="helper_response",
+                        diagnostics={"scope": "package", "complete": True, "warningCount": 0},
+                        rebuild={"status": "measured", "rebuiltAssemblyCount": 99},
+                        tests={"verdict": "passed", "total": 99, "failed": 0, "postSettleErrorCount": 0},
+                        executionBlocker={"code": "receipt_override"},
+                    )),
+                    self.root,
+                )
+                self.assertEqual(outcome, report["rows"][0]["outcome"])
+                self.assertIn(reason, report["rows"][0]["reasons"])
+                self.assertEqual(1, report["required"]["total"])
+                self.assertEqual(1, acceptance.exit_code_for(report))
+
+    def test_helper_success_ignores_stale_receipt_measurements(self) -> None:
+        ref = evidence(self.root, "clean.json", compile_response())
+        report = run_eval(
+            plan(requirement("r", policy={"warningBudget": 0, "requireMeasuredRebuild": True})),
+            receipts(receipt(
+                "c", "r", ref, evidenceKind="helper_response", outcome="failed",
+                diagnostics={"scope": "all", "complete": True, "warningCount": 9},
+                rebuild={"status": "unavailable"},
+                tests={"verdict": "failed", "postSettleErrorCount": 9},
+            )),
+            self.root,
+        )
+        self.assertEqual("pass", report["verdict"])
+
     def test_at02_missing_or_incomplete_warning_counts_block_cleanliness(self) -> None:
         ref = evidence(self.root, "raw.json", {"ok": True})
         for diagnostics in (None, {"scope": "all", "complete": False, "warningCount": None}, {"scope": "all", "complete": True, "warningCount": None}):

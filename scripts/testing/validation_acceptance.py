@@ -24,7 +24,7 @@ PLAN_SCHEMA_VERSION = "xuunity.light-mcp.validation-plan.v1"
 RECEIPTS_SCHEMA_VERSION = "xuunity.light-mcp.validation-receipts.v1"
 ACCEPTANCE_SCHEMA_VERSION = "xuunity.light-mcp.validation-acceptance.v1"
 CONSUMER_VERDICT_SCHEMA_VERSION = "foxsterlabs.ccp.release-verdict.v2"
-EVALUATOR_VERSION = "0.1.0"
+EVALUATOR_VERSION = "0.1.1"
 SCHEMA_ID_BASE = "https://github.com/FoxsterDev/xuunity-mcp/templates/workflows/"
 
 MAX_INPUT_BYTES = 10 * 1024 * 1024
@@ -989,10 +989,12 @@ def evaluate_requirement(
             details.append(f"helper payload {normalized['payloadType']} cannot satisfy {requirement['stage']}")
             return finish("blocked", "stage_mismatch")
         operation_outcome = normalized["operationOutcome"]
-        diagnostics = normalized["diagnostics"] if diagnostics is None else diagnostics
-        rebuild = normalized["rebuild"] if rebuild is None else rebuild
-        tests = normalized["tests"] if tests is None else tests
-        blocker = normalized["executionBlocker"] if blocker is None else blocker
+        # The saved response owns measured facts, including missing evidence.
+        # Receipt metadata binds the run; it cannot replace those measurements.
+        diagnostics = normalized["diagnostics"]
+        rebuild = normalized["rebuild"]
+        tests = normalized["tests"]
+        blocker = normalized["executionBlocker"]
         row["provenance"]["producer"] = normalized["producer"]
         row["provenance"]["requestId"] = normalized["requestId"]
         row["provenance"]["fieldPaths"] = normalized["fieldPaths"]

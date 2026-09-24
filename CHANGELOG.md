@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Why this matters
+
+- Receipt metadata could hide warnings, cached-only compilation or post-settle
+  errors in a saved Unity helper response and incorrectly pass release acceptance.
+
+### What changed
+
+- The offline evaluator now takes diagnostics, rebuild measurements, test counts,
+  post-settle errors and execution blockers directly from the saved helper
+  response. Metadata cannot replace missing measurements with passing claims.
+
+### What this gives developers
+
+- Acceptance follows the saved Unity evidence even when receipt metadata
+  contradicts it. Raw receipts keep their existing producer-supplied facts.
+
+### Validation
+
+- Full host suite: `1134` tests OK with `14` expected platform skips;
+  focused offline evaluator suite: `38` tests passed. The new regression cases
+  reproduce contradictory warning, rebuild, test-count, post-settle and timeout
+  metadata. No Unity execution was needed for this offline-only change.
+
+### Known limitations
+
+- This change checks saved evidence; it does not run Unity or attest that an
+  operator-supplied raw receipt is truthful. Package-scoped warning evidence
+  requires a separate raw receipt with ownership evidence.
+- Hosted Unity Package CI remains waived because runner license secrets are
+  absent; there is no hosted EditMode/PlayMode proof for this release.
+
 ## 0.3.79
 
 Release tag: `v0.3.79`

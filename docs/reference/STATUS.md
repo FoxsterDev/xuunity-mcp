@@ -6,6 +6,11 @@ Status: `active public status snapshot`
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
 for MCP-capable AI agents. The current released source line is `v0.3.79`.
 
+The offline validation-acceptance evaluator now treats saved helper measurements
+as authoritative. Receipt metadata cannot hide warnings, missing rebuild evidence,
+test counts or post-settle errors. This is an offline acceptance correction;
+Unity execution and transport behavior are unchanged.
+
 ## Current Package
 
 Unity package:
