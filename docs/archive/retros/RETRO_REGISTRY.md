@@ -2,7 +2,7 @@
 
 Status: active public registry
 Last triage: 2026-09-24 (saved helper evidence authority correction)
-Current release: `v0.3.79`
+Current release: `v0.3.80`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single

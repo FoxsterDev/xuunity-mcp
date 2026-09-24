@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.3.80
+
+Release tag: `v0.3.80`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.80
+```
+
+### Changed
+
+- Released `v0.3.80` package metadata, server metadata, package manifests, and Git UPM examples.
+
 ### Why this matters
 
 - Receipt metadata could hide warnings, cached-only compilation or post-settle
