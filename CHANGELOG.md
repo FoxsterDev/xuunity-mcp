@@ -22,6 +22,11 @@
   `compile_dispatch_gate_timeout` when idle never arrives. An `apply_then_gate`
   profile hook now needs only `status` and `compile_player_scripts` after it;
   the `wait` step is optional.
+- A reconciled PlayMode test result labels the post-run domain reload
+  `expected_domain_reload` with
+  `lifecycle_churn_classification=expected_playmode_exit_domain_reload`
+  instead of `stale_risk`; EditMode churn and unreconciled results keep
+  `stale_risk`.
 
 ## 0.3.80
 

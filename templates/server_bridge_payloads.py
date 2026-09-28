@@ -495,6 +495,27 @@ def normalize_tests_payload_from_lifecycle(payload: dict[str, Any], lifecycle: d
     return normalized
 
 
+EXPECTED_DOMAIN_RELOAD_TRUST_CLASS = "expected_domain_reload"
+
+
+def relabel_reconciled_playmode_reload(payload: dict[str, Any], operation: str) -> bool:
+    """Play Mode exit always reloads the domain; once the persisted result is reconciled that churn is not a risk."""
+
+    if operation != "unity.tests.run_playmode":
+        return False
+    if str(payload.get("playmode_state_after_settle_trust_class") or "") != "stale_risk":
+        return False
+    payload["playmode_state_after_settle_trust_class"] = EXPECTED_DOMAIN_RELOAD_TRUST_CLASS
+    payload["playmode_state_after_settle_note"] = (
+        "Play Mode exit reloaded the scripting domain, so the bridge identity changed during post-test settle; "
+        "the persisted test result was reconciled after the reload and the settled Play Mode state is the "
+        "host's own post-reload observation."
+    )
+    payload["playmode_state_after_settle_recommended_next_action"] = "none"
+    payload["lifecycle_churn_classification"] = "expected_playmode_exit_domain_reload"
+    return True
+
+
 def normalize_response_payload_from_lifecycle(
     response: dict[str, Any],
     lifecycle: dict[str, Any],

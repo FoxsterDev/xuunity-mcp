@@ -47,6 +47,7 @@ TEST_PLAYMODE_ACCOUNTING_FIELDS = (
     "playmode_state_after_settle_trust_class",
     "playmode_state_after_settle_note",
     "playmode_state_after_settle_recommended_next_action",
+    "lifecycle_churn_classification",
     "persisted_test_result_reconciliation",
     "post_lifecycle_status_confirmation",
     "terminal_lifecycle_disposition",

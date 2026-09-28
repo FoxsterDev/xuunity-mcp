@@ -76,6 +76,7 @@ from server_bridge_payloads import (
     bridge_response_to_tool_result as bridge_response_to_tool_result_data,
     normalize_response_payload_from_lifecycle as normalize_response_payload_from_lifecycle_data,
     scenario_failure_tool_result as scenario_failure_tool_result_data,
+    relabel_reconciled_playmode_reload,
     _decode_bridge_payload_dict,
     _bridge_error_code,
 )
@@ -1099,6 +1100,7 @@ def reconcile_persisted_test_result_after_lifecycle(
             return "pending_or_unavailable"
         time.sleep(0.05)
 
+    relabel_reconciled_playmode_reload(payload, operation)
     for field in (
         "playmode_state_after_settle",
         "playmode_state_after_test_callbacks",
@@ -1110,6 +1112,7 @@ def reconcile_persisted_test_result_after_lifecycle(
         "playmode_state_after_settle_note",
         "playmode_state_after_settle_recommended_next_action",
         "lifecycle_churn_observed",
+        "lifecycle_churn_classification",
     ):
         if field in payload:
             persisted[field] = payload[field]

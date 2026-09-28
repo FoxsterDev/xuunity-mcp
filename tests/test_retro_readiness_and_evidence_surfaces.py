@@ -221,5 +221,50 @@ class CompleteFailureListTests(unittest.TestCase):
         self.assertTrue(envelope["test_result_path"].endswith("req.json"))
 
 
+class ExpectedDomainReloadTests(unittest.TestCase):
+    def _payload(self) -> dict:
+        return {
+            "status": "passed",
+            "playmode_state_after_settle": "edit",
+            "playmode_state_after_settle_trust_class": "stale_risk",
+            "playmode_state_after_settle_note": "bridge identity changed during post-test settle",
+            "playmode_state_after_settle_recommended_next_action": "confirm_via_unity_playmode_state",
+            "lifecycle_churn_observed": True,
+        }
+
+    def test_reconciled_playmode_results_relabel_the_exit_reload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = Path(tmp)
+            request_id = "req-playmode"
+            write_json(test_result_path(project_root, request_id), {"request_id": request_id, "response_handoff_state": "written"})
+            payload = self._payload()
+
+            outcome = server_batch_orchestrator.reconcile_persisted_test_result_after_lifecycle(
+                project_root, request_id, "unity.tests.run_playmode", payload
+            )
+            persisted = read_json(test_result_path(project_root, request_id))
+
+        self.assertEqual("reconciled", outcome)
+        self.assertEqual("expected_domain_reload", payload["playmode_state_after_settle_trust_class"])
+        self.assertEqual("none", payload["playmode_state_after_settle_recommended_next_action"])
+        self.assertEqual("expected_playmode_exit_domain_reload", payload["lifecycle_churn_classification"])
+        self.assertTrue(payload["lifecycle_churn_observed"])
+        self.assertEqual("expected_domain_reload", persisted["playmode_state_after_settle_trust_class"])
+
+    def test_editmode_churn_and_unreconciled_results_keep_stale_risk(self) -> None:
+        editmode = self._payload()
+        self.assertFalse(server_bridge_payloads.relabel_reconciled_playmode_reload(editmode, "unity.tests.run_editmode"))
+        self.assertEqual("stale_risk", editmode["playmode_state_after_settle_trust_class"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = self._payload()
+            outcome = server_batch_orchestrator.reconcile_persisted_test_result_after_lifecycle(
+                Path(tmp), "req-missing", "unity.tests.run_playmode", payload, wait_timeout_seconds=0.0
+            )
+
+        self.assertEqual("pending_or_unavailable", outcome)
+        self.assertEqual("stale_risk", payload["playmode_state_after_settle_trust_class"])
+
+
 if __name__ == "__main__":
     unittest.main()

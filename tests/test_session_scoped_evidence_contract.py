@@ -1404,14 +1404,15 @@ class PostSettleCompileTrustTests(unittest.TestCase):
         self.assertFalse(persisted["playmode_state_accounting_consistent"])
         self.assertTrue(payload["lifecycle_churn_observed"])
         self.assertTrue(persisted["lifecycle_churn_observed"])
-        self.assertEqual("stale_risk", payload["playmode_state_after_settle_trust_class"])
-        self.assertEqual("stale_risk", persisted["playmode_state_after_settle_trust_class"])
+        self.assertEqual("expected_domain_reload", payload["playmode_state_after_settle_trust_class"])
+        self.assertEqual("expected_domain_reload", persisted["playmode_state_after_settle_trust_class"])
+        self.assertEqual("expected_playmode_exit_domain_reload", persisted["lifecycle_churn_classification"])
         self.assertIn("bridge identity changed", persisted["playmode_state_after_settle_note"])
 
         compact = server_bridge_payloads.compact_operation_payload(payload, "unity.tests.run_playmode")
         self.assertEqual("playing", compact["playmode_state_after_test_callbacks"])
         self.assertEqual("edit", compact["playmode_state_after_host_settle"])
-        self.assertEqual("stale_risk", compact["playmode_state_after_settle_trust_class"])
+        self.assertEqual("expected_domain_reload", compact["playmode_state_after_settle_trust_class"])
 
     def test_the_trust_class_survives_the_compact_envelope(self) -> None:
         payload = self._refresh("playing", is_playing=True)
