@@ -50,6 +50,14 @@
   instead of `stale_risk`; EditMode churn and unreconciled results keep
   `stale_risk`.
 
+### Added
+
+- `unity_asset_snapshot` / `unity.asset.snapshot`: a read-only, depth-limited
+  snapshot of the serialized fields of a ScriptableObject or any other main
+  asset as path/type/value rows, with array sizes, bounded array elements, and
+  object references rendered as `type:name@path`, so a configuration question
+  is answered without Play Mode or asset YAML.
+
 ## 0.3.80
 
 Release tag: `v0.3.80`

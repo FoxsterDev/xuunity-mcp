@@ -15,6 +15,24 @@ namespace XUUnity.LightMcp.Tests.EditMode
     [Category("XUUnity.MCP.Fast")]
     public sealed class XUUnityLightMcpRetroSettleAndEvidenceEditModeTests
     {
+        const string GENERATED_ROOT = "Assets/XUUnityLightMcpGenerated";
+        const string PROBE_ASSET_PATH = GENERATED_ROOT + "/XUUnityLightMcpAssetSnapshotProbe.asset";
+
+        [TearDown]
+        public void TearDown()
+        {
+            if (AssetDatabase.LoadMainAssetAtPath(PROBE_ASSET_PATH) != null)
+            {
+                AssetDatabase.DeleteAsset(PROBE_ASSET_PATH);
+            }
+
+            if (AssetDatabase.IsValidFolder(GENERATED_ROOT)
+                && AssetDatabase.FindAssets("", new[] { GENERATED_ROOT }).Length == 0)
+            {
+                AssetDatabase.DeleteAsset(GENERATED_ROOT);
+            }
+        }
+
         [Test]
         public void ScenarioValidator_AcceptsStatusThenCompileAfterProfileMutationWithoutAWait()
         {
@@ -116,6 +134,53 @@ namespace XUUnity.LightMcp.Tests.EditMode
             Assert.That(unsupported.error.code, Is.EqualTo("unsupported_console_anchor"));
         }
 
+        [Test]
+        public void AssetSnapshot_ReadsSerializedFieldsOfAScriptableObjectWithoutPlayMode()
+        {
+            if (!AssetDatabase.IsValidFolder(GENERATED_ROOT))
+            {
+                AssetDatabase.CreateFolder("Assets", "XUUnityLightMcpGenerated");
+            }
+
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<XUUnityLightMcpAssetSnapshotProbeAsset>(), PROBE_ASSET_PATH);
+            AssetDatabase.SaveAssets();
+
+            var response = Snapshot(PROBE_ASSET_PATH, maxDepth: 2, maxArrayElements: 2);
+            Assert.That(response.status, Is.EqualTo("ok"), response.error?.message);
+            var payload = JsonUtility.FromJson<XUUnityLightMcpAssetSnapshotPayload>(response.payload_json);
+
+            Assert.That(payload.success, Is.True);
+            Assert.That(payload.main_asset_type, Does.Contain("XUUnityLightMcpAssetSnapshotProbeAsset"));
+            Assert.That(payload.guid, Is.Not.Empty);
+            Assert.That(payload.field_count, Is.EqualTo(payload.fields.Count));
+            Assert.That(Value(payload, "intValue"), Is.EqualTo("7"));
+            Assert.That(Value(payload, "label"), Is.EqualTo("probe"));
+            Assert.That(Value(payload, "flag"), Is.EqualTo("true"));
+            Assert.That(Value(payload, "mode"), Is.EqualTo("Pivot"));
+            Assert.That(Value(payload, "nested.weight"), Is.EqualTo("3"));
+            Assert.That(Value(payload, "nested.label"), Is.EqualTo("inner"));
+            Assert.That(Value(payload, "m_Script"), Does.StartWith("MonoScript:"));
+
+            var numbers = Field(payload, "numbers");
+            Assert.That(numbers.type, Is.EqualTo("Array"));
+            Assert.That(numbers.array_size, Is.EqualTo(3));
+            Assert.That(numbers.array_truncated, Is.True);
+            Assert.That(Value(payload, "numbers.Array.data[1]"), Is.EqualTo("2"));
+            Assert.That(payload.fields.Exists(field => field.path == "numbers.Array.data[2]"), Is.False);
+        }
+
+        [Test]
+        public void AssetSnapshot_RefusesPathsOutsideTheProjectAndMissingAssets()
+        {
+            var outside = Snapshot("/tmp/outside.asset", maxDepth: 2, maxArrayElements: 8);
+            var missing = Snapshot(GENERATED_ROOT + "/DoesNotExist.asset", maxDepth: 2, maxArrayElements: 8);
+
+            Assert.That(outside.status, Is.EqualTo("error"));
+            Assert.That(outside.error.code, Is.EqualTo("asset_path_invalid"));
+            Assert.That(missing.status, Is.EqualTo("error"));
+            Assert.That(missing.error.code, Is.EqualTo("asset_not_found"));
+        }
+
         static XUUnityLightMcpScenarioDefinition ProfileScenario(params XUUnityLightMcpScenarioStepDefinition[] gateSteps)
         {
             var steps = new List<XUUnityLightMcpScenarioStepDefinition>
@@ -153,6 +218,34 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 operation = "unity.console.grep",
                 args_json = JsonUtility.ToJson(args),
             });
+        }
+
+        static XUUnityLightMcpResponse Snapshot(string assetPath, int maxDepth, int maxArrayElements)
+        {
+            var args = new XUUnityLightMcpAssetSnapshotArgs
+            {
+                assetPath = assetPath,
+                maxDepth = maxDepth,
+                maxArrayElements = maxArrayElements,
+            };
+            return new XUUnityLightMcpAssetSnapshotOperation().Execute(new XUUnityLightMcpRequest
+            {
+                request_id = $"asset-{Guid.NewGuid():N}",
+                operation = "unity.asset.snapshot",
+                args_json = JsonUtility.ToJson(args),
+            });
+        }
+
+        static XUUnityLightMcpAssetSnapshotField Field(XUUnityLightMcpAssetSnapshotPayload payload, string path)
+        {
+            var field = payload.fields.Find(candidate => candidate.path == path);
+            Assert.That(field, Is.Not.Null, $"field '{path}' missing from {string.Join(", ", payload.fields.ConvertAll(candidate => candidate.path))}");
+            return field;
+        }
+
+        static string Value(XUUnityLightMcpAssetSnapshotPayload payload, string path)
+        {
+            return Field(payload, path).value;
         }
     }
 }

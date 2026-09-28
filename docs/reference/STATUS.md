@@ -376,6 +376,7 @@ Implemented host-side MCP tools and helpers:
 - `unity_ui_interaction_validate`
 - `unity_prefab_snapshot`
 - `unity_prefab_validate`
+- `unity_asset_snapshot`
 - `unity_ui_tree_snapshot`
 - `unity_ui_query`
 - `unity_ui_exists`

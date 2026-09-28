@@ -105,6 +105,7 @@ Unity MCP implementations when the user wants safe production validation.
 | UI reference | `unity_ui_vision_submit` | `Supported` | Records a rubric judgement against a packet, checks the arithmetic (observation per criterion, overall clamped to the worst required criterion plus one), records judge role, and returns the vision lane. |
 | UI reference | `unity_ui_interaction_validate` | `Supported` | Validates `ui-interaction.v1` evidence from a scenario result; Play-mode delivery proves a user path, Edit-mode delivery blocks the lane instead of passing it. |
 | Prefab read | `unity_prefab_snapshot` | `Supported` | Reads a prefab asset hierarchy as normalized `ui.read.v1` nodes without opening it for editing. |
+| Asset read | `unity_asset_snapshot` | `Supported` | Reads the serialized fields of a ScriptableObject or any other main asset as depth-limited path/type/value rows without Play Mode or asset YAML; read-only. |
 | Prefab read | `unity_prefab_validate` | `Supported` | Reports typed pre-PlayMode defects (missing script GUID, missing or mistyped serialized reference, missing nested prefab) and lists lanes it could not evaluate. |
 | UI read | `unity_ui_tree_snapshot` | `Supported` | Snapshots the live uGUI hierarchy with paths, active state, effective CanvasGroup alpha, canvas order, screen bounds, and text/font/material where a backend reader is present. |
 | UI read | `unity_ui_query` | `Supported` | Returns nodes matching an AND-combined selector (name, type, path, text, visibility, interactability) and reports ambiguity. |

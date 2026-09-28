@@ -53,6 +53,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.scene.open", CoreCapability },
             { "unity.scene.assert", CoreCapability },
             { "unity.prefab.snapshot", CoreCapability },
+            { "unity.asset.snapshot", CoreCapability },
             { "unity.prefab.validate", CoreCapability },
             { "unity.prefab.mutate", PrefabMutationCapability },
             { "unity.prefab.render", UiRenderCapability },

@@ -750,6 +750,30 @@ TOOLS: dict[str, dict[str, Any]] = {
             "required": ["projectRoot", "prefabPath"]
         }
     },
+    "unity_asset_snapshot": {
+        "bridgeOperation": "unity.asset.snapshot",
+        "description": (
+            "Read the serialized fields of a project asset (a ScriptableObject, material, or any main asset) as a "
+            "flat, depth-limited list of path/type/value rows without entering Play Mode or parsing asset YAML. "
+            "Read-only; the asset is never modified. Nested structs recurse up to maxDepth, arrays report their size "
+            "and the first maxArrayElements items, and object references render as type:name@path."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "assetPath": {
+                    "type": "string",
+                    "description": "Project-relative asset path such as Assets/Configs/BuildConfiguration.asset."
+                },
+                "maxDepth": {"type": "integer", "default": 2, "minimum": 0},
+                "maxFields": {"type": "integer", "default": 200, "minimum": 1},
+                "maxArrayElements": {"type": "integer", "default": 8, "minimum": 0},
+                "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
+            },
+            "required": ["projectRoot", "assetPath"]
+        }
+    },
     "unity_prefab_validate": {
         "bridgeOperation": "unity.prefab.validate",
         "description": (

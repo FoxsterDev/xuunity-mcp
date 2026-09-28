@@ -825,7 +825,7 @@ Popular MCP tools:
 `unity_ui_reference_compare` | `unity_ui_fixture_validate` |
 `unity_ui_vision_packet` | `unity_ui_vision_submit` |
 `unity_ui_interaction_validate` |
-`unity_prefab_snapshot` | `unity_prefab_validate` |
+`unity_prefab_snapshot` | `unity_prefab_validate` | `unity_asset_snapshot` |
 `unity_ui_tree_snapshot` | `unity_ui_query` | `unity_ui_exists` |
 `unity_ui_get_text` | `unity_ui_get_bounds` |
 `unity_prefab_render` | `unity_prefab_mutate` | `unity_ui_click` |
@@ -1033,6 +1033,9 @@ returns `verdict=ready_with_compile_errors` with `fix_compile_errors` and the
 already left Safe Mode (`Exiting safe mode`) the readiness wait keeps polling
 instead of failing with `startup_safe_mode_dialog_observed`, which is now
 raised only when the log has gone quiet with the dialog markers present.
+`unity_asset_snapshot` reads the serialized fields of a ScriptableObject or
+any other main asset as depth-limited path/type/value rows, so a configuration
+question is answered without Play Mode or asset YAML.
 Refresh, compile, and direct test MCP tools also return compact operation
 summaries by default; pass `includeFullPayload=true` when you need full
 `_xuunity_lifecycle` snapshots for transport or lifecycle debugging.

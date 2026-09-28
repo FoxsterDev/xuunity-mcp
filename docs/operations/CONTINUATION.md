@@ -100,6 +100,7 @@ Unity bridge:
 - edit-mode test execution
 - console tail
 - console grep with a `since=playmode_start` buffer anchor
+- read-only asset field snapshot (`unity.asset.snapshot`)
 - scene snapshot
 - scene open for deterministic Edit Mode scene setup
 - play mode control
