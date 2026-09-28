@@ -192,6 +192,9 @@ namespace XUUnity.LightMcp.Editor.Helpers
             state.pendingNestedResponseErrorCode = "";
             state.pendingNestedResponseErrorMessage = "";
             state.pendingNestedStableTickCount = 0;
+            state.pendingNestedDispatchAttemptCount = 0;
+            state.pendingNestedDispatchGateStartedAtUtc = "";
+            state.pendingNestedDispatchGateBusyObserved = false;
         }
 
         public static void CapturePendingNestedResponse(XUUnityLightMcpScenarioRunState state, XUUnityLightMcpResponse response)

@@ -110,17 +110,19 @@ namespace XUUnity.LightMcp.Editor.Helpers
                         index);
                 }
 
-                var patternValid = followingKinds.Count >= 3
-                    && string.Equals(followingKinds[0], "wait", StringComparison.Ordinal)
-                    && string.Equals(followingKinds[1], "status", StringComparison.Ordinal)
-                    && string.Equals(followingKinds[2], "compile_player_scripts", StringComparison.Ordinal);
+                var gateKinds = followingKinds.Count > 0 && string.Equals(followingKinds[0], "wait", StringComparison.Ordinal)
+                    ? followingKinds.Skip(1).ToList()
+                    : followingKinds;
+                var patternValid = gateKinds.Count >= 2
+                    && string.Equals(gateKinds[0], "status", StringComparison.Ordinal)
+                    && string.Equals(gateKinds[1], "compile_player_scripts", StringComparison.Ordinal);
                 if (!patternValid)
                 {
                     AddIssue(
                         payload,
                         "error",
                         "apply_then_gate_sequence_required",
-                        "mutationSettlePolicy=apply_then_gate requires the next three steps to be wait, status, and compile_player_scripts, in that order.",
+                        "mutationSettlePolicy=apply_then_gate requires the next steps to be status and compile_player_scripts, optionally preceded by one wait; the compile step waits for editor idle before it dispatches.",
                         stepId,
                         index);
                 }

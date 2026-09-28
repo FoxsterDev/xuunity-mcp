@@ -74,6 +74,9 @@ namespace XUUnity.LightMcp.Editor.Core
             public string playmode_state_after_settle = "edit";
             public string settle_request_id = "";
             public string settle_phase = "";
+            public double dispatch_gate_wait_seconds;
+            public int dispatch_attempt_count;
+            public bool dispatch_gate_busy_observed;
             public XUUnityLightMcpCompileConfigPayload result = new();
             public string validation_evidence = "unity_mcp";
         }

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed
+
+- The scenario `compile_player_scripts` step waits for editor idle (compile,
+  update, domain reload, package, and import activity) before it dispatches,
+  retries one `editor_busy` refusal, reports `dispatch_gate_wait_seconds`,
+  `dispatch_attempt_count`, and `dispatch_gate_busy_observed`, and fails as
+  `compile_dispatch_gate_timeout` when idle never arrives. An `apply_then_gate`
+  profile hook now needs only `status` and `compile_player_scripts` after it;
+  the `wait` step is optional.
+
 ## 0.3.80
 
 Release tag: `v0.3.80`

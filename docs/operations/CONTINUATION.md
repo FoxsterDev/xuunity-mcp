@@ -109,7 +109,8 @@ Unity bridge:
 
 Scenario second-wave steps:
 - `scene_open`
-- `compile_player_scripts`
+- `compile_player_scripts` (waits for editor idle before it dispatches, so it
+  is the settle primitive after an `apply_then_gate` profile hook)
 - `tests_run_editmode`
 - `game_view_configure`
 - `project_defined_hook`

@@ -211,6 +211,9 @@ namespace XUUnity.LightMcp.Editor.Core
             public string pendingNestedResponseErrorCode = "";
             public string pendingNestedResponseErrorMessage = "";
             public int pendingNestedStableTickCount;
+            public int pendingNestedDispatchAttemptCount;
+            public string pendingNestedDispatchGateStartedAtUtc = "";
+            public bool pendingNestedDispatchGateBusyObserved;
             public string pollUntilStartedAtUtc = "";
             public string pollUntilDeadlineUtc = "";
             public string pollUntilNextPollUtc = "";

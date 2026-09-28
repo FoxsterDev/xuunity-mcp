@@ -317,8 +317,21 @@ contract error instead of normal waiting.
 A build-profile apply may change scripting defines and trigger a domain reload.
 Do not place `project_refresh` immediately after that hook. Mark the apply step
 with `mutationSettlePolicy: "apply_then_gate"`; scenario validation then
-requires the next three steps to be `wait`, `status`, and
-`compile_player_scripts`, in that order, and rejects an intervening refresh.
+requires the next steps to be `status` and `compile_player_scripts`, optionally
+preceded by one `wait`, and rejects an intervening refresh. The
+`compile_player_scripts` step is the settle primitive: it waits for the editor
+to leave compile, update, domain-reload, package and import activity before it
+dispatches (bounded by its own `timeoutSeconds`, reported as
+`compile_waiting_for_editor_idle_before_dispatch` while waiting), retries one
+`editor_busy` refusal automatically, and reports `dispatch_gate_wait_seconds`,
+`dispatch_attempt_count` and `dispatch_gate_busy_observed` in its payload. A
+blind `wait` before it is therefore optional; a gate that never sees idle fails
+as `compile_dispatch_gate_timeout` with the editor busy flags in the message.
+
+A mutating hook should report the editor state it changed in its payload, for
+example the resulting scripting defines per platform plus a changed flag after
+a profile apply, so the scenario result proves what was applied without a
+second inspection round.
 
 Run hook-dependent scenarios only while the assembly that owns the hook is
 enabled by the active profile. If validation cannot resolve a hook, the
