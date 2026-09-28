@@ -280,6 +280,8 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
         "skipped",
         "retryable",
         "retry_required",
+        "retry_recommended",
+        "editor_quit_by_wrapper",
         "recommended_next_action",
         "closeout_classification",
         "closeout_verified",
@@ -306,6 +308,8 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
         "result_trust_class",
         "operation_outcome",
         "retryable",
+        "retry_recommended",
+        "editor_quit_by_wrapper",
     ):
         if key not in envelope and details.get(key) is not None and details.get(key) != "":
             envelope[key] = details.get(key)

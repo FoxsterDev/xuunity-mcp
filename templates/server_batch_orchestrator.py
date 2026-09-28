@@ -3084,6 +3084,7 @@ def run_gui_fallback_operation(
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
     output_mode: str = "full",
+    progress_reporter: Any = None,
 ) -> None:
     return run_gui_fallback_operation_data(
         project_root=project_root,
@@ -3103,6 +3104,7 @@ def run_gui_fallback_operation(
         artifact_probe_path_override=artifact_probe_path_override,
         artifact_probe_warn_only=artifact_probe_warn_only,
         output_mode=output_mode,
+        progress_reporter=progress_reporter,
         batch_start_editor_state=batch_start_editor_state,
         gui_fallback_busy_reasons=gui_fallback_busy_reasons,
         ToolInvocationError=ToolInvocationError,

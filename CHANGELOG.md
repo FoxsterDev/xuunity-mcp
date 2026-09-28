@@ -29,6 +29,21 @@
   `console_grep` steps accept `since=playmode_start`, backed by a console-buffer
   anchor captured on Play Mode entry, and report `since_anchor_resolved`,
   `since_anchor_reason`, `since_scope_complete`, and `search_verdict`.
+- `editor_idle_timeout` details classify a live editor pid whose heartbeat is
+  stale for at most 600 s during import, update, compile, package, or
+  domain-reload activity as `editor_busy_heartbeat_stale` with
+  `retry_recommended=true` and `wait_for_editor_idle_then_retry`; longer stalls,
+  dead pids, and idle busy reasons stay `editor_state_frozen`. The stderr
+  failure line and compact envelopes carry `retry_recommended`. A GUI-fallback
+  lane that already quit the editor it opened rewrites the recovery advice to
+  `retry_same_command` with `editor_quit_by_wrapper=true`.
+- Batch and GUI-fallback summaries carry one lane-independent
+  `terminal_record` (`lane`, `compile_status`, `error_count`,
+  `rebuilt_assembly_count`, `cached_assembly_count`, `license_blocker_code`,
+  `lane_fallback_reason`, ...), also emitted as the last progress NDJSON line
+  (`event=batch_terminal_record`) and in the compact CLI output; the
+  multi-project runner reads it plus `error_code` and `retry_recommended` into
+  each project status and the summary line.
 - A reconciled PlayMode test result labels the post-run domain reload
   `expected_domain_reload` with
   `lifecycle_churn_classification=expected_playmode_exit_domain_reload`

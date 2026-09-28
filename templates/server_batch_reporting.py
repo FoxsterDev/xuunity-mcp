@@ -54,7 +54,65 @@ COMPACT_BATCH_NESTED_SUMMARY_KEYS = {
         "warning_count", "unique_warning_count", "warnings_truncated", "warnings",
     ),
     "tests": ("status", "total", "passed", "failed", "skipped"),
+    "terminal_record": (
+        "record_kind", "action", "lane", "lane_fallback_reason", "license_blocker_code",
+        "succeeded", "unity_outcome", "transport_outcome",
+        "compile_status", "error_count", "warning_count",
+        "rebuilt_assembly_count", "cached_assembly_count", "rebuild_evidence_status",
+        "tests_status", "result_file", "summary_file",
+        "top_actionable_error", "recommended_next_action",
+    ),
 }
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def build_batch_terminal_record(summary: dict[str, Any], *, summary_path: Path | None = None) -> dict[str, Any]:
+    """One lane-independent verdict: the GUI lane reports result.status while the batch lane reports compile.status."""
+
+    compile_section = summary.get("compile") if isinstance(summary.get("compile"), dict) else {}
+    matrix_section = summary.get("matrix") if isinstance(summary.get("matrix"), dict) else {}
+    tests_section = summary.get("tests") if isinstance(summary.get("tests"), dict) else {}
+    section = matrix_section or compile_section
+    error_count = _int_or_none(summary.get("total_errors"))
+    if error_count is None and matrix_section:
+        error_count = _int_or_none(matrix_section.get("failed"))
+    if error_count is None and compile_section:
+        error_count = _int_or_none(compile_section.get("error_count"))
+    return {
+        "record_kind": "batch_terminal_record",
+        "action": str(summary.get("action") or ""),
+        "lane": str(summary.get("effective_execution_lane") or summary.get("requested_execution_lane") or ""),
+        "lane_fallback_reason": str(summary.get("lane_fallback_reason") or ""),
+        "license_blocker_code": str(summary.get("license_blocker_code") or ""),
+        "succeeded": bool(summary.get("succeeded")),
+        "unity_outcome": str(summary.get("unity_outcome") or ""),
+        "transport_outcome": str(summary.get("transport_outcome") or ""),
+        "compile_status": str(section.get("status") or "") if section else "",
+        "error_count": error_count,
+        "warning_count": _int_or_none(section.get("warning_count")) if section else None,
+        "rebuilt_assembly_count": _int_or_none(section.get("rebuilt_assembly_count")) if section else None,
+        "cached_assembly_count": _int_or_none(section.get("cached_assembly_count")) if section else None,
+        "rebuild_evidence_status": str(section.get("rebuild_evidence_status") or "") if section else "",
+        "tests_status": str(tests_section.get("status") or "") if tests_section else "",
+        "result_file": str(summary.get("result_file") or ""),
+        "summary_file": str(summary_path) if summary_path else "",
+        "top_actionable_error": str(summary.get("top_actionable_error") or ""),
+        "recommended_next_action": str(summary.get("recommended_next_action") or ""),
+    }
+
+
+def attach_batch_terminal_record(summary: dict[str, Any], *, summary_path: Path | None = None) -> dict[str, Any]:
+    record = build_batch_terminal_record(summary, summary_path=summary_path)
+    summary["terminal_record"] = record
+    return record
 
 
 def first_non_empty_line(
@@ -198,6 +256,21 @@ class BatchProgressReporter:
             "last_known_output_path": str(last_known_output_path or ""),
             "message": message or _default_progress_message(phase),
         }
+        self._write(event)
+        return event
+
+    def emit_terminal_record(self, record: dict[str, Any]) -> dict[str, Any]:
+        event = {
+            "event": "batch_terminal_record",
+            "run_id": self.run_id,
+            "operation": self.operation,
+            "elapsed_seconds": int(max(0.0, time.time() - self.started_at)),
+        }
+        event.update(record)
+        self._write(event)
+        return event
+
+    def _write(self, event: dict[str, Any]) -> None:
         encoded = json.dumps(event, ensure_ascii=True, separators=(",", ":"))
         self.progress_path.parent.mkdir(parents=True, exist_ok=True)
         with self.progress_path.open("a", encoding="utf-8") as handle:
@@ -205,7 +278,6 @@ class BatchProgressReporter:
             handle.write("\n")
         if self.stdout:
             print(encoded, flush=True)
-        return event
 
 
 def _default_progress_message(phase: str) -> str:

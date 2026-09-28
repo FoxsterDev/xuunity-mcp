@@ -273,6 +273,21 @@ def idle_wait_blocking_reasons(
     return deduped
 
 
+TRANSIENT_BUSY_REASONS_FOR_RETRY = frozenset(
+    {
+        "asset_import",
+        "updating",
+        "compiling",
+        "domain_reload",
+        "package_operation",
+        "refresh_settle",
+        "compile_settle",
+        "script_reload_pending",
+    }
+)
+TRANSIENT_BUSY_HEARTBEAT_STALE_MAX_SECONDS = 600.0
+
+
 def build_editor_idle_timeout_details(
     project_root: Path,
     *,
@@ -294,19 +309,42 @@ def build_editor_idle_timeout_details(
         not_before_unix=not_before_unix,
     )
     pid_alive = bool(last_state) and pid_is_alive(int(last_state.get("editor_pid") or 0))
-    frozen = bool(last_state) and (not pid_alive or age_seconds is None or age_seconds > heartbeat_max_age_seconds)
-    next_action = "recover_editor_session" if frozen else "wait_for_editor_idle_or_inspect_busy_state"
+    busy_reason = derive_busy_reason(last_state)
+    heartbeat_stale = age_seconds is None or age_seconds > heartbeat_max_age_seconds
+    # A long import or compile blocks the main thread that writes the heartbeat; a live pid with a transient busy
+    # reason and a bounded stale age is a slow editor, not a frozen one, and the working recovery is a plain retry.
+    stale_while_busy = (
+        bool(last_state)
+        and pid_alive
+        and heartbeat_stale
+        and age_seconds is not None
+        and age_seconds <= TRANSIENT_BUSY_HEARTBEAT_STALE_MAX_SECONDS
+        and busy_reason in TRANSIENT_BUSY_REASONS_FOR_RETRY
+    )
+    frozen = bool(last_state) and (not pid_alive or (heartbeat_stale and not stale_while_busy))
+    if frozen:
+        classification = "editor_state_frozen"
+        next_action = "recover_editor_session"
+    elif stale_while_busy:
+        classification = "editor_busy_heartbeat_stale"
+        next_action = "wait_for_editor_idle_then_retry"
+    else:
+        classification = "editor_idle_timeout"
+        next_action = "wait_for_editor_idle_or_inspect_busy_state"
     return {
-        "classification": "editor_state_frozen" if frozen else "editor_idle_timeout",
+        "classification": classification,
         "editor_pid_alive": pid_alive,
         "state_frozen": frozen,
+        "heartbeat_stale": heartbeat_stale,
         "busy_reason_detail": str((last_state or {}).get("busy_reason_detail") or ""),
         "busy_reason_as_of_utc": str((last_state or {}).get("heartbeat_utc") or ""),
         "result_trust_class": "stale_snapshot" if frozen else "editor_state_not_idle",
         "heartbeat_age_seconds": None if age_seconds is None else round(age_seconds, 3),
-        "busy_reason": derive_busy_reason(last_state),
+        "busy_reason": busy_reason,
         "blocking_reasons": blocking_reasons,
-        "safe_to_retry": False,
+        "safe_to_retry": stale_while_busy,
+        "retry_recommended": stale_while_busy,
+        "retry_reason": f"heartbeat_stale_while_editor_busy_with_{busy_reason}" if stale_while_busy else "",
         "recommended_next_action": next_action,
         "recommended_recovery_command": recommended_recovery_command_for_project(project_root, next_action),
         "request_id": str(after_request_id or ""),

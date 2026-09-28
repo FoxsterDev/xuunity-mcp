@@ -384,6 +384,21 @@ Pass criteria:
   operation may have completed even though the waiter timed out; do not retry
   blind. When the editor is unreachable the action is
   `recover_editor_session` with an `ensure-ready` recovery command.
+- a wrapper `editor_idle_timeout` whose details carry
+  `classification=editor_busy_heartbeat_stale` (live editor pid, heartbeat
+  stale for less than 600 s while the last busy reason was import, update,
+  compile, package or domain-reload activity) also carries
+  `retry_recommended=true` and `wait_for_editor_idle_then_retry`; rerun the same
+  command instead of `recover-editor-session`. A stale heartbeat beyond that
+  bound, a dead pid, or an idle busy reason stays `editor_state_frozen`. When a
+  GUI-fallback lane already quit the editor it opened, the error carries
+  `editor_quit_by_wrapper=true` and `recommended_next_action=retry_same_command`.
+- every batch and GUI-fallback summary, and the last progress NDJSON line
+  (`event=batch_terminal_record`), carries one lane-independent
+  `terminal_record` with `lane`, `compile_status`, `error_count`,
+  `rebuilt_assembly_count`, `cached_assembly_count`, `license_blocker_code`
+  and `lane_fallback_reason`, so a sweep does not parse `result.status` on one
+  lane and `compile.status` on the other.
 
 ### 4a. Filtered Test Zero-Match Recovery
 

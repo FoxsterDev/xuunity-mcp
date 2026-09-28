@@ -466,6 +466,27 @@ def batch_error_code(payload) -> str:
     return str(error.get("code") or "")
 
 
+def batch_error_details(payload) -> dict:
+    """Error details of a failed batch run, merged with the fields the wrapper promotes to the top level."""
+
+    if not isinstance(payload, dict):
+        return {}
+    error = payload.get("error")
+    details = error.get("details") if isinstance(error, dict) and isinstance(error.get("details"), dict) else {}
+    merged = dict(details)
+    for key in ("retry_recommended", "retry_reason", "editor_quit_by_wrapper", "recommended_next_action", "safe_to_retry"):
+        if key in payload and key not in merged:
+            merged[key] = payload[key]
+    return merged
+
+
+def terminal_record_from_run(result_summary, summary_artifact) -> dict:
+    for container in (result_summary, summary_artifact):
+        if isinstance(container, dict) and isinstance(container.get("terminal_record"), dict):
+            return dict(container["terminal_record"])
+    return {}
+
+
 def live_project_editor_pids_from_run(payload, result_summary) -> list:
     """Live editor pids reported by any of the places a blocked batch run records them."""
 
@@ -616,6 +637,8 @@ def build_batch_status(
         operator_verdict = "failed_wrapper_unity_unproven"
 
     license_from_cache, license_probed_at_utc, license_probe_age = license_probe_facts(payload, result_summary)
+    error_details = batch_error_details(payload)
+    terminal_record = terminal_record_from_run(result_summary, summary_artifact)
 
     recovery_closeout = dict(recovery_closeout or recovery_closeout_facts(None))
     status = {
@@ -636,6 +659,12 @@ def build_batch_status(
         "license_probed_at_utc": license_probed_at_utc,
         "license_probe_age_seconds": license_probe_age,
         "operator_verdict": operator_verdict,
+        "error_code": batch_error_code(payload),
+        "retry_recommended": bool(error_details.get("retry_recommended")),
+        "retry_reason": str(error_details.get("retry_reason") or ""),
+        "editor_quit_by_wrapper": bool(error_details.get("editor_quit_by_wrapper")),
+        "wrapper_recommended_next_action": str(error_details.get("recommended_next_action") or ""),
+        "terminal_record": terminal_record,
         "blocked_by_live_editor": blocked_by_live_editor,
         "live_project_editor_pids": live_editor_pids,
         "compile_evidence": compile_evidence,
@@ -740,6 +769,7 @@ def emit_batch_final_summary(results_dir: str) -> int:
     overall_failed = 0
     overall_blocked = 0
     blocked_projects = []
+    retry_recommended_projects = []
     editor_close_side_effects = []
     verdict_counts = {}
     for item in statuses:
@@ -770,6 +800,16 @@ def emit_batch_final_summary(results_dir: str) -> int:
             )
         elif not ok:
             overall_failed += 1
+        if bool(item.get("retry_recommended")):
+            retry_recommended_projects.append(
+                {
+                    "project": item.get("project", ""),
+                    "project_root": item.get("project_root", ""),
+                    "error_code": item.get("error_code", ""),
+                    "retry_reason": item.get("retry_reason", ""),
+                    "editor_quit_by_wrapper": bool(item.get("editor_quit_by_wrapper")),
+                }
+            )
         if item.get("editor_closed_before_batch") is True:
             editor_close_side_effects.append(
                 {
@@ -794,6 +834,10 @@ def emit_batch_final_summary(results_dir: str) -> int:
             f"batch_rc={item.get('batch_rc', 0)}",
             f"succeeded={str(bool(item.get('succeeded'))).lower()}",
             f"verdict={operator_verdict}",
+            f"error_code={item.get('error_code', '')}",
+            f"retry_recommended={str(bool(item.get('retry_recommended'))).lower()}",
+            f"terminal_lane={(item.get('terminal_record') or {}).get('lane', '')}",
+            f"terminal_compile_status={(item.get('terminal_record') or {}).get('compile_status', '')}",
             f"requested_lane={item.get('requested_execution_lane', '')}",
             f"effective_lane={item.get('effective_execution_lane', '')}",
             f"fallback_mode={item.get('batch_fallback_mode', '')}",
@@ -825,6 +869,8 @@ def emit_batch_final_summary(results_dir: str) -> int:
         "projects_blocked": overall_blocked,
         "operator_verdict_counts": verdict_counts,
         "blocked_projects": blocked_projects,
+        "projects_retry_recommended": len(retry_recommended_projects),
+        "retry_recommended_projects": retry_recommended_projects,
         "editors_closed_before_batch": len(editor_close_side_effects),
         "editor_close_side_effects": editor_close_side_effects,
         "results_dir": str(results_path),

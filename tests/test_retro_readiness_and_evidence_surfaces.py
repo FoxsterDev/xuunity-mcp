@@ -212,6 +212,7 @@ class CompleteFailureListTests(unittest.TestCase):
                 "first_failures": failures(3),
                 "failure_count": 9,
                 "test_result_path": "/project/Library/XUUnityLightMcp/state/test_results/req.json",
+                "retry_recommended": True,
             },
             exit_code=1,
         )
@@ -219,6 +220,7 @@ class CompleteFailureListTests(unittest.TestCase):
         self.assertEqual(failures(3)[0], envelope["first_failure"])
         self.assertEqual(9, envelope["failure_count"])
         self.assertTrue(envelope["test_result_path"].endswith("req.json"))
+        self.assertTrue(envelope["retry_recommended"])
 
 
 class ExpectedDomainReloadTests(unittest.TestCase):
@@ -312,6 +314,143 @@ class AnchoredGrepAutoExtensionTests(unittest.TestCase):
         self.assertTrue(payload["scope_truncated"])
         self.assertEqual("inconclusive", payload["search_verdict"])
         self.assertEqual(4096, payload["searched_tail_chars"])
+
+
+class StaleHeartbeatRetryHintTests(unittest.TestCase):
+    def _details(self, *, age: float, busy_reason: str, alive: bool = True) -> dict:
+        state = {"editor_pid": 123, "heartbeat_utc": "2026-09-28T14:32:00Z", "busy_reason": busy_reason}
+        with (
+            mock.patch.object(server_bridge_state, "pid_is_alive", return_value=alive),
+            mock.patch.object(server_bridge_state, "heartbeat_age_seconds", return_value=age),
+        ):
+            return server_bridge_state.build_editor_idle_timeout_details(
+                Path("/project"), last_state=state, reason="before unity.compile.player_scripts",
+                timeout_ms=180000, heartbeat_max_age_seconds=10, require_healthy_bridge=False,
+            )
+
+    def test_a_stale_heartbeat_during_a_bounded_import_stall_recommends_a_retry(self) -> None:
+        for busy_reason in ("asset_import", "updating"):
+            with self.subTest(busy_reason=busy_reason):
+                details = self._details(age=183.4, busy_reason=busy_reason)
+
+                self.assertEqual("editor_busy_heartbeat_stale", details["classification"])
+                self.assertFalse(details["state_frozen"])
+                self.assertTrue(details["heartbeat_stale"])
+                self.assertTrue(details["retry_recommended"])
+                self.assertTrue(details["safe_to_retry"])
+                self.assertEqual(f"heartbeat_stale_while_editor_busy_with_{busy_reason}", details["retry_reason"])
+                self.assertEqual("wait_for_editor_idle_then_retry", details["recommended_next_action"])
+                self.assertIn("request-status-summary", details["recommended_recovery_command"])
+
+    def test_a_non_transient_reason_or_a_long_stale_heartbeat_stays_frozen(self) -> None:
+        for age, busy_reason in ((183.4, "idle"), (1522.871, "asset_import")):
+            with self.subTest(age=age, busy_reason=busy_reason):
+                details = self._details(age=age, busy_reason=busy_reason)
+
+                self.assertEqual("editor_state_frozen", details["classification"])
+                self.assertFalse(details["retry_recommended"])
+                self.assertEqual("recover_editor_session", details["recommended_next_action"])
+
+    def test_a_dead_pid_is_never_retryable(self) -> None:
+        details = self._details(age=183.4, busy_reason="asset_import", alive=False)
+
+        self.assertEqual("editor_state_frozen", details["classification"])
+        self.assertFalse(details["retry_recommended"])
+
+
+class GuiFallbackQuitAnnotationTests(unittest.TestCase):
+    def test_recovery_aimed_at_the_editor_the_wrapper_quit_becomes_a_rerun(self) -> None:
+        exc = ToolInvocationError(
+            "editor_idle_timeout",
+            "Timed out waiting for Unity editor idle. recommended_next_action=recover_editor_session",
+            {"recommended_next_action": "recover_editor_session", "recommended_recovery_command": "x recover-editor-session"},
+        )
+
+        server_batch_lanes.annotate_gui_fallback_error_after_wrapper_quit(exc)
+
+        self.assertTrue(exc.details["editor_quit_by_wrapper"])
+        self.assertEqual("retry_same_command", exc.details["recommended_next_action"])
+        self.assertEqual("", exc.details["recommended_recovery_command"])
+        self.assertTrue(exc.details["retry_recommended"])
+        self.assertIn("recommended_next_action=retry_same_command", exc.message)
+        self.assertEqual(exc.message, str(exc))
+
+    def test_product_level_next_actions_are_left_alone(self) -> None:
+        exc = ToolInvocationError("compile_failed", "compile failed", {"recommended_next_action": "inspect_compile_errors"})
+
+        server_batch_lanes.annotate_gui_fallback_error_after_wrapper_quit(exc)
+
+        self.assertTrue(exc.details["editor_quit_by_wrapper"])
+        self.assertEqual("inspect_compile_errors", exc.details["recommended_next_action"])
+        self.assertNotIn("retry_recommended", exc.details)
+
+
+class BatchTerminalRecordTests(unittest.TestCase):
+    def test_gui_and_batch_shaped_summaries_produce_the_same_record_shape(self) -> None:
+        gui_summary = {
+            "action": "batch_compile", "succeeded": True, "unity_outcome": "passed",
+            "transport_outcome": "gui_operation_completed", "effective_execution_lane": "gui",
+            "lane_fallback_reason": "licensing_client_ipc_failure", "result_file": "/r/gui.json",
+            "compile": {"status": "passed", "error_count": 0, "rebuilt_assembly_count": 16, "cached_assembly_count": 140,
+                        "rebuild_evidence_status": "measured"},
+        }
+        batch_summary = {
+            "action": "batch_build_config_compile_matrix", "succeeded": False, "unity_outcome": "failed",
+            "transport_outcome": "batch_process_exited_cleanly", "effective_execution_lane": "batch",
+            "result_file": "/r/batch.json", "total_errors": 2,
+            "matrix": {"status": "failed", "failed": 1, "warning_count": 4, "rebuilt_assembly_count": 3,
+                       "cached_assembly_count": 9, "rebuild_evidence_status": "measured"},
+            "top_actionable_error": "CS1061",
+        }
+
+        gui = server_batch_reporting.build_batch_terminal_record(gui_summary, summary_path=Path("/r/gui_summary.json"))
+        batch = server_batch_reporting.build_batch_terminal_record(batch_summary, summary_path=Path("/r/batch_summary.json"))
+
+        self.assertEqual(set(gui), set(batch))
+        self.assertEqual(("gui", "passed", 0, 16), (gui["lane"], gui["compile_status"], gui["error_count"], gui["rebuilt_assembly_count"]))
+        self.assertEqual(("batch", "failed", 2, 3), (batch["lane"], batch["compile_status"], batch["error_count"], batch["rebuilt_assembly_count"]))
+        self.assertEqual("licensing_client_ipc_failure", gui["lane_fallback_reason"])
+        self.assertEqual("CS1061", batch["top_actionable_error"])
+        self.assertEqual("/r/batch_summary.json", batch["summary_file"].replace("\\", "/"))
+
+    def test_the_record_reaches_the_compact_cli_output_and_the_last_ndjson_line(self) -> None:
+        summary = {"action": "batch_compile", "succeeded": True, "unity_outcome": "passed", "effective_execution_lane": "batch",
+                   "compile": {"status": "passed", "error_count": 0}}
+        record = server_batch_reporting.attach_batch_terminal_record(summary)
+        compact = server_batch_reporting.build_compact_batch_cli_output({"action": "batch_compile", "succeeded": True, "result_summary": summary})
+
+        self.assertEqual("passed", compact["terminal_record"]["compile_status"])
+        self.assertEqual("batch", compact["terminal_record"]["lane"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            progress_path = Path(tmp) / "progress.jsonl"
+            reporter = server_batch_reporting.BatchProgressReporter(
+                run_id="run-1", operation="batch_compile", log_path=Path(tmp) / "unity.log", progress_path=progress_path
+            )
+            captured = io.StringIO()
+            with redirect_stdout(captured):
+                reporter.emit("summary_written")
+                reporter.emit_terminal_record(record)
+            lines = [json.loads(line) for line in progress_path.read_text(encoding="utf-8").splitlines()]
+
+        self.assertEqual("batch_terminal_record", lines[-1]["event"])
+        self.assertEqual("passed", lines[-1]["compile_status"])
+        self.assertEqual("batch_terminal_record", json.loads(captured.getvalue().splitlines()[-1])["event"])
+
+    def test_the_sweep_runner_reads_the_record_and_the_retry_hint(self) -> None:
+        payload = {
+            "error": {"code": "editor_idle_timeout", "details": {"retry_recommended": True, "retry_reason": "heartbeat_stale_while_editor_busy_with_asset_import"}},
+            "editor_quit_by_wrapper": True,
+            "result_summary": {"terminal_record": {"lane": "gui", "compile_status": ""}},
+        }
+
+        details = run_multi_project.batch_error_details(payload)
+        record = run_multi_project.terminal_record_from_run(payload["result_summary"], {})
+
+        self.assertTrue(details["retry_recommended"])
+        self.assertTrue(details["editor_quit_by_wrapper"])
+        self.assertEqual("gui", record["lane"])
+        self.assertEqual({}, run_multi_project.terminal_record_from_run({}, {"summary": 1}))
 
 
 if __name__ == "__main__":

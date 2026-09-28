@@ -202,6 +202,9 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "current_bridge_generation",
         "current_bridge_session_id",
         "retryable",
+        "retry_recommended",
+        "retry_reason",
+        "editor_quit_by_wrapper",
         "request_processed",
         "automatic_retry_safe",
         "bridge_stabilization",
@@ -249,6 +252,8 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
     effective_execution_lane = str(payload.get("effective_execution_lane") or "")
     lane_fallback_reason = str(payload.get("lane_fallback_reason") or "")
     license_blocker_code = str(payload.get("license_blocker_code") or "")
+    retry_recommended = payload.get("retry_recommended")
+    editor_quit_by_wrapper = payload.get("editor_quit_by_wrapper")
 
     parts = ["[xuunity-mcp] request_failure"]
     if code:
@@ -275,6 +280,10 @@ def emit_tool_error_summary(payload: dict[str, Any]) -> None:
         parts.append(f"lane_fallback_reason={lane_fallback_reason}")
     if license_blocker_code:
         parts.append(f"license_blocker_code={license_blocker_code}")
+    if retry_recommended is not None:
+        parts.append(f"retry_recommended={str(bool(retry_recommended)).lower()}")
+    if editor_quit_by_wrapper is not None:
+        parts.append(f"editor_quit_by_wrapper={str(bool(editor_quit_by_wrapper)).lower()}")
     if closeout_classification:
         parts.append(f"closeout_classification={closeout_classification}")
     if closeout_verified is not None:

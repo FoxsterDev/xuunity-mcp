@@ -4,6 +4,42 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from server_batch_reporting import attach_batch_terminal_record
+
+GUI_FALLBACK_NEXT_ACTIONS_VOID_AFTER_WRAPPER_QUIT = frozenset(
+    {
+        "recover_editor_session",
+        "wait_for_bridge_or_recover_editor",
+        "wait_for_editor_idle_then_retry",
+        "wait_for_editor_idle_or_inspect_busy_state",
+    }
+)
+
+
+def annotate_gui_fallback_error_after_wrapper_quit(exc: Any) -> None:
+    """The GUI lane closes the editor it opened, so a recovery aimed at that editor has nothing left to recover."""
+
+    details = exc.details if isinstance(getattr(exc, "details", None), dict) else {}
+    exc.details = details
+    details["editor_quit_by_wrapper"] = True
+    details["editor_quit_by_wrapper_note"] = (
+        "The GUI fallback lane closes the editor it opened, so recover-editor-session has nothing to recover; "
+        "rerun the same command instead."
+    )
+    previous = str(details.get("recommended_next_action") or "")
+    if previous not in GUI_FALLBACK_NEXT_ACTIONS_VOID_AFTER_WRAPPER_QUIT:
+        return
+    details["recommended_next_action"] = "retry_same_command"
+    details["recommended_recovery_command"] = ""
+    details["retry_recommended"] = True
+    message = str(getattr(exc, "message", "") or "")
+    if message:
+        exc.message = message.replace(
+            f"recommended_next_action={previous}",
+            "recommended_next_action=retry_same_command",
+        )
+        exc.args = (exc.message,)
+
 
 def load_batch_side_effect_allow_config_data(
     path_value: str | None,
@@ -340,6 +376,7 @@ def run_gui_fallback_operation_data(
     artifact_probe_path_override: str = "",
     artifact_probe_warn_only: bool = False,
     output_mode: str = "full",
+    progress_reporter: Any = None,
     batch_start_editor_state: Callable[[Path], dict[str, Any]],
     gui_fallback_busy_reasons: Callable[[Path, dict[str, Any]], list[str]],
     ToolInvocationError: Any,
@@ -433,6 +470,10 @@ def run_gui_fallback_operation_data(
             result_payload.setdefault("validation_evidence", "unity_gui")
             result_path.parent.mkdir(parents=True, exist_ok=True)
             write_json(result_path, result_payload)
+    except ToolInvocationError as exc:
+        if opened_by_fallback:
+            annotate_gui_fallback_error_after_wrapper_quit(exc)
+        raise
     finally:
         if opened_by_fallback:
             restore_state = restore_host_opened_editor_state(project_root, 30000, request_editor_quit)
@@ -510,7 +551,10 @@ def run_gui_fallback_operation_data(
         result_summary["artifact_probe_succeeded"] = artifact_probe_succeeded
         result_summary["artifact_probe_summary"] = artifact_probe_summary
     attach_batch_lane_fields_to_summary(result_summary, payload)
+    terminal_record = attach_batch_terminal_record(result_summary, summary_path=summary_path)
     write_batch_summary_artifact(summary_path, result_summary)
+    if progress_reporter is not None:
+        progress_reporter.emit_terminal_record(terminal_record)
     payload["summary_file"] = str(summary_path)
     payload["result_summary"] = result_summary
     if str(payload.get("action") or "") == "plain_batch_build":
@@ -697,6 +741,7 @@ def run_batch_operation_data(
                 artifact_probe_path_override=artifact_probe_path_override,
                 artifact_probe_warn_only=artifact_probe_warn_only,
                 output_mode=output_mode,
+                progress_reporter=progress_reporter,
             )
             return
     except ToolInvocationError as exc:
@@ -708,6 +753,7 @@ def run_batch_operation_data(
             truncate_text=truncate_text,
         )
         attach_batch_lane_fields_to_summary(summary, payload)
+        attach_batch_terminal_record(summary, summary_path=summary_path)
         write_batch_summary_artifact(summary_path, summary)
         raise attach_batch_summary_to_error(
             exc,
@@ -822,8 +868,10 @@ def run_batch_operation_data(
         result_summary["build_succeeded"] = payload["build_succeeded"]
     result_summary["workspace_side_effects"] = side_effects
     attach_batch_lane_fields_to_summary(result_summary, payload)
+    terminal_record = attach_batch_terminal_record(result_summary, summary_path=summary_path)
     write_batch_summary_artifact(summary_path, result_summary)
     progress_reporter.emit("summary_written")
+    progress_reporter.emit_terminal_record(terminal_record)
     payload["result_summary"] = result_summary
     if str(payload.get("action") or "") == "plain_batch_build":
         payload["build_result_summary"] = result_summary
