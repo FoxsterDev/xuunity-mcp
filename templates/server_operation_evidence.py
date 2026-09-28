@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from server_bridge_paths import test_result_path
 from server_core import parse_utc_timestamp as parse_core_utc_timestamp, render_launcher_cli
 
 
@@ -16,6 +17,8 @@ ARTIFACT_GROUP_NAMES = (
     "compile_outputs",
     "test_outputs",
 )
+
+COMPACT_TEST_FAILURE_LIMIT = 25
 
 
 def parse_utc_timestamp(value: Any) -> float | None:
@@ -81,7 +84,7 @@ def _try_parse_json_dict(value: Any) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-def _first_failures(value: Any, limit: int = 3) -> list[dict[str, str]]:
+def compact_test_failures(value: Any, limit: int = COMPACT_TEST_FAILURE_LIMIT) -> list[dict[str, str]]:
     if not isinstance(value, list):
         return []
 
@@ -98,6 +101,16 @@ def _first_failures(value: Any, limit: int = 3) -> list[dict[str, str]]:
         if len(failures) >= limit:
             break
     return failures
+
+
+def test_failure_count(value: Any) -> int:
+    if not isinstance(value, list):
+        return 0
+    return sum(1 for item in value if isinstance(item, dict))
+
+
+def _first_failures(value: Any, limit: int = 3) -> list[dict[str, str]]:
+    return compact_test_failures(value, limit=limit)
 
 
 def _test_filter_was_requested(payload: dict[str, Any]) -> bool:
@@ -122,6 +135,7 @@ def _attach_direct_test_verdict(
     *,
     operation: str,
     project_root: Path,
+    request_id: str = "",
 ) -> None:
     if operation not in {"unity.tests.run_playmode", "unity.tests.run_editmode"}:
         return
@@ -169,6 +183,9 @@ def _attach_direct_test_verdict(
         "filter_requested": filter_requested,
         "filter_summary": filter_summary,
         "first_failures": _first_failures(enriched.get("failures")),
+        "failure_count": test_failure_count(enriched.get("failures")),
+        "failures_truncated": test_failure_count(enriched.get("failures")) > COMPACT_TEST_FAILURE_LIMIT,
+        "test_result_path": str(test_result_path(project_root, request_id)) if request_id else "",
         "last_started_test": str(enriched.get("last_started_test") or ""),
         "last_finished_test": str(enriched.get("last_finished_test") or ""),
         "last_progress_at_utc": str(enriched.get("last_progress_at_utc") or ""),
@@ -436,7 +453,7 @@ def attach_operation_evidence_to_payload(
     host_completed_unix: float | None,
 ) -> dict[str, Any]:
     enriched = dict(payload or {})
-    _attach_direct_test_verdict(enriched, operation=operation, project_root=project_root)
+    _attach_direct_test_verdict(enriched, operation=operation, project_root=project_root, request_id=request_id)
     enriched["structured_timing"] = build_structured_timing(
         operation=operation,
         request_id=request_id,

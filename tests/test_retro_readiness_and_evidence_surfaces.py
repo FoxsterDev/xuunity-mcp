@@ -159,5 +159,67 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
         self.assertNotIn("verdict_note", summary)
 
 
+def failures(count: int) -> list[dict[str, str]]:
+    return [{"name": f"Suite.Test{index}", "message": f"Expected {index}"} for index in range(count)]
+
+
+class CompleteFailureListTests(unittest.TestCase):
+    def test_the_compact_test_payload_lists_every_failure_up_to_the_bound(self) -> None:
+        payload = {
+            "status": "failed",
+            "total": 12,
+            "failed": 9,
+            "failures": failures(9),
+            "test_result_path": "/project/Library/XUUnityLightMcp/state/test_results/req.json",
+        }
+
+        compact = server_bridge_payloads.compact_operation_payload(payload, "unity.tests.run_editmode")
+
+        self.assertEqual(3, len(compact["first_failures"]))
+        self.assertEqual(9, len(compact["failures"]))
+        self.assertEqual(9, compact["failure_count"])
+        self.assertFalse(compact["failures_truncated"])
+        self.assertEqual(payload["test_result_path"], compact["test_result_path"])
+        self.assertEqual({"name", "message"}, set(compact["failures"][8]))
+
+    def test_more_failures_than_the_bound_are_counted_and_flagged(self) -> None:
+        compact = server_bridge_payloads.compact_operation_payload(
+            {"status": "failed", "failures": failures(30)}, "unity.tests.run_playmode"
+        )
+
+        self.assertEqual(25, server_operation_evidence.COMPACT_TEST_FAILURE_LIMIT)
+        self.assertEqual(25, len(compact["failures"]))
+        self.assertEqual(30, compact["failure_count"])
+        self.assertTrue(compact["failures_truncated"])
+
+    def test_direct_test_evidence_names_the_persisted_result_file(self) -> None:
+        enriched = {"status": "failed", "total": 9, "failed": 9, "failures": failures(9)}
+        project_root = Path("/tmp/FakeProject")
+
+        server_operation_evidence._attach_direct_test_verdict(
+            enriched, operation="unity.tests.run_editmode", project_root=project_root, request_id="req-9"
+        )
+
+        self.assertEqual(9, enriched["failure_count"])
+        self.assertFalse(enriched["failures_truncated"])
+        self.assertEqual(str(test_result_path(project_root, "req-9")), enriched["test_result_path"])
+        self.assertEqual(9, len(enriched["failures"]), "the full payload keeps the raw failure list")
+
+    def test_the_terminal_envelope_carries_the_count_and_the_result_path(self) -> None:
+        envelope = server_launcher.build_compact_terminal_envelope(
+            {
+                "outcome": "completed",
+                "first_failures": failures(3),
+                "failure_count": 9,
+                "test_result_path": "/project/Library/XUUnityLightMcp/state/test_results/req.json",
+            },
+            exit_code=1,
+        )
+
+        self.assertEqual(failures(3)[0], envelope["first_failure"])
+        self.assertEqual(9, envelope["failure_count"])
+        self.assertTrue(envelope["test_result_path"].endswith("req.json"))
+
+
 if __name__ == "__main__":
     unittest.main()

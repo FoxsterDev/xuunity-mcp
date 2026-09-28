@@ -29,7 +29,12 @@ from server_bridge_state import (
     try_read_bridge_state,
 )
 from server_core import ToolInvocationError, read_json, render_launcher_cli
-from server_operation_evidence import attach_operation_evidence_to_final_status
+from server_operation_evidence import (
+    COMPACT_TEST_FAILURE_LIMIT,
+    attach_operation_evidence_to_final_status,
+    compact_test_failures,
+    test_failure_count,
+)
 
 
 TEST_PLAYMODE_ACCOUNTING_FIELDS = (
@@ -796,22 +801,7 @@ def is_test_operation(operation: str) -> bool:
 
 
 def _first_failures(value: Any, limit: int = 3) -> list[dict[str, str]]:
-    if not isinstance(value, list):
-        return []
-
-    failures: list[dict[str, str]] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        failures.append(
-            {
-                "name": str(item.get("name") or ""),
-                "message": str(item.get("message") or ""),
-            }
-        )
-        if len(failures) >= limit:
-            break
-    return failures
+    return compact_test_failures(value, limit=limit)
 
 
 def _counts_from_test_payload(payload: dict[str, Any] | None) -> tuple[int, int, int, int]:
@@ -1050,6 +1040,10 @@ def build_test_verdict_summary(
         "filter_requested": filter_requested,
         "filter_summary": filter_summary,
         "first_failures": _first_failures((source_payload or {}).get("failures")),
+        "failures": compact_test_failures((source_payload or {}).get("failures")),
+        "failure_count": test_failure_count((source_payload or {}).get("failures")),
+        "failures_truncated": test_failure_count((source_payload or {}).get("failures")) > COMPACT_TEST_FAILURE_LIMIT,
+        "test_result_path": str(test_result_path(project_root, request_id)),
         "last_started_test": str((source_payload or {}).get("last_started_test") or ""),
         "last_finished_test": str((source_payload or {}).get("last_finished_test") or ""),
         "last_progress_at_utc": str((source_payload or {}).get("last_progress_at_utc") or ""),

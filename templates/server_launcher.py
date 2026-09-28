@@ -328,6 +328,7 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
         failures = decoded_payload.get("failures")
         if isinstance(failures, list) and failures:
             envelope["first_failure"] = failures[0]
+            envelope["failure_count"] = len(failures)
     elif payload_type == "unity.compile.matrix":
         envelope["matrix_status"] = str(decoded_payload.get("status") or "")
         for key in ("total", "passed", "failed"):
@@ -407,6 +408,9 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
     first_failures = payload.get("first_failures")
     if "first_failure" not in envelope and isinstance(first_failures, list) and first_failures:
         envelope["first_failure"] = first_failures[0]
+    for key in ("failure_count", "failures_truncated", "test_result_path"):
+        if key not in envelope and payload.get(key) not in (None, ""):
+            envelope[key] = payload.get(key)
     pointers = _artifact_pointers(payload)
     if pointers:
         envelope["artifacts"] = pointers

@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from server_bridge_constants import COMPILE_WARNING_SAMPLE_LIMIT
 from server_health import read_editor_log_scope
+from server_operation_evidence import COMPACT_TEST_FAILURE_LIMIT, compact_test_failures, test_failure_count
 
 
 POST_SETTLE_COMPILE_TRUST_CONFIRMED = "confirmed"
@@ -791,6 +792,7 @@ def _compact_tests_payload(payload: dict[str, Any], operation: str) -> dict[str,
             "recommended_recovery_command",
             "duration_seconds",
             "result_path",
+            "test_result_path",
             "settle_request_id",
             "persisted_test_result_reconciliation",
             "console_error_count_since_request_start",
@@ -801,6 +803,9 @@ def _compact_tests_payload(payload: dict[str, Any], operation: str) -> dict[str,
     failures = payload.get("failures") or payload.get("first_failures")
     if isinstance(failures, list) and failures:
         compact["first_failures"] = failures[:3]
+        compact["failures"] = compact_test_failures(failures)
+        compact["failure_count"] = test_failure_count(failures)
+        compact["failures_truncated"] = compact["failure_count"] > COMPACT_TEST_FAILURE_LIMIT
     compact.update(_compact_post_settle_fields(payload))
     compact.update(_artifact_ref(payload))
     return compact

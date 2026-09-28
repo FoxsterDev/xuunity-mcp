@@ -11,6 +11,10 @@
   at the deadline, with `dialog_block_basis`), and a healthy bridge whose editor
   still reports compile errors returns `verdict=ready_with_compile_errors`
   with `startup_log_observation` and the `request-project-refresh` recovery.
+- Compact EditMode/PlayMode test payloads, `request-final-status`, and the
+  compact terminal envelope carry `failures[]` (up to 25 name/message rows),
+  `failure_count`, `failures_truncated`, and `test_result_path`;
+  `first_failures` stays for compatibility.
 - The scenario `compile_player_scripts` step waits for editor idle (compile,
   update, domain reload, package, and import activity) before it dispatches,
   retries one `editor_busy` refusal, reports `dispatch_gate_wait_seconds`,
