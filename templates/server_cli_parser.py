@@ -243,8 +243,11 @@ def build_parser() -> argparse.ArgumentParser:
     console_grep_cmd.add_argument(
         "--max-search-chars",
         type=int,
-        default=500000,
-        help="Editor.log characters to search from the anchor (4096..10000000).",
+        default=None,
+        help=(
+            "Editor.log characters to search from the anchor (4096..10000000). Omit it to search the whole "
+            "anchored scope up to the hard cap; the default bounded window is 500000 for unanchored searches."
+        ),
     )
     console_grep_cmd.add_argument(
         "--since",

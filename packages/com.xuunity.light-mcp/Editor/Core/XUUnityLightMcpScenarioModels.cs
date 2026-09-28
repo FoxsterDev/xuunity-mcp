@@ -38,6 +38,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public bool ignoreCase = true;
             public bool includeStackTraces;
             public string[] includeTypes = null;
+            public string since = "";
             public string fileName = "";
             public bool includeImage;
             public int maxResolution = 640;

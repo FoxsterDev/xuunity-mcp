@@ -63,7 +63,26 @@ namespace XUUnity.LightMcp.Editor.Operations
             }
 
             var includeTypes = NormalizeIncludeTypes(args.includeTypes);
-            var allItems = XUUnityLightMcpConsoleBuffer.Snapshot();
+            var since = (args.since ?? "").Trim();
+            XUUnityLightMcpConsoleSinceSnapshot sinceSnapshot = null;
+            List<XUUnityLightMcpConsoleItem> allItems;
+            if (since.Length == 0)
+            {
+                allItems = XUUnityLightMcpConsoleBuffer.Snapshot();
+            }
+            else if (string.Equals(since, XUUnityLightMcpConsoleBuffer.PlayModeStartAnchor, StringComparison.Ordinal))
+            {
+                sinceSnapshot = XUUnityLightMcpConsoleBuffer.SnapshotSincePlayModeStart();
+                allItems = sinceSnapshot.Items;
+            }
+            else
+            {
+                return XUUnityLightMcpResponseWriter.Error(
+                    request.request_id,
+                    "unsupported_console_anchor",
+                    $"unity.console.grep source=console supports since=playmode_start only; since='{since}' needs source=editor_log.");
+            }
+
             var candidates = allItems
                 .Where(item => includeTypes.Contains(item.type))
                 .Where(item => IsMatch(item, args, pattern, compiledRegex))
@@ -111,7 +130,8 @@ namespace XUUnity.LightMcp.Editor.Operations
                     .ToList();
             }
 
-            var payload = new XUUnityLightMcpConsolePayload
+            ResolveSearchVerdict(matchCount, sinceSnapshot, out var searchVerdict, out var searchVerdictReason);
+            var payload = new XUUnityLightMcpConsoleGrepPayload
             {
                 project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath,
                 pattern = pattern,
@@ -122,7 +142,15 @@ namespace XUUnity.LightMcp.Editor.Operations
                 excluded_count = excludedCount,
                 build_pipeline_suppressed_count = buildPipelineSuppressedCount,
                 items = matches,
-                truncated = truncated
+                truncated = truncated,
+                since = since,
+                since_anchor_resolved = sinceSnapshot != null && sinceSnapshot.AnchorResolved,
+                since_anchor_reason = sinceSnapshot?.AnchorReason ?? "",
+                since_anchor_sequence = sinceSnapshot?.AnchorSequence ?? 0L,
+                since_anchor_started_utc = sinceSnapshot?.AnchorStartedUtc ?? "",
+                since_scope_complete = sinceSnapshot != null && sinceSnapshot.ScopeComplete,
+                search_verdict = searchVerdict,
+                search_verdict_reason = searchVerdictReason
             };
 
             return XUUnityLightMcpResponseWriter.Success(
@@ -130,6 +158,42 @@ namespace XUUnity.LightMcp.Editor.Operations
                 OperationName,
                 JsonUtility.ToJson(payload)
             );
+        }
+
+        static void ResolveSearchVerdict(
+            int matchCount,
+            XUUnityLightMcpConsoleSinceSnapshot sinceSnapshot,
+            out string verdict,
+            out string reason)
+        {
+            if (matchCount > 0)
+            {
+                verdict = "matched";
+                reason = "pattern_found_in_console_buffer";
+                return;
+            }
+
+            verdict = "inconclusive";
+            if (sinceSnapshot == null)
+            {
+                reason = "unanchored_console_buffer_does_not_prove_absence";
+                return;
+            }
+
+            if (!sinceSnapshot.AnchorResolved)
+            {
+                reason = "requested_anchor_not_recorded";
+                return;
+            }
+
+            if (!sinceSnapshot.ScopeComplete)
+            {
+                reason = "console_ring_buffer_evicted_items_after_anchor";
+                return;
+            }
+
+            verdict = "not_matched";
+            reason = "complete_console_scope_since_anchor_searched";
         }
 
         static bool IsMatch(XUUnityLightMcpConsoleItem item, XUUnityLightMcpConsoleGrepArgs args, string pattern, Regex compiledRegex)

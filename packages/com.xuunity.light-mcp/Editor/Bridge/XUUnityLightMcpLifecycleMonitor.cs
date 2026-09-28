@@ -127,6 +127,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
             if (stateChange == PlayModeStateChange.ExitingEditMode)
             {
                 XUUnityLightMcpEditorLogAnchors.CapturePlayModeStart();
+                XUUnityLightMcpConsoleBuffer.CapturePlayModeStartAnchor();
             }
 
             XUUnityLightMcpBridgeRuntimeState.MarkPlayModeStateChanged(ResolvePlayModeStateLabel(stateChange));

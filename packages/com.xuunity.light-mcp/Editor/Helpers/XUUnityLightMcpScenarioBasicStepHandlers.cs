@@ -166,6 +166,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 includeStackTraces = step.includeStackTraces,
                 limit = step.limit > 0 ? step.limit : 20,
                 includeTypes = step.includeTypes,
+                since = step.since,
             };
 
             return ProcessNestedOperationStep("unity.console.grep", JsonUtility.ToJson(args), stepResult);

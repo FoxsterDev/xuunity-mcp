@@ -1029,8 +1029,15 @@ Pass criteria:
   `match_count = 0` as proof of absence
 - raising `maxSearchChars` on the same tool call reaches the later marker and
   changes the verdict to `matched`
+- the truncation probes above pass `maxSearchChars` explicitly; a call that
+  omits it searches the whole anchored scope up to the 10,000,000-character
+  hard cap, reports `search_window_auto_extended = true`, and answers
+  `matched` or `not_matched` for a scope larger than the default window
 - a small complete anchored scope with no marker reports
   `search_verdict = not_matched`
+- `source=console` with `since=playmode_start` returns only items logged after
+  the latest Play Mode entry, reports `since_scope_complete`, and answers
+  `not_matched` only when the ring buffer retained every post-anchor item
 - `unity_console_tail` still keeps the recent end of a truncated anchored scope
   and reports `search_window_direction = scope_tail`
 

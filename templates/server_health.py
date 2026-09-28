@@ -810,7 +810,7 @@ def grep_editor_log_payload(
     include_stack_traces: bool = False,
     include_build_pipeline_noise: bool = False,
     limit: int = 20,
-    max_chars: int = EDITOR_LOG_GREP_MAX_CHARS,
+    max_chars: int | None = None,
     since: str = "",
     bridge_state: dict[str, Any] | None = None,
     host_session_state: dict[str, Any] | None = None,
@@ -822,6 +822,9 @@ def grep_editor_log_payload(
     pattern = str(pattern or "").strip()
     if not pattern:
         raise ValueError("editor_log grep requires a non-empty pattern.")
+    max_chars_explicit = max_chars is not None
+    if max_chars is None:
+        max_chars = EDITOR_LOG_GREP_MAX_CHARS
 
     options = re.IGNORECASE if ignore_case else 0
     compiled = None
@@ -863,6 +866,16 @@ def grep_editor_log_payload(
         explicit_path_requested=explicit_path_requested,
         editor_is_live=bridge_state_is_live,
     )
+    requested_search_chars = max_chars
+    scope_bytes_available = int(anchor.get("scoped_bytes_available") or 0) if anchor.get("anchored") else 0
+    search_window_auto_extended = (
+        bool(anchor.get("anchored"))
+        and not max_chars_explicit
+        and scope_bytes_available > max_chars
+        and scope_bytes_available <= EDITOR_LOG_GREP_ABS_MAX_CHARS
+    )
+    if search_window_auto_extended:
+        max_chars = EDITOR_LOG_GREP_ABS_MAX_CHARS
     text, first_line_number = _read_editor_log_since_anchor(
         log_path,
         anchor,
@@ -930,6 +943,11 @@ def grep_editor_log_payload(
         "items": visible_matches,
         "truncated": truncated,
         "searched_tail_chars": max_chars,
+        "requested_search_chars": requested_search_chars,
+        "search_window_auto_extended": search_window_auto_extended,
+        "search_window_auto_extended_reason": (
+            "anchored_scope_exceeded_default_window_within_hard_cap" if search_window_auto_extended else ""
+        ),
         "searched_window_chars": int(anchor.get("searched_window_chars") or len(text)),
         "search_window_direction": str(anchor.get("search_window_direction") or "scope_tail"),
         "scope_truncated": scope_truncated,

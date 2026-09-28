@@ -408,12 +408,13 @@ def cmd_request_console_grep(args):
                 ignore_case=bool(args.ignore_case),
                 include_stack_traces=bool(args.include_stack_traces),
                 limit=max(1, int(args.limit or 20)),
-                max_chars=max(
-                    EDITOR_LOG_GREP_MIN_CHARS,
-                    min(
-                        EDITOR_LOG_GREP_ABS_MAX_CHARS,
-                        int(args.max_search_chars or EDITOR_LOG_GREP_MAX_CHARS),
-                    ),
+                max_chars=(
+                    max(
+                        EDITOR_LOG_GREP_MIN_CHARS,
+                        min(EDITOR_LOG_GREP_ABS_MAX_CHARS, int(args.max_search_chars)),
+                    )
+                    if getattr(args, "max_search_chars", None)
+                    else None
                 ),
                 since=str(getattr(args, "since", "") or ""),
                 bridge_state=anchor_bridge_state,

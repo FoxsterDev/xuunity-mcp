@@ -24,6 +24,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public bool includeBuildPipelineNoise;
             public int limit = 20;
             public string[] includeTypes = null;
+            public string since = "";
         }
 
         [Serializable]
@@ -69,6 +70,19 @@ namespace XUUnity.LightMcp.Editor.Core
             public string truncation_recovery_tool = "";
             public string truncation_recovery_hint = "";
             public string full_payload_recovery_hint = "";
+        }
+
+        [Serializable]
+        internal sealed class XUUnityLightMcpConsoleGrepPayload : XUUnityLightMcpConsolePayload
+        {
+            public string since = "";
+            public bool since_anchor_resolved;
+            public string since_anchor_reason = "";
+            public long since_anchor_sequence;
+            public string since_anchor_started_utc = "";
+            public bool since_scope_complete;
+            public string search_verdict = "";
+            public string search_verdict_reason = "";
         }
 
         [Serializable]

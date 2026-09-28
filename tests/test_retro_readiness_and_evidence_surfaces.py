@@ -266,5 +266,53 @@ class ExpectedDomainReloadTests(unittest.TestCase):
         self.assertEqual("stale_risk", payload["playmode_state_after_settle_trust_class"])
 
 
+class AnchoredGrepAutoExtensionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._temp = tempfile.TemporaryDirectory()
+        self.root = Path(self._temp.name)
+        self.log = self.root / "Editor.log"
+        prefix = "previous session\n"
+        filler = "noise line that is long enough to matter\n" * 15000
+        self.log.write_bytes((prefix + filler + "LATE MARKER\n").encode("utf-8"))
+        self.bridge_state = {"editor_log_offset_at_playmode_start": len(prefix), "editor_log_path": str(self.log)}
+        self.assertGreater(self.log.stat().st_size, server_health.EDITOR_LOG_GREP_MAX_CHARS)
+
+    def tearDown(self) -> None:
+        self._temp.cleanup()
+
+    def test_an_anchored_scope_beyond_the_default_window_is_searched_completely(self) -> None:
+        payload = server_health.grep_editor_log_payload(
+            self.root, self.log, pattern="LATE MARKER", since="playmode_start", bridge_state=self.bridge_state
+        )
+
+        self.assertTrue(payload["search_window_auto_extended"])
+        self.assertEqual(server_health.EDITOR_LOG_GREP_MAX_CHARS, payload["requested_search_chars"])
+        self.assertFalse(payload["scope_truncated"])
+        self.assertEqual("matched", payload["search_verdict"])
+        self.assertEqual("editor_log_absolute", payload["line_numbering_basis"])
+
+        absent = server_health.grep_editor_log_payload(
+            self.root, self.log, pattern="NEVER LOGGED", since="playmode_start", bridge_state=self.bridge_state
+        )
+
+        self.assertEqual("not_matched", absent["search_verdict"])
+        self.assertEqual("complete_anchored_scope_searched", absent["search_verdict_reason"])
+
+    def test_an_explicit_budget_still_bounds_the_search(self) -> None:
+        payload = server_health.grep_editor_log_payload(
+            self.root,
+            self.log,
+            pattern="LATE MARKER",
+            since="playmode_start",
+            max_chars=4096,
+            bridge_state=self.bridge_state,
+        )
+
+        self.assertFalse(payload["search_window_auto_extended"])
+        self.assertTrue(payload["scope_truncated"])
+        self.assertEqual("inconclusive", payload["search_verdict"])
+        self.assertEqual(4096, payload["searched_tail_chars"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1063,8 +1063,15 @@ headline: `matched` proves presence in the searched window; `not_matched` is
 only emitted after a complete anchored scope; and a zero-match from a truncated
 scope is `inconclusive`, with `scope_truncated`, `search_window_direction`, a
 partial-scope trust class, and `recommended_next_action` explaining recovery.
-Raise `maxSearchChars` on the same MCP call to continue a truncated anchored
-search. Anchors carry the Unity editor PID that recorded them; a PID mismatch
+When `maxSearchChars` is omitted, an anchored search extends to the whole
+anchored scope up to the 10,000,000-character hard cap and reports
+`search_window_auto_extended=true`, so a play session larger than the default
+window is still searched completely; pass `maxSearchChars` to bound the search
+explicitly, and raise it on the same MCP call to continue a truncated anchored
+search. With `source=console`, `since=playmode_start` bounds the in-memory
+console buffer to items logged after the latest Play Mode entry and reports
+`since_scope_complete`; the same field works on scenario `console_grep` steps.
+Anchors carry the Unity editor PID that recorded them; a PID mismatch
 is `anchor_process_mismatch`, never a trustworthy negative.
 `unity_console_tail` intentionally keeps the recent end of the same scope.
 Its in-memory Console mode suppresses stack traces by default; opt in with

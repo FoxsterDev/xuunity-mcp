@@ -1501,8 +1501,10 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "minimum": 4096,
                     "maximum": 10000000,
                     "description": (
-                        "Maximum Editor.log characters searched from a resolved anchor. Raise this after an "
-                        "inconclusive scope_truncated result to keep the continuation inside the MCP tool."
+                        "Maximum Editor.log characters searched from a resolved anchor. When omitted, an anchored "
+                        "search extends to the whole anchored scope up to the 10,000,000-character hard cap and "
+                        "reports search_window_auto_extended=true; pass a value to bound the search explicitly, "
+                        "and raise it after an inconclusive scope_truncated result."
                     )
                 },
                 "includeTypes": {
@@ -1521,9 +1523,13 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "offset the editor recorded in that request's journal entry and also needs "
                         "sinceRequestId. The resolved anchor and searched_from_line are echoed back in "
                         "since_anchor, and an anchor that cannot be trusted is refused by name rather than "
-                        "silently widened. If the anchored scope exceeds the fixed search ceiling, grep keeps "
+                        "silently widened. An anchored scope larger than the default window is searched "
+                        "completely up to the hard cap unless maxSearchChars is passed; beyond the cap grep keeps "
                         "the anchor-adjacent head, reports search_window_direction/scope_truncated, and ranks "
-                        "a zero-match search_verdict as inconclusive rather than proof of absence."
+                        "a zero-match search_verdict as inconclusive rather than proof of absence. With "
+                        "source=console only since=playmode_start is supported: it bounds the in-memory console "
+                        "buffer to items logged after the latest Play Mode entry and reports "
+                        "since_scope_complete."
                     )
                 },
                 "sinceRequestId": {

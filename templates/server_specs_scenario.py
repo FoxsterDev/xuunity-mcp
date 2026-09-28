@@ -97,6 +97,14 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
             "type": "array",
             "items": {"type": "string"},
         },
+        "since": {
+            "type": "string",
+            "enum": ["playmode_start"],
+            "description": (
+                "console_grep only. Bound the in-memory console search to items logged after the most recent "
+                "Play Mode entry; a zero-match is not_matched only when since_scope_complete is true."
+            ),
+        },
         "fileName": {"type": "string"},
         "includeImage": {"type": "boolean"},
         "maxResolution": {"type": "integer", "minimum": 1},

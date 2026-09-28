@@ -186,6 +186,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     {
                         AddIssue(payload, "error", "invalid_limit", "console_grep step requires limit >= 0; omit it or use 0 for the default.", stepId, index);
                     }
+                    if (!string.IsNullOrWhiteSpace(step.since)
+                        && !string.Equals(step.since.Trim(), "playmode_start", StringComparison.Ordinal))
+                    {
+                        AddIssue(payload, "error", "invalid_since", "console_grep step since must be omitted or playmode_start.", stepId, index);
+                    }
                     break;
                 case "playmode_set":
                     if (!IsPlayModeAction(step.action))

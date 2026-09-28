@@ -210,6 +210,9 @@ def case_real_anchor_and_truncation(outcome: Outcome, project_root: Path, state:
     log_path = resolved
     size = log_path.stat().st_size
     scope_bytes = max(0, size - offset)
+    # An omitted budget now searches the whole anchored scope, so the truncation contract is probed with an
+    # explicit small budget and the auto-extension contract with no budget at all.
+    budget_args = ["--max-search-chars", "65536"] if scope_bytes > 65536 else []
     payload = run_wrapper(
         [
             "request-console-grep",
@@ -218,6 +221,7 @@ def case_real_anchor_and_truncation(outcome: Outcome, project_root: Path, state:
             "--pattern", "e",
             "--since", "playmode_start",
             "--limit", "5",
+            *budget_args,
         ]
     )
     anchor = payload.get("since_anchor", {})
@@ -273,6 +277,7 @@ def case_real_anchor_and_truncation(outcome: Outcome, project_root: Path, state:
                 "--pattern", "__XUUNITY_MCP_ANCHORED_SCOPE_ABSENCE_PROBE_9F1834__",
                 "--since", "playmode_start",
                 "--limit", "3",
+                *budget_args,
             ]
         )
         outcome.check(
@@ -287,6 +292,31 @@ def case_real_anchor_and_truncation(outcome: Outcome, project_root: Path, state:
             "the inconclusive result names recovery",
             bool(absent.get("recommended_next_action")),
             f"recommended_next_action={absent.get('recommended_next_action')}",
+        )
+
+    if 500000 < scope_bytes <= 10_000_000:
+        extended = run_wrapper(
+            [
+                "request-console-grep",
+                "--project-root", str(project_root),
+                "--editor-log-path", stamped,
+                "--pattern", "__XUUNITY_MCP_ANCHORED_SCOPE_ABSENCE_PROBE_9F1834__",
+                "--since", "playmode_start",
+                "--limit", "3",
+            ]
+        )
+        outcome.check(
+            "an omitted budget searches the whole anchored scope and turns the zero-match into not_matched",
+            extended.get("search_window_auto_extended") is True
+            and extended.get("scope_truncated") is False
+            and extended.get("search_verdict") == "not_matched",
+            f"auto_extended={extended.get('search_window_auto_extended')} truncated={extended.get('scope_truncated')} "
+            f"verdict={extended.get('search_verdict')} searched={extended.get('searched_window_chars')}",
+        )
+    else:
+        outcome.skip(
+            "auto-extension",
+            f"scope is {scope_bytes} bytes; an omitted budget auto-extends only above 500000 bytes and up to 10000000",
         )
 
 

@@ -99,6 +99,7 @@ Unity bridge:
 - compile validation
 - edit-mode test execution
 - console tail
+- console grep with a `since=playmode_start` buffer anchor
 - scene snapshot
 - scene open for deterministic Edit Mode scene setup
 - play mode control

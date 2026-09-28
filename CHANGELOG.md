@@ -22,6 +22,13 @@
   `compile_dispatch_gate_timeout` when idle never arrives. An `apply_then_gate`
   profile hook now needs only `status` and `compile_player_scripts` after it;
   the `wait` step is optional.
+- Anchored `unity_console_grep` / `request-console-grep` search the whole
+  anchored scope up to the 10,000,000-character hard cap when `maxSearchChars`
+  is omitted (`search_window_auto_extended`, `requested_search_chars`); an
+  explicit budget still bounds the window. `source=console` and scenario
+  `console_grep` steps accept `since=playmode_start`, backed by a console-buffer
+  anchor captured on Play Mode entry, and report `since_anchor_resolved`,
+  `since_anchor_reason`, `since_scope_complete`, and `search_verdict`.
 - A reconciled PlayMode test result labels the post-run domain reload
   `expected_domain_reload` with
   `lifecycle_churn_classification=expected_playmode_exit_domain_reload`

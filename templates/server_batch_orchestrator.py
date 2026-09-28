@@ -1788,14 +1788,15 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     limit = arguments.get("limit", 20)
     if not isinstance(limit, int):
         raise JsonRpcError(-32602, "limit must be an integer.")
-    max_search_chars = arguments.get("maxSearchChars", EDITOR_LOG_GREP_MAX_CHARS)
-    if not isinstance(max_search_chars, int) or isinstance(max_search_chars, bool):
-        raise JsonRpcError(-32602, "maxSearchChars must be an integer.")
-    if max_search_chars < EDITOR_LOG_GREP_MIN_CHARS or max_search_chars > EDITOR_LOG_GREP_ABS_MAX_CHARS:
-        raise JsonRpcError(
-            -32602,
-            f"maxSearchChars must be between {EDITOR_LOG_GREP_MIN_CHARS} and {EDITOR_LOG_GREP_ABS_MAX_CHARS}.",
-        )
+    max_search_chars = arguments.get("maxSearchChars")
+    if max_search_chars is not None:
+        if not isinstance(max_search_chars, int) or isinstance(max_search_chars, bool):
+            raise JsonRpcError(-32602, "maxSearchChars must be an integer.")
+        if max_search_chars < EDITOR_LOG_GREP_MIN_CHARS or max_search_chars > EDITOR_LOG_GREP_ABS_MAX_CHARS:
+            raise JsonRpcError(
+                -32602,
+                f"maxSearchChars must be between {EDITOR_LOG_GREP_MIN_CHARS} and {EDITOR_LOG_GREP_ABS_MAX_CHARS}.",
+            )
 
     regex = arguments.get("regex", False)
     ignore_case = arguments.get("ignoreCase", True)
@@ -1817,6 +1818,12 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     include_types = _optional_string_list_argument(arguments, "includeTypes")
     since = _editor_log_since_argument(arguments)
     since_request_id = str(arguments.get("sinceRequestId") or "").strip()
+    if source == "console" and since and since != "playmode_start":
+        raise JsonRpcError(
+            -32602,
+            f"since={since} requires source=editor_log; the in-memory console buffer only supports "
+            "since=playmode_start.",
+        )
     project_root = ensure_project_root(project_root_value)
 
     if source == "editor_log":
@@ -1851,22 +1858,20 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             raise JsonRpcError(-32602, str(exc)) from exc
         return mcp_json_result(payload)
 
+    console_args: dict[str, Any] = {
+        "pattern": pattern,
+        "excludePattern": exclude_pattern,
+        "regex": regex,
+        "ignoreCase": ignore_case,
+        "includeStackTraces": include_stack_traces,
+        "includeBuildPipelineNoise": include_build_pipeline_noise,
+        "limit": max(1, limit),
+        "includeTypes": include_types or None,
+    }
+    if since:
+        console_args["since"] = since
     try:
-        response = invoke_bridge(
-            str(project_root),
-            "unity.console.grep",
-            {
-                "pattern": pattern,
-                "excludePattern": exclude_pattern,
-                "regex": regex,
-                "ignoreCase": ignore_case,
-                "includeStackTraces": include_stack_traces,
-                "includeBuildPipelineNoise": include_build_pipeline_noise,
-                "limit": max(1, limit),
-                "includeTypes": include_types or None,
-            },
-            timeout_ms,
-        )
+        response = invoke_bridge(str(project_root), "unity.console.grep", console_args, timeout_ms)
     except ToolInvocationError as exc:
         return mcp_json_result(build_tool_error_payload(exc), is_error=True)
     if response.get("status") == "ok":
