@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.81
+
+Release tag: `v0.3.81`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.81
+```
+
 ### Why this matters
 
 - A one-hour consumer session on `v0.3.80` completed every Unity request, yet the
@@ -15,6 +25,7 @@
 
 ### Changed
 
+- Released `v0.3.81` package metadata, server metadata, package manifests, and Git UPM examples.
 - `ensure-ready` no longer fails on the `Exiting safe mode` line: it classifies
   as `compile_errors_after_safe_mode_exit`, the readiness wait keeps polling
   while Editor.log still moves, `startup_safe_mode_dialog_observed` is raised
