@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Why this matters
+
+- A one-hour consumer session on `v0.3.80` completed every Unity request, yet the
+  wrapper reported three failures Unity had already resolved (a readiness verdict
+  after the editor left Safe Mode, a scenario compile dispatched into a
+  recompiling editor, and a frozen-editor recovery for a slow import) and the
+  operator path lacked four evidence surfaces (a complete failure list, a
+  complete anchored log search, a session-bound console search, and a way to
+  read a serialized asset field). Each cost extra tool rounds or a raw 55 MB log
+  read.
+
 ### Changed
 
 - `ensure-ready` no longer fails on the `Exiting safe mode` line: it classifies
@@ -57,6 +68,45 @@
   asset as path/type/value rows, with array sizes, bounded array elements, and
   object references rendered as `type:name@path`, so a configuration question
   is answered without Play Mode or asset YAML.
+
+### What this gives developers
+
+- Fewer false failures: an editor that recovered on its own, a compile that only
+  needed to wait, and a slow import are no longer reported as manual-recovery
+  incidents.
+- Fewer evidence rounds: every failure, the whole play session, the current
+  console session, and a serialized asset field are readable from the tool
+  surface instead of the raw log or the asset file.
+
+### Validation
+
+- Host suite: `1156` tests OK with `14` expected platform skips; the new
+  `tests/test_retro_readiness_and_evidence_surfaces.py` reproduces each retro
+  case (classifier, readiness wait, compact failures, expected reload, grep
+  auto-extension, retry hint, GUI-lane quit annotation, terminal record); the
+  tool-list parity fixture was regenerated for the added tool.
+- Live consumer hub project on Unity `6000.0.58f2` in devmode: package EditMode
+  self-tests `128/128`, `6/6`, and `39/39` including seven new tests (validator
+  sequence, dispatch-gate timeout, console anchor, asset snapshot); a profile
+  hook that changed scripting defines followed by only a 2 s wait let the
+  compile step gate for `16.0` s (`dispatch_gate_busy_observed=true`, one
+  attempt) and compile `87` rebuilt / `189` cached assemblies with zero errors,
+  the scenario passing in `41` s where the retro's run failed with
+  `editor_busy`; a play smoke `console_grep since=playmode_start` resolved the
+  anchor with a complete scope (`64` matches, an absent marker `not_matched`);
+  `unity_asset_snapshot` read an enum override field from the consumer's build
+  configuration asset without Play Mode.
+
+### Known limitations
+
+- The 600 s retry bound for a stale heartbeat comes from two observations
+  (180 s stalls that recovered on re-run, a 1522 s stall that was frozen); it is
+  a classification boundary, not a measured editor limit.
+- The console-buffer anchor survives domain reloads through `SessionState`, but
+  items logged between Play Mode entry and the reload are not retained by the
+  recreated buffer; the payload says so with `console_buffer_recreated_after_anchor`.
+- Hosted Unity Package CI remains waived; the package proof above is a local
+  devmode run.
 
 ## 0.3.80
 

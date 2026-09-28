@@ -35,6 +35,23 @@ Current source coordinates Unity licensing probes and GUI editor admission with
 a host-wide lock, forwards the normalized Hub licensing channel, verifies the
 exact channel connection, and blocks readiness when licensing is lost.
 
+Current source applies the 2026-09-28 readiness/settle retro: `ensure-ready`
+keeps polling after a Safe Mode observation while Editor.log still moves and
+returns `ready_with_compile_errors` once the bridge attaches with compile errors
+(the `Exiting safe mode` line is no longer read as the dialog); compact test
+payloads carry `failures[]` up to 25 entries plus `failure_count` and
+`test_result_path`; the scenario `compile_player_scripts` step waits for editor
+idle before it dispatches and retries one `editor_busy` refusal, so an
+`apply_then_gate` profile hook needs only `status` and `compile_player_scripts`
+after it; anchored `unity_console_grep` searches the whole anchored scope up to
+the hard cap unless `maxSearchChars` is passed, and `source=console` accepts
+`since=playmode_start`; a stale heartbeat under 600 s during import or compile
+reports `editor_busy_heartbeat_stale` with `retry_recommended=true`, a GUI
+fallback that quit its own editor no longer recommends `recover-editor-session`,
+and every batch summary carries a lane-independent `terminal_record`; a
+reconciled PlayMode result labels the exit reload `expected_domain_reload`;
+`unity_asset_snapshot` reads serialized asset fields without Play Mode.
+
 Current source closes the separate rebuilt-versus-cache-hit evidence gap.
 Direct, matrix, batch, and multi-project compile summaries report how many
 assemblies Unity rebuilt and how many it accepted from cache, plus a status and
@@ -442,6 +459,7 @@ Latest release and current-source validation for `v0.3.80`:
 | Typed resolver oracle | Current-source Unity `2022.3` + EDM4U callback adapter | Inactive Android and resolver callback failure fail closed; a project-local Maven coordinate passes with callback success, two stable SHA-256 samples, explicit dependency proof, `trust_class=decision_grade`, and a cleared package-operation busy flag. |
 | Consumer regression route | Compile preflight + scenario/contract + PlayMode lifecycle + consistency | Unity `6000.0` passes compile preflight `6/6`, acceptance `10/10`, refresh/compile contract, settled-state and lifecycle recovery, healthy final Edit Mode with zero compiler errors/unrecovered abandons, and project-action consistency. |
 | Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.80`: `42/42`. |
+| Current-source readiness/settle retro fixes (2026-09-28) | Host suite plus a live consumer hub project on Unity `6000.0.58f2` in devmode | Host suite `1156` OK with `14` expected platform skips. Package EditMode `128/128`, `6/6`, `39/39` including seven new tests. A define-changing profile hook followed by a 2 s wait let the scenario compile step gate `16.0` s on editor idle and compile `87` rebuilt / `189` cached assemblies with zero errors (scenario passed in `41` s); the restore profile compiled `82` rebuilt / `181` cached with an immediate dispatch. A play smoke `console_grep since=playmode_start` resolved its anchor with a complete scope (`64` matches; an absent marker `not_matched`), and `unity_asset_snapshot` read an enum override from the consumer's build configuration asset without Play Mode. Editor closeout and the consumer package pin were restored. |
 | Historical Git UPM release smoke | Clean Unity project pinned to an earlier public tag | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package self-tests passed, and closeout verified process exit. |
 | Multi-project compile matrix | Public summary evidence from consumer validation | `9/9` projects, `38/38` compile lanes, `0` failures |
 | Git tag visibility | Remote Git refs | Release tag `v0.3.80` is the current Git UPM release target; remote publication requires an authenticated push. |
