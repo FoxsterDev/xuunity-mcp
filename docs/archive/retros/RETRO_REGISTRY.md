@@ -9,6 +9,22 @@ deleted. Host-private and project-specific retros belong in the host's single
 `<host-output-root>/Operations/XUUnityLightUnityMcp/Retros/` folder and must be tracked by that
 host-local registry.
 
+## Grooming 2026-09-24 (coverage and design follow-ups)
+
+The active table includes partially closed retros even when their original P0/P1
+slice shipped. The greenfield-hardening P2/P3 residual was incorrectly located
+under completed history and is now active. Historical measured evidence below
+is unchanged. This is a documentation audit against local source `41e79e8`, not
+new Unity or remote release validation.
+
+Also read [design-plan history](../../architecture/designs/DESIGN_PLAN_HISTORY.md)
+before selecting work. Designs are a separate intake surface: in particular the
+[validation-evidence acceptance design](../../architecture/designs/XUUNITY_MCP_VALIDATION_EVIDENCE_ACCEPTANCE_DESIGN_2026-09-21.md)
+has a shipped offline evaluator but still needs consumer adoption closeout and
+independent acceptance. Its optional host-side `client_probe` decision remains
+open; it is not an approved runtime change. Private source retros stay in their
+own owner registries, not in this public table.
+
 ## Storage Rule
 
 - Public-safe reusable MCP retro: store in this folder and register here.
@@ -25,6 +41,21 @@ host-local registry.
 - `Completed Public History` is the place to find reusable lessons already
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
+
+## Intake 2026-09-28 (chat retro: readiness after Safe Mode, settle after mutating hooks, evidence surfaces)
+
+- Source: a one-hour feature session on `v0.3.80` (hub project plus a
+  thirteen-project consumer sweep). Unity completed 184/184 requests; the retro
+  attributes every failure verdict to the wrapper, a scenario's step order, or
+  host load, and lists four missing evidence surfaces. This is an intake from
+  session evidence, not a release validation or a grooming triage.
+- Two host-local changes were applied the same day (the environment hook now
+  reports applied scripting defines; the profile scenarios wait longer after the
+  hook, a labelled blind sleep because the validator forbids `project_refresh`
+  after a profile mutation).
+  The public items (readiness re-probe after Safe Mode, complete failure list,
+  settle-gated compile step, tail-first anchored grep, sweep terminal record with
+  retry hint, expected-reload labelling, asset field snapshot) remain open.
 
 ## Re-Evaluation 2026-09-24 (saved helper evidence authority)
 
@@ -617,9 +648,11 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 
 | Date | File | Scope | Registry Status | Why It Is Not Completed History |
 | --- | --- | --- | --- | --- |
+| 2026-09-28 | `2026-09-28_readiness_after_safe_mode_and_hook_settle_operator_retro.md` | Readiness verdict after a Safe Mode observation, settle-gated compile after define-changing hooks, complete failure lists, tail-first anchored grep, sweep terminal record with retry hint, hook-reported defines, asset field snapshot | **intake 2026-09-28; host-local hook report and labelled wait applied; public items open** | Unity completed 184/184 requests, yet `ensure-ready` and a checked-in scenario reported failures Unity had already resolved, and four evidence surfaces (three failures of nine listed, anchored grep searching the oldest window, no applied-defines report, no asset field read) pushed the operator to a 55 MB log and compiler response files. Overlaps the 2026-08-19 anchored-scope row (window direction) and the 2026-09-02 batch-shape row (sweep terminal record). |
+| 2026-09-03 | `2026-09-03_greenfield_hardening_operator_retro.md` | staleness surfacing (editor domain + AssetDatabase), compact build envelope, advisory de-duplication | **both P1 currency findings released in `v0.3.69`; P2/P3 residuals open** | Every catalog-backed action now passes a shared editor-domain currency gate, while `requiresFreshAssets: true` prepends a settled forced refresh. Runtime background execution is enabled without native autofocus. Remaining: compact build/EDM4U envelopes and advisory de-duplication (P2), plus the inline-image idea (P3); native autofocus was deliberately declined. |
 | 2026-09-02 | `2026-09-02_batch_summary_shape_and_compile_evidence_retro.md` | Sweep-runner verdict versus the wrapper's default compact batch payload shape, plus compile-warning and rebuilt-versus-cached evidence surfaces | **P0 and summary-artifact P2 released in `v0.3.67`; warning-evidence P1 released in `v0.3.70`; rebuild/cache P1 released in `v0.3.73`; output-shape P2 remains** | `v0.3.73` adds Unity-measured `rebuilt_assembly_count` / `cached_assembly_count` evidence to direct, matrix, compact batch, and multi-project summaries. The historical measurement is now protected from release-sweep relabelling. The batch `--output` selector is consumed by direct batch commands, but pinning a lane-independent full/compact shape through the multi-project runner remains open. |
-| 2026-08-26 | `2026-08-26_import_worker_bridge_ownership_retro.md` | Import-worker ownership plus UI selector, click-causality, readiness-log, package-removal, and contention follow-ups | **P0 released in `v0.3.60`; selector-truncation P1 implemented in current source; other follow-ups open** | Import-worker bridge ownership and provenance are released. The two-sighting capped-selector false negative now has a typed inconclusive result with scope/budget evidence and bounded recovery; a partial match is also refused because uniqueness is unproven. Non-causal `state_changed`, readiness-log attribution, package-removal verification, and operator-contention follow-ups remain separate work. |
-| 2026-08-19 | `2026-08-19_anchored_scope_truncation_and_verdict_field_ranking_retro.md` | Console-lane verdict ranking: a truncated search scope that reports zero matches as a negative, and an anchored scope whose fixed cut kept the tail rather than the anchor-adjacent head | **both P1 items implemented in current source; P2/P3 residuals open** | Current source keeps anchored grep windows beside the anchor, exposes `search_verdict`/reason, direction and truncation at the top level, and makes partial zero-matches explicitly inconclusive with a recovery action and partial-scope trust class. Complete anchored zero-matches remain `not_matched`; console tail keeps recent-tail behavior. Focused regression owns early-boot recovery, boundary safety, absolute numbering, negative/inconclusive ranking, and tail compatibility. Remaining: P2 user-controlled window/import-freshness hints and P3 benign settle-warning downgrade. **Second sighting 2026-09-02**: ranking behaved correctly on an anchored 2.16 MB scope with 1.66 MB unsearched, and the answer still required a shell fallback, so the P2 window residual is proposed for P1. |
+| 2026-08-26 | `2026-08-26_import_worker_bridge_ownership_retro.md` | Import-worker ownership plus UI selector, click-causality, readiness-log, package-removal, and contention follow-ups | **P0 released in `v0.3.60`; selector-truncation P1 released in `v0.3.64`; other follow-ups open** | Import-worker bridge ownership and provenance are released. The two-sighting capped-selector false negative now has a typed inconclusive result with scope/budget evidence and bounded recovery; a partial match is also refused because uniqueness is unproven. Non-causal `state_changed`, readiness-log attribution, package-removal verification, and operator-contention follow-ups remain separate work. |
+| 2026-08-19 | `2026-08-19_anchored_scope_truncation_and_verdict_field_ranking_retro.md` | Console-lane verdict ranking: a truncated search scope that reports zero matches as a negative, and an anchored scope whose fixed cut kept the tail rather than the anchor-adjacent head | **both P1 items implemented in current source; P2/P3 residuals open** | Current source keeps anchored grep windows beside the anchor, exposes `search_verdict`/reason, direction and truncation at the top level, and makes partial zero-matches explicitly inconclusive with a recovery action and partial-scope trust class. Complete anchored zero-matches remain `not_matched`; console tail keeps recent-tail behavior. Focused regression owns early-boot recovery, boundary safety, absolute numbering, negative/inconclusive ranking, and tail compatibility. The bounded `maxSearchChars` recovery and process-bound anchors shipped in `v0.3.66`; do not select the earlier missing-budget report again. Remaining: richer window-direction/selection and import-freshness hints (P2), plus benign settle-warning downgrade (P3). |
 | 2026-05-14 | `2026-05-14_sdk_rollout_mcp_portfolio_retro.md` | SDK/EDM4U rollout validation lane: typed resolver preconditions, package restore, generated-Gradle diff guard, GUI process pool + quit-and-wait closeout, portfolio SDK summary | **generated-diff + typed resolver/package-restore P0 complete in current source; orchestration remains P1** | `v0.3.45`-`v0.3.48` shipped and hardened generated-diff plus callback-backed Android resolution. Current source adds fail-closed closed-project `unity.sdk.package_restore` with an idle-stable registered package graph, atomic package/dependency receipt, and proven process exit. Still open: GUI process pool, batch resolve, closeout orchestration, and portfolio summary. Device lanes remain ROADMAP Wave 5. |
 | 2026-06-02 | `2026-06-02_token_efficiency_response_envelope_retro.md` | Response-envelope token efficiency: compact-by-default across MCP tool surfaces | mostly implemented; P2 residual | Compact-by-default shipped `v0.3.32`-`v0.3.44` for scenario, refresh, compile, build-config compile, test, `unity_status_summary`, `ensure-ready`, and batch CLI, each with `includeFullPayload`/`--output` opt-in (STATUS.md "Compact MCP envelopes"). Remaining (ROADMAP.md "Phase 2" residual): broader multi-project compact ceilings, a token ledger, and fast-path profiles. |
 | 2026-06-11 | `2026-06-11_token_accounting_and_fast_path_retro.md` | Token-accounting ledger, one-shot package-pin verifier, fast-path prompt profile | partial; P2 | The biggest win (compact output) shipped through `v0.3.40`/`v0.3.44`, and the fast path is documented in `docs/agents/PACKAGE_BUMP_FAST_PATH.md`, but no token-accounting ledger, one-shot verify-package-pin verifier, or runner token-budget hints exist in source or ROADMAP/STATUS. Overlaps the response-envelope row above as the token-efficiency tail. |
@@ -681,9 +714,9 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 | 2026-05-07 | `2026-05-07_token_stability_and_summary_first_recovery_retro.md` | token stability and summary-first recovery | implemented history | Sanitized from host-private single-project evidence; private source removed after promotion. |
 | undated | `xuunity_mcp_chat_retro.md` | legacy general MCP chat/session postmortem (PASS/EXCELLENT) | history; asks shipped | Both improvement asks are shipped: `no_tests` treated as an acceptable status (`run_multi_project.py` `acceptable_test_statuses={"passed","no_tests"}`) and compact-by-default final/latest surfaces (`v0.3.44`). Legacy wrapper terminology predates the current MCP tool surface; kept as history. |
 | undated | `xuunity_mcp_install_retro.md` | legacy end-to-end install/verify/Android-compile success record (v0.3.21) | history; no open items | Clean happy-path install postmortem with zero open items; the described flow still exists and was hardened through `v0.3.42`-`v0.3.44`. No backlog to implement. |
-| 2026-09-03 | `2026-09-03_greenfield_hardening_operator_retro.md` | staleness surfacing (editor domain + AssetDatabase), compact build envelope, advisory de-duplication | **both P1 currency findings released in `v0.3.69`; P2/P3 residuals open** | Every catalog-backed action now passes a shared editor-domain currency gate, while `requiresFreshAssets: true` prepends a settled forced refresh. Runtime background execution is enabled without native autofocus. Remaining: compact build/EDM4U envelopes and advisory de-duplication (P2), plus the inline-image idea (P3); native autofocus was deliberately declined. |
 
 ## Prompt Templates
 
 - `CHAT_RETRO_PROMPT.md`
 - `INSTALL_RETRO_PROMPT.md`
+- `REFERENCE_DRIVEN_UI_AUDIT_PROMPT.md`

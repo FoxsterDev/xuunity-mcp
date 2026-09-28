@@ -53,7 +53,7 @@ registry-normalization re-review against current source.
 - `XUUNITY_MCP_PLAYMODE_VERDICT_RECOVERY_DESIGN_2026-05-15.md`
 - `XUUNITY_MCP_TEST_RESULT_ACCOUNTING_CONSISTENCY_DESIGN_2026-05-16.md`
 - `XUUNITY_MCP_BATCH_OPERATOR_ERGONOMICS_DESIGN_2026-05-21.md`
-- `XUUNITY_MCP_UTC_TIMESTAMP_PARSER_CONSOLIDATION_DESIGN_2026-08-04.md` — backlog, not scheduled
+- `XUUNITY_MCP_UTC_TIMESTAMP_PARSER_CONSOLIDATION_DESIGN_2026-08-04.md` — implemented in current source; keep the timezone regression
 
 ## Historical Designs
 
