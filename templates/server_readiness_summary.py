@@ -103,6 +103,12 @@ def build_ensure_ready_summary(
         health_status = "unlicensed"
     playmode_state = str(bridge_state.get("playmode_state") or "")
     next_action = _next_action_for_ready(bridge_state, discovery)
+    compile_errors_reported = bool(bridge_state.get("script_compilation_failed")) or _int_or_zero(
+        bridge_state.get("compiler_error_count")
+    ) > 0
+    verdict = "ready" if health_status == "healthy" else "degraded"
+    if health_status == "healthy" and compile_errors_reported:
+        verdict = "ready_with_compile_errors"
 
     summary: dict[str, Any] = {
         "action": "ensure_ready",
@@ -121,7 +127,7 @@ def build_ensure_ready_summary(
         "full_payload_command": render_launcher_cli(
             "ensure-ready", project_root, "--include-full-payload"
         ),
-        "verdict": "ready" if health_status == "healthy" else "degraded",
+        "verdict": verdict,
         "succeeded": health_status == "healthy",
         "health": {
             "status": health_status,
@@ -160,6 +166,15 @@ def build_ensure_ready_summary(
     launch = _compact_launch(payload)
     if launch:
         summary["launch"] = launch
+
+    startup_log_observation = bridge_state.get("startup_log_observation")
+    if isinstance(startup_log_observation, dict) and startup_log_observation:
+        summary["startup_log_observation"] = dict(startup_log_observation)
+    if verdict == "ready_with_compile_errors":
+        summary["verdict_note"] = (
+            "The bridge is attached and healthy, but the editor reports compile errors. Fix them and run the "
+            "recovery command; no Safe Mode dialog action is required."
+        )
 
     bridge_config_mutation = dict(payload.get("project_bridge_config_mutation") or {})
     if bridge_config_mutation:

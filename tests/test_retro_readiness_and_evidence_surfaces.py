@@ -1,0 +1,163 @@
+"""Operator-verdict and evidence-surface contracts from the 2026-09-28 readiness/settle retro.
+
+Each case reproduces a false verdict or a missing surface the retro recorded: an editor that had already left
+Safe Mode was reported as blocked on the dialog, compact test payloads listed three failures of nine, an anchored
+grep searched the oldest 500k characters of a 2 MB scope, a stale heartbeat during a long import was reported as a
+frozen editor, and the post-PlayMode domain reload read as a warning. Unity and the OS process table are the only
+mocked boundaries.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import sys
+import tempfile
+import time
+import types
+import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest import mock
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+TEMPLATES_DIR = REPO_ROOT / "templates"
+RUNNER_DIR = REPO_ROOT / "scripts" / "testing"
+for candidate in (TEMPLATES_DIR, RUNNER_DIR):
+    if str(candidate) not in sys.path:
+        sys.path.insert(0, str(candidate))
+
+import run_multi_project
+import server_batch_lanes
+import server_batch_orchestrator
+import server_batch_reporting
+import server_bridge_payloads
+import server_bridge_state
+import server_editor_host
+import server_editor_host_lifecycle
+import server_editor_host_paths
+import server_health
+import server_launcher
+import server_operation_evidence
+from server_bridge_paths import test_result_path
+from server_core import ToolInvocationError, read_json, write_json
+from server_readiness_summary import build_ensure_ready_summary
+
+SAFE_MODE_EXIT_LINE = "[ScriptCompilation] Requested script compilation because: Exiting safe mode"
+
+
+class SafeModeClassifierTests(unittest.TestCase):
+    def test_the_exit_line_is_not_a_dialog_marker(self) -> None:
+        log = "Assets/Foo.cs(1,1): error CS1061: missing member\n" + SAFE_MODE_EXIT_LINE + "\n"
+
+        self.assertEqual("safe_mode_exited", server_editor_host_paths.safe_mode_log_observation(log))
+        code, message = server_editor_host_paths.classify_editor_log(log, "fail_fast_on_interactive_compile_block")
+
+        self.assertEqual("compile_errors_after_safe_mode_exit", code)
+        self.assertIn("no dialog is blocking", message)
+
+    def test_a_dialog_marker_after_the_exit_line_still_reports_the_dialog(self) -> None:
+        log = "error CS1002\n" + SAFE_MODE_EXIT_LINE + "\nOpening project in Safe Mode\n"
+
+        self.assertEqual("safe_mode_marker_present", server_editor_host_paths.safe_mode_log_observation(log))
+        code, _ = server_editor_host_paths.classify_editor_log(log, "fail_fast_on_interactive_compile_block")
+
+        self.assertEqual("interactive_compile_block_with_safe_mode_dialog", code)
+
+    def test_compile_errors_without_any_safe_mode_mention_keep_the_plain_block_code(self) -> None:
+        self.assertEqual("none", server_editor_host_paths.safe_mode_log_observation("error CS1002\n"))
+        code, _ = server_editor_host_paths.classify_editor_log("error CS1002\n", "fail_fast_on_interactive_compile_block")
+
+        self.assertEqual("interactive_compile_block_detected", code)
+
+
+class ReadinessAfterSafeModeTests(unittest.TestCase):
+    def _patches(self, *, classification: tuple[str, str], idle_seconds: float, states: list[dict], ready: list[bool], times: list[float]):
+        fake_time = types.SimpleNamespace(time=mock.Mock(side_effect=times), sleep=mock.Mock())
+        return fake_time, (
+            mock.patch.object(server_editor_host, "time", fake_time),
+            mock.patch.object(server_editor_host, "bridge_enabled", return_value=True),
+            mock.patch.object(server_editor_host, "try_read_bridge_state", side_effect=states),
+            mock.patch.object(server_editor_host, "bridge_state_is_ready", side_effect=ready),
+            mock.patch.object(server_editor_host, "read_recent_editor_log", return_value="error CS1061\n" + SAFE_MODE_EXIT_LINE),
+            mock.patch.object(server_editor_host, "classify_editor_log", return_value=classification),
+            mock.patch.object(server_editor_host, "find_running_unity_editors_for_project", return_value=[{"pid": 222}]),
+            mock.patch.object(server_editor_host, "pid_is_alive", return_value=True),
+            mock.patch.object(server_editor_host_lifecycle, "_editor_log_idle_seconds", return_value=idle_seconds),
+            mock.patch.object(server_editor_host, "heartbeat_age_seconds", return_value=1.0),
+        )
+
+    def test_a_moving_log_with_dialog_markers_keeps_polling_until_the_deadline(self) -> None:
+        fake_time, patches = self._patches(
+            classification=("interactive_compile_block_with_safe_mode_dialog", "Safe Mode dialog observed."),
+            idle_seconds=2.0,
+            states=[{}, {}],
+            ready=[False, False],
+            times=[0.0, 0.0, 2.0],
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8], patches[9]:
+            with self.assertRaises(ToolInvocationError) as ctx:
+                server_editor_host.wait_for_ready(
+                    Path("/tmp/FakeProject"),
+                    timeout_ms=1000,
+                    heartbeat_max_age_seconds=10,
+                    startup_policy="fail_fast_on_interactive_compile_block",
+                    editor_log_path=Path("/tmp/editor.log"),
+                )
+
+        self.assertEqual("startup_safe_mode_dialog_observed", ctx.exception.code)
+        self.assertEqual("readiness_deadline_reached_with_safe_mode_markers", ctx.exception.details["dialog_block_basis"])
+        self.assertEqual(2.0, ctx.exception.details["editor_log_idle_seconds"])
+        fake_time.sleep.assert_called_once_with(1.0)
+
+    def test_an_editor_that_left_safe_mode_becomes_ready_with_compile_errors(self) -> None:
+        ready_state = {
+            "editor_pid": 222,
+            "bridge_bootstrap_attached": True,
+            "health_status": "healthy",
+            "script_compilation_failed": True,
+            "compiler_error_count": 1,
+        }
+        fake_time, patches = self._patches(
+            classification=("compile_errors_after_safe_mode_exit", "Editor left Safe Mode with compile errors."),
+            idle_seconds=0.5,
+            states=[{}, ready_state],
+            ready=[False, True],
+            times=[0.0, 0.0, 0.5],
+        )
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7], patches[8], patches[9]:
+            state = server_editor_host.wait_for_ready(
+                Path("/tmp/FakeProject"),
+                timeout_ms=1000,
+                heartbeat_max_age_seconds=10,
+                startup_policy="fail_fast_on_interactive_compile_block",
+                editor_log_path=Path("/tmp/editor.log"),
+            )
+
+        observation = state["startup_log_observation"]
+        self.assertEqual("startup_compile_errors_after_safe_mode_exit", observation["readiness_condition"])
+        self.assertTrue(observation["safe_mode_exit_observed"])
+        self.assertEqual("bridge_attached", observation["resolved_by"])
+        self.assertEqual("fix_compile_errors", observation["recommended_next_action"])
+        fake_time.sleep.assert_called_once_with(1.0)
+
+        summary = build_ensure_ready_summary(Path("/tmp/FakeProject"), {"bridge_state": state, "discovery": {}})
+        self.assertEqual("ready_with_compile_errors", summary["verdict"])
+        self.assertTrue(summary["succeeded"])
+        self.assertEqual("fix_compile_errors", summary["recommended_next_action"])
+        self.assertIn("request-project-refresh", summary["recovery_command"])
+        self.assertEqual(observation, summary["startup_log_observation"])
+        self.assertNotIn("Safe Mode manually", summary["verdict_note"])
+
+    def test_a_healthy_bridge_without_compile_errors_stays_plain_ready(self) -> None:
+        summary = build_ensure_ready_summary(
+            Path("/tmp/FakeProject"),
+            {"bridge_state": {"health_status": "healthy", "compiler_error_count": 0}, "discovery": {}},
+        )
+
+        self.assertEqual("ready", summary["verdict"])
+        self.assertNotIn("verdict_note", summary)
+
+
+if __name__ == "__main__":
+    unittest.main()

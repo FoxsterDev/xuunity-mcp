@@ -1027,7 +1027,12 @@ explicit approval.
 state-group, timing, or artifact details.
 `ensure-ready` defaults to a compact readiness envelope; pass
 `--include-full-payload` for full discovery, package import, launch, and
-lifecycle evidence.
+lifecycle evidence. A healthy bridge whose editor still reports compile errors
+returns `verdict=ready_with_compile_errors` with `fix_compile_errors` and the
+`request-project-refresh` recovery command; when Editor.log shows the editor
+already left Safe Mode (`Exiting safe mode`) the readiness wait keeps polling
+instead of failing with `startup_safe_mode_dialog_observed`, which is now
+raised only when the log has gone quiet with the dialog markers present.
 Refresh, compile, and direct test MCP tools also return compact operation
 summaries by default; pass `includeFullPayload=true` when you need full
 `_xuunity_lifecycle` snapshots for transport or lifecycle debugging.

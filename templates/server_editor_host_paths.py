@@ -276,6 +276,33 @@ def bridge_state_is_ready(state: dict[str, Any] | None, heartbeat_max_age_second
     )
 
 
+SAFE_MODE_EXIT_MARKER = "exiting safe mode"
+
+
+def safe_mode_log_observation(log_text: str) -> str:
+    """Unity's exit line also contains the generic marker, so the newest Safe Mode mention decides dialog versus recovered."""
+
+    lowered = (log_text or "").lower()
+    last_marker = -1
+    last_exit = -1
+    cursor = 0
+    while True:
+        index = lowered.find("safe mode", cursor)
+        if index < 0:
+            break
+        exit_start = index - len("exiting ")
+        if exit_start >= 0 and lowered.startswith(SAFE_MODE_EXIT_MARKER, exit_start):
+            last_exit = index
+        else:
+            last_marker = index
+        cursor = index + 1
+    if last_marker < 0 and last_exit < 0:
+        return "none"
+    if last_exit > last_marker:
+        return "safe_mode_exited"
+    return "safe_mode_marker_present"
+
+
 def classify_editor_log(log_text: str, startup_policy: str) -> tuple[str, str] | None:
     if not log_text:
         return None
@@ -292,15 +319,7 @@ def classify_editor_log(log_text: str, startup_policy: str) -> tuple[str, str] |
             "Unity could not clone a git package dependency. Inspect Editor.log for the failing dependency URL or commit hash.",
         )
 
-    safe_mode_marker_present = any(
-        marker in log_text
-        for marker in (
-            "Safe Mode",
-            "safe mode",
-            "Enter Safe Mode",
-            "Opening project in Safe Mode",
-        )
-    )
+    safe_mode_observation = safe_mode_log_observation(log_text)
     compile_error_present = (
         "error CS" in log_text
         or "Assembly has duplicate references" in log_text
@@ -308,12 +327,19 @@ def classify_editor_log(log_text: str, startup_policy: str) -> tuple[str, str] |
         or "Unable to resolve reference" in log_text
     )
     if compile_error_present:
-        if safe_mode_marker_present:
+        if safe_mode_observation == "safe_mode_marker_present":
             return (
                 "interactive_compile_block_with_safe_mode_dialog",
                 "Compilation errors were detected during startup and Editor.log includes Safe Mode markers. "
                 "This wrapper will not click Safe Mode dialogs; run the batch compile gate and fix compile "
                 "errors or open Safe Mode manually.",
+            )
+
+        if safe_mode_observation == "safe_mode_exited":
+            return (
+                "compile_errors_after_safe_mode_exit",
+                "Compilation errors were detected during startup and Editor.log shows the editor has already "
+                "left Safe Mode, so no dialog is blocking. Fix the compile errors and refresh the project.",
             )
 
         if startup_policy == "batch_compile_lane":

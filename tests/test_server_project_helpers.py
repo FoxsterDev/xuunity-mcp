@@ -16,6 +16,7 @@ if str(TEMPLATES_DIR) not in sys.path:
 import server
 import server_batch_orchestrator
 import server_editor_host
+import server_editor_host_lifecycle
 import server_project_context
 from server_host_platform import HostPlatformAdapter
 from server_project_context import ensure_project_root as ensure_project_root_base
@@ -154,6 +155,7 @@ class ServerProjectHelperTests(unittest.TestCase):
                 return_value=[{"pid": 222}],
             ),
             mock.patch.object(server_editor_host, "pid_is_alive", return_value=True),
+            mock.patch.object(server_editor_host_lifecycle, "_editor_log_idle_seconds", return_value=30.0),
         ):
             with self.assertRaises(ToolInvocationError) as ctx:
                 server_editor_host.wait_for_ready(
@@ -166,6 +168,9 @@ class ServerProjectHelperTests(unittest.TestCase):
 
         self.assertEqual("startup_safe_mode_dialog_observed", ctx.exception.code)
         self.assertEqual("unmeasured", ctx.exception.details["compile_state"])
+        self.assertEqual(
+            "editor_log_quiescent_with_safe_mode_markers", ctx.exception.details["dialog_block_basis"]
+        )
         fake_time.sleep.assert_not_called()
 
     def test_wait_for_ready_names_bridge_not_attached_without_claiming_compile_truth(self) -> None:

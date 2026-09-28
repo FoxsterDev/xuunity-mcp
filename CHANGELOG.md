@@ -4,6 +4,13 @@
 
 ### Changed
 
+- `ensure-ready` no longer fails on the `Exiting safe mode` line: it classifies
+  as `compile_errors_after_safe_mode_exit`, the readiness wait keeps polling
+  while Editor.log still moves, `startup_safe_mode_dialog_observed` is raised
+  only once the log has been quiet for 20 s with the dialog markers present (or
+  at the deadline, with `dialog_block_basis`), and a healthy bridge whose editor
+  still reports compile errors returns `verdict=ready_with_compile_errors`
+  with `startup_log_observation` and the `request-project-refresh` recovery.
 - The scenario `compile_player_scripts` step waits for editor idle (compile,
   update, domain reload, package, and import activity) before it dispatches,
   retries one `editor_busy` refusal, reports `dispatch_gate_wait_seconds`,

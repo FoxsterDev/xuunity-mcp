@@ -61,6 +61,7 @@ HOST_EDITOR_LAUNCH_IN_PROGRESS_MAX_AGE_SECONDS = 90.0
 TASKKILL_TIMEOUT_SECONDS = 15.0
 LAUNCH_HELPER_TIMEOUT_SECONDS = 30.0
 TRANSIENT_LICENSING_BLOCKER_GRACE_SECONDS = 5.0
+SAFE_MODE_DIALOG_QUIESCENCE_SECONDS = 20.0
 STARTUP_BLOCKER_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "licensing_connection_lost",
@@ -1122,6 +1123,7 @@ def _readiness_error_from_log_observation(
         "asset_import_in_progress": bool(observed_state.get("asset_import_in_progress")),
         "domain_reload_in_progress": bool(observed_state.get("domain_reload_in_progress")),
         "package_operation_in_progress": bool(observed_state.get("package_operation_in_progress")),
+        "safe_mode_exit_observed": log_code == "compile_errors_after_safe_mode_exit",
     }
 
     if log_code == "interactive_compile_block_with_safe_mode_dialog":
@@ -1131,6 +1133,14 @@ def _readiness_error_from_log_observation(
             "wait. Handle the dialog explicitly; this is a log observation, not an authoritative compile verdict."
         )
         next_action = "open_safe_mode_manually"
+    elif log_code == "compile_errors_after_safe_mode_exit":
+        code = "startup_compile_errors_after_safe_mode_exit"
+        summary = (
+            "Editor.log shows the editor left Safe Mode with compile errors still present, so no dialog is "
+            "blocking. Fix the compile errors, then refresh the project; this is a log observation, not an "
+            "authoritative compile verdict."
+        )
+        next_action = "fix_compile_errors"
     elif bridge_pid > 0 and live_editor_pids and bridge_pid not in live_editor_pids:
         code = "editor_identity_changed"
         summary = (
@@ -1299,6 +1309,38 @@ def _launch_blocked_error(observation: dict[str, Any]) -> ToolInvocationError:
     )
 
 
+def _safe_mode_dialog_is_blocking(editor_log_path: Path, readiness_error: ToolInvocationError) -> bool:
+    """A Safe Mode prompt leaves Editor.log silent; a log that keeps moving means Unity is still working on its own."""
+
+    idle_seconds = _editor_log_idle_seconds(editor_log_path)
+    readiness_error.details["editor_log_idle_seconds"] = None if idle_seconds is None else round(idle_seconds, 3)
+    blocking = idle_seconds is not None and idle_seconds >= SAFE_MODE_DIALOG_QUIESCENCE_SECONDS
+    readiness_error.details["dialog_block_basis"] = (
+        "editor_log_quiescent_with_safe_mode_markers"
+        if blocking
+        else "editor_log_still_moving_after_safe_mode_markers"
+    )
+    return blocking
+
+
+def _startup_log_observation_after_ready(
+    readiness_error: ToolInvocationError,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    details = dict(readiness_error.details or {})
+    compile_errors_reported = bool(state.get("script_compilation_failed")) or int(
+        state.get("compiler_error_count") or 0
+    ) > 0
+    return {
+        "readiness_condition": readiness_error.code,
+        "editor_log_observation_code": str(details.get("editor_log_observation_code") or ""),
+        "safe_mode_exit_observed": bool(details.get("safe_mode_exit_observed")),
+        "resolved_by": "bridge_attached",
+        "compile_errors_reported_by_bridge": compile_errors_reported,
+        "recommended_next_action": "fix_compile_errors" if compile_errors_reported else "none",
+    }
+
+
 def wait_for_ready(
     project_root: Path,
     timeout_ms: int,
@@ -1337,6 +1379,8 @@ def wait_for_ready(
             state["startup_policy"] = startup_policy
             state["editor_log_path"] = str(editor_log_path)
             state["heartbeat_age_seconds"] = round(age_seconds or 0.0, 3)
+            if last_readiness_error is not None:
+                state["startup_log_observation"] = _startup_log_observation_after_ready(last_readiness_error, state)
             return state
 
         classification = classify_editor_log(read_recent_editor_log(editor_log_path, started_at), startup_policy)
@@ -1346,9 +1390,12 @@ def wait_for_ready(
                 "interactive_compile_block_detected",
                 "interactive_compile_block_with_safe_mode_dialog",
                 "safe_mode_manual_required",
+                "compile_errors_after_safe_mode_exit",
             }:
                 readiness_error = _readiness_error_from_log_observation(project_root, state, classification)
-                if readiness_error.code == "startup_safe_mode_dialog_observed":
+                if readiness_error.code == "startup_safe_mode_dialog_observed" and _safe_mode_dialog_is_blocking(
+                    editor_log_path, readiness_error
+                ):
                     raise readiness_error
                 # A bridge can attach or finish import immediately after the log
                 # moves. Do not turn that normal startup race into a blocking
@@ -1384,6 +1431,8 @@ def wait_for_ready(
         time.sleep(1.0)
 
     if last_readiness_error is not None:
+        if last_readiness_error.code == "startup_safe_mode_dialog_observed":
+            last_readiness_error.details["dialog_block_basis"] = "readiness_deadline_reached_with_safe_mode_markers"
         raise last_readiness_error
 
     blocker_observation = _startup_blocker_observation(project_root, editor_log_path, started_at)
