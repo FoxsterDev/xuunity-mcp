@@ -18,11 +18,11 @@ on:
       - "templates/**"
   push:
     # No paths filter: the release gate needs a Discovery Checks run for every
-    # master SHA, and a filtered trigger leaves release commits with no run at
+    # main SHA, and a filtered trigger leaves release commits with no run at
     # all — the gate then polls its whole budget for evidence that can never
     # appear.
     branches:
-      - master
+      - main
   workflow_dispatch:
 
 permissions:
