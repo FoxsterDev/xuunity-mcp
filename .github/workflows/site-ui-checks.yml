@@ -12,7 +12,7 @@ on:
       - ".github/workflows/site-ui-checks.yml"
   push:
     branches:
-      - master
+      - main
     paths:
       - "docs/**"
       - "package.json"
