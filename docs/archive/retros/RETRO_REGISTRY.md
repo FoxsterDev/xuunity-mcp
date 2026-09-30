@@ -42,6 +42,19 @@ own owner registries, not in this public table.
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
 
+## Intake 2026-09-29 (guarded click refused a transparent button hit area)
+
+- Source: a consumer gameplay session on `v0.3.80`. `unity_ui_click` refused a
+  button whose own `Image` is an alpha-0 hit area with `raycastTarget` on and a
+  visible child icon that does not take raycasts; the icon was refused too, and
+  the operator fell back to a project hook calling the production API. Unity's
+  `GraphicRaycaster` still hits that hit area, so a real finger reaches it.
+- Implemented in current source on 2026-09-29/30: the click gates on uGUI
+  pointer reachability (`pointer_targetable`, `pointer_target_status`,
+  `pointer_target_blocked_by`) and reports `transparent_hit_area` evidence;
+  `visible` keeps its render meaning. Awaits the next release. No retro file:
+  the intake note is the record.
+
 ## Intake 2026-09-28 (chat retro: readiness after Safe Mode, settle after mutating hooks, evidence surfaces)
 
 - Source: a one-hour feature session on `v0.3.80` (hub project plus a

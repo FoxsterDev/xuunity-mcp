@@ -35,6 +35,16 @@ Current source coordinates Unity licensing probes and GUI editor admission with
 a host-wide lock, forwards the normalized Hub licensing channel, verifies the
 exact channel connection, and blocks readiness when licensing is lost.
 
+Current source gates `unity_ui_click` on uGUI pointer reachability instead of
+render alpha: a transparent `raycastTarget` hit area (for example an alpha-0
+button Image framing a visible icon) is clicked and reported as
+`transparent_hit_area`, while `pointer_target_status` and
+`pointer_target_blocked_by` name the raycast filter that makes a target
+unreachable (`canvas_group_blocks_raycasts`, `alpha_hit_test_rejected`,
+`raycast_filter_rejected`, `no_raycaster`, and others). UI tree nodes report
+`pointer_targetable` beside the unchanged render-visibility `visible` field, and
+the scenario `ui_click` step carries the same evidence.
+
 Current source applies the 2026-09-28 readiness/settle retro: `ensure-ready`
 keeps polling after a Safe Mode observation while Editor.log still moves and
 returns `ready_with_compile_errors` once the bridge attaches with compile errors
@@ -448,6 +458,7 @@ Latest release and current-source validation for `v0.3.81`:
 | --- | --- | --- |
 | Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.81`, `unity=2021.3`, no hard Test Framework dependency |
 | Host Python tests | `scripts/testing/run_host_python_tests.sh` (release checks plus full discovery) | Full discovery passed `1156` tests with `14` expected platform skips, including live TCP loopback transport coverage. |
+| Current-source uGUI pointer targeting | Package self-tests in scaffolded consumer projects | EditMode `178/178` on Unity `2022.3.67f2` and `6000.0.58f2` with uGUI, `128/128` on Unity `6000.0.58f2` without uGUI; the uGUI PlayMode assembly passes `17` with `2` environment skips on `6000.0.58f2`, including a live `EventSystem` raycast that reaches an alpha-0 `Image` stacked over an opaque button. PlayMode was not run on `2022.3`. |
 | `v0.3.73` rebuilt/cache compile evidence | Consumer editors on Unity `2022.3.62f3` and `6000.0.58f2` using the release source | Both versions passed package EditMode `161/161`. Live player-script compile returned `9` rebuilt / `30` cached assemblies on Unity `2022.3.62f3` and `76` rebuilt / `181` cached assemblies on Unity `6000.0.58f2`, each `measured` with zero compiler errors or warnings; original package pins and editor ownership were restored. | <!-- release-version: historical -->
 | Historical play-mode liveness measurement | Interactive MCP observation of an unfocused editor in Play Mode | With `playmode_state=playing` and `health_status=healthy`, the payload reports `playmode_loop_liveness=throttled`, `playmode_frames_advanced_last_interval=0`, `editor_application_focused=false`, `playmode_liveness_warning=playmode_throttled_editor_unfocused`, and the focus/no-throttling remediation; `unity_status_summary` carries the same fields. |
 | Current-source structural compile diagnostics | Focused host contract plus a live duplicate-reference fault injection on Unity `2022.3.62f3` | Focused refresh/compile/test envelope coverage passes `129/129`. A real duplicate `.asmdef` reference produced `assembly_definition_error` with session-scoped `Editor.log` evidence and recovered to authoritative compile green after probe removal. Package tests passed EditMode `68/68` and PlayMode `18` passed with one expected skip; the editor was closed and consumer manifest/lock bytes were restored. |
