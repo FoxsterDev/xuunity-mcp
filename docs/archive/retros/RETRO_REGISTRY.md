@@ -42,6 +42,19 @@ own owner registries, not in this public table.
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
 
+## Intake 2026-09-30 (stale license verdict forced GUI fallback into Safe Mode)
+
+- Source: a consumer session on `v0.3.80` whose `batch-compile` opened a GUI
+  editor and met Unity's Safe Mode dialog, because a 20-day-old
+  `licensing_client_ipc_failure` verdict from a probe that had merely timed out
+  was reused from the project cache; the bridge's "Unity has compilation
+  errors" refusal was then dropped from the summary.
+- Implemented in current source on 2026-09-30: the classifier no longer reads
+  the routine `[Licensing::IpcConnector]` line as a failure, unproven verdicts
+  expire after 24 hours, the newest verdict for an executable is shared across
+  projects, and GUI fallback errors reach `top_actionable_error`. Retro:
+  `2026-09-30_stale_license_verdict_forced_gui_fallback_retro.md`. Unreleased.
+
 ## Intake 2026-09-29 (guarded click refused a transparent button hit area)
 
 - Source: a consumer gameplay session on `v0.3.80`. `unity_ui_click` refused a
@@ -663,6 +676,7 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 
 | Date | File | Scope | Registry Status | Why It Is Not Completed History |
 | --- | --- | --- | --- | --- |
+| 2026-09-30 | `2026-09-30_stale_license_verdict_forced_gui_fallback_retro.md` | timed-out licensing probe recorded as a permanent `licensing_client_ipc_failure`; project cache without expiry; GUI fallback dropped the bridge error | **fixed in current source 2026-09-30; unreleased** | Five projects ran every `batch-*` helper through the GUI lane for 20 days on a verdict drawn from a probe that only ran out of time, and one of them hit Unity's Safe Mode dialog on a compile error the summary then failed to report. Classifier, cache expiry, host-wide newest-verdict sharing and error carry are in source; residual: a project with no verdict still takes GUI while another editor is live, and a successful batch run does not yet record a proven verdict. |
 | 2026-09-30 | `2026-09-30_editor_quit_ack_without_exit_retro.md` | `request-editor-quit` acknowledgement versus actual editor exit | **intake 2026-09-30; backlog, no fix applied** | The direct quit command printed `quit_requested` and exited 0 twice while an idle, healthy editor stayed alive; only `restore-editor-state` closed it (`quit_ack_without_exit_sigterm_recovered`). The command should verify exit like the closeout path. The root cause of the surviving `EditorApplication.Exit` is unverified. |
 | 2026-09-28 | `2026-09-28_readiness_after_safe_mode_and_hook_settle_operator_retro.md` | Readiness verdict after a Safe Mode observation, settle-gated compile after define-changing hooks, complete failure lists, anchored grep auto-extension and console anchor, sweep terminal record with retry hint, hook-reported defines, asset field snapshot | **all eight items released in `v0.3.81`** | Unity completed 184/184 requests, yet `ensure-ready` and a checked-in scenario reported failures Unity had already resolved, and four evidence surfaces (three failures of nine listed, anchored grep searching the oldest window, no applied-defines report, no asset field read) pushed the operator to a 55 MB log and compiler response files. Overlaps the 2026-08-19 anchored-scope row (window direction) and the 2026-09-02 batch-shape row (sweep terminal record). |
 | 2026-09-03 | `2026-09-03_greenfield_hardening_operator_retro.md` | staleness surfacing (editor domain + AssetDatabase), compact build envelope, advisory de-duplication | **both P1 currency findings released in `v0.3.69`; P2/P3 residuals open** | Every catalog-backed action now passes a shared editor-domain currency gate, while `requiresFreshAssets: true` prepends a settled forced refresh. Runtime background execution is enabled without native autofocus. Remaining: compact build/EDM4U envelopes and advisory de-duplication (P2), plus the inline-image idea (P3); native autofocus was deliberately declined. |

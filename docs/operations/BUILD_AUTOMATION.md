@@ -155,6 +155,17 @@ Known batch blockers are normalized as stable codes:
 - `licensing_client_ipc_failure`
 - `unknown_batch_failure`
 
+A probe that times out without a licensing error line is `unknown_batch_failure`
+(`batchmode_supported=null`); `auto` mode then tries the batch lane, which is the
+real test. The verdict is cached per project under
+`Library/XUUnityLightMcp/state/license_capabilities.json` and host-wide per Unity
+executable and version. A proven `batchmode_supported=true` verdict is reused
+until a later probe replaces it; an unproven or negative verdict is re-checked
+after 24 hours. The newest probe for the same executable wins across projects,
+so one proven probe lifts sibling projects onto the batch lane
+(`probe_skipped_reason=host_probe_cache`). `--refresh` here, or
+`--refresh-license` on a batch helper, forces a new probe.
+
 Batch helpers accept:
 
 ```bash

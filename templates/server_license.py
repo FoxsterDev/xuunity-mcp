@@ -22,6 +22,7 @@ from server_hub_licensing import resolve_hub_licensing_ipc
 
 LICENSE_CAPABILITIES_CACHE_SCHEMA = 5
 HOST_LICENSE_CACHE_TTL_SECONDS = 300
+UNPROVEN_LICENSE_VERDICT_TTL_SECONDS = 24 * 60 * 60
 LICENSE_PROBE_DEFAULT_TIMEOUT_MS = 30000
 BATCHMODE_SUPPORT_OVERRIDE_ENV = "XUUNITY_LIGHT_UNITY_MCP_BATCHMODE_SUPPORT_OVERRIDE"
 GUI_ADMISSION_OVERRIDE_ENV = "XUUNITY_LIGHT_UNITY_MCP_GUI_ADMISSION_OVERRIDE"
@@ -61,7 +62,7 @@ def classify_license_log(text: str, exit_code: int | None = None, timed_out: boo
         ),
         (
             "licensing_client_ipc_failure",
-            r"Licensing Client.*IPC|LicensingClient.*IPC|IPC.*Licensing|licensing.*IPC|Failed to connect.*Licensing Client|"
+            r"Licensing Client.*IPC|LicensingClient.*IPC|IPC.*Licensing|Failed to connect.*Licensing Client|"
             r"connection with (?:the )?Unity Licensing Client has been lost|re-connection attempt was UN-successful",
         ),
     ]
@@ -193,10 +194,17 @@ def build_license_capabilities(
         payload["override_env"] = BATCHMODE_SUPPORT_OVERRIDE_ENV
         return payload
 
+    host_cache_path = licensing_host_state_dir() / (
+        hashlib.sha256(json.dumps(cache_key, sort_keys=True).encode("utf-8")).hexdigest() + ".json"
+    )
     if not refresh:
-        cached = read_cached_license_capabilities(cache_path, cache_key)
+        cached, from_host_cache = freshest_cached_license_capabilities(cache_path, host_cache_path, cache_key)
         if cached is not None:
             cached["from_cache"] = True
+            if from_host_cache:
+                cached.update({"project_root": str(project_root), "cache_path": str(cache_path),
+                               "probe_skipped_reason": "host_probe_cache"})
+                write_json(cache_path, cached)
             if str(cached.get("batchmode_blocker_code") or "") == "licensing_client_ipc_failure":
                 resolution, _ = resolve_hub_licensing_ipc()
                 cached["licensing_ipc_resolution"] = resolution
@@ -214,9 +222,6 @@ def build_license_capabilities(
 
     requested_at = time.time()
     with licensing_host_lock(max(1.0, timeout_ms / 1000.0) + 5.0) as waited:
-        host_cache_path = licensing_host_state_dir() / (
-            hashlib.sha256(json.dumps(cache_key, sort_keys=True).encode("utf-8")).hexdigest() + ".json"
-        )
         cached = read_cached_license_capabilities(host_cache_path, cache_key)
         if cached is not None:
             completed_at = float(cached.get("probe_completed_at") or 0)
@@ -472,6 +477,34 @@ def read_cached_license_capabilities(cache_path: Path, cache_key: dict[str, str]
     if str(cached_key.get("unity_version") or "") != cache_key["unity_version"]:
         return None
     return dict(payload)
+
+
+def freshest_cached_license_capabilities(
+    cache_path: Path, host_cache_path: Path, cache_key: dict[str, str]
+) -> tuple[dict[str, Any] | None, bool]:
+    """The newest probe for the same executable and version wins, whichever project ran it."""
+    project = read_cached_license_capabilities(cache_path, cache_key)
+    host = read_cached_license_capabilities(host_cache_path, cache_key)
+    from_host = host is not None and (project is None or probe_completed_at(host) > probe_completed_at(project))
+    cached = host if from_host else project
+    if cached is None or license_verdict_expired(cached):
+        return None, False
+    return cached, from_host
+
+
+def license_verdict_expired(payload: dict[str, Any], now: float | None = None) -> bool:
+    """A proven batch entitlement holds until a later probe replaces it; an unproven verdict is re-checked daily."""
+    if payload.get("batchmode_supported") is True:
+        return False
+    current = time.time() if now is None else now
+    return current - probe_completed_at(payload) >= UNPROVEN_LICENSE_VERDICT_TTL_SECONDS
+
+
+def probe_completed_at(payload: dict[str, Any]) -> float:
+    try:
+        return float(payload.get("probe_completed_at") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def gui_admission_override_enabled() -> bool:

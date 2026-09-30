@@ -1,10 +1,12 @@
 import contextlib
+import hashlib
 import io
 import json
 import os
 import sys
 import tempfile
 import threading
+import time
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import unittest
@@ -511,6 +513,185 @@ class LicenseCapabilitiesTests(unittest.TestCase):
             self.assertTrue(second["from_cache"])
             self.assertEqual("2022.3.67f2", second["unity_version"])
             self.assertEqual(1, run_probe.call_count)
+
+    ROUTINE_LICENSING_STARTUP_LOG = "\n".join(
+        [
+            "[Licensing::Module] Trying to connect to existing licensing client channel...",
+            "[Licensing::IpcConnector] Channel LicenseClient-user doesn't exist",
+            "Launching external process: /Applications/Unity/Unity.Licensing.Client",
+            "[Licensing::Module] Successfully launched the LicensingClient (PId: 89259)",
+            "[Package Manager] Connected to IPC stream \"Upm-89258\" after 0.3 seconds.",
+            "[Licensing::Module] Licensing is not yet initialized.",
+        ]
+    )
+    CONNECTION_LOST_LINE = (
+        "[Licensing::Module] Error: The connection with the Unity Licensing Client has been lost. "
+        "Attempting to reconnect."
+    )
+
+    @contextlib.contextmanager
+    def _probe_environment(self, root: Path):
+        with contextlib.ExitStack() as stack:
+            patches = {
+                "detect_unity_app_path_for_project": root / "Unity.app",
+                "resolve_unity_executable": root / "Unity",
+                "resolve_unity_app_version": "6000.0.58f2",
+                "live_editor_licensing_evidence": {},
+                "resolve_hub_licensing_ipc": ({"status": "resolved"}, ""),
+            }
+            for name, value in patches.items():
+                stack.enter_context(mock.patch.object(server_license, name, return_value=value))
+            yield
+
+    def _write_verdict(
+        self, path: Path, root: Path, *, supported, age_seconds: float, blocker: str = ""
+    ) -> None:
+        server_core.write_json(path, {
+            "schema_version": server_license.LICENSE_CAPABILITIES_CACHE_SCHEMA,
+            "cache_key": {"unity_executable_path": str(root / "Unity"), "unity_version": "6000.0.58f2"},
+            "project_root": "/elsewhere/Other",
+            "batchmode_supported": supported,
+            "batchmode_blocker_code": blocker,
+            "probe_completed_at": time.time() - age_seconds,
+        })
+
+    def test_timed_out_probe_with_routine_licensing_startup_lines_is_inconclusive(self) -> None:
+        routine = server_license.classify_license_log(
+            self.ROUTINE_LICENSING_STARTUP_LOG, exit_code=124, timed_out=True
+        )
+        self.assertEqual("unknown_batch_failure", routine["batchmode_blocker_code"])
+        lost = server_license.classify_license_log(
+            self.ROUTINE_LICENSING_STARTUP_LOG + "\n" + self.CONNECTION_LOST_LINE, exit_code=124, timed_out=True
+        )
+        self.assertEqual("licensing_client_ipc_failure", lost["batchmode_blocker_code"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def probe(command, **kwargs):
+                log_path = Path(command[command.index("-logFile") + 1])
+                log_path.write_text(self.ROUTINE_LICENSING_STARTUP_LOG, encoding="utf-8")
+                raise server_license.subprocess.TimeoutExpired(command, kwargs.get("timeout"))
+
+            with (
+                self._probe_environment(root),
+                mock.patch.object(server_license.subprocess, "run", side_effect=probe),
+            ):
+                result = server_license.build_license_capabilities(project_root=root, refresh=True, timeout_ms=1000)
+
+        self.assertIsNone(result["batchmode_supported"])
+        self.assertEqual("unknown_batch_failure", result["batchmode_blocker_code"])
+        self.assertTrue(result["batchmode_probe_timed_out"])
+        self.assertEqual("batch_diagnostic_required", result["recommended_execution_lane"])
+
+    def test_unproven_project_verdict_expires_after_a_day_while_a_proven_one_holds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = server_license.license_capabilities_cache_path(root)
+            completed = mock.Mock(returncode=0, stdout="", stderr="")
+            with (
+                self._probe_environment(root),
+                mock.patch.object(server_license.subprocess, "run", return_value=completed) as run,
+            ):
+                self._write_verdict(
+                    cache, root, supported=False, age_seconds=3600, blocker="licensing_client_ipc_failure"
+                )
+                fresh = server_license.build_license_capabilities(project_root=root)
+                self.assertTrue(fresh["from_cache"])
+                self.assertFalse(fresh["batchmode_supported"])
+                run.assert_not_called()
+
+                self._write_verdict(cache, root, supported=True, age_seconds=30 * 24 * 3600)
+                proven = server_license.build_license_capabilities(project_root=root)
+                self.assertTrue(proven["from_cache"])
+                self.assertTrue(proven["batchmode_supported"])
+                run.assert_not_called()
+
+                self._write_verdict(
+                    cache, root, supported=False, age_seconds=2 * 24 * 3600, blocker="licensing_client_ipc_failure"
+                )
+                reprobed = server_license.build_license_capabilities(project_root=root)
+
+            self.assertFalse(reprobed["from_cache"])
+            self.assertTrue(reprobed["batchmode_supported"])
+            self.assertEqual(1, run.call_count)
+
+    def test_newer_proven_host_verdict_supersedes_a_stale_project_verdict(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = server_license.license_capabilities_cache_path(root)
+            key = {"unity_executable_path": str(root / "Unity"), "unity_version": "6000.0.58f2"}
+            host_cache = server_license.licensing_host_state_dir() / (
+                hashlib.sha256(json.dumps(key, sort_keys=True).encode("utf-8")).hexdigest() + ".json"
+            )
+            self._write_verdict(
+                cache, root, supported=False, age_seconds=20 * 24 * 3600, blocker="licensing_client_ipc_failure"
+            )
+            self._write_verdict(host_cache, root, supported=True, age_seconds=24 * 3600)
+            with (
+                self._probe_environment(root),
+                mock.patch.object(server_license.subprocess, "run") as run,
+            ):
+                result = server_license.build_license_capabilities(project_root=root)
+
+            run.assert_not_called()
+            self.assertTrue(result["batchmode_supported"])
+            self.assertTrue(result["from_cache"])
+            self.assertEqual("host_probe_cache", result["probe_skipped_reason"])
+            self.assertEqual(str(root), result["project_root"])
+            self.assertTrue(json.loads(cache.read_text(encoding="utf-8"))["batchmode_supported"])
+
+    def test_gui_fallback_failure_summary_carries_the_bridge_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            payload = {
+                "action": "batch_compile_player_scripts",
+                "start_editor_state": {"process_visibility_available": True, "live_project_editor_pids": []},
+            }
+            response = {
+                "status": "error",
+                "payload_json": "",
+                "error": {
+                    "code": "compile_errors_present",
+                    "message": "Unity has compilation errors. Resolve them before running compile validation.",
+                },
+            }
+            with (
+                mock.patch.object(server, "open_unity_editor", return_value={"editor_pid": 42}),
+                mock.patch.object(server, "wait_for_ready", return_value={"editor_pid": 42}),
+                mock.patch.object(server, "update_host_editor_session_pid"),
+                mock.patch.object(server, "refresh_project_context"),
+                mock.patch.object(server, "invoke_bridge", return_value=response),
+                mock.patch.object(
+                    server,
+                    "restore_host_opened_editor_state",
+                    return_value={"same_project_editor_closed": True, "process_exit_verified": True},
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                with self.assertRaises(SystemExit):
+                    server.run_gui_fallback_operation(
+                        project_root=root,
+                        unity_app=root / "Unity.app",
+                        payload=payload,
+                        action_label="batch compile",
+                        operation="unity.compile.player_scripts",
+                        operation_args={"target": "Android"},
+                        timeout_ms=1000,
+                        log_path=root / "gui.log",
+                        result_path=root / "result.json",
+                        summary_path=root / "result_summary.json",
+                        side_effect_mode="off",
+                    )
+
+            summary = json.loads((root / "result_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual("gui_operation_failed", summary["transport_outcome"])
+            self.assertEqual("compile_errors_present", summary["gui_operation_error_code"])
+            self.assertIn("Unity has compilation errors", summary["top_actionable_error"])
+            self.assertIn("Unity has compilation errors", summary["terminal_record"]["top_actionable_error"])
+            compact = server_batch_reporting.batch_cli_output_payload(payload, "compact")
+            self.assertEqual("compile_errors_present", compact["gui_operation_error_code"])
+            self.assertIn("Unity has compilation errors", compact["top_actionable_error"])
 
     def test_mcp_license_capabilities_tool_returns_structured_content(self) -> None:
         payload = {"action": "license_capabilities", "batchmode_supported": True}

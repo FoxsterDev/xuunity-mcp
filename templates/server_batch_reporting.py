@@ -31,6 +31,7 @@ COMPACT_BATCH_SUMMARY_KEYS = (
     "lane_fallback_reason",
     "license_batchmode_supported",
     "license_blocker_code",
+    "gui_operation_error_code",
     "operator_verdict",
     "top_actionable_error",
     "recommended_next_action",

@@ -541,6 +541,14 @@ def run_gui_fallback_operation_data(
         truncate_text=truncate_text,
     )
     result_summary["transport_outcome"] = "gui_operation_completed" if response.get("status") == "ok" else "gui_operation_failed"
+    if response.get("status") != "ok":
+        error = response.get("error") if isinstance(response.get("error"), dict) else {}
+        if not error and isinstance(result_payload, dict) and isinstance(result_payload.get("error"), dict):
+            error = result_payload["error"]
+        result_summary["gui_operation_error_code"] = str(error.get("code") or "")
+        message = str(error.get("message") or error.get("code") or "")
+        if message and not result_summary.get("top_actionable_error"):
+            result_summary["top_actionable_error"] = truncate_text(message, 320)
     result_summary["effective_execution_lane"] = "gui"
     result_summary["workspace_side_effects"] = side_effects
     if "build_succeeded" in payload:

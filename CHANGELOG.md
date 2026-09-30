@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### Why this matters
+
+- `batch-compile` and the other `batch-*` helpers opened a GUI editor instead
+  of running Unity batchmode on projects whose licensing probe had once merely
+  run out of time. The probe classifier read the routine
+  `[Licensing::IpcConnector] Channel ... doesn't exist` startup line as
+  `licensing_client_ipc_failure`, recorded `batchmode_supported=false`, and the
+  project-local cache reused that verdict indefinitely, so a later proven
+  probe on a sibling project never reached it. When such a project also had
+  compile errors, the GUI editor showed Unity's Safe Mode dialog, and the
+  compile refusal the bridge returned was dropped from the batch summary,
+  which reported only `gui_operation_failed` with `unity_outcome=unknown`.
+
+### Changed
+
+- The batchmode probe classifier no longer matches the `[Licensing::IpcConnector]`
+  logger prefix on its own. A probe that times out without a licensing error
+  line is `unknown_batch_failure` (`batchmode_supported=null`,
+  `recommended_execution_lane=batch_diagnostic_required`), so
+  `--batch-fallback-mode auto` tries the batch lane instead of falling back to
+  GUI. The connection-loss and explicit IPC failure messages classify as before.
+- License capability cache: a proven `batchmode_supported=true` verdict is
+  reused until a later probe replaces it; an unproven or negative verdict is
+  re-checked after 24 hours. The newest probe for the same Unity executable and
+  version wins across projects, so a project whose own cache is older adopts
+  the host-wide verdict (`probe_skipped_reason=host_probe_cache`) and one proven
+  probe lifts every sibling project onto the batch lane. `--refresh-license`
+  and the `license-capabilities --refresh` probe are unchanged.
+- A GUI fallback whose bridge operation returns an error carries that error
+  into the batch summary as `gui_operation_error_code` and
+  `top_actionable_error` (also in the terminal record and the compact CLI
+  output), for example the bridge's "Unity has compilation errors" refusal.
+
+### Validation
+
+- Host Python suite on macOS: 1161 tests, OK (14 skipped).
+- Classifier replay over the 27 real probe logs on the development host: the
+  15 timed-out logs that carried the false `licensing_client_ipc_failure`
+  verdict now classify as `unknown_batch_failure`, the one log with a genuine
+  connection-loss message keeps `licensing_client_ipc_failure`, and the 11
+  finished logs are unchanged.
+- Live: `license-capabilities` on a project holding a 20-day-old negative
+  verdict adopted a sibling project's proven verdict from the previous day
+  (`from_cache=true`, `probe_skipped_reason=host_probe_cache`,
+  `recommended_execution_lane=batch`) without launching Unity.
+
 ## 0.3.82
 
 Release tag: `v0.3.82`
