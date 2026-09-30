@@ -20,7 +20,11 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
         public void SetUp()
         {
             _clickCount = 0;
-            _canvasRoot = new GameObject("XUUnityMcp_StepCanvas", typeof(RectTransform), typeof(Canvas));
+            _canvasRoot = new GameObject(
+                "XUUnityMcp_StepCanvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(GraphicRaycaster));
             _canvasRoot.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             _canvasRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(1080f, 1920f);
 

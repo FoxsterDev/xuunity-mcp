@@ -199,11 +199,35 @@ class UiReadSurfaceContractTest(unittest.TestCase):
             "ui_target_not_visible",
             "ui_target_not_interactable",
             "ui_target_does_not_block_raycasts",
+            "ui_target_not_pointer_targetable",
             "ui_target_has_no_click_handler",
         ):
             self.assertIn(refusal, text, refusal)
         self.assertIn("ExecuteEvents.Execute(", text)
         self.assertNotIn("Input.simulateMouseWithTouches", text)
+
+    def test_click_gates_on_pointer_targetability_instead_of_render_alpha(self) -> None:
+        """Unity raycasts an alpha-0 Graphic, so render visibility must not refuse a transparent hit area."""
+
+        operation = read(EDITOR_ROOT / "Ugui" / "XUUnityLightMcpUiClickOperation.cs")
+        targeting = read(EDITOR_ROOT / "Ugui" / "XUUnityLightMcpUguiPointerTargeting.cs")
+        models = read(EDITOR_ROOT / "Core" / "XUUnityLightMcpUiReadModels.cs")
+
+        self.assertIn("FindHandlerPointerTarget(", operation)
+        self.assertIn("payload.pointer_targetable = true;", operation)
+        self.assertIn("ui_click_transparent_hit_area_without_visible_content", operation)
+        for filter_input in ("raycastTarget", "canvasRenderer.cull", "raycastPadding", "alphaHitTestMinimumThreshold"):
+            self.assertIn(filter_input, targeting, filter_input)
+        for field in (
+            "pointer_targetable",
+            "pointer_target_status",
+            "pointer_target_path",
+            "pointer_target_blocked_by",
+            "transparent_hit_area",
+            "transparent_hit_area_evidence",
+            "transparent_hit_area_visible_path",
+        ):
+            self.assertRegex(models, rf"public\s+\w[\w<>\[\]]*\s+{field}\b")
 
     def test_click_is_inconclusive_when_the_search_budget_was_exhausted(self) -> None:
         operation = read(EDITOR_ROOT / "Ugui" / "XUUnityLightMcpUiClickOperation.cs")

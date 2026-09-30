@@ -911,8 +911,10 @@ TOOLS: dict[str, dict[str, Any]] = {
         "bridgeOperation": "unity.ui.click",
         "description": (
             "Deliver one guarded semantic click to a unique selector through the EventSystem - never a coordinate "
-            "click or OS automation. Refuses ambiguous, hidden, non-interactable, raycast-transparent, and "
-            "handler-less targets. A node/depth-budget-limited search is ui_selector_search_truncated because "
+            "click or OS automation. Refuses ambiguous, inactive, non-interactable, and handler-less targets, and "
+            "targets no uGUI raycast would reach (pointer_target_status names the rejecting filter). Render alpha "
+            "is not a raycast filter, so a transparent raycastTarget hit area is clicked and reported as "
+            "transparent_hit_area. A node/depth-budget-limited search is ui_selector_search_truncated because "
             "absence or uniqueness is unproven; it reports the searched scope plus retry budget. Records the matched node, "
             "delivery mechanism, and before/after snapshot signatures. Requires explicit approve=true and "
             "action='click'. Requires com.unity.ugui."

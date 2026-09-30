@@ -1,6 +1,8 @@
+using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.TestTools;
 using UnityEngine.UI;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Ugui;
@@ -133,6 +135,61 @@ namespace XUUnity.LightMcp.Tests.PlayModeUgui
             Assert.That(_guarded.rejected, Is.EqualTo(0),
                 "targeting a non-raycast child must not produce a raycast identity the handler rejects");
             Assert.That(_guarded.accepted, Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator ALiveRaycastReachesATransparentHitAreaThatFramesAVisibleIcon()
+        {
+            var eventSystem = new GameObject("XUUnityMcp_TransparentHitAreaEventSystem", typeof(EventSystem));
+            try
+            {
+                var hitArea = new GameObject(
+                    "TransparentHitArea",
+                    typeof(RectTransform),
+                    typeof(Image),
+                    typeof(Button));
+                hitArea.transform.SetParent(_canvasRoot.transform, false);
+                hitArea.transform.SetAsLastSibling();
+                hitArea.GetComponent<RectTransform>().sizeDelta = new Vector2(200f, 200f);
+                hitArea.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
+                hitArea.GetComponent<CanvasRenderer>().cullTransparentMesh = true;
+                var clicks = 0;
+                hitArea.GetComponent<Button>().onClick.AddListener(() => clicks++);
+
+                var icon = new GameObject(
+                    "TransparentHitAreaIcon",
+                    typeof(RectTransform),
+                    typeof(Image),
+                    typeof(CanvasGroup));
+                icon.transform.SetParent(hitArea.transform, false);
+                icon.GetComponent<RectTransform>().sizeDelta = new Vector2(96f, 96f);
+                icon.GetComponent<Image>().raycastTarget = false;
+                icon.GetComponent<CanvasGroup>().blocksRaycasts = false;
+
+                yield return null;
+                yield return null;
+
+                var payload = Click("{\"name\":\"TransparentHitArea\"}");
+
+                if (payload.pointer_raycast_hit_count == 0)
+                {
+                    Assert.Ignore("this runtime produced no event-system raycast hit, so the live raycast cannot be "
+                                  + "observed here");
+                }
+
+                Assert.That(payload.refusal_code, Is.Empty,
+                    "the opaque GuardedButton under the same point is the control: an occlusion refusal here means "
+                    + "Unity did not raycast the alpha-0 hit area");
+                Assert.That(payload.pointer_raycast_evidence, Is.EqualTo("event_system_raycast_resolves_to_handler"));
+                Assert.That(payload.pointer_raycast_target_path, Does.EndWith("/TransparentHitArea"));
+                Assert.That(payload.transparent_hit_area_evidence, Is.EqualTo("visible_descendant_renders"));
+                Assert.That(clicks, Is.EqualTo(1));
+                Assert.That(_guarded.accepted + _guarded.rejected, Is.Zero);
+            }
+            finally
+            {
+                Object.DestroyImmediate(eventSystem);
+            }
         }
 
         [Test]

@@ -151,6 +151,58 @@ satisfied in every case below; the value says whether occlusion was actually rul
 A synthesized value always comes with the `ui_click_pointer_raycast_synthesized` warning; an
 observed one never does.
 
+### `pointer_targetable` and `pointer_target_status`
+
+Whether a real pointer at a node's centre would land on its uGUI `Graphic`, by the filters
+`GraphicRaycaster` and `Graphic.Raycast` apply. Render alpha is not one of them, so `visible`
+(render visibility) and `pointer_targetable` are independent: an alpha-0 `Image` with
+`raycastTarget` is `visible=false`, `pointer_targetable=true`. Depth and occlusion are left to
+the live raycast described by `pointer_raycast_evidence`.
+
+On a UI tree node the status describes the node's own `Graphic`, evaluated only for active
+nodes whose bounds were requested; on a click payload it describes the click as a whole, where
+any `Graphic` under the handler whose click bubbles to it may carry the pointer
+(`pointer_target_path`). On a refused click the status and `pointer_target_blocked_by`
+describe the target: its own `Graphic`, or without one the filter chain above it. The
+scenario `ui_click` step block carries the status, the blocker, and the transparent-hit-area
+fields.
+
+| Value | Meaning |
+| --- | --- |
+| `targetable` | every filter accepts the pointer at the centre |
+| `not_evaluated` | the node has no uGUI `Graphic`, is inactive, is a prefab asset, or had no bounds requested; on a click, it was refused before this check |
+| `graphic_inactive` | the `Graphic` component is disabled |
+| `raycast_target_disabled` | `raycastTarget=false` |
+| `no_active_canvas` | the `Graphic` has no active, enabled `Canvas` above it, so no raycaster owns it |
+| `no_raycaster` | the owning `Canvas` (the nearest one, for nested canvases) has no enabled `BaseRaycaster` |
+| `canvas_renderer_culled` | `CanvasRenderer.cull` is set, typically by a `RectMask2D` |
+| `outside_raycast_area` | the centre falls outside the rect after `raycastPadding` |
+| `canvas_group_blocks_raycasts` | an enabled `CanvasGroup` in scope has `blocksRaycasts=false` |
+| `alpha_hit_test_rejected` | an `Image` with `alphaHitTestMinimumThreshold > 0` sampled a pixel below the threshold |
+| `raycast_filter_rejected` | another `ICanvasRaycastFilter` (a `Mask`, `RectMask2D`, or project filter) rejected the point |
+| `no_pointer_targetable_graphic` | click only: the target has no `Graphic` and nothing under its handler accepts the pointer |
+
+A render-invisible target keeps `ui_target_not_visible` unless it is interactable, has a click
+handler, and a pointer target reaches that handler, so hidden panels refuse exactly as before.
+A visible target the gate refuses is `ui_target_does_not_block_raycasts` when a `CanvasGroup`
+blocks it and `ui_target_not_pointer_targetable` otherwise. An `Image` whose sprite texture is
+not readable or is Crunch-compressed is accepted without sampling, as Unity accepts it after
+logging an error. The event camera follows `GraphicRaycaster.eventCamera`: none for overlay
+canvases and for screen-space-camera canvases without a camera, otherwise the canvas camera or
+`Camera.main`.
+
+### `transparent_hit_area_evidence`
+
+Set when the `Graphic` carrying the click renders nothing (alpha 0 through its colour, its
+`CanvasRenderer` alpha or colour as set by `CrossFadeAlpha`/`CrossFadeColor`, culling, or a
+`CanvasGroup`) but Unity still raycasts it. The click is delivered either way.
+
+| Value | Meaning |
+| --- | --- |
+| `visible_descendant_renders` | a rendered descendant (`transparent_hit_area_visible_path`) is drawn over the hit area, the usual icon-button pattern |
+| `no_visible_descendant` | nothing under the hit area renders; the click carries the `ui_click_transparent_hit_area_without_visible_content` warning |
+| empty | the hit area renders, or the click was refused first |
+
 ### `background_execution_mode`
 
 | Value | Meaning |

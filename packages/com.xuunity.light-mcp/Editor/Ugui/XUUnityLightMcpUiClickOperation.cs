@@ -140,31 +140,13 @@ namespace XUUnity.LightMcp.Editor.Ugui
             payload.match_count = 1;
             payload.target_node = node;
 
-            if (!node.visible)
+            if (!node.active_in_hierarchy)
             {
                 return Refuse(
                     request,
                     payload,
                     "ui_target_not_visible",
-                    "The target is hidden, so a click would not be reachable by a user.");
-            }
-
-            if (!node.interactable)
-            {
-                return Refuse(
-                    request,
-                    payload,
-                    "ui_target_not_interactable",
-                    "The target reports interactable=false; delivering a click would fake user reachability.");
-            }
-
-            if (!node.blocks_raycasts)
-            {
-                return Refuse(
-                    request,
-                    payload,
-                    "ui_target_does_not_block_raycasts",
-                    "The target's CanvasGroup does not block raycasts, so a real pointer would pass through it.");
+                    "The target is inactive in the hierarchy, so a click would not be reachable by a user.");
             }
 
             var targetTransform = before.ResolveTransform(node);
@@ -180,16 +162,42 @@ namespace XUUnity.LightMcp.Editor.Ugui
 
             var selectable = targetObject.GetComponent<Selectable>();
             payload.target_component = selectable != null ? selectable.GetType().Name : "";
-            if (selectable != null && !selectable.IsInteractable())
+            var interactable = node.interactable && (selectable == null || selectable.IsInteractable());
+            var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(targetObject);
+            var pointerPosition = XUUnityLightMcpUiTreeBuilder.Centre(node.bounds);
+            var pointerTarget = XUUnityLightMcpUguiPointerTargeting.FindHandlerPointerTarget(
+                targetObject,
+                handler,
+                pointerPosition,
+                out var targetStatus,
+                out var targetBlockedBy);
+            payload.pointer_target_status = pointerTarget != null
+                ? XUUnityLightMcpUguiPointerTargeting.Targetable
+                : targetStatus;
+            payload.pointer_target_blocked_by = pointerTarget == null && targetBlockedBy != null
+                ? XUUnityLightMcpUiTreeBuilder.BuildPath(targetBlockedBy.transform)
+                : "";
+
+            // A hidden target keeps the pre-existing refusal unless a real pointer would reach a live handler.
+            if (!node.visible && (pointerTarget == null || handler == null || !interactable))
+            {
+                return Refuse(
+                    request,
+                    payload,
+                    "ui_target_not_visible",
+                    "The target is hidden and no interactable click handler is reachable through a raycast target, "
+                    + $"so a user could not click it. {DescribeTargetStatus(payload)}");
+            }
+
+            if (!interactable)
             {
                 return Refuse(
                     request,
                     payload,
                     "ui_target_not_interactable",
-                    "The target Selectable is not interactable at delivery time.");
+                    "The target is not interactable; delivering a click would fake user reachability.");
             }
 
-            var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(targetObject);
             if (handler == null)
             {
                 return Refuse(
@@ -199,13 +207,19 @@ namespace XUUnity.LightMcp.Editor.Ugui
                     "No IPointerClickHandler is present on the target or its ancestors.");
             }
 
+            if (pointerTarget == null)
+            {
+                return RefuseNotPointerTargetable(request, payload, handler);
+            }
+
+            payload.pointer_targetable = true;
+            payload.pointer_target_path = XUUnityLightMcpUiTreeBuilder.BuildPath(pointerTarget.transform);
+            DescribeTransparentHitArea(payload, pointerTarget);
+
             var eventSystem = EventSystem.current;
             payload.event_system_present = eventSystem != null;
             payload.event_system_scope = "eventsystem_current_at_delivery";
 
-            var pointerPosition = new Vector2(
-                node.bounds.x + node.bounds.width / 2f,
-                node.bounds.y + node.bounds.height / 2f);
             var pointer = BuildClickPointer(eventSystem, pointerPosition);
 
             var observed = ResolvePointerRaycast(eventSystem, pointer, handler, out var hitCount, out var occluder);
@@ -384,6 +398,66 @@ namespace XUUnity.LightMcp.Editor.Ugui
                 index = 0f,
                 depth = 0
             };
+        }
+
+        static string DescribeTargetStatus(XUUnityLightMcpUiClickPayload payload)
+        {
+            var blockedByText = payload.pointer_target_blocked_by.Length > 0
+                ? $" (blocked by '{payload.pointer_target_blocked_by}')"
+                : "";
+            return $"The target reports {payload.pointer_target_status}{blockedByText}.";
+        }
+
+        static XUUnityLightMcpResponse RefuseNotPointerTargetable(
+            XUUnityLightMcpRequest request,
+            XUUnityLightMcpUiClickPayload payload,
+            GameObject handler)
+        {
+            var evidence = $"{DescribeTargetStatus(payload)} No Graphic under "
+                           + $"'{XUUnityLightMcpUiTreeBuilder.BuildPath(handler.transform)}' accepts a pointer at the "
+                           + "target's centre.";
+
+            if (payload.pointer_target_status == XUUnityLightMcpUguiPointerTargeting.CanvasGroupBlocksRaycasts)
+            {
+                return Refuse(
+                    request,
+                    payload,
+                    "ui_target_does_not_block_raycasts",
+                    "A CanvasGroup does not block raycasts, so a real pointer would pass through the target. "
+                    + evidence);
+            }
+
+            return Refuse(
+                request,
+                payload,
+                "ui_target_not_pointer_targetable",
+                "A real pointer at the target's centre would not reach its click handler. " + evidence);
+        }
+
+        static void DescribeTransparentHitArea(XUUnityLightMcpUiClickPayload payload, Graphic pointerTarget)
+        {
+            if (XUUnityLightMcpUguiPointerTargeting.Renders(pointerTarget))
+            {
+                return;
+            }
+
+            payload.transparent_hit_area = true;
+            foreach (var graphic in pointerTarget.GetComponentsInChildren<Graphic>())
+            {
+                if (graphic != pointerTarget && XUUnityLightMcpUguiPointerTargeting.Renders(graphic))
+                {
+                    payload.transparent_hit_area_evidence = "visible_descendant_renders";
+                    payload.transparent_hit_area_visible_path = XUUnityLightMcpUiTreeBuilder.BuildPath(graphic.transform);
+                    return;
+                }
+            }
+
+            payload.transparent_hit_area_evidence = "no_visible_descendant";
+            payload.warnings.Add(XUUnityLightMcpUiTreeBuilder.Diagnostic(
+                "ui_click_transparent_hit_area_without_visible_content",
+                $"'{payload.pointer_target_path}' is a transparent hit area with no rendered descendant, so a user "
+                + "would be tapping empty screen. Unity still raycasts it and the click is delivered; confirm the "
+                + "target is meant to be an invisible hit area."));
         }
 
         static void CopyRenderEvidence(XUUnityLightMcpUiClickPayload payload, XUUnityLightMcpUiTargetInfo target)

@@ -73,12 +73,27 @@ namespace XUUnity.LightMcp.Editor.Ugui
             node.raycast_target_known = true;
             node.effective_alpha = Mathf.Clamp01(node.effective_alpha * graphic.color.a);
             node.visible = node.active_in_hierarchy && node.effective_alpha > 0f;
+            DescribePointerTarget(graphic, node);
 
             var material = graphic.materialForRendering;
             node.material = material != null ? material.name : "";
             node.material_resolved_status = material != null ? "resolved" : "unresolved";
             node.clip_state = ResolveClipState(graphic, node);
             return true;
+        }
+
+        static void DescribePointerTarget(Graphic graphic, XUUnityLightMcpUiNode node)
+        {
+            if (!node.active_in_hierarchy || !node.has_bounds)
+            {
+                return;
+            }
+
+            node.pointer_target_status = XUUnityLightMcpUguiPointerTargeting.Evaluate(
+                graphic,
+                XUUnityLightMcpUiTreeBuilder.Centre(node.bounds),
+                out _);
+            node.pointer_targetable = node.pointer_target_status == XUUnityLightMcpUguiPointerTargeting.Targetable;
         }
 
         static string ResolveClipState(Graphic graphic, XUUnityLightMcpUiNode node)

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using UnityEditor;
@@ -24,6 +25,7 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
         string _snapshotPath = "";
         GameObject _canvasRoot;
         int _clickCount;
+        readonly List<Object> _generatedObjects = new();
 
         [SetUp]
         public void SetUp()
@@ -58,6 +60,16 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
                 Object.DestroyImmediate(_canvasRoot);
                 _canvasRoot = null;
             }
+
+            foreach (var generated in _generatedObjects)
+            {
+                if (generated != null)
+                {
+                    Object.DestroyImmediate(generated);
+                }
+            }
+
+            _generatedObjects.Clear();
 
             if (!string.IsNullOrEmpty(_outputPath) && File.Exists(_outputPath))
             {
@@ -300,7 +312,158 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             var disabled = Click("{\"selector\":{\"name\":\"DisabledButton\"},\"action\":\"click\",\"approve\":true}");
             Assert.That(disabled.refusal_code, Is.EqualTo("ui_target_not_interactable"));
 
+            var passThrough = Click(
+                "{\"selector\":{\"name\":\"PassThroughButton\"},\"action\":\"click\",\"approve\":true}");
+            Assert.That(passThrough.refusal_code, Is.EqualTo("ui_target_does_not_block_raycasts"));
+            Assert.That(passThrough.pointer_target_status, Is.EqualTo("canvas_group_blocks_raycasts"));
+            Assert.That(passThrough.pointer_target_blocked_by, Does.EndWith("/PassThroughButton"));
+            Assert.That(passThrough.target_node.visible, Is.True, "the pass-through button renders normally");
+
             Assert.That(_clickCount, Is.Zero, "no refusal path may deliver a click");
+        }
+
+        [Test]
+        public void Click_DeliversThroughATransparentHitAreaThatFramesAVisibleIcon()
+        {
+            BuildClickableCanvas();
+            NewTransparentHitAreaButtonWithIcon("Settings");
+
+            var payload = Click("{\"selector\":{\"name\":\"Settings\"},\"action\":\"click\",\"approve\":true}");
+
+            Assert.That(payload.refusal_code, Is.Empty, payload.errors.Count > 0 ? payload.errors[0].message : "");
+            Assert.That(payload.status, Is.EqualTo("effective"));
+            Assert.That(_clickCount, Is.EqualTo(1));
+            Assert.That(payload.target_node.visible, Is.False, "the hit area itself renders nothing");
+            Assert.That(payload.target_node.pointer_targetable, Is.True);
+            Assert.That(payload.target_node.pointer_target_status, Is.EqualTo("targetable"));
+            Assert.That(payload.pointer_targetable, Is.True);
+            Assert.That(payload.pointer_target_path, Does.EndWith("/Settings"));
+            Assert.That(payload.transparent_hit_area, Is.True);
+            Assert.That(payload.transparent_hit_area_evidence, Is.EqualTo("visible_descendant_renders"));
+            Assert.That(payload.transparent_hit_area_visible_path, Does.EndWith("/Settings/Icon"));
+            Assert.That(
+                payload.warnings.Exists(item => item.code == "ui_click_transparent_hit_area_without_visible_content"),
+                Is.False);
+        }
+
+        [Test]
+        public void Click_ReachesTheButtonThroughItsHitAreaWhenTheSelectorNamesTheNonRaycastIcon()
+        {
+            BuildClickableCanvas();
+            NewTransparentHitAreaButtonWithIcon("Settings");
+
+            var payload = Click("{\"selector\":{\"name\":\"Icon\"},\"action\":\"click\",\"approve\":true}");
+
+            Assert.That(payload.refusal_code, Is.Empty, payload.errors.Count > 0 ? payload.errors[0].message : "");
+            Assert.That(payload.delivered_to_path, Does.EndWith("/Settings"));
+            Assert.That(_clickCount, Is.EqualTo(1));
+            Assert.That(payload.target_node.visible, Is.True);
+            Assert.That(payload.target_node.pointer_targetable, Is.False);
+            Assert.That(payload.target_node.pointer_target_status, Is.EqualTo("raycast_target_disabled"));
+            Assert.That(payload.pointer_target_path, Does.EndWith("/Settings"));
+            Assert.That(payload.transparent_hit_area_evidence, Is.EqualTo("visible_descendant_renders"));
+        }
+
+        [Test]
+        public void Click_DeliversToATransparentHitAreaWithNothingVisibleButFlagsIt()
+        {
+            BuildClickableCanvas();
+            NewTransparentHitAreaButton("GhostButton");
+
+            var payload = Click("{\"selector\":{\"name\":\"GhostButton\"},\"action\":\"click\",\"approve\":true}");
+
+            Assert.That(payload.refusal_code, Is.Empty, payload.errors.Count > 0 ? payload.errors[0].message : "");
+            Assert.That(payload.delivered, Is.True);
+            Assert.That(_clickCount, Is.EqualTo(1), "Unity raycasts an alpha-0 Graphic, so a real pointer reaches it");
+            Assert.That(payload.pointer_targetable, Is.True);
+            Assert.That(payload.transparent_hit_area, Is.True);
+            Assert.That(payload.transparent_hit_area_evidence, Is.EqualTo("no_visible_descendant"));
+            Assert.That(payload.transparent_hit_area_visible_path, Is.Empty);
+            Assert.That(
+                payload.warnings.Exists(item => item.code == "ui_click_transparent_hit_area_without_visible_content"),
+                Is.True,
+                "an invisible hit area with nothing drawn over it must be flagged");
+        }
+
+        [Test]
+        public void Click_RefusesATransparentSpritePixelThatTheAlphaHitTestRejects()
+        {
+            BuildClickableCanvas();
+            NewAlphaHitTestButton("TransparentSpriteButton", Color.clear);
+            NewAlphaHitTestButton("OpaqueSpriteButton", Color.white);
+
+            var refused = Click(
+                "{\"selector\":{\"name\":\"TransparentSpriteButton\"},\"action\":\"click\",\"approve\":true}");
+
+            Assert.That(refused.refusal_code, Is.EqualTo("ui_target_not_pointer_targetable"));
+            Assert.That(refused.pointer_targetable, Is.False);
+            Assert.That(refused.pointer_target_status, Is.EqualTo("alpha_hit_test_rejected"));
+            Assert.That(refused.pointer_target_blocked_by, Does.EndWith("/TransparentSpriteButton"));
+            Assert.That(refused.target_node.pointer_targetable, Is.False);
+            Assert.That(_clickCount, Is.Zero, "a refused click must never be delivered");
+
+            var delivered = Click(
+                "{\"selector\":{\"name\":\"OpaqueSpriteButton\"},\"action\":\"click\",\"approve\":true}");
+
+            Assert.That(
+                delivered.refusal_code,
+                Is.Empty,
+                delivered.errors.Count > 0 ? delivered.errors[0].message : "");
+            Assert.That(delivered.pointer_target_status, Is.EqualTo("targetable"));
+            Assert.That(_clickCount, Is.EqualTo(1), "the same threshold accepts an opaque pixel");
+        }
+
+        [Test]
+        public void Click_NamesTheRejectingFilterForUnreachableTargets()
+        {
+            BuildClickableCanvas();
+
+            var mask = NewChild("ScrollMask");
+            mask.AddComponent<RectMask2D>();
+            mask.GetComponent<RectTransform>().anchoredPosition = new Vector2(200f, 0f);
+            var clipped = NewCountingButton("ClippedButton").GetComponent<RectTransform>();
+            clipped.SetParent(mask.transform, false);
+            clipped.anchoredPosition = new Vector2(-200f, 0f);
+
+            NewCountingButton("PaddedOutButton").GetComponent<Image>().raycastPadding = new Vector4(200f, 0f, 0f, 0f);
+
+            var bare = NewChild("BareButton");
+            bare.AddComponent<Button>();
+            var bareChild = new GameObject("BareChild", typeof(RectTransform));
+            bareChild.transform.SetParent(bare.transform, false);
+
+            NewCountingButton("DisabledImageButton").GetComponent<Image>().enabled = false;
+
+            var unwired = new GameObject("XUUnityMcp_UnwiredCanvas", typeof(RectTransform), typeof(Canvas));
+            unwired.transform.SetParent(_canvasRoot.transform, false);
+            var unwiredButton = NewCountingButton("UnwiredButton");
+            unwiredButton.transform.SetParent(unwired.transform, false);
+
+            var expectations = new Dictionary<string, (string status, string blockedBy)>
+            {
+                ["ClippedButton"] = ("raycast_filter_rejected", "/ScrollMask"),
+                ["PaddedOutButton"] = ("outside_raycast_area", ""),
+                ["BareChild"] = ("no_pointer_targetable_graphic", ""),
+                ["DisabledImageButton"] = ("graphic_inactive", ""),
+                ["UnwiredButton"] = ("no_raycaster", "/XUUnityMcp_UnwiredCanvas")
+            };
+
+            foreach (var expectation in expectations)
+            {
+                var name = expectation.Key;
+                var payload = Click(
+                    "{\"selector\":{\"name\":\"" + name + "\"},\"action\":\"click\",\"approve\":true}");
+
+                Assert.That(payload.refusal_code, Is.EqualTo("ui_target_not_pointer_targetable"), name);
+                Assert.That(payload.pointer_target_status, Is.EqualTo(expectation.Value.status), name);
+                Assert.That(payload.pointer_target_blocked_by, Does.EndWith(expectation.Value.blockedBy), name);
+            }
+
+            var clippedNode = Click(
+                "{\"selector\":{\"name\":\"ClippedButton\"},\"action\":\"click\",\"approve\":true}").target_node;
+            Assert.That(clippedNode.pointer_targetable, Is.False);
+            Assert.That(clippedNode.pointer_target_status, Is.EqualTo("raycast_filter_rejected"));
+            Assert.That(_clickCount, Is.Zero, "a refused click must never be delivered");
         }
 
         [Test]
@@ -367,21 +530,25 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
 
         void BuildClickableCanvas()
         {
-            _canvasRoot = new GameObject("XUUnityMcp_ClickCanvas", typeof(RectTransform), typeof(Canvas));
+            _canvasRoot = new GameObject(
+                "XUUnityMcp_ClickCanvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(GraphicRaycaster));
             _canvasRoot.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             _canvasRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(1080f, 1920f);
 
-            var claim = NewButton("ClaimButton", interactable: true);
-            claim.onClick.AddListener(() =>
-            {
-                _clickCount++;
-                claim.interactable = false;
-            });
+            NewCountingButton("ClaimButton");
 
             NewButton("DisabledButton", interactable: false);
 
+            var passThrough = NewButton("PassThroughButton", interactable: true);
+            passThrough.gameObject.AddComponent<CanvasGroup>().blocksRaycasts = false;
+
             var hidden = NewButton("HiddenButton", interactable: true);
-            hidden.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
+            var hiddenGroup = hidden.gameObject.AddComponent<CanvasGroup>();
+            hiddenGroup.alpha = 0f;
+            hiddenGroup.blocksRaycasts = false;
 
             NewChild("Row");
             NewChild("Row");
@@ -395,6 +562,54 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             var button = child.AddComponent<Button>();
             button.interactable = interactable;
             return button;
+        }
+
+        Button NewCountingButton(string name)
+        {
+            var button = NewButton(name, interactable: true);
+            button.onClick.AddListener(() =>
+            {
+                _clickCount++;
+                button.interactable = false;
+            });
+            return button;
+        }
+
+        Button NewTransparentHitAreaButton(string name)
+        {
+            var button = NewCountingButton(name);
+            button.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
+            return button;
+        }
+
+        void NewTransparentHitAreaButtonWithIcon(string name)
+        {
+            var button = NewTransparentHitAreaButton(name);
+            var icon = new GameObject("Icon", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
+            icon.transform.SetParent(button.transform, false);
+            icon.GetComponent<RectTransform>().sizeDelta = new Vector2(96f, 96f);
+            icon.GetComponent<Image>().raycastTarget = false;
+            icon.GetComponent<CanvasGroup>().blocksRaycasts = false;
+        }
+
+        void NewAlphaHitTestButton(string name, Color pixel)
+        {
+            var texture = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+            var pixels = new Color[16];
+            for (var i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = pixel;
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+            var sprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f));
+            _generatedObjects.Add(texture);
+            _generatedObjects.Add(sprite);
+
+            var image = NewCountingButton(name).GetComponent<Image>();
+            image.sprite = sprite;
+            image.alphaHitTestMinimumThreshold = 0.5f;
         }
 
         GameObject NewChild(string name)

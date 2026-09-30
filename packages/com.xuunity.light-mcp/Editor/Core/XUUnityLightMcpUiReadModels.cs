@@ -113,6 +113,8 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool blocks_raycasts = true;
         public bool raycast_target;
         public bool raycast_target_known;
+        public bool pointer_targetable;
+        public string pointer_target_status = "not_evaluated";
         public string canvas_path = "";
         public int canvas_sort_order;
         public int render_order;
@@ -320,6 +322,13 @@ namespace XUUnity.LightMcp.Editor.Core
         public int match_count;
         public XUUnityLightMcpUiNode target_node;
         public string target_component = "";
+        public bool pointer_targetable;
+        public string pointer_target_status = "not_evaluated";
+        public string pointer_target_path = "";
+        public string pointer_target_blocked_by = "";
+        public bool transparent_hit_area;
+        public string transparent_hit_area_evidence = "";
+        public string transparent_hit_area_visible_path = "";
         public bool event_system_present;
         public string event_system_scope = "";
         public bool delivered;
@@ -357,6 +366,10 @@ namespace XUUnity.LightMcp.Editor.Core
         public string target_path = "";
         public string target_component = "";
         public string handler_path = "";
+        public string pointer_target_status = "not_evaluated";
+        public string pointer_target_blocked_by = "";
+        public bool transparent_hit_area;
+        public string transparent_hit_area_evidence = "";
         public bool effective;
         public bool no_observable_effect;
         public bool state_changed;

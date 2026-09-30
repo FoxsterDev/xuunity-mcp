@@ -114,7 +114,7 @@ Unity MCP implementations when the user wants safe production validation.
 | UI read | `unity_ui_get_bounds` | `Supported` | Returns the screen-space rect of a single matched node so a failed comparison region maps to concrete geometry. |
 | UI render | `unity_prefab_render` | `Supported` | Renders a prefab in an isolated preview scene at the declared viewport and safe area without booting the app, returning the PNG plus the snapshot it rendered. Requires com.unity.ugui. |
 | UI mutation | `unity_prefab_mutate` | `Supported` | Typed atomic prefab transaction through the Editor API; previews by default, re-validates bindings, rolls the whole batch back on any failure, and emits a reversible inverse patch. |
-| UI interaction | `unity_ui_click` | `Supported` | One guarded EventSystem click to a unique selector; refuses ambiguous, hidden, disabled, raycast-transparent, and handler-less targets. A node/depth-budget-limited search is `ui_selector_search_truncated` with scope/budget evidence because absence or uniqueness is unproven. Requires com.unity.ugui. |
+| UI interaction | `unity_ui_click` | `Supported` | One guarded EventSystem click to a unique selector; refuses ambiguous, inactive, disabled, and handler-less targets and targets no uGUI raycast would reach (`pointer_target_status`). A transparent `raycastTarget` hit area is clicked and reported as `transparent_hit_area`. A node/depth-budget-limited search is `ui_selector_search_truncated` with scope/budget evidence because absence or uniqueness is unproven. Requires com.unity.ugui. |
 | Maintenance | `unity_maintenance_prune` | `Supported` | Prunes stale request, scenario, capture, and optional log artifacts. |
 
 ## Host-Side Helper Commands

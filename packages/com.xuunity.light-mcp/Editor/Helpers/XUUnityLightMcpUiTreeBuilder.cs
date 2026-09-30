@@ -934,6 +934,27 @@ namespace XUUnity.LightMcp.Editor.Helpers
             node.canvas_sort_order = rootCanvas != null ? rootCanvas.sortingOrder : canvas.sortingOrder;
         }
 
+        public static float ResolveCanvasGroupAlpha(Transform transform)
+        {
+            var alpha = 1f;
+            for (var current = transform; current != null; current = current.parent)
+            {
+                var group = current.GetComponent<CanvasGroup>();
+                if (group == null)
+                {
+                    continue;
+                }
+
+                alpha *= group.alpha;
+                if (group.ignoreParentGroups)
+                {
+                    break;
+                }
+            }
+
+            return Mathf.Clamp01(alpha);
+        }
+
         static void ApplyAlphaAndRaycasts(Transform transform, XUUnityLightMcpUiNode node)
         {
             var alpha = 1f;
@@ -993,12 +1014,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             rectTransform.GetWorldCorners(WorldCorners);
-            var canvas = rectTransform.GetComponentInParent<Canvas>();
-            Camera camera = null;
-            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-            {
-                camera = canvas.worldCamera;
-            }
+            var camera = ResolveEventCamera(rectTransform);
 
             var minX = float.MaxValue;
             var minY = float.MaxValue;
@@ -1018,6 +1034,24 @@ namespace XUUnity.LightMcp.Editor.Helpers
             rect.width = Round(maxX - minX);
             rect.height = Round(maxY - minY);
             return true;
+        }
+
+        public static Camera ResolveEventCamera(RectTransform rectTransform)
+        {
+            var canvas = rectTransform != null ? rectTransform.GetComponentInParent<Canvas>() : null;
+            if (canvas == null
+                || canvas.renderMode == RenderMode.ScreenSpaceOverlay
+                || (canvas.renderMode == RenderMode.ScreenSpaceCamera && canvas.worldCamera == null))
+            {
+                return null;
+            }
+
+            return canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+        }
+
+        public static Vector2 Centre(XUUnityLightMcpUiRect rect)
+        {
+            return new Vector2(rect.x + rect.width / 2f, rect.y + rect.height / 2f);
         }
 
         public static string BuildPath(Transform transform)

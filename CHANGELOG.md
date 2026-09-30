@@ -2,6 +2,94 @@
 
 ## Unreleased
 
+### Why this matters
+
+- `unity_ui_click` refused a common uGUI button shape that a real finger clicks
+  fine: a `Button` whose own `Image` is an alpha-0 hit area (`raycastTarget`
+  on) with a visible child icon that does not take raycasts. The target read
+  `visible=false` and was refused as `ui_target_not_visible`, and selecting the
+  icon instead was refused as `ui_target_does_not_block_raycasts`, so the only
+  way through was a temporary project hook that called the production API.
+
+### Changed
+
+- `unity_ui_click` gates on pointer reachability instead of render alpha. After
+  the handler is resolved it looks for a `Graphic` that a real pointer at the
+  target's centre would land on: the target's own, or any `Graphic` under the
+  handler whose click bubbles to it. The check applies the `GraphicRaycaster`
+  and `Graphic.Raycast` filters (`raycastTarget`, active and enabled, an active
+  owning `Canvas` with an enabled `BaseRaycaster`, `CanvasRenderer.cull`,
+  `raycastPadding`, enabled `CanvasGroup.blocksRaycasts` with
+  `ignoreParentGroups` and override-sorting canvases, `Image` alpha hit test
+  and other `ICanvasRaycastFilter` components) with the event camera
+  `GraphicRaycaster.eventCamera` would use. Depth and occlusion stay with the
+  existing live `EventSystem.RaycastAll`.
+- The click payload adds `pointer_targetable`, `pointer_target_status`,
+  `pointer_target_path`, and `pointer_target_blocked_by`. When the `Graphic`
+  carrying the click renders nothing it adds `transparent_hit_area`,
+  `transparent_hit_area_evidence` (`visible_descendant_renders` with
+  `transparent_hit_area_visible_path`, or `no_visible_descendant` plus the
+  `ui_click_transparent_hit_area_without_visible_content` warning). The click
+  is still delivered either way.
+- Active UI tree nodes with a uGUI `Graphic` and requested bounds report
+  `pointer_targetable` and `pointer_target_status` for their own `Graphic` at
+  their centre; inactive nodes, prefab-asset nodes, and reads without bounds
+  stay `not_evaluated`. `visible` keeps its render-visibility meaning for
+  `requireVisible`, snapshot signatures, and region explanations. The scenario
+  `ui_click` step block and the host interaction record carry
+  `pointer_target_status`, `pointer_target_blocked_by`, `transparent_hit_area`,
+  and `transparent_hit_area_evidence`.
+- Refusals: an inactive target stays `ui_target_not_visible`, and so does a
+  render-invisible target unless it is interactable, has a click handler, and a
+  pointer target reaches that handler, so hidden panels and hidden disabled
+  buttons refuse exactly as in `v0.3.81`. A visible target nothing reaches is
+  `ui_target_does_not_block_raycasts` when a `CanvasGroup` blocks it and the
+  new `ui_target_not_pointer_targetable` otherwise (for example an alpha hit
+  test that rejects the pixel, a `RectMask2D` that excludes the centre, or a
+  canvas without a `GraphicRaycaster`).
+- A `Graphic` counts as rendered only when its colour, its `CanvasRenderer`
+  alpha and colour (`CrossFadeAlpha`/`CrossFadeColor`), culling, and its
+  `CanvasGroup` chain all leave it visible.
+- An `Image` whose sprite texture is not readable or is Crunch-compressed is
+  accepted without sampling, matching Unity, which accepts it after logging an
+  error, so UI reads never write that error to the console.
+
+### Validation
+
+- Host Python suite on macOS: 1157 tests, OK (14 skipped).
+- Package EditMode self-tests in scaffolded consumer projects through the
+  wrapper's GUI fallback lane: Unity `6000.0.58f2` uGUI 178/178, Unity
+  `2022.3.67f2` uGUI 178/178, Unity `6000.0.58f2` no-uGUI 128/128.
+- Mutation reds on the `XUUnity.MCP.UiRenderClick` category (taken before the
+  review fixes, 20 tests then): restoring the render-alpha gate fails the two
+  transparent-hit-area tests; restoring the target CanvasGroup gate fails the
+  icon-child test and the hidden-target refusal-precedence test; skipping the
+  alpha hit test fails only the alpha hit test case. The review-fix pass added
+  fixtures for `canvas_group_blocks_raycasts`, `raycast_filter_rejected`,
+  `outside_raycast_area`, `no_pointer_targetable_graphic`, `graphic_inactive`,
+  and `no_raycaster` without re-running the mutations.
+- PlayMode on Unity `6000.0.58f2`: the uGUI PlayMode assembly passes 17 with
+  2 environment skips, and the transparent-hit-area test run alone passes 1/1:
+  a live `EventSystem` raycast reaches an alpha-0 `Image` with
+  `cullTransparentMesh` stacked over an opaque button and resolves to its
+  handler (`event_system_raycast_resolves_to_handler`). PlayMode was not run
+  on `2022.3`.
+
+### Known limitations
+
+- The static gate does not model `Graphic.depth` (a Graphic the canvas has not
+  drawn yet) or cross-canvas sort order; those stay with the live raycast, and
+  without an `EventSystem` the click still carries a synthesized raycast and the
+  existing `ui_click_pointer_raycast_synthesized` warning.
+- `transparent_hit_area_evidence` counts any active, unculled descendant
+  `Graphic` with positive alpha as rendered content; an empty `Text` or a
+  sibling drawn over the hit area is not distinguished.
+- Unity Package CI is still waived, so the Unity counts above are local evidence.
+- The fix was not re-checked live in the consumer project that reported the
+  refusal: that project had already worked around it with a hit-area alpha of
+  1/255, and its gameplay was not reachable in the editor at release time. The
+  alpha-0 case is covered by the scaffolded-project tests above.
+
 ## 0.3.81
 
 Release tag: `v0.3.81`
