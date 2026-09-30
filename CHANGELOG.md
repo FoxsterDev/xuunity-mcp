@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.82
+
+Release tag: `v0.3.82`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.82
+```
+
 ### Why this matters
 
 - `unity_ui_click` refused a common uGUI button shape that a real finger clicks
@@ -13,6 +23,7 @@
 
 ### Changed
 
+- Released `v0.3.82` package metadata, server metadata, package manifests, and Git UPM examples.
 - `unity_ui_click` gates on pointer reachability instead of render alpha. After
   the handler is resolved it looks for a `Graphic` that a real pointer at the
   target's centre would land on: the target's own, or any `Graphic` under the

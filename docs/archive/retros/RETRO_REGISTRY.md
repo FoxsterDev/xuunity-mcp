@@ -2,7 +2,7 @@
 
 Status: active public registry
 Last triage: 2026-09-24 (saved helper evidence authority correction)
-Current release: `v0.3.81`
+Current release: `v0.3.82`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
@@ -52,7 +52,7 @@ own owner registries, not in this public table.
 - Implemented in current source on 2026-09-29/30: the click gates on uGUI
   pointer reachability (`pointer_targetable`, `pointer_target_status`,
   `pointer_target_blocked_by`) and reports `transparent_hit_area` evidence;
-  `visible` keeps its render meaning. Awaits the next release. No retro file:
+  `visible` keeps its render meaning. Released in `v0.3.82`. No retro file:
   the intake note is the record.
 
 ## Intake 2026-09-28 (chat retro: readiness after Safe Mode, settle after mutating hooks, evidence surfaces)
