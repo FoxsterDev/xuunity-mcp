@@ -26,17 +26,29 @@ Lane: `batch-compile --batch-fallback-mode auto` on a consumer project whose in-
 
 ## Fix Applied
 
-1. The classifier no longer matches the `[Licensing::IpcConnector]` logger
-   prefix on its own. A timed-out probe without a licensing error line is
-   `unknown_batch_failure` (`batchmode_supported=null`), so `auto` mode tries
-   the batch lane, which is the real test.
-2. A proven `batchmode_supported=true` verdict is reused until a later probe
-   replaces it; an unproven or negative verdict expires after 24 hours. The
-   newest probe for the same executable and version wins across projects, and
-   a project adopts the host-wide verdict when it is newer than its own
-   (`probe_skipped_reason=host_probe_cache`).
+1. The classifier excludes the three routine `[Licensing::IpcConnector]` lines
+   every editor start writes (`Channel ... doesn't exist`, `Successfully
+   connected to`, `channel disconnected successfully`) from the IPC failure
+   match. The blocker patterns are unchanged. A probe that times out or exits
+   non-zero with only those lines is `unknown_batch_failure`
+   (`batchmode_supported=null`), so `auto` mode tries the batch lane, which is
+   the real test.
+2. A proven verdict for the same executable and version is shared across
+   projects: a project whose own verdict is missing, inconclusive or negative
+   adopts a newer proven host-wide verdict (`probe_skipped_reason=host_probe_cache`).
+   Negative verdicts stay project-local and are re-probed after 24 hours, only
+   when no editor is live; otherwise the stale verdict is reused with
+   `cache_verdict_stale=true`, so the lane never changes on a busy host.
+   Proven and inconclusive verdicts do not expire.
 3. A GUI fallback whose bridge operation returns an error carries the error
    into the summary as `gui_operation_error_code` and `top_actionable_error`.
+
+Compatibility with the licensing cluster of `v0.3.63` to `v0.3.74`: the Hub
+channel discovery and `-licensingIpc` forwarding, the per-user probe lock,
+`licensing_busy`, the `licensed_editor_live` skip, the 300 s host probe cache
+and the `--refresh` semantics are untouched. The batch lane itself still
+launches without a forwarded channel, as before; on this host the Hub client
+sits on the standard user-named channel, which is why batch probes connect.
 
 Live proof: `license-capabilities` on the affected project adopted the sibling
 project's proven verdict from the previous day and recommended the batch lane
@@ -62,3 +74,8 @@ without launching Unity.
 - The default probe timeout (30 s) is shorter than a cold project open, so a
   first probe on a large project is usually inconclusive. Recording a proven
   verdict after a successful batch-lane run would close that gap; not done here.
+- The batch lane does not forward the Hub licensing channel the way the GUI
+  lane does. On a host whose Hub client uses a dynamic channel, a batch editor
+  spawns its own licensing client; whether that disturbs live GUI editors is
+  unproven. Forwarding `-licensingIpc` into batch commands is a candidate
+  follow-up, not done here.

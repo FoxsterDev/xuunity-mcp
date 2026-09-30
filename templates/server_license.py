@@ -22,10 +22,15 @@ from server_hub_licensing import resolve_hub_licensing_ipc
 
 LICENSE_CAPABILITIES_CACHE_SCHEMA = 5
 HOST_LICENSE_CACHE_TTL_SECONDS = 300
-UNPROVEN_LICENSE_VERDICT_TTL_SECONDS = 24 * 60 * 60
+NEGATIVE_LICENSE_VERDICT_TTL_SECONDS = 24 * 60 * 60
 LICENSE_PROBE_DEFAULT_TIMEOUT_MS = 30000
 BATCHMODE_SUPPORT_OVERRIDE_ENV = "XUUNITY_LIGHT_UNITY_MCP_BATCHMODE_SUPPORT_OVERRIDE"
 GUI_ADMISSION_OVERRIDE_ENV = "XUUNITY_LIGHT_UNITY_MCP_GUI_ADMISSION_OVERRIDE"
+ROUTINE_LICENSING_IPC_LINE = re.compile(
+    r"\[Licensing::IpcConnector\] (?:Channel [^\r\n]* doesn't exist|Successfully connected to:[^\r\n]*|"
+    r"[^\r\n]* channel disconnected successfully\.?)",
+    re.IGNORECASE,
+)
 
 
 def license_capabilities_cache_path(project_root: Path) -> Path:
@@ -62,12 +67,14 @@ def classify_license_log(text: str, exit_code: int | None = None, timed_out: boo
         ),
         (
             "licensing_client_ipc_failure",
-            r"Licensing Client.*IPC|LicensingClient.*IPC|IPC.*Licensing|Failed to connect.*Licensing Client|"
+            r"Licensing Client.*IPC|LicensingClient.*IPC|IPC.*Licensing|licensing.*IPC|Failed to connect.*Licensing Client|"
             r"connection with (?:the )?Unity Licensing Client has been lost|re-connection attempt was UN-successful",
         ),
     ]
     for code, pattern in patterns:
-        match = re.search(pattern, haystack, re.IGNORECASE)
+        # Every editor start writes the IpcConnector channel lines; they are not failure evidence on their own.
+        subject = ROUTINE_LICENSING_IPC_LINE.sub("", haystack) if code == "licensing_client_ipc_failure" else haystack
+        match = re.search(pattern, subject, re.IGNORECASE)
         if match:
             if code == "access_token_unavailable" and access_token_warning_recovered(haystack, exit_code, timed_out):
                 continue
@@ -76,7 +83,7 @@ def classify_license_log(text: str, exit_code: int | None = None, timed_out: boo
             return {
                 "batchmode_blocker_code": code,
                 "matched_pattern": pattern,
-                "matched_text": _excerpt_around(haystack, match.start(), match.end()),
+                "matched_text": _excerpt_around(subject, match.start(), match.end()),
             }
 
     if timed_out:
@@ -197,28 +204,16 @@ def build_license_capabilities(
     host_cache_path = licensing_host_state_dir() / (
         hashlib.sha256(json.dumps(cache_key, sort_keys=True).encode("utf-8")).hexdigest() + ".json"
     )
+    stale_cached: dict[str, Any] | None = None
     if not refresh:
-        cached, from_host_cache = freshest_cached_license_capabilities(cache_path, host_cache_path, cache_key)
-        if cached is not None:
-            cached["from_cache"] = True
+        cached, from_host_cache, stale = select_cached_license_capabilities(cache_path, host_cache_path, cache_key)
+        if cached is not None and not stale:
             if from_host_cache:
                 cached.update({"project_root": str(project_root), "cache_path": str(cache_path),
                                "probe_skipped_reason": "host_probe_cache"})
                 write_json(cache_path, cached)
-            if str(cached.get("batchmode_blocker_code") or "") == "licensing_client_ipc_failure":
-                resolution, _ = resolve_hub_licensing_ipc()
-                cached["licensing_ipc_resolution"] = resolution
-                if str(resolution.get("status") or "") == "resolved":
-                    cached["editor_ui_supported"] = True
-                    cached["recommended_execution_lane"] = "gui"
-                    cached["licensing_handoff_classification"] = "machine_recoverable_with_hub_session"
-                    cached["manual_user_action_required"] = False
-                else:
-                    cached["editor_ui_supported"] = None
-                    cached["recommended_execution_lane"] = "gui_admission_blocked"
-                    cached["licensing_handoff_classification"] = "manual_user_action_required"
-                    cached["manual_user_action_required"] = True
-            return cached
+            return describe_cached_license_verdict(cached)
+        stale_cached = cached
 
     requested_at = time.time()
     with licensing_host_lock(max(1.0, timeout_ms / 1000.0) + 5.0) as waited:
@@ -232,6 +227,11 @@ def build_license_capabilities(
                 write_json(cache_path, cached)
                 return cached
         live = live_editor_licensing_evidence()
+        probe_blocked = bool(live.get("editor_live") or live.get("visibility_unknown"))
+        if stale_cached is not None and probe_blocked:
+            stale_cached.update({"probe_skipped_reason": "stale_cache_editor_live", "cache_verdict_stale": True,
+                                 "probe_lock_hit": waited})
+            return describe_cached_license_verdict(stale_cached)
         if live.get("licensed_editor_live"):
             payload = build_capabilities_payload(
                 project_root=project_root, unity_app=resolved_unity_app,
@@ -246,7 +246,7 @@ def build_license_capabilities(
                             "recommended_execution_lane": "gui", "probe_lock_hit": waited,
                             "licensing_ipc_resolution": live["resolution"]})
             return payload
-        if live.get("editor_live") or live.get("visibility_unknown"):
+        if probe_blocked:
             raise ToolInvocationError("licensing_busy", "Cannot safely probe licensing while an editor is live or process visibility is unavailable.")
         timeout_ms = max(1000, int(timeout_ms or LICENSE_PROBE_DEFAULT_TIMEOUT_MS))
         probe_log_path = default_license_probe_log_path(project_root)
@@ -479,25 +479,48 @@ def read_cached_license_capabilities(cache_path: Path, cache_key: dict[str, str]
     return dict(payload)
 
 
-def freshest_cached_license_capabilities(
+def select_cached_license_capabilities(
     cache_path: Path, host_cache_path: Path, cache_key: dict[str, str]
-) -> tuple[dict[str, Any] | None, bool]:
-    """The newest probe for the same executable and version wins, whichever project ran it."""
+) -> tuple[dict[str, Any] | None, bool, bool]:
+    """A proven verdict for the same executable is shared across projects; a negative one stays project-local."""
     project = read_cached_license_capabilities(cache_path, cache_key)
     host = read_cached_license_capabilities(host_cache_path, cache_key)
-    from_host = host is not None and (project is None or probe_completed_at(host) > probe_completed_at(project))
-    cached = host if from_host else project
-    if cached is None or license_verdict_expired(cached):
-        return None, False
-    return cached, from_host
+    if (
+        host is not None
+        and host.get("batchmode_supported") is True
+        and (project is None or project.get("batchmode_supported") is not True)
+        and probe_completed_at(host) > probe_completed_at(project or {})
+    ):
+        return host, True, False
+    if project is None:
+        return None, False, False
+    return project, False, negative_verdict_expired(project)
 
 
-def license_verdict_expired(payload: dict[str, Any], now: float | None = None) -> bool:
-    """A proven batch entitlement holds until a later probe replaces it; an unproven verdict is re-checked daily."""
-    if payload.get("batchmode_supported") is True:
+def negative_verdict_expired(payload: dict[str, Any], now: float | None = None) -> bool:
+    """Only a negative verdict expires, and only into a re-probe when no editor is live."""
+    if payload.get("batchmode_supported") is not False:
         return False
     current = time.time() if now is None else now
-    return current - probe_completed_at(payload) >= UNPROVEN_LICENSE_VERDICT_TTL_SECONDS
+    return current - probe_completed_at(payload) >= NEGATIVE_LICENSE_VERDICT_TTL_SECONDS
+
+
+def describe_cached_license_verdict(cached: dict[str, Any]) -> dict[str, Any]:
+    cached["from_cache"] = True
+    if str(cached.get("batchmode_blocker_code") or "") == "licensing_client_ipc_failure":
+        resolution, _ = resolve_hub_licensing_ipc()
+        cached["licensing_ipc_resolution"] = resolution
+        if str(resolution.get("status") or "") == "resolved":
+            cached["editor_ui_supported"] = True
+            cached["recommended_execution_lane"] = "gui"
+            cached["licensing_handoff_classification"] = "machine_recoverable_with_hub_session"
+            cached["manual_user_action_required"] = False
+        else:
+            cached["editor_ui_supported"] = None
+            cached["recommended_execution_lane"] = "gui_admission_blocked"
+            cached["licensing_handoff_classification"] = "manual_user_action_required"
+            cached["manual_user_action_required"] = True
+    return cached
 
 
 def probe_completed_at(payload: dict[str, Any]) -> float:

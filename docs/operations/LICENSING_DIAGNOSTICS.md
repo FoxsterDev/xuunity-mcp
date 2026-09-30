@@ -26,6 +26,16 @@ to a live licensing client skips the probe with
 entitlement. A live editor without that evidence, or unavailable process
 visibility, prevents a new probe.
 
+The project-local verdict is reused as long as it is proven (`batchmode_supported`
+true) or inconclusive (null). A negative verdict is re-probed after 24 hours,
+but only when no editor is live; on a busy host the stale verdict is reused with
+`cache_verdict_stale: true` and `probe_skipped_reason: stale_cache_editor_live`,
+so lane selection does not change. A proven verdict for the same executable and
+version is shared across projects through the host cache
+(`probe_skipped_reason: host_probe_cache`); negative verdicts are never shared.
+The routine `[Licensing::IpcConnector]` channel lines are not probe failure
+evidence on their own.
+
 Build summaries retain `total_errors` and add `build_errors` and `startup_errors`.
 The latter counts the known licensing validation/access-token lines followed by
 successful entitlement resolution in the build log, capped at the original

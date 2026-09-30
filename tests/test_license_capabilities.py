@@ -530,13 +530,13 @@ class LicenseCapabilitiesTests(unittest.TestCase):
     )
 
     @contextlib.contextmanager
-    def _probe_environment(self, root: Path):
+    def _probe_environment(self, root: Path, live: dict | None = None):
         with contextlib.ExitStack() as stack:
             patches = {
                 "detect_unity_app_path_for_project": root / "Unity.app",
                 "resolve_unity_executable": root / "Unity",
                 "resolve_unity_app_version": "6000.0.58f2",
-                "live_editor_licensing_evidence": {},
+                "live_editor_licensing_evidence": dict(live or {}),
                 "resolve_hub_licensing_ipc": ({"status": "resolved"}, ""),
             }
             for name, value in patches.items():
@@ -555,15 +555,28 @@ class LicenseCapabilitiesTests(unittest.TestCase):
             "probe_completed_at": time.time() - age_seconds,
         })
 
-    def test_timed_out_probe_with_routine_licensing_startup_lines_is_inconclusive(self) -> None:
-        routine = server_license.classify_license_log(
-            self.ROUTINE_LICENSING_STARTUP_LOG, exit_code=124, timed_out=True
+    def _host_cache_path(self, root: Path) -> Path:
+        key = {"unity_executable_path": str(root / "Unity"), "unity_version": "6000.0.58f2"}
+        return server_license.licensing_host_state_dir() / (
+            hashlib.sha256(json.dumps(key, sort_keys=True).encode("utf-8")).hexdigest() + ".json"
         )
-        self.assertEqual("unknown_batch_failure", routine["batchmode_blocker_code"])
+
+    def test_routine_ipc_connector_lines_are_not_failure_evidence(self) -> None:
+        for exit_code, timed_out in ((124, True), (1, False)):
+            with self.subTest(exit_code=exit_code):
+                result = server_license.classify_license_log(
+                    self.ROUTINE_LICENSING_STARTUP_LOG, exit_code=exit_code, timed_out=timed_out
+                )
+                self.assertEqual("unknown_batch_failure", result["batchmode_blocker_code"])
         lost = server_license.classify_license_log(
             self.ROUTINE_LICENSING_STARTUP_LOG + "\n" + self.CONNECTION_LOST_LINE, exit_code=124, timed_out=True
         )
         self.assertEqual("licensing_client_ipc_failure", lost["batchmode_blocker_code"])
+        connector_failure = server_license.classify_license_log(
+            self.ROUTINE_LICENSING_STARTUP_LOG + "\n[Licensing::IpcConnector] Failed to connect to: LicenseClient-user",
+            exit_code=1,
+        )
+        self.assertEqual("licensing_client_ipc_failure", connector_failure["batchmode_blocker_code"])
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -584,7 +597,7 @@ class LicenseCapabilitiesTests(unittest.TestCase):
         self.assertTrue(result["batchmode_probe_timed_out"])
         self.assertEqual("batch_diagnostic_required", result["recommended_execution_lane"])
 
-    def test_unproven_project_verdict_expires_after_a_day_while_a_proven_one_holds(self) -> None:
+    def test_only_a_negative_verdict_expires_and_only_into_a_quiet_host_reprobe(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             cache = server_license.license_capabilities_cache_path(root)
@@ -593,19 +606,13 @@ class LicenseCapabilitiesTests(unittest.TestCase):
                 self._probe_environment(root),
                 mock.patch.object(server_license.subprocess, "run", return_value=completed) as run,
             ):
-                self._write_verdict(
-                    cache, root, supported=False, age_seconds=3600, blocker="licensing_client_ipc_failure"
-                )
-                fresh = server_license.build_license_capabilities(project_root=root)
-                self.assertTrue(fresh["from_cache"])
-                self.assertFalse(fresh["batchmode_supported"])
-                run.assert_not_called()
-
-                self._write_verdict(cache, root, supported=True, age_seconds=30 * 24 * 3600)
-                proven = server_license.build_license_capabilities(project_root=root)
-                self.assertTrue(proven["from_cache"])
-                self.assertTrue(proven["batchmode_supported"])
-                run.assert_not_called()
+                for supported, age in ((False, 3600), (True, 30 * 24 * 3600), (None, 30 * 24 * 3600)):
+                    with self.subTest(supported=supported, age=age):
+                        self._write_verdict(cache, root, supported=supported, age_seconds=age)
+                        kept = server_license.build_license_capabilities(project_root=root)
+                        self.assertTrue(kept["from_cache"])
+                        self.assertIs(kept["batchmode_supported"], supported)
+                        run.assert_not_called()
 
                 self._write_verdict(
                     cache, root, supported=False, age_seconds=2 * 24 * 3600, blocker="licensing_client_ipc_failure"
@@ -616,30 +623,63 @@ class LicenseCapabilitiesTests(unittest.TestCase):
             self.assertTrue(reprobed["batchmode_supported"])
             self.assertEqual(1, run.call_count)
 
-    def test_newer_proven_host_verdict_supersedes_a_stale_project_verdict(self) -> None:
+    def test_a_stale_negative_verdict_is_reused_while_an_editor_is_live(self) -> None:
+        live_states = (
+            {"editor_live": True},
+            {"editor_live": True, "licensed_editor_live": True},
+            {"visibility_unknown": True},
+        )
+        for live in live_states:
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(live=live):
+                root = Path(tmp)
+                cache = server_license.license_capabilities_cache_path(root)
+                self._write_verdict(
+                    cache, root, supported=False, age_seconds=20 * 24 * 3600, blocker="licensing_client_ipc_failure"
+                )
+                with (
+                    self._probe_environment(root, live=live),
+                    mock.patch.object(server_license.subprocess, "run") as run,
+                ):
+                    result = server_license.build_license_capabilities(project_root=root)
+                run.assert_not_called()
+                self.assertTrue(result["from_cache"])
+                self.assertTrue(result["cache_verdict_stale"])
+                self.assertEqual("stale_cache_editor_live", result["probe_skipped_reason"])
+                self.assertFalse(result["batchmode_supported"])
+                self.assertEqual("gui", result["recommended_execution_lane"])
+
+    def test_a_proven_host_verdict_is_shared_but_a_negative_one_stays_project_local(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             cache = server_license.license_capabilities_cache_path(root)
-            key = {"unity_executable_path": str(root / "Unity"), "unity_version": "6000.0.58f2"}
-            host_cache = server_license.licensing_host_state_dir() / (
-                hashlib.sha256(json.dumps(key, sort_keys=True).encode("utf-8")).hexdigest() + ".json"
-            )
-            self._write_verdict(
-                cache, root, supported=False, age_seconds=20 * 24 * 3600, blocker="licensing_client_ipc_failure"
-            )
-            self._write_verdict(host_cache, root, supported=True, age_seconds=24 * 3600)
+            host_cache = self._host_cache_path(root)
             with (
-                self._probe_environment(root),
+                self._probe_environment(root, live={"editor_live": True, "licensed_editor_live": True}),
                 mock.patch.object(server_license.subprocess, "run") as run,
             ):
-                result = server_license.build_license_capabilities(project_root=root)
+                self._write_verdict(
+                    cache, root, supported=False, age_seconds=20 * 24 * 3600, blocker="licensing_client_ipc_failure"
+                )
+                self._write_verdict(host_cache, root, supported=True, age_seconds=24 * 3600)
+                adopted = server_license.build_license_capabilities(project_root=root)
+                self.assertTrue(adopted["batchmode_supported"])
+                self.assertEqual("host_probe_cache", adopted["probe_skipped_reason"])
+                self.assertEqual(str(root), adopted["project_root"])
+                self.assertTrue(json.loads(cache.read_text(encoding="utf-8"))["batchmode_supported"])
 
+                self._write_verdict(cache, root, supported=True, age_seconds=10 * 24 * 3600)
+                self._write_verdict(
+                    host_cache, root, supported=False, age_seconds=3600, blocker="no_valid_editor_license"
+                )
+                kept = server_license.build_license_capabilities(project_root=root)
+                self.assertTrue(kept["batchmode_supported"])
+                self.assertNotEqual("host_probe_cache", kept.get("probe_skipped_reason"))
+
+                self._write_verdict(cache, root, supported=None, age_seconds=10 * 24 * 3600)
+                inconclusive = server_license.build_license_capabilities(project_root=root)
+                self.assertIsNone(inconclusive["batchmode_supported"])
+                self.assertTrue(inconclusive["from_cache"])
             run.assert_not_called()
-            self.assertTrue(result["batchmode_supported"])
-            self.assertTrue(result["from_cache"])
-            self.assertEqual("host_probe_cache", result["probe_skipped_reason"])
-            self.assertEqual(str(root), result["project_root"])
-            self.assertTrue(json.loads(cache.read_text(encoding="utf-8"))["batchmode_supported"])
 
     def test_gui_fallback_failure_summary_carries_the_bridge_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

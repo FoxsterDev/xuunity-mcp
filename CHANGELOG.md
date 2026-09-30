@@ -17,19 +17,27 @@
 
 ### Changed
 
-- The batchmode probe classifier no longer matches the `[Licensing::IpcConnector]`
-  logger prefix on its own. A probe that times out without a licensing error
-  line is `unknown_batch_failure` (`batchmode_supported=null`,
-  `recommended_execution_lane=batch_diagnostic_required`), so
-  `--batch-fallback-mode auto` tries the batch lane instead of falling back to
-  GUI. The connection-loss and explicit IPC failure messages classify as before.
-- License capability cache: a proven `batchmode_supported=true` verdict is
-  reused until a later probe replaces it; an unproven or negative verdict is
-  re-checked after 24 hours. The newest probe for the same Unity executable and
-  version wins across projects, so a project whose own cache is older adopts
-  the host-wide verdict (`probe_skipped_reason=host_probe_cache`) and one proven
-  probe lifts every sibling project onto the batch lane. `--refresh-license`
-  and the `license-capabilities --refresh` probe are unchanged.
+- The batchmode probe classifier no longer counts the routine
+  `[Licensing::IpcConnector]` lines that every editor start writes (`Channel
+  ... doesn't exist`, `Successfully connected to`, `channel disconnected
+  successfully`) as `licensing_client_ipc_failure` evidence. The blocker
+  patterns themselves are unchanged, so connection-loss, reconnection-failure
+  and other IPC failure lines classify as before. A probe that times out, or
+  exits non-zero, with only those routine lines is `unknown_batch_failure`
+  (`batchmode_supported=null`, `recommended_execution_lane=batch_diagnostic_required`),
+  so `--batch-fallback-mode auto` tries the batch lane instead of GUI.
+- License capability cache: a proven `batchmode_supported=true` verdict for
+  the same Unity executable and version is shared across projects. A project
+  whose own verdict is missing, inconclusive or negative adopts a newer proven
+  host-wide verdict (`probe_skipped_reason=host_probe_cache`), so one proven
+  probe lifts every sibling project onto the batch lane. Negative verdicts
+  stay project-local and are re-probed after 24 hours, but only when no Unity
+  editor is live; while an editor is live, or process visibility is
+  unavailable, the stale verdict is reused with `cache_verdict_stale=true` and
+  `probe_skipped_reason=stale_cache_editor_live`, so the lane never changes on
+  a busy host. Proven and inconclusive verdicts do not expire.
+  `--refresh-license`, the `licensed_editor_live` skip, `licensing_busy` and
+  the Hub channel forwarding are unchanged.
 - A GUI fallback whose bridge operation returns an error carries that error
   into the batch summary as `gui_operation_error_code` and
   `top_actionable_error` (also in the terminal record and the compact CLI
