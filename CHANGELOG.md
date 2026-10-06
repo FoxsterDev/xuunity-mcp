@@ -14,6 +14,15 @@
   compile errors, the GUI editor showed Unity's Safe Mode dialog, and the
   compile refusal the bridge returned was dropped from the batch summary,
   which reported only `gui_operation_failed` with `unity_outcome=unknown`.
+- `unity_prefab_mutate`, and the transient overrides of `unity_prefab_render`,
+  could not assign a sprite from a texture imported in single-sprite mode. In
+  that mode the `Texture2D` main asset and its `Sprite` sub-asset share one
+  name, and the lookup returned the first object with the requested name, which
+  is the texture. `path#Name`, `assetSubAssetName`, a plain path and a GUID all
+  failed as `prefab_mutation_asset_type_mismatch` ("... is a Texture2D, which
+  is not in the type chain of the declared Sprite field"), and the mutator's
+  own inverse patch for such a sprite (`restoreValue: "path#Name"`) could not
+  be replayed.
 
 ### Changed
 
@@ -42,6 +51,18 @@
   into the batch summary as `gui_operation_error_code` and
   `top_actionable_error` (also in the terminal record and the compact CLI
   output), for example the bridge's "Unity has compilation errors" refusal.
+- Asset-typed object references in `unity_prefab_mutate` and
+  `unity_prefab_render` overrides resolve against the field's declared type. A
+  named sub-asset (`assetSubAssetName` or a `path#SubAsset` suffix) prefers
+  the same-named object whose type fits the field, so a single-mode sprite
+  resolves to the `Sprite`, not its `Texture2D`. A plain path or GUID whose
+  main asset does not fit the field resolves to the only sub-asset that does,
+  so a texture path assigns its sprite. When several sub-assets fit, as in a
+  sliced sheet, none is guessed: the write still fails as
+  `prefab_mutation_asset_type_mismatch` until a sub-asset is named. A name
+  that matches only objects of the wrong type keeps
+  `prefab_mutation_asset_type_mismatch`, and a name that matches nothing keeps
+  `prefab_mutation_asset_not_found`.
 
 ### Validation
 
@@ -55,6 +76,25 @@
   verdict adopted a sibling project's proven verdict from the previous day
   (`from_cache=true`, `probe_skipped_reason=host_probe_cache`,
   `recommended_execution_lane=batch`) without launching Unity.
+- Host Python suite on macOS after the asset-reference change (tool
+  description and its `tools/list` parity baseline): 1162 tests, OK (14
+  skipped).
+- Package EditMode self-tests on Unity `6000.0.58f2` in a uGUI consumer
+  project resolving the local package source: `XUUnity.MCP.SelfTest` 182/182.
+  New fixtures: a single-mode sprite texture (resolve by name, resolve by plain
+  path, wrong-type name match) and an asset holding two meshes under a
+  non-mesh main asset (ambiguous plain path).
+- Mutation reds on `XUUnity.MCP.PrefabMutation` (25 tests): restoring the
+  previous lookup fails exactly the by-name and plain-path sprite tests with
+  the original "is a Texture2D" message; dropping the single-fit check fails
+  only the ambiguous-mesh test; dropping the wrong-type name fallback fails
+  only the wrong-type test (`prefab_mutation_asset_not_found` instead of
+  `prefab_mutation_asset_type_mismatch`).
+- Live on Unity `6000.0.58f2`: a `unity_prefab_mutate` preview against a
+  project texture imported as a single sprite resolved `path#Name`,
+  `assetSubAssetName` and the bare GUID to its `Sprite`, and a
+  `unity_prefab_render` override with `path#Name` rendered that sprite.
+  This change was not run on Unity `2022.3`.
 
 ## 0.3.82
 

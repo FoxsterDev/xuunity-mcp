@@ -195,6 +195,27 @@ namespace XUUnity.LightMcp.Tests.EditMode
         }
 
         [Test]
+        public void APlainPathIsNotResolvedToOneOfSeveralSubAssetsThatFitTheField()
+        {
+            var containerPath = PREFAB_DIR + "/XUUnityMcp_MeshContainer.asset";
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<XUUnityLightMcpAssetSnapshotProbeAsset>(), containerPath);
+            AssetDatabase.AddObjectToAsset(new Mesh { name = "XUUnityMcp_MeshA" }, containerPath);
+            AssetDatabase.AddObjectToAsset(new Mesh { name = "XUUnityMcp_MeshB" }, containerPath);
+            AssetDatabase.SaveAssets();
+
+            var payload = Mutate(
+                "{\"prefabPath\":\"" + _prefabPath + "\",\"approve\":true,\"previewOnly\":false,"
+                + "\"allowedComponentTypes\":[\"MeshFilter\"],\"operations\":["
+                + "{\"op\":\"add_component\",\"path\":\"XUUnityMcp_MutationRoot/Panel\",\"componentType\":\"MeshFilter\"},"
+                + "{\"op\":\"set_serialized_field\",\"path\":\"XUUnityMcp_MutationRoot/Panel\","
+                + "\"componentType\":\"MeshFilter\",\"propertyPath\":\"m_Mesh\",\"stringValue\":\"" + containerPath + "\"}"
+                + "]}");
+
+            Assert.That(payload.status, Is.EqualTo("rolled_back"));
+            Assert.That(payload.changes[1].error_code, Is.EqualTo("prefab_mutation_asset_type_mismatch"));
+        }
+
+        [Test]
         public void AWriteThatChangesNothingIsReportedAsNoOpNotApplied()
         {
             var payload = Mutate(SetAlphaJson(1f, approve: true, previewOnly: false));

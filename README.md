@@ -1122,7 +1122,10 @@ UI prefab authoring is one lane, not two. `unity_prefab_mutate` covers typed
 fields, RectTransform geometry, CanvasGroup state, child structure, allow-listed
 components, and asset-typed object references (`Sprite`, `Material`,
 `TMP_FontAsset`, …) addressed by project path or GUID — including a sub-asset such
-as a sliced sprite, via `assetSubAssetName` or a `path#SubAsset` suffix. Component
+as a sliced sprite, via `assetSubAssetName` or a `path#SubAsset` suffix. The
+lookup follows the field's declared type: a name shared by a texture and its
+single-mode sprite resolves to the sprite, and a plain path or GUID resolves to
+its only sub-asset that fits the field when the main asset does not. Component
 and `GameObject` references stay out of scope by design, so a component can never
 be swapped for another type. There is therefore no remaining reason to hand-edit
 prefab YAML; if you do edit a serialized asset out of band anyway, run

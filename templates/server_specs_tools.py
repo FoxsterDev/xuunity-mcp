@@ -885,7 +885,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "operations": {
                     "type": "array",
                     "items": {"type": "object"},
-                    "description": "Typed operations [{op, path, componentType, propertyPath, stringValue|numberValue|boolValue|x,y,z,w, templatePath, childName, assetSubAssetName, valueKind}]. On an enum property, numberValue is the member index and stringValue is the member name. On an asset-typed object reference, stringValue is a project-relative asset path or a 32-character GUID, optionally with assetSubAssetName (or a path#SubAsset suffix) for a sub-asset such as a sliced sprite; valueKind=\"null\" clears the reference."
+                    "description": "Typed operations [{op, path, componentType, propertyPath, stringValue|numberValue|boolValue|x,y,z,w, templatePath, childName, assetSubAssetName, valueKind}]. On an enum property, numberValue is the member index and stringValue is the member name. On an asset-typed object reference, stringValue is a project-relative asset path or a 32-character GUID, optionally with assetSubAssetName (or a path#SubAsset suffix) for a sub-asset such as a sliced sprite. A plain path or GUID whose main asset does not fit the field resolves to its only sub-asset that does, such as the sprite of a single-sprite texture; valueKind=\"null\" clears the reference."
                 },
                 "previewOnly": {"type": "boolean", "default": True},
                 "approve": {

@@ -657,7 +657,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             SplitAssetReference(requested, operation.assetSubAssetName, out var target, out var subAsset);
-            if (!TryLoadAssetObject(target, subAsset, out var asset, out var loadError))
+            if (!TryLoadAssetObject(target, subAsset, declared, out var asset, out var loadError))
             {
                 errorCode = "prefab_mutation_asset_not_found";
                 error = loadError;
@@ -712,6 +712,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
         static bool TryLoadAssetObject(
             string requested,
             string subAssetName,
+            string declaredType,
             out UnityEngine.Object asset,
             out string error)
         {
@@ -736,25 +737,73 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     return false;
                 }
 
+                if (!FitsDeclaredType(asset, declaredType))
+                {
+                    var fitting = SingleSubAssetFittingType(path, declaredType);
+                    if (fitting != null)
+                    {
+                        asset = fitting;
+                    }
+                }
+
                 return true;
             }
 
+            UnityEngine.Object firstNameMatch = null;
             foreach (var candidate in AssetDatabase.LoadAllAssetsAtPath(path))
             {
-                if (candidate == null)
+                if (candidate == null || !string.Equals(candidate.name, wantedSubAsset, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                if (string.Equals(candidate.name, wantedSubAsset, StringComparison.Ordinal))
+                if (FitsDeclaredType(candidate, declaredType))
                 {
                     asset = candidate;
                     return true;
                 }
+
+                if (firstNameMatch == null)
+                {
+                    firstNameMatch = candidate;
+                }
+            }
+
+            if (firstNameMatch != null)
+            {
+                asset = firstNameMatch;
+                return true;
             }
 
             error = $"'{path}' has no sub-asset named '{wantedSubAsset}'.";
             return false;
+        }
+
+        static UnityEngine.Object SingleSubAssetFittingType(string path, string declaredType)
+        {
+            UnityEngine.Object fitting = null;
+            foreach (var candidate in AssetDatabase.LoadAllAssetsAtPath(path))
+            {
+                if (candidate == null || !FitsDeclaredType(candidate, declaredType))
+                {
+                    continue;
+                }
+
+                if (fitting != null)
+                {
+                    return null;
+                }
+
+                fitting = candidate;
+            }
+
+            return fitting;
+        }
+
+        static bool FitsDeclaredType(UnityEngine.Object candidate, string declaredType)
+        {
+            return string.IsNullOrEmpty(declaredType)
+                   || XUUnityLightMcpPrefabInspector.TypeChainContains(candidate.GetType(), declaredType);
         }
 
         static bool LooksLikeAssetGuid(string value)
