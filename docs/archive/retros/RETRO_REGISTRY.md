@@ -2,7 +2,7 @@
 
 Status: active public registry
 Last triage: 2026-09-24 (saved helper evidence authority correction)
-Current release: `v0.3.82`
+Current release: `v0.3.83`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
@@ -55,7 +55,8 @@ own owner registries, not in this public table.
   re-probed after 24 hours only on a quiet host, and GUI fallback errors reach
   `top_actionable_error`. Hub channel forwarding, the probe lock and
   `licensed_editor_live` are untouched. Retro:
-  `2026-09-30_stale_license_verdict_forced_gui_fallback_retro.md`. Unreleased.
+  `2026-09-30_stale_license_verdict_forced_gui_fallback_retro.md`. Released in
+  `v0.3.83`.
 
 ## Intake 2026-09-29 (guarded click refused a transparent button hit area)
 
@@ -678,7 +679,7 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 
 | Date | File | Scope | Registry Status | Why It Is Not Completed History |
 | --- | --- | --- | --- | --- |
-| 2026-09-30 | `2026-09-30_stale_license_verdict_forced_gui_fallback_retro.md` | timed-out licensing probe recorded as a permanent `licensing_client_ipc_failure`; project cache without expiry; GUI fallback dropped the bridge error | **fixed in current source 2026-09-30; unreleased** | Five projects ran every `batch-*` helper through the GUI lane for 20 days on a verdict drawn from a probe that only ran out of time, and one of them hit Unity's Safe Mode dialog on a compile error the summary then failed to report. Classifier exemption for routine IpcConnector lines, proven-verdict sharing, quiet-host re-probe of negative verdicts and error carry are in source; the Hub channel forwarding, probe lock and `licensed_editor_live` skip are untouched. Residual: a project with no verdict still takes GUI while another editor is live, a successful batch run does not record a proven verdict, and the batch lane does not forward `-licensingIpc`. |
+| 2026-09-30 | `2026-09-30_stale_license_verdict_forced_gui_fallback_retro.md` | timed-out licensing probe recorded as a permanent `licensing_client_ipc_failure`; project cache without expiry; GUI fallback dropped the bridge error | **fixed 2026-09-30; released in `v0.3.83`** | Five projects ran every `batch-*` helper through the GUI lane for 20 days on a verdict drawn from a probe that only ran out of time, and one of them hit Unity's Safe Mode dialog on a compile error the summary then failed to report. Classifier exemption for routine IpcConnector lines, proven-verdict sharing, quiet-host re-probe of negative verdicts and error carry are in source; the Hub channel forwarding, probe lock and `licensed_editor_live` skip are untouched. Residual: a project with no verdict still takes GUI while another editor is live, a successful batch run does not record a proven verdict, and the batch lane does not forward `-licensingIpc`. |
 | 2026-09-30 | `2026-09-30_editor_quit_ack_without_exit_retro.md` | `request-editor-quit` acknowledgement versus actual editor exit | **intake 2026-09-30; backlog, no fix applied** | The direct quit command printed `quit_requested` and exited 0 twice while an idle, healthy editor stayed alive; only `restore-editor-state` closed it (`quit_ack_without_exit_sigterm_recovered`). The command should verify exit like the closeout path. The root cause of the surviving `EditorApplication.Exit` is unverified. |
 | 2026-09-28 | `2026-09-28_readiness_after_safe_mode_and_hook_settle_operator_retro.md` | Readiness verdict after a Safe Mode observation, settle-gated compile after define-changing hooks, complete failure lists, anchored grep auto-extension and console anchor, sweep terminal record with retry hint, hook-reported defines, asset field snapshot | **all eight items released in `v0.3.81`** | Unity completed 184/184 requests, yet `ensure-ready` and a checked-in scenario reported failures Unity had already resolved, and four evidence surfaces (three failures of nine listed, anchored grep searching the oldest window, no applied-defines report, no asset field read) pushed the operator to a 55 MB log and compiler response files. Overlaps the 2026-08-19 anchored-scope row (window direction) and the 2026-09-02 batch-shape row (sweep terminal record). |
 | 2026-09-03 | `2026-09-03_greenfield_hardening_operator_retro.md` | staleness surfacing (editor domain + AssetDatabase), compact build envelope, advisory de-duplication | **both P1 currency findings released in `v0.3.69`; P2/P3 residuals open** | Every catalog-backed action now passes a shared editor-domain currency gate, while `requiresFreshAssets: true` prepends a settled forced refresh. Runtime background execution is enabled without native autofocus. Remaining: compact build/EDM4U envelopes and advisory de-duplication (P2), plus the inline-image idea (P3); native autofocus was deliberately declined. |

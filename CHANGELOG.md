@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.83
+
+Release tag: `v0.3.83`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.83
+```
+
 ### Why this matters
 
 - `batch-compile` and the other `batch-*` helpers opened a GUI editor instead
@@ -26,6 +36,7 @@
 
 ### Changed
 
+- Released `v0.3.83` package metadata, server metadata, package manifests, and Git UPM examples.
 - The batchmode probe classifier no longer counts the routine
   `[Licensing::IpcConnector]` lines that every editor start writes (`Channel
   ... doesn't exist`, `Successfully connected to`, `channel disconnected
@@ -95,6 +106,17 @@
   `assetSubAssetName` and the bare GUID to its `Sprite`, and a
   `unity_prefab_render` override with `path#Name` rendered that sprite.
   This change was not run on Unity `2022.3`.
+
+### Known limitations
+
+- `Unity Package CI` stays waived (no runner Unity license), so the package
+  EditMode proof for this release is the local consumer-project run above,
+  on Unity `6000.0.58f2` only.
+- A plain path to a texture with several sprites (a sliced sheet) still
+  needs a sub-asset name; the lookup refuses to pick one.
+- A project with no license verdict still takes the GUI lane while another
+  licensed editor is live, a successful batch run does not yet record a
+  proven verdict, and the batch lane does not forward `-licensingIpc`.
 
 ## 0.3.82
 

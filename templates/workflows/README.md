@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Workflow Templates
 
 Date: `2026-05-23`
-Status: `current for v0.3.82`
+Status: `current for v0.3.83`
 
 This folder contains machine-readable agent workflow templates.
 
@@ -37,5 +37,5 @@ fails when a schema file and its spec drift apart.
 Current production package source for workflow evidence:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.82
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.83
 ```
