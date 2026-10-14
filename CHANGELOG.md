@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Cancel superseded discovery, site UI, and integration CI runs for the same
+  pull request. Keep all platform tests and independent push, tag, and manual
+  evidence runs; release and deployment workflows are unchanged.
+
 ## 0.3.83
 
 Release tag: `v0.3.83`
