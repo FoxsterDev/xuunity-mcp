@@ -61,6 +61,123 @@ Stop immediately when:
 - Unity is in Safe Mode and the selected startup policy is fail-fast
 - a validation failure is already specific enough to act on
 
+## Operator Discipline For An Edit And Evidence Cycle
+
+Finish one coherent source-edit batch before validation; freeze that batch while
+compile, tests, or scenarios consume it. After C# edits, choose the supported
+compile-first route from the actual editor state: use closed-project batch
+validation only after closure is proven, or reuse the live bridge compile lane
+when the target editor is already open. Unknown editor ownership is a blocker
+for lane selection. Follow Workflows 2 and 9 rather than opening the GUI before
+the compile gate or launching a competing editor.
+
+Wait for the selected operation's typed terminal result and the required editor
+settle/readiness evidence before advancing. Request delivery, a healthy heartbeat,
+or an idle sample alone does not prove completion. Recover interrupted requests
+by their request id; keep pending, unmeasured, failed, and timed-out results
+distinct. A later successful query does not change a failed scenario into a
+pass; retain its run id and record a corrected rerun separately.
+
+During startup, Safe Mode prompt, entered, ambiguous and exited log markers are
+different observations. A moving log does not establish a blocked dialog.
+Changed conditions emit bounded JSON with `provisional=true` and a typed `code`
+on stderr while readiness continues; repeated identical conditions are
+not emitted every poll. Compile state remains unmeasured until authoritative
+bridge/compiler evidence arrives. An explicit quiet prompt may stop early;
+the deadline preserves the last typed observation. Client stderr buffering can
+delay its presentation and is outside the host readiness guarantee.
+
+Set `XUUNITY_HOST_CALL_TIMING=1` to measure host work. MCP results include a
+pre-emission snapshot in `_meta.xuunity_host_timing`; a bounded
+`xuunity_host_call_timing` stderr receipt records the total after stdout flush.
+CLI receipts use `cli_dispatch` scope. Exclusive measured stages plus the
+explicit unattributed remainder reconcile to the monotonic total; missing
+stages are null/unmeasured. Serialization measures JSON encoding; output writes
+and flush are within the total and remainder. Launcher startup, client latency
+and diagnostic receipt emission are excluded. `dispatch_unity_wait` includes
+transport and host waiting; use the separate request/Unity timing evidence to
+inspect execution and settle. Profile comparable calls before attributing gaps
+or optimizing them.
+
+For UI work, query the known selector and narrow scene/root scope with
+`unity_ui_query`, `unity_ui_exists`, `unity_ui_get_text`, or
+`unity_ui_get_bounds` before requesting a full tree. Widen scope or node budgets
+only when the result requires it; a truncated search cannot prove absence or
+uniqueness. Keep the fixed Game View and point-of-use PlayMode liveness checks
+from the [smoke contract](../operations/SMOKE_TESTS.md).
+
+`unity_ui_click` synchronizes the existing Game View context before computing
+bounds and running EventSystem raycasts. It does not resize the preset or change
+zoom. Inspect `coordinate_context_status`, the before/after Screen dimensions,
+and `pointer_x`/`pointer_y` in `pointer_coordinate_space`. If synchronization
+cannot establish matching render dimensions, `ui_coordinate_context_unresolved`
+refuses delivery; make the intended Game View visible before retrying. A real
+raycast is still required to prove occlusion checks, even when dimensions agree.
+
+For scenario `project_refresh`, a settled phase must belong to the pending
+request ID. Idle alone cannot replace lost request evidence after a reload.
+Inspect the explicit unresolved reason and mutation boundary before choosing
+the next action; do not replay pending project actions blindly. Measured refresh
+timing separates execution and settle waiting. Missing or inconsistent clock
+evidence produces `timing_measured=false` and a null compact step duration.
+
+Treat click delivery and the expected application transition as separate proof.
+For an asynchronous close or navigation, a scenario `ui_click` can use
+`expectStateChange: false` to record delivery without requiring an immediate
+tree change. It must then use the project's existing registered bounded wait or
+`project_defined_hook_poll_until` contract, with explicit timeout and terminal
+predicates, followed by `ui_exists` with `expectedExists: false` for disappearance
+or a `ui_exists`/`ui_get_text` assertion for the next state. These UI read steps
+are immediate assertions, not automatic waits. Do not invent a hook, repeat the
+click while waiting, or remove a next-state assertion to obtain a passing run.
+Keep `expectStateChange: true` when immediate change is the intended contract.
+
+An occlusion refusal remains a refusal: inspect the named occluder and follow the
+authorized user path to dismiss it before retrying. Do not invoke the handler
+directly or disable overlays merely to bypass reachability checks. A synthesized
+raycast explicitly leaves occlusion unproven. Existing source examples are
+`Step_FailsWhenAnExpectedStateChangeDoesNotHappen` in the
+[EditMode interaction tests](../../packages/com.xuunity.light-mcp/Tests/EditModeUgui/XUUnityLightMcpUiInteractionStepTests.cs)
+and `AnOccludingHandlerIsRefusedInsteadOfClickedThrough` in the
+[PlayMode raycast tests](../../packages/com.xuunity.light-mcp/Tests/PlayMode/Ugui/XUUnityLightMcpUiClickRaycastIdentityPlayModeTests.cs).
+They cover an inert delivered click and an occlusion refusal respectively; the
+latter can skip when the runtime supplies no raycast hit. Source presence is
+not a passing test receipt.
+
+Inspect configuration through an explicit allowlist of required non-secret
+fields. Report presence, environment, and ownership rather than raw values;
+never persist raw login request/response bodies, tokens, or credential-bearing
+URLs in scenario payloads, logs, or evidence bundles.
+
+Record a small proof matrix, with source identity, run/request id, artifacts,
+and pass/fail/blocked/not-run status for every required claim:
+
+| Claim | Representative proof | Remaining limit |
+| --- | --- | --- |
+| Source rule or payload contract | Inspected source plus focused real-code tests | Does not prove the live editor loaded it |
+| Script compilation | Terminal compile result for the required targets/profiles and affected assemblies | Does not prove UI or startup behavior |
+| Editor/runtime UI transition | Advancing PlayMode, delivery receipt, bounded wait and next-state assertion | Does not prove device behavior |
+| Device or native behavior | Identified player build and representative device run | Editor/build success alone leaves this row unproven |
+| Server-dependent journey | Correlated request and expected business outcome in the intended environment, with secrets excluded | Local models and UI tests cannot prove a backend result |
+| Shared-source consumers | Exact shared revision and per-consumer terminal compile evidence | One project's compile does not cover its consumers |
+
+For `unity_prefab_render`, `capture_status=capture_produced` means PNG writing
+completed; a failed render before writing reports `capture_status=not_produced`.
+The existing `success` field remains compatible, and `proof_class` describes
+the available snapshot evidence. Every isolated render reports
+`visual_acceptance=visual_acceptance_unproven`, including intentionally blank
+captures. Visual acceptance still requires the intended fixture/state, semantic
+text/visibility checks, and relevant pixels or reference comparison. Apply
+transient preview overrides for runtime-populated holders and text, and retain
+evidence that the original prefab bytes are unchanged. The render tests
+`Render_RevealsAHiddenHolderAndTextOnlyOnThePreviewInstance` and
+`Render_AcceptsAnIntentionallyBlankPrefabAsAnArtifact` in
+[the render/click suite](../../packages/com.xuunity.light-mcp/Tests/EditModeUgui/XUUnityLightMcpRenderAndClickTests.cs)
+separate these contracts: a known revealed holder needs its expected pixels,
+while an intentionally blank prefab may still produce a valid artifact. Do not
+apply a universal nonblank-pixel threshold or promote an isolated preview to
+live-runtime or device acceptance.
+
 ## Discover Commands Before Writing Editor Automation
 
 Read wrapper `--help` once when choosing a Unity workflow; it lists all parser

@@ -133,6 +133,48 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         public static bool TryGetExistingRenderTargetSize(out int width, out int height)
         {
+            return TryGetExistingRenderTarget(out _, out width, out height);
+        }
+
+        // A bridge EditorApplication.update callback can observe editor-window Screen dimensions.
+        // Let the existing Game View complete its native event boundary before projecting UI or
+        // calling GraphicRaycaster. This never changes the preset, zoom, or pointer position.
+        public static bool TrySynchronizeScreenContext(out string status)
+        {
+            if (!TryGetExistingRenderTarget(out var gameView, out var width, out var height))
+            {
+                status = "no_existing_game_view";
+                return true;
+            }
+
+            if (Screen.width == width && Screen.height == height)
+            {
+                status = "already_aligned";
+                return true;
+            }
+
+            try
+            {
+                gameView.SendEvent(new Event
+                {
+                    type = EventType.ExecuteCommand,
+                    commandName = "XUUnityMcpSynchronizeScreenContext"
+                });
+            }
+            catch
+            {
+                status = "game_view_context_unresolved";
+                return false;
+            }
+
+            var aligned = Screen.width == width && Screen.height == height;
+            status = aligned ? "game_view_synchronized" : "game_view_context_unresolved";
+            return aligned;
+        }
+
+        static bool TryGetExistingRenderTarget(out EditorWindow window, out int width, out int height)
+        {
+            window = null;
             width = 0;
             height = 0;
             try
@@ -151,6 +193,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     : null;
                 if (TryReadRenderTargetSize(lastFocused, renderTextureField, out width, out height))
                 {
+                    window = lastFocused as EditorWindow;
                     return true;
                 }
 
@@ -158,6 +201,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 if (gameViewType.IsInstanceOfType(focusedWindow)
                     && TryReadRenderTargetSize(focusedWindow, renderTextureField, out width, out height))
                 {
+                    window = focusedWindow;
                     return true;
                 }
 
@@ -165,6 +209,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 {
                     if (TryReadRenderTargetSize(candidate, renderTextureField, out width, out height))
                     {
+                        window = candidate as EditorWindow;
                         return true;
                     }
                 }

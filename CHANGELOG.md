@@ -6,14 +6,26 @@
   failed operation/test statuses and nonzero process exits. Passing test totals
   no longer appear as a tool failure solely because Unity serialized empty error fields.
 
+- UI clicks reconcile the existing Game View's screen context before projecting
+  the target and running EventSystem raycasts. Fixed portrait presets and zoom
+  stay unchanged; unresolved coordinate mismatches return an explicit refusal,
+  and real overlays still block delivery. Click receipts include the original
+  dimensions, synchronization result and pointer coordinates.
+- Scenario refresh completion now requires the same request's settled evidence
+  plus stable idle ticks. Lost evidence remains unresolved, rather than becoming
+  success from idle alone. Summaries distinguish applied and pending project
+  actions and separate execution from settle waiting; unavailable elapsed time
+  is explicitly unmeasured instead of a stale or misleading zero duration.
 - Startup diagnostics distinguish Safe Mode prompts, entered mode and exit
   markers. Changed provisional blockers can appear on stderr while readiness
   continues; a moving log no longer implies an early terminal dialog failure.
-
 - Opt-in host timing reports measured phases and the unattributed remainder.
   Context discovery now reads the request journal once per stale-artifact
   inspection instead of once for every candidate, preserving evidence order
   without a persistent cache.
+- Prefab render results distinguish a written capture from visual acceptance.
+  The operator recipe covers visible preview content, delayed UI transitions,
+  terminal reconciliation, scoped queries and compile-first validation.
 
 - Cancel superseded discovery, site UI, and integration CI runs for the same
   pull request. Keep all platform tests and independent push, tag, and manual

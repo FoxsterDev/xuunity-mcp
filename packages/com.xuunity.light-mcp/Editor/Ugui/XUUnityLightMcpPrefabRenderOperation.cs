@@ -183,6 +183,7 @@ namespace XUUnity.LightMcp.Editor.Ugui
                 var bytes = readback.EncodeToPNG();
                 File.WriteAllBytes(outputPath, bytes);
 
+                payload.capture_status = "capture_produced";
                 payload.screenshot_path = outputPath;
                 payload.screenshot_width = width;
                 payload.screenshot_height = height;

@@ -57,6 +57,20 @@ authoritative post-settle result fields for host-side compact MCP summaries.
 Full raw bridge payloads remain available through the host server's documented
 full-payload opt-in.
 
+Scenario refresh settle evidence must match the pending request ID. Execution
+and settle-wait timings are reported separately; missing or inconsistent timing
+is unmeasured. Scenario summaries identify applied and pending project hooks in
+`mutation_boundary`; verify an applied mutation before retrying the scenario.
+
+A prefab PNG reports `capture_status=capture_produced` while visual acceptance
+remains `visual_acceptance_unproven`. Inspect the requested state and pixels or
+use reference comparison; preview rendering does not prove runtime behavior.
+Runtime uGUI clicks first synchronize the existing Game View context and check
+actual Screen dimensions before building the UI tree. If unresolved, they
+refuse as `ui_coordinate_context_unresolved`; they do not resize the view or
+change zoom. See the public [smoke guidance](../../../docs/operations/SMOKE_TESTS.md)
+for acceptance and recovery checks.
+
 Background execution is opt-in, because an editor-time
 `Application.runInBackground` assignment is backed by the project setting
 `PlayerSettings.runInBackground` and can reach a consumer's committed

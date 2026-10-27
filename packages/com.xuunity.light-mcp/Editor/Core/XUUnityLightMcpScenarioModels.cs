@@ -160,6 +160,9 @@ namespace XUUnity.LightMcp.Editor.Core
             public string error_code = "";
             public string error_message = "";
             public double duration_seconds;
+            public double execution_duration_seconds;
+            public double settle_wait_duration_seconds;
+            public bool timing_measured;
         }
 
         [Serializable]

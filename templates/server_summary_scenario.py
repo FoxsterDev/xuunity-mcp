@@ -130,6 +130,13 @@ def summarize_scenario_step(step: dict[str, Any] | None) -> dict[str, Any] | Non
     for key in SCENARIO_STEP_LIVENESS_FIELDS:
         if key in step:
             summary[key] = step.get(key)
+    if step.get("timing_measured") is True:
+        summary["timing_measured"] = True
+        for key in ("execution_duration_seconds", "settle_wait_duration_seconds"):
+            summary[key] = round(float(step.get(key) or 0.0), 6)
+    elif step.get("kind") == "project_refresh":
+        summary["timing_measured"] = False
+        summary["duration_seconds"] = None
 
     playmode_set_summary = _extract_playmode_set_summary(step, payload)
     if playmode_set_summary:
@@ -1248,6 +1255,23 @@ def _extract_editor_relaunch_attribution(payload: dict[str, Any]) -> dict[str, A
     return {}
 
 
+def build_scenario_mutation_boundary(steps: list[Any]) -> dict[str, Any]:
+    last_applied = None
+    pending_actions = []
+    for step in steps:
+        if not isinstance(step, dict) or step.get("kind") != "project_defined_hook":
+            continue
+        payload = _parse_step_payload_json(step)
+        outcome = str(payload.get("outcome") or step.get("outcome") or "")
+        identity = {"step_id": str(step.get("stepId") or ""), "hook_name": str(step.get("hook_name") or "")}
+        if outcome.endswith("_applied"):
+            last_applied = {**identity, "outcome": outcome, "mutation_status": "applied"}
+        elif step.get("status") in {"pending", "skipped"}:
+            pending_actions.append({**identity, "execution_status": "not_executed"})
+    return {"last_applied_mutation": last_applied, "pending_project_actions": pending_actions,
+            "automatic_replay_safe": False}
+
+
 def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_statuses: set[str]) -> dict[str, Any]:
     normalized = normalize_scenario_payload(payload, scenario_terminal_statuses)
     steps = normalized.get("steps")
@@ -1257,7 +1281,8 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
     last_completed_step = None
     active_step = None
     compact_steps: list[dict[str, Any]] = []
-    current_step_index = int(normalized.get("current_step_index") or -1)
+    raw_step_index = normalized.get("current_step_index")
+    current_step_index = int(raw_step_index) if raw_step_index not in (None, "") else -1
 
     for index, raw_step in enumerate(step_items):
         if not isinstance(raw_step, dict):
@@ -1298,6 +1323,7 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
         "last_completed_step": last_completed_step,
         "first_failed_step": first_failed_step,
         "steps": compact_steps,
+        "mutation_boundary": build_scenario_mutation_boundary(step_items),
     }
     liveness_summary = build_scenario_liveness_summary(step_items)
     if liveness_summary["observed_step_count"] > 0:
@@ -1590,6 +1616,7 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         "path_coverage_summary",
         "profile_mutation_summary",
         "applied_mutation_settle_summary",
+        "mutation_boundary",
         "refresh_timeout_recovery",
         "structured_timing",
         "artifact_manifest",

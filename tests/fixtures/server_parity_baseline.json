@@ -213,7 +213,7 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "bcf7f9b9f278f00bc393ecbbc544f51ad823c3374920c9952d42ef7e88559ea3",
+    "sha256": "1c015cb310178238f88c7f872ac618c37c9567b0bcd2b0eb8864a72b6bd12251",
     "tool_count": 69,
     "tool_names": [
       "xuunity_setup_plan",
@@ -307,6 +307,11 @@
   },
   "scenario_result_summary": {
     "action": "unity_scenario_result_summary",
+    "mutation_boundary": {
+      "last_applied_mutation": null,
+      "pending_project_actions": [],
+      "automatic_replay_safe": false
+    },
     "active_step": {
       "duration_seconds": 0.5,
       "error_code": "missing_root",

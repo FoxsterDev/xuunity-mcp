@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -33,7 +34,13 @@ namespace XUUnity.LightMcp.Editor.Helpers
             if (stepResult.status == "pending")
             {
                 var request = BuildNestedRequest("unity.project.refresh", BuildProjectRefreshArgsJson(step), GetTimeoutMs(step, 45.0d));
+                state.pendingNestedStartedAtUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+                var stopwatch = Stopwatch.StartNew();
                 var response = ExecuteNestedOperation(request.operation, request.args_json, request);
+                stopwatch.Stop();
+                stepResult.execution_duration_seconds = Math.Round(stopwatch.Elapsed.TotalSeconds, 6);
+                stepResult.timing_measured = true;
+                UpdateProjectRefreshTiming(state.pendingNestedStartedAtUtc, stepResult);
                 if (response == null)
                 {
                     stepResult.status = "failed";
@@ -45,12 +52,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 if (response.status != "ok")
                 {
                     ApplyNestedResponse(stepResult, response, request.created_at_utc);
+                    UpdateProjectRefreshTiming(state.pendingNestedStartedAtUtc, stepResult);
                     return true;
                 }
 
                 state.pendingNestedRequestId = request.request_id;
                 state.pendingNestedOperation = request.operation;
-                state.pendingNestedStartedAtUtc = request.created_at_utc;
                 state.pendingNestedStableTickCount = 0;
                 state.waitingUntilUtc = DateTime.UtcNow.AddSeconds(GetTimeoutSeconds(step, 45.0d)).ToString("yyyy-MM-ddTHH:mm:ssZ");
                 stepResult.status = "running";
@@ -64,6 +71,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return true;
             }
 
+            UpdateProjectRefreshTiming(state.pendingNestedStartedAtUtc, stepResult);
+
             if (!TryParseUtc(state.waitingUntilUtc, out var deadlineUtc))
             {
                 stepResult.status = "failed";
@@ -73,7 +82,14 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return true;
             }
 
-            if (IsEditorIdleForRefreshSettle())
+            if (IsRefreshRequestSettled(
+                state.pendingNestedRequestId,
+                XUUnityLightMcpBridgeRuntimeState.RefreshSettleRequestId,
+                XUUnityLightMcpBridgeRuntimeState.RefreshSettlePending,
+                XUUnityLightMcpBridgeRuntimeState.RefreshSettlePhase,
+                EditorApplication.isCompiling,
+                EditorApplication.isUpdating,
+                EditorApplication.isPlaying || !EditorApplication.isPlayingOrWillChangePlaymode))
             {
                 state.pendingNestedStableTickCount++;
                 if (state.pendingNestedStableTickCount >= 2)
@@ -96,7 +112,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
             stepResult.status = "failed";
             stepResult.error_code = "project_refresh_timeout";
             stepResult.error_message = "Timed out waiting for project refresh to settle.";
-            stepResult.payload_json = BuildRefreshTimeoutPayloadJson(stepResult.payload_json, state.pendingNestedStableTickCount);
+            stepResult.payload_json = BuildRefreshTimeoutPayloadJson(
+                stepResult.payload_json, state.pendingNestedStableTickCount, state.pendingNestedRequestId);
             ClearPendingNestedOperation(state);
             return true;
         }
@@ -126,7 +143,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return "lost_final_accounting";
         }
 
-        public static string BuildRefreshTimeoutPayloadJson(string existingPayloadJson, int stableIdleTicks)
+        public static string BuildRefreshTimeoutPayloadJson(string existingPayloadJson, int stableIdleTicks, string expectedRequestId = "")
         {
             return BuildRefreshTimeoutPayloadJson(
                 existingPayloadJson,
@@ -136,7 +153,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 XUUnityLightMcpBridgeRuntimeState.RefreshSettlePhase,
                 XUUnityLightMcpPlayModeStateOperation.ResolvePlayModeState(),
                 stableIdleTicks,
-                XUUnityLightMcpBridgeRuntimeState.RefreshSettleRequestId);
+                XUUnityLightMcpBridgeRuntimeState.RefreshSettleRequestId,
+                expectedRequestId);
         }
 
         public static string BuildRefreshTimeoutPayloadJson(
@@ -147,7 +165,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
             string settlePhase,
             string playmodeState,
             int stableIdleTicks,
-            string settleRequestId)
+            string settleRequestId,
+            string expectedRequestId = "")
         {
             XUUnityLightMcpProjectRefreshTimeoutPayload payload = null;
             if (!string.IsNullOrWhiteSpace(existingPayloadJson))
@@ -175,6 +194,16 @@ namespace XUUnity.LightMcp.Editor.Helpers
             payload.playmode_state_at_timeout = playmodeState ?? "";
             payload.stable_idle_ticks_at_timeout = stableIdleTicks;
             payload.operation_may_have_completed = classification == "lost_final_accounting" || classification == "idle_confirmation_incomplete";
+            payload.expected_settle_request_id = expectedRequestId ?? "";
+            payload.observed_settle_request_id = settleRequestId ?? "";
+            payload.settled_completion = "unproven";
+            payload.settled_completion_reason = string.IsNullOrWhiteSpace(expectedRequestId)
+                ? "missing_expected_request_id"
+                : string.IsNullOrWhiteSpace(settleRequestId)
+                    ? "missing_runtime_request_id"
+                    : !string.Equals(expectedRequestId, settleRequestId, StringComparison.Ordinal)
+                        ? "request_id_mismatch"
+                        : "matching_request_not_confirmed_settled";
             payload.settle_phase = normalizedPhase;
             if (string.IsNullOrWhiteSpace(payload.settle_request_id))
             {
@@ -196,13 +225,76 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return JsonUtility.ToJson(args);
         }
 
-        public static bool IsEditorIdleForRefreshSettle()
+        internal static bool IsRefreshRequestSettled(
+            string expectedRequestId,
+            string observedRequestId,
+            bool settlePending,
+            string settlePhase,
+            bool isCompiling,
+            bool isUpdating,
+            bool playModeStable)
         {
-            return !XUUnityLightMcpBridgeRuntimeState.RefreshSettlePending
-                && string.Equals(XUUnityLightMcpBridgeRuntimeState.RefreshSettlePhase, "settled", StringComparison.Ordinal)
-                && !EditorApplication.isCompiling
-                && !EditorApplication.isUpdating
-                && (EditorApplication.isPlaying || !EditorApplication.isPlayingOrWillChangePlaymode);
+            return !string.IsNullOrWhiteSpace(expectedRequestId)
+                && string.Equals(expectedRequestId, observedRequestId, StringComparison.Ordinal)
+                && !settlePending
+                && string.Equals(settlePhase, "settled", StringComparison.Ordinal)
+                && !isCompiling
+                && !isUpdating
+                && playModeStable;
+        }
+
+        internal static bool TryCalculateProjectRefreshTiming(
+            string startedAtUtc,
+            DateTime nowUtc,
+            double executionDurationSeconds,
+            out double durationSeconds,
+            out double settleWaitDurationSeconds)
+        {
+            durationSeconds = 0.0d;
+            settleWaitDurationSeconds = 0.0d;
+            if (!DateTime.TryParseExact(startedAtUtc, "O", CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out var startedUtc)
+                || startedUtc.Kind != DateTimeKind.Utc
+                || nowUtc.Kind != DateTimeKind.Utc
+                || nowUtc < startedUtc
+                || double.IsNaN(executionDurationSeconds)
+                || double.IsInfinity(executionDurationSeconds)
+                || executionDurationSeconds < 0.0d)
+            {
+                return false;
+            }
+
+            durationSeconds = Math.Round((nowUtc - startedUtc).TotalSeconds, 6);
+            if (durationSeconds < executionDurationSeconds)
+            {
+                durationSeconds = 0.0d;
+                return false;
+            }
+
+            settleWaitDurationSeconds = Math.Round(durationSeconds - executionDurationSeconds, 6);
+            return true;
+        }
+
+        private static void UpdateProjectRefreshTiming(string startedAtUtc, XUUnityLightMcpScenarioStepResult stepResult)
+        {
+            if (!stepResult.timing_measured)
+            {
+                return;
+            }
+
+            stepResult.timing_measured = TryCalculateProjectRefreshTiming(
+                startedAtUtc, DateTime.UtcNow, stepResult.execution_duration_seconds,
+                out var durationSeconds, out var settleWaitDurationSeconds);
+            if (stepResult.timing_measured)
+            {
+                stepResult.duration_seconds = durationSeconds;
+                stepResult.settle_wait_duration_seconds = settleWaitDurationSeconds;
+            }
+            else
+            {
+                stepResult.duration_seconds = 0.0d;
+                stepResult.settle_wait_duration_seconds = 0.0d;
+            }
         }
 
         public static void FinalizeProjectRefreshStep(XUUnityLightMcpScenarioStepResult stepResult)

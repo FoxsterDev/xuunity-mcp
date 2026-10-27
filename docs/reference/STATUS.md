@@ -11,6 +11,46 @@ as authoritative. Receipt metadata cannot hide warnings, missing rebuild evidenc
 test counts or post-settle errors. This is an offline acceptance correction;
 Unity execution and transport behavior are unchanged.
 
+## Current-Source Evidence Boundaries
+
+Compact responses no longer interpret null, empty, or whitespace-only error
+containers as failures. Explicit failed verdicts and meaningful error content
+still fail. Scenario summaries expose `mutation_boundary` so an applied hook is
+not mistaken for an action safe to replay; pending/skipped hooks remain separate
+and `automatic_replay_safe` is always false.
+
+Scenario refresh completion must match the pending request identity. It reports
+execution and settle-wait durations separately; missing or inconsistent timing
+is unmeasured. Safe Mode entry, prompt, generic marker, and exit observations
+are distinct log evidence. Startup emits bounded, provisional stderr updates
+while waiting for bridge readiness; these do not establish a current compile
+verdict or authorize clicking a dialog.
+
+`XUUNITY_HOST_CALL_TIMING=1` enables host-side monotonic timing for MCP calls and
+CLI dispatch. The stderr receipt follows stdout flush, with exclusive measured
+stages and an explicit unattributed remainder; launcher startup and client
+latency are excluded. Stale-artifact inspection reads the journal once per call
+for all candidate requests, without a persistent journal cache. See
+[Smoke Tests](../operations/SMOKE_TESTS.md#host-call-timing-diagnostic-smoke).
+
+Prefab rendering distinguishes a produced PNG from visual acceptance: inspect
+the requested state, text, visibility and pixels or run reference comparison.
+Runtime uGUI clicks synchronize the existing Game View context before building
+the UI tree, verify actual Screen dimensions, and refuse unresolved context as
+`ui_coordinate_context_unresolved`. This does not resize the view or change zoom.
+
+The latest focused live evidence for these changes is on macOS, Unity
+`6000.0.58f2`, on the primary display: fixed-portrait click tests passed `4/4`
+without skips across three canvas modes and a real occluder, at `1440x3200` and
+zoom `0.35`; prefab tests passed `23/23`, refresh tests `29/29`, and asynchronous
+interaction tests `4/4`. This is not proof for other Unity versions, operating
+systems, or display configurations. A no-reload refresh control completed with
+matching request identity; a controlled domain reload lost runtime identity and
+returned explicit unresolved accounting without replaying the request. Separate
+runtime and test-assembly compile-negative fixtures stopped in batchmode before
+GUI acceptance, and restored positive controls passed. Remote Unity Package CI
+remains waived for lack of a runner license; local evidence does not replace it.
+
 ## Current Package
 
 Unity package:

@@ -128,6 +128,10 @@ namespace XUUnity.LightMcp.Editor.Core
             public string playmode_state_at_timeout = "";
             public int stable_idle_ticks_at_timeout;
             public bool operation_may_have_completed;
+            public string expected_settle_request_id = "";
+            public string observed_settle_request_id = "";
+            public string settled_completion = "unproven";
+            public string settled_completion_reason = "";
         }
 
         [Serializable]

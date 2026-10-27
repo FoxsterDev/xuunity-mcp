@@ -360,7 +360,20 @@ Pass criteria:
   `playmode_state_after_settle_recommended_next_action=confirm_via_unity_playmode_state`;
   use `unity_playmode_state` before gating a PlayMode-sensitive mutation
 - if scenario-driven refresh is used, nested refresh payload should expose the
-  same settled contract class rather than only raw `*_requested` transport timing
+  same settled contract class rather than only raw `*_requested` transport timing.
+  The settle completion must match the pending request ID; a prior request's
+  settled state cannot close this request. Timeout evidence names
+  `expected_settle_request_id`, `observed_settle_request_id`, and an unproven
+  `settled_completion` with its reason
+- measured refresh timing separates `execution_duration_seconds` from
+  `settle_wait_duration_seconds`. A missing, imprecise, future, or inconsistent
+  persisted start leaves timing unmeasured (`timing_measured=false`), rather
+  than manufacturing a zero or clamped duration
+- inspect `mutation_boundary` in both scenario summaries and compact decisions:
+  `last_applied_mutation` identifies the last hook reporting `*_applied`, while
+  `pending_project_actions` identifies pending/skipped hooks not executed.
+  `automatic_replay_safe=false` even when both lists are empty; verify the
+  applied state before deciding whether to retry
 - if a passed `project_defined_hook` reports an `*_applied` mutation and a
   later refresh or compile gate fails after only passed wait/status steps, the compact scenario
   verdict remains `inconclusive`/`failed` at scenario level but reports
@@ -962,6 +975,11 @@ result straight into `unity_ui_reference_compare`.
 
 Pass criteria:
 
+- `capture_status=capture_produced` proves that a PNG was written, while
+  `visual_acceptance=visual_acceptance_unproven` remains explicit. Open the
+  pixels and inspect the requested state, text, and visibility, or complete the
+  reference comparison below. A blank or wrong-state image is not visual
+  acceptance; isolated preview rendering does not prove live runtime behavior
 - the render returns a non-empty `snapshot_path`, the file exists beside the
   capture with a `.ui-snapshot.json` suffix, and it parses as a complete
   `xuunity.ui.read.v1` payload with the rendered nodes and `target.capture_width`
@@ -1088,6 +1106,17 @@ Pass criteria:
   nodes are reachable; in Edit Mode the same call reports
   `dont_destroy_on_load_status = edit_mode_no_dont_destroy_on_load_scene`
 - `sceneName=<additive scene>` narrows `target.searched_scenes` to that one scene
+- before building the UI tree, `unity_ui_click` checks the existing Game View
+  render size against actual `Screen.width` / `Screen.height`. If misaligned,
+  it uses the existing Game View's `SendEvent` context synchronization and
+  checks the actual Screen size again. It does not resize the preset or alter
+  zoom. Inspect `coordinate_context_status`, `pointer_x`, `pointer_y`, and
+  `pointer_coordinate_space` (`game_view_render_pixels` or `screen_pixels`)
+- unresolved context refuses as `ui_coordinate_context_unresolved` before
+  pointer delivery. Make the intended Game View visible and retry; do not
+  bypass the refusal. A fixed portrait preset at reduced zoom must target the
+  same logical node across Overlay, Camera, and World Space canvases, and a
+  real occluder must still block the click
 - `unity_ui_click` delivers to a node in the additive scene and to a node in
   `DontDestroyOnLoad`, and its `delivered_to_path` resolves in the owning scene
 - with two same-named objects in different loaded scenes, the click refuses as
@@ -1318,3 +1347,56 @@ using this package revision before claiming editor lifecycle validation:
    the assembly and reload; verify the new probe generation and support.
 6. Preserve the existing play-mode reload recovery and batch-to-GUI build
    fallback smoke cases. Verify the build output still exists before handoff.
+
+## Host-Call Timing Diagnostic Smoke
+
+Enable `XUUNITY_HOST_CALL_TIMING=1` in the environment of the host helper or MCP
+server process. For a CLI observation without Unity dispatch, run:
+
+```bash
+XUUNITY_HOST_CALL_TIMING=1 ./xuunity_light_unity_mcp.sh registry-context-report \
+  > context-result.json 2> context-timing.jsonl
+```
+
+For MCP, set the same environment variable in the client's server configuration
+and restart that host helper. Keep stdout reserved for the existing JSON result
+or MCP protocol; timing receipts use stderr. Locate the JSON line whose `event`
+is `xuunity_host_call_timing`; stderr can also contain other diagnostics.
+
+Pass criteria:
+
+- MCP tool metadata `_meta.xuunity_host_timing` is a snapshot at
+  `before_response_serialization`, not the final call duration. The stderr
+  receipt follows stdout flush (`stdout_flush_returned` for MCP,
+  `cli_dispatch_stdout_flush_returned` for CLI) and reports that wider boundary
+- read `scope`: `cli_dispatch` excludes launcher startup; `direct_handler` is
+  narrower than a complete protocol call. None of these measure client latency
+  or receipt emission. This is host elapsed time, not pure Unity execution time
+- exclusive stages are `context_discovery`, `activation`, `idle_before`,
+  `dispatch_unity_wait`, `idle_after`, and `serialization`. Serialization measures
+  JSON encoding; final write/flush and uncovered paths remain in
+  `unattributed_seconds`. An unentered stage has `status=unmeasured` and a null
+  duration; a partial stage is not a completed measurement. In particular, an
+  activation path outside the measured recovery wrapper may remain unmeasured
+- `accounting_valid=true` and `total_seconds` reconciles to
+  `measured_stage_total_seconds + unattributed_seconds` within rounding. Use
+  invocation counts to distinguish repeated discovery from one slow call;
+  do not assign the remainder to Unity or any other stage without evidence
+- stale-artifact inspection reads the journal once for all candidate requests
+  per inspection, preserving request order and generation evidence. Each new
+  inspection reads current journal contents; there is no persistent journal
+  cache. Compare equivalent candidate sets and retain a warm/cold-cache caveat
+  when comparing durations
+
+During `ensure-ready`, Safe Mode entry, explicit prompt, generic marker, and
+exit are separate log observations. Bounded stderr updates marked
+`provisional=true` and `startup_stage=waiting_for_bridge_readiness` describe the
+wait and keep `compile_state=unmeasured`; they do not authorize a dialog click or
+prove compile failure. Retain the final bridge-ready result or readiness-deadline
+failure separately. A historical Safe Mode marker alone cannot prove a current
+dialog.
+
+When checking compact operation envelopes, null, empty, and whitespace-only
+nested error containers must not turn an otherwise successful result into an
+error. Meaningful error content, an explicit failed verdict, or `succeeded=false`
+must still fail; check the operation verdict rather than transport success alone.

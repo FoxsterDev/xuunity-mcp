@@ -58,6 +58,21 @@ namespace XUUnity.LightMcp.Editor.Ugui
                     "A selector with at least one constraint is required.");
             }
 
+            payload.screen_width_before_context = Screen.width;
+            payload.screen_height_before_context = Screen.height;
+            if (!XUUnityLightMcpGameViewUtility.TrySynchronizeScreenContext(out payload.coordinate_context_status))
+            {
+                payload.screen_width = Screen.width;
+                payload.screen_height = Screen.height;
+                payload.render_target_available = XUUnityLightMcpGameViewUtility.TryGetExistingRenderTargetSize(
+                    out payload.render_width, out payload.render_height);
+                payload.render_target_differs_from_screen = payload.render_target_available
+                    && (payload.render_width != payload.screen_width || payload.render_height != payload.screen_height);
+                return Refuse(request, payload, "ui_coordinate_context_unresolved",
+                    "Game View render pixels and the active Screen context differ. No pointer event was delivered; "
+                    + "the existing preset was preserved. Make the intended Game View visible and retry.");
+            }
+
             var before = XUUnityLightMcpUiTreeBuilder.Build(new XUUnityLightMcpUiTreeOptions
             {
                 TargetKind = args.targetKind,
@@ -165,6 +180,9 @@ namespace XUUnity.LightMcp.Editor.Ugui
             var interactable = node.interactable && (selectable == null || selectable.IsInteractable());
             var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(targetObject);
             var pointerPosition = XUUnityLightMcpUiTreeBuilder.Centre(node.bounds);
+            payload.pointer_x = pointerPosition.x;
+            payload.pointer_y = pointerPosition.y;
+            payload.pointer_coordinate_space = payload.render_target_available ? "game_view_render_pixels" : "screen_pixels";
             var pointerTarget = XUUnityLightMcpUguiPointerTargeting.FindHandlerPointerTarget(
                 targetObject,
                 handler,

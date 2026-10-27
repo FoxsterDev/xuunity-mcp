@@ -15,6 +15,58 @@ import server_summaries
 
 
 class ScenarioDecisionVerdictTests(unittest.TestCase):
+    def test_refresh_timeout_before_mutation_reports_action_not_executed(self) -> None:
+        payload = {"status": "failed", "current_step_index": 0, "steps": [
+            {"stepId": "refresh", "kind": "project_refresh", "status": "failed",
+             "error_code": "project_refresh_timeout", "duration_seconds": 42,
+             "timing_measured": True, "execution_duration_seconds": 2, "settle_wait_duration_seconds": 40},
+            {"stepId": "change_environment", "kind": "project_defined_hook", "status": "pending"},
+        ]}
+        verdict = server_summaries.build_scenario_decision_verdict(payload, {"passed", "failed"})
+        self.assertFalse(verdict["succeeded"])
+        boundary = verdict["mutation_boundary"]
+        self.assertIsNone(boundary["last_applied_mutation"])
+        self.assertEqual("not_executed", boundary["pending_project_actions"][0]["execution_status"])
+        self.assertEqual("change_environment", boundary["pending_project_actions"][0]["step_id"])
+        self.assertEqual(40, verdict["steps"][0]["settle_wait_duration_seconds"])
+        self.assertFalse(boundary["automatic_replay_safe"])
+        summary = server_summaries.build_scenario_result_summary(payload, {"passed", "failed"})
+        self.assertEqual("refresh", summary["active_step"]["step_id"])
+
+    def test_refresh_timeout_after_mutation_preserves_applied_unsettled_boundary(self) -> None:
+        payload = {"status": "failed", "steps": [
+            {"stepId": "change_environment", "kind": "project_defined_hook", "status": "passed",
+             "payload_json": json.dumps({"outcome": "environment_applied"})},
+            {"stepId": "refresh", "kind": "project_refresh", "status": "failed", "error_code": "project_refresh_timeout"},
+        ]}
+        verdict = server_summaries.build_scenario_decision_verdict(payload, {"passed", "failed"})
+        self.assertFalse(verdict["succeeded"])
+        self.assertEqual("mutation_applied_unsettled", verdict["trust_class"])
+        self.assertEqual("change_environment", verdict["mutation_boundary"]["last_applied_mutation"]["step_id"])
+        self.assertEqual("unproven", verdict["applied_mutation_settle_summary"]["settle_completion"])
+        self.assertNotIn("settle_wait_duration_seconds", verdict["steps"][1])
+
+    def test_refresh_with_unmeasured_timing_does_not_publish_stale_elapsed(self) -> None:
+        for measured in (False, None):
+            with self.subTest(measured=measured):
+                step = {"stepId": "refresh", "kind": "project_refresh", "status": "failed",
+                        "duration_seconds": 3, "settle_wait_duration_seconds": 2.75}
+                if measured is not None:
+                    step["timing_measured"] = measured
+                payload = {"status": "failed", "current_step_index": 0, "steps": [step]}
+                verdict = server_summaries.build_scenario_decision_verdict(payload, {"passed", "failed"})
+                summary = verdict["steps"][0]
+                self.assertIsNone(summary["duration_seconds"])
+                self.assertIs(summary["timing_measured"], False)
+                self.assertNotIn("settle_wait_duration_seconds", summary)
+
+    def test_current_step_zero_is_preserved_and_missing_index_remains_unknown(self) -> None:
+        for index, expected in [(0, 0), (None, -1), ("", -1)]:
+            with self.subTest(index=index):
+                payload = {"status": "running", "current_step_index": index, "steps": []}
+                summary = server_summaries.build_scenario_result_summary(payload, {"passed", "failed"})
+                self.assertEqual(summary["current_step_index"], expected)
+
     def test_throttled_step_downgrades_scenario_trust_and_names_remedy(self) -> None:
         payload = {
             "project_root": "/tmp/FakeProject",

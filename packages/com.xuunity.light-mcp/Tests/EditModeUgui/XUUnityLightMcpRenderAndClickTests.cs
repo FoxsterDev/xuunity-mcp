@@ -101,6 +101,8 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
 
             Assert.That(payload.success, Is.True, string.Join("; ", payload.errors.ConvertAll(item => item.message)));
             Assert.That(payload.application_booted, Is.False);
+            Assert.That(payload.capture_status, Is.EqualTo("capture_produced"));
+            Assert.That(payload.visual_acceptance, Is.EqualTo("visual_acceptance_unproven"));
             Assert.That(payload.persisted_scene_changes, Is.False);
             Assert.That(File.Exists(payload.screenshot_path), Is.True);
             Assert.That(payload.screenshot_width, Is.EqualTo(240));
@@ -217,6 +219,136 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
         }
 
         [Test]
+        public void Render_RevealsAHiddenHolderAndTextOnlyOnThePreviewInstance()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+            {
+                Assert.Ignore("A graphics device is required to prove the revealed Holder rendered pixels.");
+            }
+
+            var root = PrefabUtility.LoadPrefabContents(_prefabPath);
+            try
+            {
+                Object.DestroyImmediate(root.GetComponent<Image>());
+                var holder = new GameObject("Holder", typeof(RectTransform), typeof(Image));
+                holder.transform.SetParent(root.transform, false);
+                var rect = holder.GetComponent<RectTransform>();
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                holder.GetComponent<Image>().color = new Color(0.2f, 0.6f, 0.9f, 1f);
+                var title = root.transform.Find("Title");
+                title.SetParent(holder.transform, false);
+                title.GetComponent<Text>().text = "Hidden title";
+                title.GetComponent<Text>().font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                title.GetComponent<Text>().fontSize = 20;
+                title.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+                title.GetComponent<RectTransform>().sizeDelta = new Vector2(220f, 60f);
+                title.gameObject.SetActive(false);
+                holder.SetActive(false);
+                PrefabUtility.SaveAsPrefabAsset(root, _prefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+
+            var before = File.ReadAllBytes(_prefabPath);
+            var payload = Render(240, 480, extraArgsJson:
+                "\"includeSnapshot\":true,\"overrides\":["
+                + "{\"op\":\"set_active\",\"path\":\"XUUnityMcp_RenderRoot/Holder\",\"boolValue\":true},"
+                + "{\"op\":\"set_active\",\"path\":\"XUUnityMcp_RenderRoot/Holder/Title\",\"boolValue\":true},"
+                + "{\"op\":\"set_serialized_field\",\"path\":\"XUUnityMcp_RenderRoot/Holder/Title\","
+                + "\"componentType\":\"Text\",\"propertyPath\":\"m_Text\",\"stringValue\":\"Preview title\"}]");
+
+            Assert.That(payload.success, Is.True, string.Join("; ", payload.errors.ConvertAll(item => item.message)));
+            Assert.That(payload.requested_override_count, Is.EqualTo(3));
+            Assert.That(payload.capture_status, Is.EqualTo("capture_produced"));
+            Assert.That(payload.visual_acceptance, Is.EqualTo("visual_acceptance_unproven"));
+            Assert.That(payload.applied_overrides.Count, Is.EqualTo(3));
+            Assert.That(payload.applied_overrides.TrueForAll(change => change.status == "applied"), Is.True);
+            var holderNode = payload.snapshot.nodes.Find(node => node.name == "Holder");
+            var titleNode = payload.snapshot.nodes.Find(node => node.name == "Title");
+            Assert.That(holderNode, Is.Not.Null);
+            Assert.That(holderNode.visible, Is.True);
+            Assert.That(titleNode, Is.Not.Null);
+            Assert.That(titleNode.active_in_hierarchy, Is.True);
+            Assert.That(titleNode.visible, Is.True);
+            Assert.That(titleNode.text, Is.EqualTo("Preview title"));
+            var evidenceDirectory = Path.Combine(Application.dataPath, "../Library/XUUnityLightMcp/prefab-visibility-evidence");
+            Directory.CreateDirectory(evidenceDirectory);
+            File.Copy(payload.screenshot_path, Path.Combine(evidenceDirectory, "revealed-holder.png"), true);
+            File.WriteAllText(Path.Combine(evidenceDirectory, "revealed-holder.json"), JsonUtility.ToJson(payload, true));
+
+            var texture = new Texture2D(2, 2);
+            try
+            {
+                Assert.That(texture.LoadImage(File.ReadAllBytes(payload.screenshot_path)), Is.True);
+                var holderPixel = texture.GetPixel(60, 120);
+                Assert.That(holderPixel.a, Is.GreaterThan(0.5f));
+                Assert.That(holderPixel.b, Is.GreaterThan(holderPixel.r),
+                    "the revealed blue Holder must render away from the centred title");
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture);
+            }
+
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(_prefabPath));
+            var originalHolder = AssetDatabase.LoadAssetAtPath<GameObject>(_prefabPath).transform.Find("Holder");
+            Assert.That(originalHolder.gameObject.activeSelf, Is.False);
+            Assert.That(originalHolder.Find("Title").gameObject.activeSelf, Is.False);
+            Assert.That(originalHolder.Find("Title").GetComponent<Text>().text, Is.EqualTo("Hidden title"));
+        }
+
+        [Test]
+        public void Render_AcceptsAnIntentionallyBlankPrefabAsAnArtifact()
+        {
+            var root = PrefabUtility.LoadPrefabContents(_prefabPath);
+            try
+            {
+                Object.DestroyImmediate(root.GetComponent<Image>());
+                root.transform.Find("Title").gameObject.SetActive(false);
+                PrefabUtility.SaveAsPrefabAsset(root, _prefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+
+            var before = File.ReadAllBytes(_prefabPath);
+            var payload = Render(240, 480, extraArgsJson: "\"includeSnapshot\":true");
+
+            Assert.That(payload.success, Is.True, string.Join("; ", payload.errors.ConvertAll(item => item.message)));
+            Assert.That(File.Exists(payload.screenshot_path), Is.True);
+            Assert.That(payload.screenshot_size_bytes, Is.GreaterThan(0));
+            Assert.That(payload.snapshot.nodes.Exists(node => node.name == "Title"), Is.False);
+            Assert.That(payload.capture_status, Is.EqualTo("capture_produced"));
+            Assert.That(payload.visual_acceptance, Is.EqualTo("visual_acceptance_unproven"));
+            Assert.That(payload.requested_override_count, Is.Zero);
+            var evidenceDirectory = Path.Combine(Application.dataPath, "../Library/XUUnityLightMcp/prefab-visibility-evidence");
+            Directory.CreateDirectory(evidenceDirectory);
+            File.Copy(payload.screenshot_path, Path.Combine(evidenceDirectory, "intentional-blank.png"), true);
+            File.WriteAllText(Path.Combine(evidenceDirectory, "intentional-blank.json"), JsonUtility.ToJson(payload, true));
+            var texture = new Texture2D(2, 2);
+            try
+            {
+                Assert.That(texture.LoadImage(File.ReadAllBytes(payload.screenshot_path)), Is.True);
+                Assert.That(texture.width, Is.EqualTo(240));
+                Assert.That(texture.height, Is.EqualTo(480));
+                Assert.That(texture.GetPixel(120, 240).a, Is.LessThan(0.01f));
+                Assert.That(texture.GetPixel(1, 1).a, Is.LessThan(0.01f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture);
+            }
+
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(_prefabPath));
+        }
+
+        [Test]
         public void Render_FailsInsteadOfCapturingTheStateTheOverrideDidNotReach()
         {
             var payload = Render(
@@ -228,6 +360,8 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
 
             Assert.That(payload.success, Is.False);
             Assert.That(payload.errors.ConvertAll(item => item.code), Does.Contain("prefab_render_override_failed"));
+            Assert.That(payload.capture_status, Is.EqualTo("not_produced"));
+            Assert.That(payload.visual_acceptance, Is.EqualTo("visual_acceptance_unproven"));
             Assert.That(payload.screenshot_path, Is.Empty, "a capture of the wrong state is worse than no capture");
             Assert.That(payload.applied_overrides[0].error_code, Is.EqualTo("prefab_mutation_target_not_found"));
         }

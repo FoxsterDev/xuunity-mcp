@@ -335,6 +335,12 @@ namespace XUUnity.LightMcp.Editor.Core
         public string delivered_to_path = "";
         public string delivery_mechanism = "";
         public string pointer_raycast_evidence = "";
+        public string coordinate_context_status = "not_evaluated";
+        public int screen_width_before_context;
+        public int screen_height_before_context;
+        public float pointer_x;
+        public float pointer_y;
+        public string pointer_coordinate_space = "";
         public string pointer_raycast_target_path = "";
         public int pointer_raycast_hit_count;
         public string occluded_by_path = "";
@@ -445,6 +451,8 @@ namespace XUUnity.LightMcp.Editor.Core
         public string operation = "unity.prefab.render";
         public string project_root = "";
         public bool success;
+        public string capture_status = "not_produced";
+        public string visual_acceptance = "visual_acceptance_unproven";
         public string proof_class = XUUnityLightMcpUiRead.ProofError;
         public string generated_at_utc = "";
         public string prefab_path = "";

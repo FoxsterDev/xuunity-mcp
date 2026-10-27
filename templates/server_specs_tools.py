@@ -808,8 +808,10 @@ TOOLS: dict[str, dict[str, Any]] = {
         "description": (
             "Render a prefab in an isolated preview scene under a controlled Canvas at the declared viewport and "
             "safe area, without booting the application. Writes the PNG and the ui.read.v1 snapshot beside it, and "
-            "returns screenshot_path plus snapshot_path, so the capture closes both the visual and the semantic "
-            "acceptance lane through unity_ui_reference_compare with no Play-mode run. Pass overrides to capture a "
+            "returns screenshot_path plus snapshot_path. capture_status=capture_produced means PNG writing completed; "
+            "visual_acceptance=visual_acceptance_unproven keeps artifact creation separate from visual approval. "
+            "Check the intended state, expected text/visibility and pixels, or run unity_ui_reference_compare "
+            "separately; isolated renders do not prove live runtime or device behavior. Pass overrides to capture a "
             "second runtime-driven UI state without touching the asset. Non-persistent: the preview scene is closed "
             "and no open scene is modified. Requires com.unity.ugui."
         ),
