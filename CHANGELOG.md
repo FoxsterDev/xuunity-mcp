@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.3.84
+
+Release tag: `v0.3.84`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.84
+```
+
+Developers could mistake empty error fields for failed tests, or idle Unity state
+for a completed refresh after a domain reload. This release makes those verdicts
+explicit and preserves real click and capture evidence during UI validation.
+
+### Changed
+
 - Compact terminal results ignore semantically empty error fields while preserving
   failed operation/test statuses and nonzero process exits. Passing test totals
   no longer appear as a tool failure solely because Unity serialized empty error fields.
@@ -30,6 +46,21 @@
 - Cancel superseded discovery, site UI, and integration CI runs for the same
   pull request. Keep all platform tests and independent push, tag, and manual
   evidence runs; release and deployment workflows are unchanged.
+
+### Validation and limitations
+
+- Focused live checks on macOS with Unity `6000.0.58f2`: refresh EditMode
+  `29/29`, prefab EditMode `23/23`, fixed-portrait PlayMode `4/4`, and asynchronous
+  interaction PlayMode `4/4`, without skips. Portrait clicks covered three canvas
+  modes and a real occluder at `1440x3200`, zoom `0.35`, on the primary display.
+- A no-reload refresh completed with matching identity. A controlled domain
+  reload produced explicit unresolved accounting without replay. Runtime and
+  test-assembly compile-negative fixtures failed; restored controls passed.
+- These local checks do not establish other Unity versions, operating systems,
+  secondary displays, or full application acceptance. Remote Unity Package CI
+  remains waived because its runner has no Unity license.
+- Host timings exclude launcher startup and client latency. Prefab capture
+  production does not itself establish visual acceptance.
 
 ## 0.3.83
 
