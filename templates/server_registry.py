@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+from server_host_call_timing import measure_host_stage
 
 
 @dataclass
@@ -221,10 +222,12 @@ def get_registry() -> BridgeRegistry:
     return _BRIDGE_REGISTRY
 
 def get_project_context(project_root: str) -> ProjectContext:
-    return get_registry().get_or_discover(project_root)
+    with measure_host_stage("context_discovery"):
+        return get_registry().get_or_discover(project_root)
 
 def refresh_project_context(project_root: str | Path) -> ProjectContext:
-    return get_registry().refresh_context(str(project_root))
+    with measure_host_stage("context_discovery"):
+        return get_registry().refresh_context(str(project_root))
 
 def list_active_project_contexts() -> list[ProjectContext]:
     return get_registry().list_active_contexts()

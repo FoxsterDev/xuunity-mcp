@@ -254,8 +254,21 @@ def _artifact_pointers(payload: dict) -> dict:
     return pointers
 
 
+def _has_error_content(value) -> bool:
+    if isinstance(value, dict):
+        return any(_has_error_content(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_has_error_content(item) for item in value)
+    if isinstance(value, str):
+        return bool(value.strip())
+    return bool(value)
+
+
 def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: str = "") -> dict:
-    error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
+    raw_error = payload.get("error")
+    error = raw_error if isinstance(raw_error, dict) and _has_error_content(raw_error) else {}
+    if not isinstance(raw_error, dict) and _has_error_content(raw_error):
+        error = {"code": "operation_error", "message": str(raw_error)}
     details = error.get("details") if isinstance(error.get("details"), dict) else {}
     envelope: dict = {
         "payload_mode": "compact_terminal_envelope",
@@ -421,12 +434,21 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
     envelope["full_payload_available"] = True
     if isinstance(payload.get("full_payload_command"), str) and payload.get("full_payload_command"):
         envelope["full_payload_command"] = payload.get("full_payload_command")
+    failure_statuses = {"error", "failed", "failure", "cancelled", "canceled", "timeout", "timed_out", "blocked"}
+    if payload.get("succeeded") is False or any(
+        str(envelope.get(key) or "").lower() in failure_statuses
+        for key in ("status", "verdict", "health_status", "operation_outcome", "test_verdict", "matrix_status", "unity_outcome")
+    ) or any(
+        str(envelope.get(key, {}).get("status") or "").lower() in failure_statuses
+        for key in ("matrix", "health", "operator_verdict")
+    ):
+        envelope["outcome"] = "error"
     return envelope
 
 
 def _bounded_compact_json(envelope: dict) -> str:
     encoded = json.dumps(envelope, ensure_ascii=True, separators=(",", ":"))
-    if len(encoded.encode("utf-8")) <= COMPACT_OUTPUT_MAX_BYTES:
+    if len(encoded.encode("utf-8")) + 1 <= COMPACT_OUTPUT_MAX_BYTES:
         return encoded + "\n"
     reduced = {
         "payload_mode": "compact_terminal_envelope",
@@ -441,7 +463,7 @@ def _bounded_compact_json(envelope: dict) -> str:
         "compact_truncated": True,
     }
     encoded = json.dumps(reduced, ensure_ascii=True, separators=(",", ":"))
-    if len(encoded.encode("utf-8")) <= COMPACT_OUTPUT_MAX_BYTES:
+    if len(encoded.encode("utf-8")) + 1 <= COMPACT_OUTPUT_MAX_BYTES:
         return encoded + "\n"
     minimal = {
         "payload_mode": "compact_terminal_envelope",

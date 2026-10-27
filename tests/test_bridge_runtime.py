@@ -15,6 +15,8 @@ import server_bridge_runtime
 import server_bridge_state
 import server_bridge_final_status
 import server_operation_evidence
+import server_bridge_journal
+import server_bridge_request_artifacts
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -743,6 +745,103 @@ class BridgeRuntimeTests(unittest.TestCase):
                 "stale_inbox_without_unity_ownership",
                 inspection["candidates"][0]["classification"],
             )
+
+    def test_stale_inspection_reads_journal_once_and_preserves_candidate_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            bridge = root / "Library" / "XUUnityLightMcp"
+            journal = bridge / "journal" / "requests"
+            inbox, outbox = bridge / "inbox", bridge / "outbox"
+            events = [
+                ("02.json", "done", "request_completed", "02", "2026-01-01T00:00:02Z"),
+                ("01.json", "done", "request_submitted", "01", "2026-01-01T00:00:01Z"),
+                ("03.json", "different-request", "request_completed", "03", "2026-01-01T00:00:03Z"),
+                ("04.json", "older-generation", "request_completed", "04", "2026-01-01T00:00:04Z"),
+            ]
+            for filename, request_id, event_type, event_id, stamp in events:
+                write_json(journal / filename, {
+                    "request_id": request_id, "event_type": event_type,
+                    "event_id": event_id, "event_at_utc": stamp, "bridge_generation": 1,
+                })
+            (journal / "malformed.json").write_text("{", encoding="utf-8")
+            (journal / "not-object.json").write_text("[]", encoding="utf-8")
+            write_json(journal / "missing-id.json", {"event_type": "request_completed"})
+            for directory, request_id in [(inbox, "done"), (outbox, "done"), (outbox, "missing"),
+                                          (outbox, "mismatched"), (outbox, "older-generation")]:
+                path = directory / f"{request_id}.json"
+                write_json(path, {"request_id": request_id})
+                os.utime(path, (1700000000, 1700000000))
+            expected_order = [str(path.resolve()) for directory in (inbox, outbox)
+                              for path in directory.glob("*.json")
+                              if path.stem in {"done", "older-generation"}]
+            original_glob = Path.glob
+            journal_scans = []
+
+            def observe_glob(path, pattern, *args, **kwargs):
+                if path == journal:
+                    journal_scans.append(pattern)
+                return original_glob(path, pattern, *args, **kwargs)
+
+            with mock.patch.object(Path, "glob", observe_glob), mock.patch.object(
+                server_bridge_journal, "read_json", wraps=server_bridge_journal.read_json,
+            ) as reader:
+                result = server_bridge_request_artifacts.inspect_stale_request_artifacts(
+                    root, current_state={"transport": "file_ipc", "health_status": "healthy",
+                                         "pending_request_count": 0, "bridge_generation": 99},
+                    max_entries=100,
+                )
+            self.assertEqual(["*.json"], journal_scans)
+            self.assertEqual(7, reader.call_count, "each journal file is parsed at most once per inspection")
+            self.assertEqual(3, result["candidate_count"])
+            self.assertEqual(expected_order, [row["path"] for row in result["candidates"]])
+            self.assertEqual({"stale_inbox_after_terminal_event": 1, "stale_outbox_after_terminal_event": 2},
+                             result["classifications"])
+            for row in result["candidates"]:
+                self.assertEqual("request_completed", row["terminal_event_type"])
+                self.assertEqual(row["request_id"] == "done", row["request_submitted"])
+                self.assertFalse(row["request_started"])
+            # Existing inspection uses request-id history, without filtering terminal events by generation.
+            self.assertIn("older-generation", [row["request_id"] for row in result["candidates"]])
+            indexed = server_bridge_journal.read_request_journal_events_by_request(
+                root, {"done", "missing", "mismatched", "older-generation"},
+            )
+            self.assertEqual(["01", "02"], [event["event_id"] for event in indexed["done"]])
+            self.assertEqual(str(journal / "01.json"), indexed["done"][0]["_path"])
+            self.assertEqual([], indexed["missing"])
+            self.assertEqual([], indexed["mismatched"])
+            self.assertEqual(1, indexed["older-generation"][0]["bridge_generation"])
+
+    def test_stale_inspection_without_old_artifacts_does_not_scan_journal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            bridge = root / "Library" / "XUUnityLightMcp"
+            journal = bridge / "journal" / "requests"
+            write_json(journal / "event.json", {"request_id": "recent", "event_type": "request_completed"})
+            write_json(bridge / "outbox" / "recent.json", {"status": "ok"})
+            with mock.patch.object(server_bridge_journal, "read_json", wraps=server_bridge_journal.read_json) as reader:
+                result = server_bridge_request_artifacts.inspect_stale_request_artifacts(
+                    root, current_state={"health_status": "healthy"},
+                )
+            self.assertEqual(0, reader.call_count)
+            self.assertEqual(0, result["candidate_count"])
+
+    def test_stale_inspection_refreshes_journal_on_each_call_and_keeps_full_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            bridge = root / "Library" / "XUUnityLightMcp"
+            for name in ("first", "second"):
+                path = bridge / "outbox" / f"{name}.json"
+                write_json(path, {"status": "ok"})
+                os.utime(path, (1700000000, 1700000000))
+            state = {"transport": "file_ipc", "health_status": "healthy", "pending_request_count": 0}
+            before = server_bridge_request_artifacts.inspect_stale_request_artifacts(root, current_state=state)
+            self.assertEqual(0, before["candidate_count"])
+            for name in ("first", "second"):
+                write_json(bridge / "journal" / "requests" / f"{name}.json",
+                           {"request_id": name, "event_type": "request_completed"})
+            after = server_bridge_request_artifacts.inspect_stale_request_artifacts(root, current_state=state, max_entries=1)
+            self.assertEqual(2, after["candidate_count"])
+            self.assertEqual(1, len(after["candidates"]))
 
     def test_build_request_final_status_uses_injected_state_reader_when_provided(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

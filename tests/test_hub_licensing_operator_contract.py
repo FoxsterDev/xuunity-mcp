@@ -248,6 +248,50 @@ class HubLicensingResolutionTests(unittest.TestCase):
 
 
 class OperatorEnvelopeAndLifecycleTests(unittest.TestCase):
+    def test_compact_verdict_uses_error_content_and_underlying_result(self) -> None:
+        passing = {
+            "status": "completed", "payload_type": "unity.tests.run_editmode",
+            "payload_json": json.dumps({"status": "passed", "total": 101, "passed": 101, "failed": 0}),
+        }
+        empty_errors = [None, "", {}, {"code": "", "message": ""}, {"details": {}, "message": " "}]
+        for error in empty_errors:
+            with self.subTest(error=error):
+                envelope = server_launcher.build_compact_terminal_envelope({**passing, "error": error}, 0)
+                self.assertEqual("ok", envelope["outcome"])
+                self.assertNotIn("error", envelope)
+                self.assertEqual(101, envelope["passed"])
+                self.assertLessEqual(len(server_launcher._bounded_compact_json(envelope).encode()), 8192)
+        self.assertEqual("ok", server_launcher.build_compact_terminal_envelope(passing, 0)["outcome"])
+        for error in ({"code": "failed"}, {"message": "failure"}, {"details": {"reason": "unsettled"}}, "failure"):
+            with self.subTest(error=error):
+                envelope = server_launcher.build_compact_terminal_envelope({**passing, "error": error}, 0)
+                self.assertEqual("error", envelope["outcome"])
+                self.assertIn("error", envelope)
+        for failure in ({"status": "failed"}, {"succeeded": False}, {"payload_json": '{"status":"failed","failed":1}'}):
+            with self.subTest(failure=failure):
+                self.assertEqual("error", server_launcher.build_compact_terminal_envelope({**passing, **failure}, 0)["outcome"])
+        self.assertEqual("error", server_launcher.build_compact_terminal_envelope(passing, 1)["outcome"])
+
+    def test_compact_verdict_preserves_nested_failures(self) -> None:
+        for payload in (
+            {"result_summary": {"matrix": {"status": "failed", "total": 1, "failed": 1}}},
+            {"health": {"status": "error"}},
+            {"operator_verdict": {"status": "blocked"}},
+            {"health_status": "error"},
+        ):
+            with self.subTest(payload=payload):
+                self.assertEqual("error", server_launcher.build_compact_terminal_envelope(payload, 0)["outcome"])
+        payload = {"result_summary": {"matrix": {"status": "passed", "total": 1, "passed": 1}}}
+        self.assertEqual("ok", server_launcher.build_compact_terminal_envelope(payload, 0)["outcome"])
+
+    def test_compact_byte_limit_includes_terminal_newline(self) -> None:
+        envelope = {"outcome": "ok", "padding": ""}
+        base = len(json.dumps(envelope, ensure_ascii=True, separators=(",", ":")).encode())
+        envelope["padding"] = "x" * (8192 - base)
+        encoded = server_launcher._bounded_compact_json(envelope)
+        self.assertLessEqual(len(encoded.encode()), 8192)
+        self.assertTrue(json.loads(encoded)["compact_truncated"])
+
     def test_compact_json_extraction_prefers_outer_terminal_payload_over_nested_object(self) -> None:
         payload = {
             "action": "request-final-status",

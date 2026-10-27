@@ -245,10 +245,35 @@ from server_cli_parser import build_parser
 
 def main() -> None:
     reconfigure_stdio_utf8()
-    try:
-        if len(sys.argv) == 1:
-            raise SystemExit(serve_stdio())
+    if len(sys.argv) == 1:
+        raise SystemExit(serve_stdio())
+    from server_host_call_timing import host_call_timing_scope, emit_host_call_timing_receipt
+    with host_call_timing_scope("cli_dispatch") as timing:
+        if timing is not None:
+            timing.tool_name = str(sys.argv[1])[:80]
+        outcome = "completed"
+        try:
+            _main_cli()
+        except SystemExit as exc:
+            outcome = "completed" if exc.code in (None, 0) else "failed"
+            raise
+        except BaseException:
+            outcome = "failed"
+            raise
+        finally:
+            # Existing print_json flushes each JSON result; cover any other CLI output too.
+            try:
+                sys.stdout.flush()
+            except Exception:
+                outcome = "stdout_emission_failed"
+                raise
+            finally:
+                boundary = "stdout_emission_failed" if outcome == "stdout_emission_failed" else "cli_dispatch_stdout_flush_returned"
+                emit_host_call_timing_receipt(boundary, outcome)
 
+
+def _main_cli() -> None:
+    try:
         mark_host_client_kind(HOST_CLIENT_KIND_CLI)
         parser = build_parser()
         try:

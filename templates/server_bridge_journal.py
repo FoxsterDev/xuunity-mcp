@@ -370,11 +370,18 @@ def parse_journal_utc_timestamp(value: Any) -> float:
 
 
 def read_request_journal_events(project_root: Path, request_id: str) -> list[dict[str, Any]]:
-    journal_dir = request_journal_dir(project_root)
-    if not journal_dir.is_dir():
-        return []
+    return read_request_journal_events_by_request(project_root, {request_id})[request_id]
 
-    matched: list[dict[str, Any]] = []
+
+def read_request_journal_events_by_request(
+    project_root: Path, request_ids: set[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Read one journal snapshot for the requested IDs, without retaining a cache."""
+    matched: dict[str, list[dict[str, Any]]] = {request_id: [] for request_id in request_ids}
+    journal_dir = request_journal_dir(project_root)
+    if not request_ids or not journal_dir.is_dir():
+        return matched
+
     for path in journal_dir.glob("*.json"):
         try:
             payload = read_json(path)
@@ -382,17 +389,19 @@ def read_request_journal_events(project_root: Path, request_id: str) -> list[dic
             continue
         if not isinstance(payload, dict):
             continue
-        if str(payload.get("request_id") or "") != request_id:
+        request_id = str(payload.get("request_id") or "")
+        if request_id not in matched:
             continue
 
         event = dict(payload)
         event["_path"] = str(path)
-        matched.append(event)
+        matched[request_id].append(event)
 
-    matched.sort(
-        key=lambda item: (
-            parse_journal_utc_timestamp(item.get("event_at_utc")),
-            str(item.get("event_id") or ""),
+    for events in matched.values():
+        events.sort(
+            key=lambda item: (
+                parse_journal_utc_timestamp(item.get("event_at_utc")),
+                str(item.get("event_id") or ""),
+            )
         )
-    )
     return matched

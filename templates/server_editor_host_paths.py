@@ -280,27 +280,24 @@ SAFE_MODE_EXIT_MARKER = "exiting safe mode"
 
 
 def safe_mode_log_observation(log_text: str) -> str:
-    """Unity's exit line also contains the generic marker, so the newest Safe Mode mention decides dialog versus recovered."""
+    """Report the newest Safe Mode mention without inferring a dialog from a generic marker."""
 
-    lowered = (log_text or "").lower()
-    last_marker = -1
-    last_exit = -1
-    cursor = 0
-    while True:
-        index = lowered.find("safe mode", cursor)
-        if index < 0:
-            break
-        exit_start = index - len("exiting ")
-        if exit_start >= 0 and lowered.startswith(SAFE_MODE_EXIT_MARKER, exit_start):
-            last_exit = index
-        else:
-            last_marker = index
-        cursor = index + 1
-    if last_marker < 0 and last_exit < 0:
-        return "none"
-    if last_exit > last_marker:
-        return "safe_mode_exited"
-    return "safe_mode_marker_present"
+    observation = "none"
+    pattern = (
+        rf"(?P<exited>{SAFE_MODE_EXIT_MARKER})"
+        r"|(?P<entered>(?:entered|entering) safe mode|opening project in safe mode)"
+        r"|(?P<prompt>safe mode (?:dialog|prompt)|(?:would you like to |do you want to )enter safe mode|enter safe mode\?)"
+        r"|(?P<generic>safe mode)"
+    )
+    states = {
+        "exited": "safe_mode_exited",
+        "entered": "safe_mode_entered",
+        "prompt": "safe_mode_prompt",
+        "generic": "safe_mode_marker_present",
+    }
+    for match in re.finditer(pattern, log_text or "", re.IGNORECASE):
+        observation = states[match.lastgroup]
+    return observation
 
 
 def classify_editor_log(log_text: str, startup_policy: str) -> tuple[str, str] | None:
@@ -327,19 +324,34 @@ def classify_editor_log(log_text: str, startup_policy: str) -> tuple[str, str] |
         or "Unable to resolve reference" in log_text
     )
     if compile_error_present:
-        if safe_mode_observation == "safe_mode_marker_present":
+        if safe_mode_observation == "safe_mode_entered":
+            return (
+                "interactive_compile_block_in_safe_mode",
+                "Editor.log records entering Safe Mode and compiler diagnostics. Fix the compile errors; "
+                "these log markers are observed history, not an authoritative current compile verdict.",
+            )
+
+        if safe_mode_observation == "safe_mode_prompt":
             return (
                 "interactive_compile_block_with_safe_mode_dialog",
-                "Compilation errors were detected during startup and Editor.log includes Safe Mode markers. "
+                "Compilation errors were detected during startup and Editor.log includes explicit Safe Mode prompt markers. "
                 "This wrapper will not click Safe Mode dialogs; run the batch compile gate and fix compile "
                 "errors or open Safe Mode manually.",
+            )
+
+        if safe_mode_observation == "safe_mode_marker_present":
+            return (
+                "interactive_compile_block_with_safe_mode_marker",
+                "Editor.log contains compiler diagnostics and an ambiguous Safe Mode mention. Inspect the "
+                "editor state and establish current compile truth; the marker does not establish a dialog or entry.",
             )
 
         if safe_mode_observation == "safe_mode_exited":
             return (
                 "compile_errors_after_safe_mode_exit",
-                "Compilation errors were detected during startup and Editor.log shows the editor has already "
-                "left Safe Mode, so no dialog is blocking. Fix the compile errors and refresh the project.",
+                "Editor.log records a Safe Mode exit and compiler diagnostics. The exit is observed "
+                "history, not proof of current compile errors or current dialog state. Establish current compile "
+                "truth and fix any remaining errors, then refresh the project.",
             )
 
         if startup_policy == "batch_compile_lane":
@@ -360,6 +372,13 @@ def classify_editor_log(log_text: str, startup_policy: str) -> tuple[str, str] |
             "interactive_compile_block_detected",
             "Compilation errors were detected during interactive startup. This wrapper is failing fast instead "
             "of waiting for a bridge heartbeat that cannot become healthy.",
+        )
+
+    if safe_mode_observation == "safe_mode_entered":
+        return (
+            "safe_mode_entered_observed",
+            "Editor.log records opening the project in Safe Mode. No compiler diagnostic was observed in "
+            "this log scope; keep polling bridge readiness and establish current compile truth separately.",
         )
 
     return None

@@ -97,7 +97,7 @@ STARTUP_BLOCKER_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
     (
         "safe_mode_dialog",
-        re.compile(r"Enter Safe Mode|Opening project in Safe Mode", re.IGNORECASE),
+        re.compile(r"Enter Safe Mode|Safe Mode (?:dialog|prompt)", re.IGNORECASE),
     ),
 )
 LICENSING_RECOVERY_PATTERN = re.compile(
@@ -1108,6 +1108,8 @@ def _readiness_error_from_log_observation(
     )
     bridge_pid = int(observed_state.get("editor_pid") or 0)
     bridge_pid_alive = bridge_pid > 0 and pid_is_alive(bridge_pid)
+    generation = observed_state.get("bridge_generation")
+    session_id = observed_state.get("bridge_session_id")
 
     details: dict[str, Any] = {
         "compile_state": "unmeasured",
@@ -1117,6 +1119,8 @@ def _readiness_error_from_log_observation(
         "observed_bridge_pid": bridge_pid,
         "observed_bridge_pid_alive": bridge_pid_alive,
         "observed_live_editor_pids": live_editor_pids,
+        "bridge_generation": generation if isinstance(generation, int) and 0 <= generation <= 2147483647 else 0,
+        "bridge_session_id": session_id if isinstance(session_id, str) and re.fullmatch(r"[0-9a-fA-F]{32}", session_id) else "",
         "bridge_bootstrap_attached": observed_state.get("bridge_bootstrap_attached"),
         "is_compiling": bool(observed_state.get("is_compiling")),
         "is_updating": bool(observed_state.get("is_updating")),
@@ -1124,9 +1128,30 @@ def _readiness_error_from_log_observation(
         "domain_reload_in_progress": bool(observed_state.get("domain_reload_in_progress")),
         "package_operation_in_progress": bool(observed_state.get("package_operation_in_progress")),
         "safe_mode_exit_observed": log_code == "compile_errors_after_safe_mode_exit",
+        "startup_stage": "waiting_for_bridge_readiness",
+        "editor_log_evidence_source": "editor_log",
+        "editor_log_evidence_kind": "observed_history",
     }
 
-    if log_code == "interactive_compile_block_with_safe_mode_dialog":
+    if log_code == "safe_mode_entered_observed":
+        code = "startup_safe_mode_entered_observed"
+        summary = log_summary
+        next_action = "poll_bridge_bootstrap_attached_then_retry"
+    elif log_code == "interactive_compile_block_in_safe_mode":
+        code = "startup_safe_mode_entered_observed"
+        summary = (
+            "Editor.log records entering Safe Mode and compiler diagnostics. Fix the compile errors; "
+            "this is observed history, not an authoritative current compile verdict."
+        )
+        next_action = "fix_compile_errors"
+    elif log_code == "interactive_compile_block_with_safe_mode_marker":
+        code = "startup_safe_mode_marker_observed"
+        summary = (
+            "Editor.log contains compiler diagnostics and an ambiguous Safe Mode mention. Inspect the "
+            "editor state and establish current compile truth; no dialog or Safe Mode entry is established."
+        )
+        next_action = "inspect_editor_state_and_compile_evidence"
+    elif log_code == "interactive_compile_block_with_safe_mode_dialog":
         code = "startup_safe_mode_dialog_observed"
         summary = (
             "Editor.log contains Safe Mode dialog and compiler-diagnostic markers written during the readiness "
@@ -1136,9 +1161,9 @@ def _readiness_error_from_log_observation(
     elif log_code == "compile_errors_after_safe_mode_exit":
         code = "startup_compile_errors_after_safe_mode_exit"
         summary = (
-            "Editor.log shows the editor left Safe Mode with compile errors still present, so no dialog is "
-            "blocking. Fix the compile errors, then refresh the project; this is a log observation, not an "
-            "authoritative compile verdict."
+            "Editor.log records a Safe Mode exit and compiler diagnostics. This is observed history, not "
+            "proof of current compile errors or current dialog state. Establish current compile truth and "
+            "fix any remaining errors, then refresh the project."
         )
         next_action = "fix_compile_errors"
     elif bridge_pid > 0 and live_editor_pids and bridge_pid not in live_editor_pids:
@@ -1244,6 +1269,11 @@ def _startup_blocker_observation(
                 last_match_kind = kind
                 last_match_line = _redact_licensing_channels(stripped[-500:])
 
+    safe_mode_observation = safe_mode_log_observation(log_text)
+    if last_match_kind == "safe_mode_dialog" and safe_mode_observation in {"safe_mode_entered", "safe_mode_exited"}:
+        last_match_kind = ""
+        last_match_line = ""
+
     idle_seconds = _editor_log_idle_seconds(editor_log_path)
     observation: dict[str, Any] = {
         "editor_pid": live_editor_pids[0] if len(live_editor_pids) == 1 else 0,
@@ -1252,6 +1282,7 @@ def _startup_blocker_observation(
         "editor_log_idle_seconds": None if idle_seconds is None else round(idle_seconds, 3),
         "bridge_bootstrap_attached": False,
         "editor_log_observation_during_wait": log_observation_during_wait,
+        "safe_mode_log_observation": safe_mode_observation,
         "editor_log_observation_scope": (
             "current_wait" if log_observation_during_wait else "stale_tail_for_live_project_editor"
         ),
@@ -1335,6 +1366,12 @@ def _startup_log_observation_after_ready(
         "readiness_condition": readiness_error.code,
         "editor_log_observation_code": str(details.get("editor_log_observation_code") or ""),
         "safe_mode_exit_observed": bool(details.get("safe_mode_exit_observed")),
+        "startup_stage": "bridge_ready",
+        "editor_log_evidence_source": details.get("editor_log_evidence_source"),
+        "editor_log_evidence_kind": details.get("editor_log_evidence_kind"),
+        "observed_bridge_pid": details.get("observed_bridge_pid"),
+        "observed_bridge_pid_alive": details.get("observed_bridge_pid_alive"),
+        "observed_live_editor_pids": details.get("observed_live_editor_pids"),
         "resolved_by": "bridge_attached",
         "compile_errors_reported_by_bridge": compile_errors_reported,
         "recommended_next_action": "fix_compile_errors" if compile_errors_reported else "none",
@@ -1348,6 +1385,7 @@ def wait_for_ready(
     startup_policy: str,
     editor_log_path: Path,
 ) -> dict[str, Any]:
+    """Poll readiness, emitting bounded provisional stderr evidence only when the observed condition changes."""
     if startup_policy not in STARTUP_POLICIES:
         raise ToolInvocationError("invalid_startup_policy", f"Unknown startup policy: {startup_policy}")
 
@@ -1389,6 +1427,9 @@ def wait_for_ready(
             if code in {
                 "interactive_compile_block_detected",
                 "interactive_compile_block_with_safe_mode_dialog",
+                "interactive_compile_block_in_safe_mode",
+                "safe_mode_entered_observed",
+                "interactive_compile_block_with_safe_mode_marker",
                 "safe_mode_manual_required",
                 "compile_errors_after_safe_mode_exit",
             }:
@@ -1401,6 +1442,32 @@ def wait_for_ready(
                 # moves. Do not turn that normal startup race into a blocking
                 # verdict; retain the typed condition for the timeout path and
                 # keep polling for authoritative bridge readiness.
+                if last_readiness_error is None or (
+                    readiness_error.code != last_readiness_error.code
+                    or code != last_readiness_error.details.get("editor_log_observation_code")
+                ):
+                    details = readiness_error.details
+                    provisional = {
+                        "code": readiness_error.code,
+                        "startup_stage": "waiting_for_bridge_readiness",
+                        "provisional": True,
+                        "compile_state": "unmeasured",
+                        "observed_bridge_pid": details["observed_bridge_pid"],
+                        "observed_bridge_pid_alive": details["observed_bridge_pid_alive"],
+                        "observed_live_editor_pids": details["observed_live_editor_pids"][:8],
+                        "observed_live_editor_pid_count": len(details["observed_live_editor_pids"]),
+                        "observed_live_editor_pids_truncated": len(details["observed_live_editor_pids"]) > 8,
+                        "bridge_generation": details["bridge_generation"],
+                        "bridge_session_id": details["bridge_session_id"],
+                        "bridge_bootstrap_attached": bool(details["bridge_bootstrap_attached"]),
+                        "is_compiling": details["is_compiling"],
+                        "editor_log_observation_during_wait": True,
+                        "recommended_next_action": details["recommended_next_action"],
+                    }
+                    try:
+                        print(json.dumps(provisional, ensure_ascii=True, separators=(",", ":")), file=sys.stderr, flush=True)
+                    except (OSError, ValueError):
+                        pass  # Diagnostic output must not turn a readiness poll into a terminal failure.
                 last_readiness_error = readiness_error
                 time.sleep(1.0)
                 continue
@@ -1433,6 +1500,7 @@ def wait_for_ready(
     if last_readiness_error is not None:
         if last_readiness_error.code == "startup_safe_mode_dialog_observed":
             last_readiness_error.details["dialog_block_basis"] = "readiness_deadline_reached_with_safe_mode_markers"
+        last_readiness_error.details["startup_stage"] = "readiness_deadline_reached"
         raise last_readiness_error
 
     blocker_observation = _startup_blocker_observation(project_root, editor_log_path, started_at)

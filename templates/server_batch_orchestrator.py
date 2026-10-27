@@ -5,6 +5,7 @@ import sys
 import json
 import time
 import subprocess
+from server_host_call_timing import measure_host_stage, timed_host_call
 from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
 
 from contextlib import nullcontext
@@ -882,6 +883,7 @@ def execute_host_health_recovery_policy(
     return result
 
 
+@measure_host_stage("activation")
 def recover_project_bridge_for_reconciliation(
     project_root: Path,
     *,
@@ -1265,7 +1267,8 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                         phase="wait_for_idle_before",
                         state=pre_idle_state,
                     )
-                    lifecycle["idle_wait_before"] = wait_for_editor_idle(
+                    lifecycle["idle_wait_before"] = timed_host_call(
+                        "idle_before", wait_for_editor_idle,
                         project_root,
                         timeout_ms,
                         DEFAULT_HEARTBEAT_MAX_AGE_SECONDS,
@@ -1288,7 +1291,8 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                         state=dispatch_state,
                     )
                 dispatch_started = True
-                response, request_id, request_started_at, transport_metadata = invoke_bridge_transport(
+                response, request_id, request_started_at, transport_metadata = timed_host_call(
+                    "dispatch_unity_wait", invoke_bridge_transport,
                     project_root,
                     operation,
                     args,
@@ -1308,7 +1312,8 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                             state=try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root),
                             detail=f"playmode_target:{expected_playmode_state}",
                         )
-                        lifecycle["playmode_wait_after"] = wait_for_playmode_state(
+                        lifecycle["playmode_wait_after"] = timed_host_call(
+                            "idle_after", wait_for_playmode_state,
                             project_root,
                             timeout_ms,
                             DEFAULT_HEARTBEAT_MAX_AGE_SECONDS,
@@ -1326,7 +1331,8 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                             request_id=request_id,
                             state=try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root),
                         )
-                        lifecycle["idle_wait_after"] = wait_for_editor_idle(
+                        lifecycle["idle_wait_after"] = timed_host_call(
+                            "idle_after", wait_for_editor_idle,
                             project_root,
                             timeout_ms,
                             DEFAULT_HEARTBEAT_MAX_AGE_SECONDS,
@@ -1343,7 +1349,8 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                         request_id=request_id,
                         state=try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root),
                     )
-                    lifecycle["idle_wait_after"] = wait_for_editor_idle(
+                    lifecycle["idle_wait_after"] = timed_host_call(
+                        "idle_after", wait_for_editor_idle,
                         project_root,
                         timeout_ms,
                         DEFAULT_HEARTBEAT_MAX_AGE_SECONDS,
@@ -3224,7 +3231,9 @@ def run_batch_operation(
 
 # Helper to maintain output formatting
 def print_json(data: Any) -> None:
-    print(json.dumps(data, ensure_ascii=False), flush=True)
+    with measure_host_stage("serialization"):
+        encoded = json.dumps(data, ensure_ascii=False)
+    print(encoded, flush=True)
 
 
 from server_core import wrap_globals_with_proxies, TimeProxy

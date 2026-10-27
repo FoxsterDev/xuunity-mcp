@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Compact terminal results ignore semantically empty error fields while preserving
+  failed operation/test statuses and nonzero process exits. Passing test totals
+  no longer appear as a tool failure solely because Unity serialized empty error fields.
+
+- Startup diagnostics distinguish Safe Mode prompts, entered mode and exit
+  markers. Changed provisional blockers can appear on stderr while readiness
+  continues; a moving log no longer implies an early terminal dialog failure.
+
+- Opt-in host timing reports measured phases and the unattributed remainder.
+  Context discovery now reads the request journal once per stale-artifact
+  inspection instead of once for every candidate, preserving evidence order
+  without a persistent cache.
+
 - Cancel superseded discovery, site UI, and integration CI runs for the same
   pull request. Keep all platform tests and independent push, tag, and manual
   evidence runs; release and deployment workflows are unchanged.

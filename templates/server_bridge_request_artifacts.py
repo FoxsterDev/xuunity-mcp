@@ -7,7 +7,9 @@ from typing import Any
 
 from server_bridge_constants import DEFAULT_BRIDGE_TRANSPORT
 from server_bridge_final_status import build_bridge_stabilization_summary
-from server_bridge_journal import read_request_journal_events, write_host_request_journal_event
+from server_bridge_journal import (
+    read_request_journal_events, read_request_journal_events_by_request, write_host_request_journal_event,
+)
 from server_bridge_paths import inbox_dir, outbox_dir
 from server_bridge_state import read_best_effort_bridge_state, try_read_bridge_state
 from server_core import ToolInvocationError
@@ -172,20 +174,23 @@ def inspect_stale_request_artifacts(
     classifications: dict[str, int] = {}
     candidate_paths: list[Path] = []
 
-    def consider_path(path: Path, artifact_kind: str) -> None:
-        try:
-            stat_result = path.stat()
-        except OSError:
-            return
+    old_artifacts: list[tuple[Path, str, str, float]] = []
+    for directory, artifact_kind in ((inbox_dir(project_root), "inbox"), (outbox_dir(project_root), "outbox")):
+        for path in directory.glob("*.json"):
+            try:
+                modified_unix = path.stat().st_mtime
+            except OSError:
+                continue
+            request_id = str(path.stem or "").strip()
+            if modified_unix < cutoff_unix and request_id:
+                old_artifacts.append((path, artifact_kind, request_id, modified_unix))
 
-        if stat_result.st_mtime >= cutoff_unix:
-            return
+    events_by_request = read_request_journal_events_by_request(
+        project_root, {item[2] for item in old_artifacts},
+    )
 
-        request_id = str(path.stem or "").strip()
-        if not request_id:
-            return
-
-        events = read_request_journal_events(project_root, request_id)
+    def consider_path(path: Path, artifact_kind: str, request_id: str, modified_unix: float) -> None:
+        events = events_by_request[request_id]
         event_types = {str(event.get("event_type") or "") for event in events}
         terminal_event_type = next(
             (
@@ -202,7 +207,7 @@ def inspect_stale_request_artifacts(
         )
         request_started = "request_started" in event_types
         request_submitted = "request_submitted" in event_types
-        age_seconds = max(0.0, time.time() - stat_result.st_mtime)
+        age_seconds = max(0.0, time.time() - modified_unix)
 
         classification = ""
         cleanup_candidate = False
@@ -237,10 +242,8 @@ def inspect_stale_request_artifacts(
                 }
             )
 
-    for path in inbox_dir(project_root).glob("*.json"):
-        consider_path(path, "inbox")
-    for path in outbox_dir(project_root).glob("*.json"):
-        consider_path(path, "outbox")
+    for artifact in old_artifacts:
+        consider_path(*artifact)
 
     return {
         "has_stale_request_artifacts": bool(candidate_paths),
