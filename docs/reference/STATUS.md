@@ -1,6 +1,6 @@
 # Status
 
-Date: `2026-09-12`
+Date: `2026-10-27`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
@@ -492,30 +492,51 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Latest release and current-source validation for `v0.3.84`:
+Current release evidence for `v0.3.84`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
 | Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.84`, `unity=2021.3`, no hard Test Framework dependency |
-| Host Python tests | `scripts/testing/run_host_python_tests.sh` (release checks plus full discovery) | Full discovery passed `1162` tests with `14` expected platform skips, including live TCP loopback transport coverage. |
-| Current-source uGUI pointer targeting | Package self-tests in scaffolded consumer projects | EditMode `178/178` on Unity `2022.3.67f2` and `6000.0.58f2` with uGUI, `128/128` on Unity `6000.0.58f2` without uGUI; the uGUI PlayMode assembly passes `17` with `2` environment skips on `6000.0.58f2`, including a live `EventSystem` raycast that reaches an alpha-0 `Image` stacked over an opaque button. PlayMode was not run on `2022.3`. |
+| Host Python tests | `scripts/testing/run_host_python_tests.sh` | `1196` tests run, `1182` passed, `14` skipped, zero failures/errors. Skips cover native Windows behavior and the manual-only Unity workflow contract. |
+| Focused Unity checks | macOS Unity `6000.0.58f2`, primary display | Refresh `29/29`, RenderAndClick `23/23`, fixed-portrait interaction `4/4`, asynchronous interaction `4/4`, no skips. Separate targeted scopes; no current cross-version matrix claim. See [evidence boundaries](#current-source-evidence-boundaries). |
+| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.84`: `42/42`. |
+| Git tag visibility | Remote Git refs and GitHub Release | [`v0.3.84`](https://github.com/FoxsterDev/xuunity-mcp/releases/tag/v0.3.84) is published at `c84bb74fa61123e3a7917e7098ca34d7d6c7b79e`; the tag remains immutable. |
+
+## Historical Validation Records
+
+The following measurements were not rerun as a cross-version `v0.3.84` matrix.
+Original counts and explicitly named release versions are retained. Record links
+show where the observations were documented; they do not independently establish
+the exact source loaded by every historical Editor session.
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Historical source uGUI pointer targeting | Package self-tests in scaffolded consumer projects | EditMode `178/178` on Unity `2022.3.67f2` and `6000.0.58f2` with uGUI, `128/128` on Unity `6000.0.58f2` without uGUI; the uGUI PlayMode assembly passes `17` with `2` environment skips on `6000.0.58f2`, including a live `EventSystem` raycast that reaches an alpha-0 `Image` stacked over an opaque button. PlayMode was not run on `2022.3`. |
 | `v0.3.73` rebuilt/cache compile evidence | Consumer editors on Unity `2022.3.62f3` and `6000.0.58f2` using the release source | Both versions passed package EditMode `161/161`. Live player-script compile returned `9` rebuilt / `30` cached assemblies on Unity `2022.3.62f3` and `76` rebuilt / `181` cached assemblies on Unity `6000.0.58f2`, each `measured` with zero compiler errors or warnings; original package pins and editor ownership were restored. | <!-- release-version: historical -->
 | Historical play-mode liveness measurement | Interactive MCP observation of an unfocused editor in Play Mode | With `playmode_state=playing` and `health_status=healthy`, the payload reports `playmode_loop_liveness=throttled`, `playmode_frames_advanced_last_interval=0`, `editor_application_focused=false`, `playmode_liveness_warning=playmode_throttled_editor_unfocused`, and the focus/no-throttling remediation; `unity_status_summary` carries the same fields. |
-| Current-source structural compile diagnostics | Focused host contract plus a live duplicate-reference fault injection on Unity `2022.3.62f3` | Focused refresh/compile/test envelope coverage passes `129/129`. A real duplicate `.asmdef` reference produced `assembly_definition_error` with session-scoped `Editor.log` evidence and recovered to authoritative compile green after probe removal. Package tests passed EditMode `68/68` and PlayMode `18` passed with one expected skip; the editor was closed and consumer manifest/lock bytes were restored. |
+| Historical source structural compile diagnostics | Focused host contract plus a live duplicate-reference fault injection on Unity `2022.3.62f3` | Focused refresh/compile/test envelope coverage passes `129/129`. A real duplicate `.asmdef` reference produced `assembly_definition_error` with session-scoped `Editor.log` evidence and recovered to authoritative compile green after probe removal. Package tests passed EditMode `68/68` and PlayMode `18` passed with one expected skip; the editor was closed and consumer manifest/lock bytes were restored. |
 | Compact MCP envelopes | Changelog and regression coverage for `0.3.32`-`0.3.53` | Scenario decision verdicts, compact operation/readiness/status summaries, authoritative post-settle compile/test/refresh fields, editor-log identity, scenario step-payload opt-ins, PlayMode already-playing stale-risk summaries, deterministic scene-open setup, opt-in compact batch helper output, safer `Editor.log` console grep/tail defaults, compact transport/idle timeout errors, compile-first post-change validation, lane-agnostic GUI-fallback compile evidence, and requested-filter zero-match verdicts are documented with full-payload recovery. |
 | `v0.3.53` release package tests | Clean devmode projects on installed Unity editors | Unity `2022.3.62f3` and `6000.0.58f2` each pass EditMode `62/62` and dependency-free PlayMode `5/5`, with post-settle compile green and verified editor closeout. |
-| Current-source guarded interaction proof | Development-system Unity `2022.3.62f3` and main-consumer Unity `6000.0.58f2`, both in devmode | Package PlayMode tests pass `7/7` on each consumer, including the uGUI-gated guarded-click delivery and refusal tests; each project was restored to its original Git UPM pin afterwards. |
-| Current-source full package gate | Clean devmode projects on Unity `2022.3.62f3` and `6000.0.58f2` | Both versions pass EditMode `86/86` and dependency-free PlayMode `5/5`, plus acceptance, refresh, and compile contracts with authoritative post-settle compile green and verified editor closeout. |
+| Historical source guarded interaction proof | Development-system Unity `2022.3.62f3` and main-consumer Unity `6000.0.58f2`, both in devmode | Package PlayMode tests pass `7/7` on each consumer, including the uGUI-gated guarded-click delivery and refusal tests; each project was restored to its original Git UPM pin afterwards. |
+| Historical source full package gate | Clean devmode projects on Unity `2022.3.62f3` and `6000.0.58f2` | Both versions pass EditMode `86/86` and dependency-free PlayMode `5/5`, plus acceptance, refresh, and compile contracts with authoritative post-settle compile green and verified editor closeout. |
 | Reference-driven UI acceptance | Unity `2021.3` and `6000.0` EditMode over `XUUnity.MCP.SelfTest` | `77/78` pass on both editors with one graphics-device-dependent test correctly self-skipping; the graphics-enabled `XUUnity.MCP.UiRenderClick` category passes `11/11`; a project without `com.unity.ugui` compiles with zero errors and builds only the core editor assembly. |
-| Typed resolver oracle | Current-source Unity `2022.3` + EDM4U callback adapter | Inactive Android and resolver callback failure fail closed; a project-local Maven coordinate passes with callback success, two stable SHA-256 samples, explicit dependency proof, `trust_class=decision_grade`, and a cleared package-operation busy flag. |
+| Typed resolver oracle | Historical source Unity `2022.3` + EDM4U callback adapter | Inactive Android and resolver callback failure fail closed; a project-local Maven coordinate passes with callback success, two stable SHA-256 samples, explicit dependency proof, `trust_class=decision_grade`, and a cleared package-operation busy flag. |
 | Consumer regression route | Compile preflight + scenario/contract + PlayMode lifecycle + consistency | Unity `6000.0` passes compile preflight `6/6`, acceptance `10/10`, refresh/compile contract, settled-state and lifecycle recovery, healthy final Edit Mode with zero compiler errors/unrecovered abandons, and project-action consistency. |
-| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.84`: `42/42`. |
-| Current-source readiness/settle retro fixes (2026-09-28) | Host suite plus a live consumer hub project on Unity `6000.0.58f2` in devmode | Host suite `1156` OK with `14` expected platform skips. Package EditMode `128/128`, `6/6`, `39/39` including seven new tests. A define-changing profile hook followed by a 2 s wait let the scenario compile step gate `16.0` s on editor idle and compile `87` rebuilt / `189` cached assemblies with zero errors (scenario passed in `41` s); the restore profile compiled `82` rebuilt / `181` cached with an immediate dispatch. A play smoke `console_grep since=playmode_start` resolved its anchor with a complete scope (`64` matches; an absent marker `not_matched`), and `unity_asset_snapshot` read an enum override from the consumer's build configuration asset without Play Mode. Editor closeout and the consumer package pin were restored. |
+| Historical source readiness/settle retro fixes (2026-09-28) | Host suite plus a live consumer hub project on Unity `6000.0.58f2` in devmode | Host suite `1156` OK with `14` expected platform skips. Package EditMode `128/128`, `6/6`, `39/39` including seven new tests. A define-changing profile hook followed by a 2 s wait let the scenario compile step gate `16.0` s on editor idle and compile `87` rebuilt / `189` cached assemblies with zero errors (scenario passed in `41` s); the restore profile compiled `82` rebuilt / `181` cached with an immediate dispatch. A play smoke `console_grep since=playmode_start` resolved its anchor with a complete scope (`64` matches; an absent marker `not_matched`), and `unity_asset_snapshot` read an enum override from the consumer's build configuration asset without Play Mode. Editor closeout and the consumer package pin were restored. |
 | Historical Git UPM release smoke | Clean Unity project pinned to an earlier public tag | Bridge reached healthy `git_pinned` status, Android APK smoke passed, package self-tests passed, and closeout verified process exit. |
 | Multi-project compile matrix | Public summary evidence from consumer validation | `9/9` projects, `38/38` compile lanes, `0` failures |
-| Git tag visibility | Remote Git refs | Release tag `v0.3.84` is the current Git UPM release target; remote publication requires an authenticated push. |
 
-Cross-platform status:
+- Ugui pointer targeting: [recorded 2026-09-30](https://github.com/FoxsterDev/xuunity-mcp/blob/fa9190f1dcd4856032820e05d5a2830f455fe80f/docs/reference/STATUS.md).
+- Structural compile diagnostics: [recorded 2026-08-08](https://github.com/FoxsterDev/xuunity-mcp/blob/487b07e873356e07f83ec0e1b4325c832d4da370/docs/reference/STATUS.md).
+- Guarded interaction proof: [recorded 2026-08-02](https://github.com/FoxsterDev/xuunity-mcp/blob/01cb97e1606ab6db161a43a87de9a229d7d43a9c/docs/reference/STATUS.md).
+- Full package gate: [recorded 2026-08-26](https://github.com/FoxsterDev/xuunity-mcp/blob/878807ba4574b845592025a736a3eea623f72b14/docs/reference/STATUS.md).
+- Reference-driven ui acceptance: [recorded 2026-07-30](https://github.com/FoxsterDev/xuunity-mcp/blob/c7bdc74da302be76d09c4e8cba8bf11ee10d113e/docs/reference/STATUS.md).
+- Typed resolver oracle and consumer regression route: [recorded 2026-07-29](https://github.com/FoxsterDev/xuunity-mcp/blob/9ad31c9acfb9a7b80cd28cd547adda05e8796567/docs/reference/STATUS.md).
+- Readiness/settle observations: [recorded 2026-09-28](https://github.com/FoxsterDev/xuunity-mcp/blob/af1807d0d1c92ea3b7a283effcf84874cf934a37/docs/reference/STATUS.md).
+- Multi-project compile matrix: [recorded 2026-07-02](https://github.com/FoxsterDev/xuunity-mcp/blob/669e9125a3f9e6eb93f002fdf06af2342295b33e/docs/reference/STATUS.md).
+
+Cross-platform capabilities and historical observations (live observations in
+this table are not new `v0.3.84` measurements):
 
 | Target | Status | Notes |
 | --- | --- | --- |

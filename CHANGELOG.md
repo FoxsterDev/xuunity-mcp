@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Correct validation documentation: distinguish the focused `v0.3.84` checks
+  from historical multi-version measurements and report the actual host test
+  pass/skip totals. This documentation-only follow-up does not change the
+  released package or its immutable tag.
+
 ## 0.3.84
 
 Release tag: `v0.3.84`

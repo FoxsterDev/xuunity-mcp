@@ -85,8 +85,9 @@ Choose one path first:
 
 ### Prerequisites
 
-- Unity 2021.3 LTS+; the current release has live validation on Unity 2021.3,
-  2022.3, and 6000.x. See [Status](docs/reference/STATUS.md).
+- Unity 2021.3 LTS+ is the package metadata minimum. Focused `v0.3.84` live
+  checks ran on macOS with Unity `6000.0.58f2` on the primary display.
+  See [Status](docs/reference/STATUS.md) for current scope and historical records.
 - Python 3.10+
 - one MCP client: [Claude Code](docs/clients/claude-code.md), [Claude Desktop](docs/clients/claude-desktop.md), [Cursor](docs/clients/cursor.md), [Rider](docs/clients/rider.md), [Windsurf](docs/clients/windsurf.md), [Antigravity IDE](docs/clients/antigravity.md), or a [Codex-style agent](docs/clients/codex.md) with the [Codex visual setup guide](docs/clients/codex-unity-mcp-setup.md)
 

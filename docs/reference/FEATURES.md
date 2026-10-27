@@ -165,7 +165,7 @@ Unity MCP implementations when the user wants safe production validation.
 | Target | Status | Validation notes |
 | --- | --- | --- |
 | Current package path | `Validated` | Production Git UPM path is `packages/com.xuunity.light-mcp#v0.3.84`; old `templates/unity-package#v0.3.11` is migration-only. |
-| macOS host tools | `Validated in this release environment` | Host Python unittest suite passed for `v0.3.84`: `1162` tests with `14` expected platform skips. |
+| macOS host tools | `Validated in this release environment` | For `v0.3.84`, `1196` host tests ran: `1182` passed, `14` skipped, zero failures/errors. Skips cover native Windows behavior and the manual-only Unity workflow contract. |
 | Linux host tools | `Portable path provided` | Unix launcher is bash-compatible and avoids zsh-only expansion; Linux host execution should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs, `run.cmd`, and `run.ps1` are included and syntax/config files are statically validated; native Windows MCP connection still needs host smoke validation. |
 | Claude Code | `Template provided` | Project `.mcp.json`, Windows `.mcp.windows.json`, and user-scope installer path are documented. |
@@ -173,10 +173,10 @@ Unity MCP implementations when the user wants safe production validation.
 | Cursor | `Template provided` | Project/user `.cursor/mcp.json` templates are provided for Unix-like and native Windows hosts. |
 | Windsurf | `Template provided` | `~/.codeium/windsurf/mcp_config.json` and Windows equivalent templates are provided. |
 | Codex-style agents | `Template provided` | Unix-like and Windows `config.toml` snippets are provided. |
-| Unity 2021.3+ | `Validated` | Default package metadata targets Unity `2021.3`; current source validation covers installed Unity `2021.3`, `2022.3`, and `6000.x` editor families. |
+| Unity 2021.3+ | `Declared metadata minimum` | Package metadata targets Unity `2021.3`. Current focused live evidence is macOS Unity `6000.0.58f2`; earlier multi-version observations are [historical records](STATUS.md#historical-validation-records). |
 | Optional Test Framework capability | `Implemented` | Core MCP is healthy without `com.unity.test-framework`; test operations enable through asmdef Version Defines when `>=1.1.33` is installed. |
-| Package self-tests | `Validated` | Current release source validation passed package EditMode and PlayMode self-test lanes across runnable installed Unity `2021.3`, `2022.3`, and `6000.x` editors after optional Test Framework setup. |
-| Multi-project batch compile | `Validated in consumer repo` | Public summary evidence records `9/9` Unity projects and `38/38` compile lanes passing after the registry-native package path update. |
+| Package self-tests | `Focused scopes validated` | On macOS Unity `6000.0.58f2`: refresh `29/29`, RenderAndClick `23/23`, fixed-portrait interaction `4/4`, asynchronous interaction `4/4`, no skips. These are separate targeted scopes, not a full package or cross-version suite. |
+| Multi-project batch compile | `Validated in consumer repo` | Historical public summary evidence records `9/9` Unity projects and `38/38` compile lanes passing after the registry-native package path update; this is not the current release consumer matrix. |
 | OpenUPM | `Ready, not published` | Package layout and metadata are registry-ready; use Git UPM until an OpenUPM package page exists. |
 
 ## Supported MCP Clients
