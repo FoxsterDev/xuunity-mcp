@@ -3111,6 +3111,7 @@ actions:
         ):
             with self.assertRaises(server.ToolInvocationError) as ctx:
                 server.cmd_request_editor_quit(args)
+            prefix = server_core.launcher_command_prefix()
 
         force_mock.assert_not_called()
         journal_mock.assert_called_once_with(Path("/tmp/FakeProject"), "quit-1")
@@ -3124,7 +3125,7 @@ actions:
         self.assertTrue(details["scene_dirty"])
         self.assertFalse(details["process_exit_verified"])
         command = details["recommended_recovery_command"]
-        self.assertTrue(command.startswith(server_core.launcher_command_prefix() + " restore-editor-state "))
+        self.assertTrue(command.startswith(prefix + " restore-editor-state "))
         self.assertIn("--require-closed", command)
         self.assertNotIn("request-editor-quit", command)
         self.assertTrue(details["host_opened_session_found"])
@@ -3150,6 +3151,7 @@ actions:
         ):
             with self.assertRaises(server.ToolInvocationError) as ctx:
                 server.cmd_request_editor_quit(args)
+            prefix = server_core.launcher_command_prefix()
 
         force_mock.assert_not_called()
         details = ctx.exception.details
@@ -3157,7 +3159,6 @@ actions:
         self.assertFalse(details["host_opened_session_found"])
         self.assertEqual("manual_editor_close", details["recommended_next_action"])
         self.assertEqual("manual_editor_close_or_explicit_force_after_ms", details["next_distinct_action"])
-        prefix = server_core.launcher_command_prefix()
         self.assertTrue(details["recommended_recovery_command"].startswith(prefix + " verify-editor-closed "))
         self.assertNotIn("restore-editor-state", details["recommended_recovery_command"])
         escalation = details["explicit_escalation_command"]
