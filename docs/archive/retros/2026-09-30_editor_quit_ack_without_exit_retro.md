@@ -1,9 +1,18 @@
 # XUUnity Light Unity MCP Retro — Editor Quit Acknowledged Without Exit
 
 Date: `2026-09-30`
-Status: `resolved in Unreleased (after v0.3.84)`
+Status: `resolved in v0.3.85`
 Lane: `ensure-ready --open-editor` GUI editor in a scaffolded consumer project, `request-playmode-tests`, `request-editor-quit`, `restore-editor-state`
 Server metadata observed in session: `xuunity-mcp 0.3.81` host, package from current source, Unity `6000.0.58f2`
+
+## Status (2026-11-03, v0.3.85)
+
+| Item | Status | What shipped | What remains / next step |
+| --- | --- | --- | --- |
+| F-1 `request-editor-quit` acknowledged without exit | done (v0.3.85) | The quit runs from a one-shot `EditorApplication.update` tick with a `SessionState` intent (120 s), so an unfocused Edit Mode editor exits. Live on Unity `6000.0.58f2` macOS: 6/6 unfocused exits in about 1.4-1.8 s without SIGTERM (fresh editor, after a PlayMode run, after a refresh, after a forced domain reload). | Not live-proven: a quit armed before a domain reload and fired after it (EditMode and unit tests only), a quit with a dirty scene, Unity 2021.3, Windows and Ubuntu editors. |
+| Candidate fix 1 — verify process exit in `request-editor-quit` | done (v0.3.85) | Exit is verified by default; survival exits non-zero with `editor_quit_ack_without_exit`; `--no-wait-for-exit` reports `quit_ack_unverified`; a rejected quit fails at once as `quit_request_rejected`. | A project still pinned to the `v0.3.84` package keeps the old quit and fails after about 30 s when unfocused; update the package pin with the host. |
+| Candidate fix 2 — log when the scheduled exit runs | done (v0.3.85) | Journal `editor_quit_executing` / `editor_quit_expired` and the editor log line `[XUUnityLightMcp] editor quit executing request_id=<id>`. | — |
+| Candidate fix 3 — document `restore-editor-state` as the closeout until fix 1 ships | superseded | Fix 1 shipped; `restore-editor-state --require-closed` remains the recovery command for a host-opened editor. | — |
 
 ## Finding
 

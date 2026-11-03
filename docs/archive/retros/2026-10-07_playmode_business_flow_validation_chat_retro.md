@@ -1,8 +1,25 @@
 # XUUnity Light Unity MCP Chat Retro — Play Mode validation of reward, loyalty and analytics flows across two consumer projects
 
 Date: `2026-10-07`
-Status: `intake; improvements proposed, none implemented`
+Status: `open; no item shipped as of v0.3.85`
 Lane: `interactive_mcp` (GUI editors opened by the host), package `v0.3.83`, Unity `6000.0.58f2`, two consumer projects, one operator session spanning ~6 hours and a context compaction
+
+Original intake status (2026-10-07): `intake; improvements proposed, none implemented`.
+
+## Status (2026-11-03, v0.3.85)
+
+Item ids follow the §9 priority table. Everything below is the original 2026-10-07 record and is unchanged.
+
+| Item | Status | What shipped | What remains / next step |
+|---|---|---|---|
+| P1 — `ui_click` raycast-filled delivery and occlusion bypass when render differs from screen | open | — | Deliver `pointerClick` with the raycast fields populated for the resolved target; skip the Screen-vs-render occlusion check when `render_target_differs_from_screen=true`. |
+| P1 — stock runtime hook (`run_in_background`, scene, `isPlaying`, `PlayerPrefs` get/set) | open | — | Ship the package-owned runtime state hook so the temp-hook cases in §5 disappear. |
+| P2 — `console_grep messagesOnly` and frame-line ratio hint | open | Related only: test results now classify console errors (`expected_by_test`) and keep a finished run's own counts; this does not touch `console_grep`. | Add `messagesOnly=true` that drops stack-frame lines, and a hint when most matches are frame lines. |
+| P2 — `poll_until`: all schema errors at once; optional `failWhen` | open | — | One validation pass listing every schema error; make `failWhen` optional. Until then, the §10 `SMOKE_TESTS.md` required-field table and sentinel idiom. |
+| P2 — scenario compact `stepsDetail: minimal` | open | — | Drop per-step liveness fields unless throttled. |
+| P3 — event recorder step | open | — | Subscribe to named static events of a type for the scenario's lifetime and return the ordered list. |
+| P3 — `recover-editor-session` compact output | open | — | `recovery_classification`, pid and duration by default. |
+| §10 public-promotion docs (`SMOKE_TESTS.md`, `CONTINUATION.md`, `DESIGN.md`/`ROADMAP.md`) | open | — | Not promoted yet. |
 
 ## 1. Executive summary
 

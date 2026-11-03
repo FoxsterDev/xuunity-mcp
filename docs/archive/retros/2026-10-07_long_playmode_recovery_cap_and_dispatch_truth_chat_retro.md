@@ -1,8 +1,28 @@
 # XUUnity Light Unity MCP Chat Retro — long PlayMode suites end in a lifecycle-reset error, and a scenario poll reports "not submitted" after dispatch
 
 Date: `2026-10-07`
-Status: `intake; improvements proposed, none implemented`
+Status: `partial (v0.3.85): P0-2 done; P2-1 and P3-3 partial; P0-1 and the other items open`
 Lane: `interactive_mcp` GUI editors (opened by the wrapper `ensure-ready --open-editor` in one project, self-launched in another) plus raw Unity CLI batch lanes. Packages `v0.3.80` → `v0.3.83` across eight days; Unity `6000.0.58f2` and one `6000.3` reference clone. Three consumer projects; 222 MCP calls in one operator session.
+
+Original intake status (2026-10-07): `intake; improvements proposed, none implemented`.
+
+## Status (2026-11-03, v0.3.85)
+
+Item ids are the finding ids of §5 and the priority ids of §9. Everything below §1 is the original 2026-10-07 record and is unchanged.
+
+| Item | Status | What shipped | What remains / next step |
+|---|---|---|---|
+| V1 / P0-1 — `request_submitted=false` after dispatch | open | — | Highest open item. Separate dispatch from wait in `scenario_run_and_wait`; keep `request_submitted=true` and `run_id` once dispatched; treat `bridge_owned_by_non_main_process` as a transient poll error; guard import-worker heartbeats. Acceptance checks in §10 still apply. |
+| F1 / P0-2 — post-reset cap overrides the caller's timeout | done (v0.3.85) | `unity.tests.run_editmode` and `unity.tests.run_playmode` wait for the caller's `timeoutMs` across the Play-entry reload. A runtime config `post_reset_recovery_cap_ms` for them is ignored and listed in `runtime-config-show` `ignored_overrides`. Reset errors, journal events and recovered responses report `post_reset_recovery_mode`, `_budget_ms`, `_elapsed_ms` and `_stop_reason`. | Live proof covers runs up to 250 s. A wait over 300 s is covered by host unit tests only; the >5 minute PlayMode suite smoke from §11 is still to run. |
+| F2 / P1-1 — lifecycle-reset error ignores compact mode | open | Related only: test runs no longer reach this envelope at the 300 s cap (F1). | Compact final-status projection under the 8 KB compact ceiling (32–33 k observed), structured `recovery_tool` arguments, no contradictory fields, no Play Mode exit cleanup while `run_phase=running`. |
+| F3 / P1-2 — `setup_plan` ignores the live session | open | Related only: compact `ensure-ready` output reads `package_import_state.dependency_declared` from the manifest declaration, so a git-pinned package is no longer reported missing. | Credit the answering server as live-session proof (`proven_by_answering_mcp_server`), search ancestor `.mcp.json` files, and keep one source of install truth between `setup_plan` and `ensure-ready`. |
+| F5 / P2-1 — console error count and `editor_log` stack frames | partial (v0.3.85: test console errors are classified and a completed run keeps its own counts / `editor_log` frame filtering remains) | Errors a passing test expected (`LogAssert.Expect`, `LogAssert.ignoreFailingMessages`) are counted as `expected_by_test` and no longer set `console_error_pressure_detected`; up to 3 `console_error_samples`. Request final status for a finished run reports counts stored at completion (`console_error_count_at_completion` and related fields) instead of the live editor counter. | `editor_log` grep does not honour `includeStackTraces=false` and has no `stack_frame_suppressed_count`. No editor-log error count from the request's anchor offset; errors before a domain reload still count as pressure. |
+| F6 / P2-2 — CLI test runs get no progress | open | — | CLI test progress sidecar for batch runs not owned by the bridge. Docs: remove the raw batch PlayMode fallback from `AI_INTEGRATION.md` and add the nested `WaitForEndOfFrame` batch-hang caveat. |
+| P2-3 — `ensure-ready` invisible from the MCP surface | open | Related only: printed recovery and next-action commands now start with the quoted absolute launcher path, so they run outside the project directory (macOS live; cmd and PowerShell quoting not run live). | Name `ensure-ready --open-editor` in the initialize instructions, the status description and the `bridge_disabled` envelope; raise the launch-lane log-path risk only when the paths differ. |
+| P1-3 — journal truth (§5.2) | open | — | Resumed test runs not retryable on abandon; refresh the generation at reclassification; set `lifecycle_churn_observed`; classify runtime-timeout overruns; final status consumes the outbox; progress events carry `request_id` and a sequence number; dead batch processes stop leaving a `healthy` state file. |
+| V3 / P3-1 — MCP console tools drop `explicit_path_requested` | open | — | Pass the flag and resolve the path with `bridge_state` in the MCP grep and tail handlers. |
+| V2 / P3-2 — `game_view_configure` persists into the user layout | open | Related only: `game_view_configure` selects only fixed-resolution sizes (a `9x16` request no longer selects the `16:9 Portrait` aspect preset) and reports `preset_kind`; test results record the Game View setup in `test_environment`. | Return `previous_game_view`, restore it at scenario cleanup, and document that the size persists. |
+| P3-3 — docs for the cap, `timeoutMs` sizing and waits | partial (v0.3.85: `DESIGN.md` describes the uncapped test-operation wait and `AGENT_WORKFLOWS.md` says to size `timeoutMs` above the suite duration / long-suite example values, `active_test_*` and wait recipe remain) | Documenting the 300 s cap is superseded by P0-2; `DESIGN.md` now states the test-operation recovery wait; `AGENT_WORKFLOWS.md` adds one `timeoutMs` sizing sentence. | Long-suite `timeoutMs` examples (`AGENT_WORKFLOWS.md` examples still use 240 000), the `active_test_*` status fields, a persisted-result wait recipe, and the `SMOKE_TESTS.md` error-grep replacement. |
 
 ## 1. Executive summary
 
