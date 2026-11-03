@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from server_core import read_json
+from server_specs_lifecycle import CALLER_DEADLINE_RECOVERY_OPERATIONS
 
 RUNTIME_DEFAULTS_FILE_NAME = "xuunity_light_unity_mcp_runtime_defaults.json"
 RUNTIME_ENV_OVERRIDE = "XUUNITY_LIGHT_UNITY_MCP_RUNTIME_CONFIG"
@@ -132,8 +133,33 @@ def resolve_operation_lifecycle_policy_overrides(project_root: Path, operation: 
     overrides: dict[str, Any] = {}
     cap_ms = settings.get("post_reset_recovery_cap_ms")
     if isinstance(cap_ms, int) and cap_ms > 0:
-        overrides["post_reset_recovery_cap_ms"] = cap_ms
+        if operation in CALLER_DEADLINE_RECOVERY_OPERATIONS:
+            overrides["post_reset_recovery_ignored_override_cap_ms"] = cap_ms
+        else:
+            overrides["post_reset_recovery_cap_ms"] = cap_ms
     return overrides
+
+
+def list_ignored_lifecycle_overrides(config: dict[str, Any]) -> list[dict[str, Any]]:
+    operations = config.get("operations")
+    if not isinstance(operations, dict):
+        return []
+    ignored: list[dict[str, Any]] = []
+    for operation in sorted(CALLER_DEADLINE_RECOVERY_OPERATIONS):
+        settings = operations.get(operation)
+        if not isinstance(settings, dict):
+            continue
+        cap_ms = settings.get("post_reset_recovery_cap_ms")
+        if isinstance(cap_ms, int) and cap_ms > 0:
+            ignored.append(
+                {
+                    "operation": operation,
+                    "key": "post_reset_recovery_cap_ms",
+                    "value": cap_ms,
+                    "reason": "test_operations_wait_for_caller_deadline",
+                }
+            )
+    return ignored
 
 
 def build_runtime_config_report(project_root: Path) -> dict[str, Any]:
@@ -142,4 +168,5 @@ def build_runtime_config_report(project_root: Path) -> dict[str, Any]:
         "project_root": str(project_root),
         "loaded_paths": loaded_paths,
         "config": config,
+        "ignored_overrides": list_ignored_lifecycle_overrides(config),
     }

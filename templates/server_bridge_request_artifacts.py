@@ -12,7 +12,7 @@ from server_bridge_journal import (
 )
 from server_bridge_paths import inbox_dir, outbox_dir
 from server_bridge_state import read_best_effort_bridge_state, try_read_bridge_state
-from server_core import ToolInvocationError
+from server_core import ToolInvocationError, render_launcher_cli
 
 def inbox_request_path(project_root: Path, request_id: str) -> Path:
     return inbox_dir(project_root) / f"{request_id}.json"
@@ -77,8 +77,8 @@ def cancel_request_best_effort(
         "request_file_path": str(request_path),
         "request_file_present": request_file_exists,
         "bridge_stabilization": stabilization,
-        "recommended_recovery_command": (
-            f"request-final-status --project-root {project_root} --request-id {request_id}"
+        "recommended_recovery_command": render_launcher_cli(
+            "request-final-status", project_root, "--request-id", request_id
         ),
     }
 

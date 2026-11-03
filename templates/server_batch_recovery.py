@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+from server_core import bridge_enable_recovery_command
 
 from pathlib import Path
 from typing import Any
@@ -255,7 +255,7 @@ def recover_project_bridge_for_reconciliation(
                 "bridge_disabled",
                 (
                     "Unity bridge is disabled for this project. "
-                    f"Enable it with {BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} "
+                    f"Enable it with {bridge_enable_recovery_command()} "
                     "and reopen Unity."
                 ),
             ),
@@ -406,7 +406,7 @@ def classify_compile_probe_failure(compile_probe: dict[str, Any]) -> tuple[str, 
         return (
             "compile_probe_blocked_by_live_editor",
             "close_same_project_editor_or_use_interactive_lane",
-            "{launcher} request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
+            "{launcher} request-editor-quit --project-root {project_root} --timeout-ms 30000 --exit-timeout-ms 30000",
         )
 
     return (

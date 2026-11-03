@@ -1542,6 +1542,7 @@ class ServerProjectHelperTests(unittest.TestCase):
     def test_recommended_recovery_command_quotes_path_and_matches_host_flavor(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME", None)
+            os.environ.pop("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH", None)
             with mock.patch.object(server_core, "is_windows_like_host", return_value=True):
                 windows_command = server.recommended_recovery_command_for_project(
                     PureWindowsPath("C:/tmp/Fake Project"),

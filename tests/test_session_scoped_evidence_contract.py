@@ -1255,6 +1255,20 @@ class RequestAttributionTests(unittest.TestCase):
 class PostSettleCompileTrustTests(unittest.TestCase):
     """A refresh that settles during Play Mode defers asset import, so its compile verdict is not authoritative."""
 
+    TEST_ENVIRONMENT = {
+        "captured_at": "request_start",
+        "capture_status": "captured",
+        "render_width": 1440,
+        "render_height": 3200,
+        "preset_label": "XUUnity 1440x3200",
+        "preset_kind": "fixed_resolution",
+        "preset_width": 1440,
+        "preset_height": 3200,
+        "render_matches_preset": "true",
+        "game_view_group": "Android",
+        "build_target": "Android",
+    }
+
     def _refresh(self, playmode_state: str, *, is_playing: bool) -> dict:
         return server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
             {"outcome": "refresh_completed", "settle_request_id": "req-1"},
@@ -1358,6 +1372,7 @@ class PostSettleCompileTrustTests(unittest.TestCase):
                     "failed": 0,
                     "playmode_state_after_settle": "playing",
                     "playmode_state_after_test_callbacks": "playing",
+                    "test_environment": dict(self.TEST_ENVIRONMENT),
                 },
             )
             payload = server_bridge_payloads.normalize_tests_payload_from_lifecycle(
@@ -1408,6 +1423,7 @@ class PostSettleCompileTrustTests(unittest.TestCase):
         self.assertEqual("expected_domain_reload", persisted["playmode_state_after_settle_trust_class"])
         self.assertEqual("expected_playmode_exit_domain_reload", persisted["lifecycle_churn_classification"])
         self.assertIn("bridge identity changed", persisted["playmode_state_after_settle_note"])
+        self.assertEqual(self.TEST_ENVIRONMENT, persisted["test_environment"])
 
         compact = server_bridge_payloads.compact_operation_payload(payload, "unity.tests.run_playmode")
         self.assertEqual("playing", compact["playmode_state_after_test_callbacks"])
@@ -1802,7 +1818,7 @@ class CompactEnvelopeTests(unittest.TestCase):
     def test_compact_game_view_configure_keeps_the_resolved_view(self) -> None:
         payload = {
             "outcome": "game_view_configured",
-            "game_view": {"width": 1170, "height": 2532, "label": "iPhone"},
+            "game_view": {"width": 1170, "height": 2532, "label": "iPhone", "preset_kind": "fixed_resolution"},
             "backend_id": "xuunity.light_unity_mcp",
             "_xuunity_lifecycle": {"activation": {"noise": True}},
         }
@@ -1811,6 +1827,7 @@ class CompactEnvelopeTests(unittest.TestCase):
 
         self.assertEqual("game_view_configured", compact["outcome"])
         self.assertEqual(1170, compact["game_view"]["width"])
+        self.assertEqual("fixed_resolution", compact["game_view"]["preset_kind"])
         self.assertNotIn("_xuunity_lifecycle", compact)
 
     def test_a_snapshot_without_root_objects_does_not_invent_a_count(self) -> None:

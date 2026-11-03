@@ -394,7 +394,7 @@ PlayMode churn note:
 Mini-playbook for closeout mismatch:
 
 1. run
-   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`
+   `request-editor-quit --project-root <project> --timeout-ms 30000 --exit-timeout-ms 30000`
 2. if it returns `editor_quit_ack_without_exit`, treat that as "quit was
    acknowledged but process exit was not proven"
 3. run `verify-editor-closed --project-root <project> --timeout-ms 30000`
@@ -421,7 +421,7 @@ Compile-first closeout recipe for changed C# scripts:
 1. inspect editor state with `request-status-summary --project-root <project>`
 2. if the same project editor blocks the batch lane, run the surfaced recovery
    command, usually
-   `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`
+   `request-editor-quit --project-root <project> --timeout-ms 30000 --exit-timeout-ms 30000`
 3. verify process exit with `verify-editor-closed --project-root <project>`
 4. run the fast batch compile gate
 5. only after compile passes, run batch EditMode tests, PlayMode, scenario, or

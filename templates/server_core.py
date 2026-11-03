@@ -161,6 +161,20 @@ def launcher_command_name() -> str:
     return "xuunity_light_unity_mcp.cmd" if is_windows_like_host() else "xuunity_light_unity_mcp.sh"
 
 
+def launcher_command_prefix() -> str:
+    """Command token for rendered commands: the published absolute launcher path, else the bare name."""
+    import os
+
+    name = launcher_command_name()
+    raw = str(os.environ.get("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH") or "").strip()
+    if raw and '"' not in raw:
+        candidate = Path(raw)
+        if candidate.is_absolute() and candidate.name == name and candidate.is_file():
+            token = f'"{candidate.as_posix()}"'
+            return f"& {token}" if name.lower().endswith(".ps1") else token
+    return name
+
+
 def quoted_shell_path(path: Any) -> str:
     """Space-safe path literal: native form on Windows-like hosts, POSIX elsewhere."""
     from pathlib import PurePath
@@ -172,7 +186,7 @@ def quoted_shell_path(path: Any) -> str:
 
 def render_launcher_cli(subcommand: str, project_root: Any, *extra: str) -> str:
     """Copy-paste-safe recovery command: host-matched launcher, quoted path."""
-    parts = [launcher_command_name(), subcommand, "--project-root", quoted_shell_path(project_root)]
+    parts = [launcher_command_prefix(), subcommand, "--project-root", quoted_shell_path(project_root)]
     parts.extend(extra)
     return " ".join(parts)
 
@@ -205,6 +219,10 @@ def reconfigure_stdio_utf8() -> None:
 
 
 BRIDGE_ENABLE_RECOVERY_COMMAND = (
-    "setup-plan --project-root {project_root} > <plan>; then "
-    "setup-apply --plan-file <plan> --project-root {project_root} --yes"
+    "{launcher} setup-plan --project-root {project_root} > <plan>; then "
+    "{launcher} setup-apply --plan-file <plan> --project-root {project_root} --yes"
 )
+
+
+def bridge_enable_recovery_command(project_root: str = "<path>") -> str:
+    return BRIDGE_ENABLE_RECOVERY_COMMAND.format(launcher=launcher_command_prefix(), project_root=project_root)

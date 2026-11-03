@@ -13,12 +13,10 @@
       "post_reset_recovery_cap_ms": 300000
     },
     "unity.tests.run_editmode": {
-      "default_timeout_ms": 300000,
-      "post_reset_recovery_cap_ms": 300000
+      "default_timeout_ms": 300000
     },
     "unity.tests.run_playmode": {
-      "default_timeout_ms": 300000,
-      "post_reset_recovery_cap_ms": 300000
+      "default_timeout_ms": 300000
     },
     "unity.playmode.set": {
       "default_timeout_ms": 180000,

@@ -64,6 +64,7 @@ def make_launcher_env(install_dir: Path) -> dict:
         "XUUNITY_LIGHT_UNITY_MCP_SOURCE_ROOT",
         "XUUNITY_LIGHT_UNITY_MCP_SERVER",
         "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME",
+        "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH",
         "XUUNITY_UNITY_EDITOR_ROOTS",
     ):
         env.pop(key, None)

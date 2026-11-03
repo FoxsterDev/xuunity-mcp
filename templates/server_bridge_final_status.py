@@ -32,9 +32,20 @@ from server_core import ToolInvocationError, read_json, render_launcher_cli
 from server_operation_evidence import (
     COMPACT_TEST_FAILURE_LIMIT,
     attach_operation_evidence_to_final_status,
+    compact_console_error_samples,
+    compact_test_environment,
     compact_test_failures,
+    not_expected_console_error_count,
     test_failure_count,
 )
+from server_specs_lifecycle import CALLER_DEADLINE_RECOVERY_OPERATIONS
+
+RECOVERED_RESPONSE_PICKUP_GRACE_MS = 2000
+RECOVERED_RESPONSE_PICKUP_POLL_MS = 50
+LONG_RECOVERY_POLL_THRESHOLD_MS = 60000
+LONG_RECOVERY_POLL_INTERVAL_MS = 1000
+TERMINAL_TEST_RESPONSE_HANDOFF_STATES = frozenset({"pending_write", "written", "released"})
+TERMINAL_TEST_RUN_PHASES = frozenset({"completed", "settled_after_timeout", "response_written", "abandoned"})
 
 
 TEST_PLAYMODE_ACCOUNTING_FIELDS = (
@@ -381,10 +392,17 @@ def build_compact_final_status_projection(final_status: dict[str, Any]) -> dict[
             "console_error_count_trust_class",
             "console_error_pressure_detected",
             "console_error_pressure_warning",
+            "console_error_expected_by_test_count",
+            "console_error_not_expected_count",
+            "console_error_classification_basis",
+            "test_environment",
             *TEST_PLAYMODE_ACCOUNTING_FIELDS,
         ):
             if key in final_status:
                 compact[key] = final_status.get(key)
+        console_error_samples = compact_console_error_samples(final_status.get("console_error_samples"))
+        if console_error_samples:
+            compact["console_error_samples"] = console_error_samples
     return compact
 
 
@@ -753,6 +771,19 @@ def try_take_recovered_response(project_root: Path, request_id: str) -> dict[str
     return response
 
 
+def take_recovered_response_with_grace(
+    project_root: Path,
+    request_id: str,
+    grace_ms: int = RECOVERED_RESPONSE_PICKUP_GRACE_MS,
+) -> dict[str, Any] | None:
+    deadline = time.monotonic() + max(0, grace_ms) / 1000.0
+    while True:
+        response = try_take_recovered_response(project_root, request_id)
+        if response is not None or time.monotonic() >= deadline:
+            return response
+        time.sleep(RECOVERED_RESPONSE_PICKUP_POLL_MS / 1000.0)
+
+
 def peek_response_payload(project_root: Path, request_id: str) -> dict[str, Any] | None:
     path = response_path(project_root, request_id)
     if not path.is_file():
@@ -845,18 +876,50 @@ def _derive_timeout_classification(test_result: dict[str, Any] | None) -> str:
     return "timeout_before_test_start"
 
 
+def _persisted_test_run_is_terminal(source: dict[str, Any]) -> bool:
+    return (
+        bool(str(source.get("completed_at_utc") or ""))
+        or str(source.get("response_handoff_state") or "") in TERMINAL_TEST_RESPONSE_HANDOFF_STATES
+        or str(source.get("run_phase") or "") in TERMINAL_TEST_RUN_PHASES
+    )
+
+
 def _test_console_pressure_summary(
     source_payload: dict[str, Any] | None,
     active_state: dict[str, Any] | None,
+    *,
+    request_id: str = "",
+    request_completed: bool = False,
 ) -> dict[str, Any]:
     source = source_payload or {}
     current = active_state or {}
+    current_session = str(current.get("console_error_counter_session_id") or "")
+    expected_by_test = max(0, int(source.get("console_error_expected_by_test_count") or 0))
     if "console_error_count_since_request_start" in source:
         count = max(0, int(source.get("console_error_count_since_request_start") or 0))
         trust_class = str(source.get("console_error_count_trust_class") or "lower_bound_without_request_baseline")
+        not_expected = (
+            max(0, int(source.get("console_error_not_expected_count") or 0))
+            if "console_error_not_expected_count" in source
+            else count
+        )
+    elif str(source.get("console_error_count_trust_class_at_completion") or ""):
+        count = max(0, int(source.get("console_error_count_at_completion") or 0))
+        trust_class = str(source.get("console_error_count_trust_class_at_completion") or "")
+        not_expected = max(
+            max(0, int(source.get("console_error_not_expected_count_at_completion") or 0)),
+            not_expected_console_error_count(source, 0, ""),
+        )
+    elif _persisted_test_run_is_terminal(source):
+        not_expected = not_expected_console_error_count(source, 0, "")
+        if "console_error_classification_basis" in source:
+            count = expected_by_test + not_expected
+            trust_class = "lower_bound_from_recorded_attribution"
+        else:
+            count = 0
+            trust_class = "unavailable"
     else:
         baseline_session = str(source.get("console_error_counter_session_id_at_request_start") or "")
-        current_session = str(current.get("console_error_counter_session_id") or "")
         if baseline_session and current_session:
             current_total = max(0, int(current.get("console_error_count_total") or 0))
             if baseline_session == current_session:
@@ -866,23 +929,35 @@ def _test_console_pressure_summary(
             else:
                 count = current_total
                 trust_class = "lower_bound_after_domain_reload"
-        elif str(current.get("active_test_console_error_count_trust_class") or "") not in {"", "unavailable"}:
+            not_expected = not_expected_console_error_count(source, count, current_session)
+        elif (
+            request_id
+            and not request_completed
+            and str(current.get("active_test_request_id") or "") == request_id
+            and str(current.get("active_test_console_error_count_trust_class") or "") not in {"", "unavailable"}
+        ):
             count = max(0, int(current.get("active_test_console_error_count_since_request_start") or 0))
             trust_class = str(current.get("active_test_console_error_count_trust_class") or "")
+            not_expected = not_expected_console_error_count(source, count, "")
         else:
             count = 0
             trust_class = "unavailable"
+            not_expected = not_expected_console_error_count(source, 0, "")
 
     return {
         "console_error_count_since_request_start": count,
         "console_error_count_trust_class": trust_class,
-        "console_error_pressure_detected": count > 0,
+        "console_error_pressure_detected": not_expected > 0,
         "console_error_pressure_warning": (
-            "Console errors or exceptions were emitted after this test request started; inspect the anchored "
-            "console before increasing the timeout."
-            if count > 0
+            "Console errors or exceptions that no passing test expected were emitted after this test request "
+            "started; inspect the anchored console before increasing the timeout."
+            if not_expected > 0
             else ""
         ),
+        "console_error_expected_by_test_count": expected_by_test,
+        "console_error_not_expected_count": not_expected,
+        "console_error_classification_basis": str(source.get("console_error_classification_basis") or ""),
+        "console_error_samples": compact_console_error_samples(source.get("console_error_samples")),
     }
 
 
@@ -1024,7 +1099,12 @@ def build_test_verdict_summary(
         else str((source_payload or {}).get("recommended_recovery_command") or "")
     )
 
-    console_pressure = _test_console_pressure_summary(source_payload, active_state)
+    console_pressure = _test_console_pressure_summary(
+        source_payload,
+        active_state,
+        request_id=request_id,
+        request_completed=request_completed,
+    )
     if test_verdict == "runtime_timeout" and bool(console_pressure["console_error_pressure_detected"]):
         recommended_next_action = "inspect_console_errors_since_request_start"
 
@@ -1055,7 +1135,7 @@ def build_test_verdict_summary(
         "lifecycle_churn_observed": bool((source_payload or {}).get("lifecycle_churn_observed")) or bridge_changed_since_submission,
         "editor_cleanup_recommended": cleanup_recommended,
         "cleanup_command": (
-            f"request-playmode-set --project-root {project_root} --action exit --timeout-ms 30000"
+            render_launcher_cli("request-playmode-set", project_root, "--action", "exit", "--timeout-ms", "30000")
             if cleanup_recommended
             else ""
         ),
@@ -1066,6 +1146,9 @@ def build_test_verdict_summary(
         **console_pressure,
     }
     summary.update(_test_playmode_accounting_summary(source_payload, source=source))
+    test_environment = compact_test_environment((source_payload or {}).get("test_environment"))
+    if test_environment:
+        summary["test_environment"] = test_environment
     post_lifecycle_heartbeat_age = heartbeat_age_seconds(active_state or {})
     post_lifecycle_confirmed = bool(
         operation == "unity.tests.run_playmode"
@@ -1136,21 +1219,38 @@ def try_recover_completed_response_after_reset(
     current_state: dict[str, Any] | None,
     poll_timeout_ms: int,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    caller_deadline_recovery = operation in CALLER_DEADLINE_RECOVERY_OPERATIONS
+    budget_ms = max(0, int(poll_timeout_ms or 0))
+    poll_interval_ms = (
+        LONG_RECOVERY_POLL_INTERVAL_MS
+        if caller_deadline_recovery and budget_ms > LONG_RECOVERY_POLL_THRESHOLD_MS
+        else 200
+    )
+    started = time.monotonic()
     final_status = build_request_final_status(
         project_root,
         request_id,
         operation,
         current_state=current_state,
-        poll_timeout_ms=poll_timeout_ms,
+        poll_timeout_ms=budget_ms,
+        poll_interval_ms=poll_interval_ms,
         return_reclassified_terminal_immediately=False,
     )
 
+    recovered_response: dict[str, Any] | None = None
     if bool(final_status.get("request_completed")):
-        recovered_response = try_take_recovered_response(project_root, request_id)
-        if recovered_response is not None:
-            return recovered_response, final_status
-
-    return None, final_status
+        stop_reason = "completed"
+        if caller_deadline_recovery:
+            recovered_response = take_recovered_response_with_grace(project_root, request_id)
+        else:
+            recovered_response = try_take_recovered_response(project_root, request_id)
+    elif bool(final_status.get("recovery_gap_detected")):
+        stop_reason = "recovery_gap_detected"
+    else:
+        stop_reason = "recovery_budget_elapsed"
+    final_status["post_reset_recovery_stop_reason"] = stop_reason
+    final_status["post_reset_recovery_elapsed_ms"] = int((time.monotonic() - started) * 1000)
+    return recovered_response, final_status
 
 
 def resolve_post_reset_recovery_timeout_ms(
@@ -1182,6 +1282,10 @@ def build_lifecycle_reset_tool_error(
     transport_host: str = "",
     transport_port: int = 0,
     poll_timeout_ms: int = 1500,
+    post_reset_recovery_mode: str = "",
+    post_reset_recovery_budget_ms: int | None = None,
+    post_reset_recovery_elapsed_ms: int | None = None,
+    post_reset_recovery_stop_reason: str = "",
 ) -> ToolInvocationError:
     delivery_event_path: Path | None = None
     try:
@@ -1299,6 +1403,14 @@ def build_lifecycle_reset_tool_error(
         details["host"] = transport_host
     if transport_port > 0:
         details["port"] = transport_port
+    if post_reset_recovery_mode:
+        details["post_reset_recovery_mode"] = post_reset_recovery_mode
+    if post_reset_recovery_budget_ms is not None:
+        details["post_reset_recovery_budget_ms"] = int(post_reset_recovery_budget_ms)
+    if post_reset_recovery_elapsed_ms is not None:
+        details["post_reset_recovery_elapsed_ms"] = int(post_reset_recovery_elapsed_ms)
+    if post_reset_recovery_stop_reason:
+        details["post_reset_recovery_stop_reason"] = post_reset_recovery_stop_reason
     return ToolInvocationError(code, message, details)
 
 

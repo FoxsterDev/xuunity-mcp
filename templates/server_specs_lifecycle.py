@@ -143,14 +143,14 @@ OPERATION_LIFECYCLE_POLICIES: dict[str, dict[str, Any]] = {
         "wait_for_idle_before": True,
         "wait_for_idle_after": True,
         "idle_stable_cycles_after": 2,
-        "post_reset_recovery_cap_ms": 300000,
+        "post_reset_recovery_caller_deadline": True,
     },
     "unity.tests.run_playmode": {
         "activate_unity": True,
         "wait_for_idle_before": True,
         "wait_for_idle_after": True,
         "idle_stable_cycles_after": 2,
-        "post_reset_recovery_cap_ms": 300000,
+        "post_reset_recovery_caller_deadline": True,
     },
     "unity.playmode.set": {
         "activate_unity": True,
@@ -179,3 +179,9 @@ OPERATION_LIFECYCLE_POLICIES: dict[str, dict[str, Any]] = {
         "post_reset_recovery_cap_ms": 600000,
     },
 }
+
+CALLER_DEADLINE_RECOVERY_OPERATIONS: frozenset[str] = frozenset(
+    operation
+    for operation, policy in OPERATION_LIFECYCLE_POLICIES.items()
+    if policy.get("post_reset_recovery_caller_deadline")
+)

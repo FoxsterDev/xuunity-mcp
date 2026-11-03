@@ -145,6 +145,12 @@ namespace XUUnity.LightMcp.Editor.Core
             public string project_root = "";
             public string outcome = "quit_requested";
             public string requested_at_utc = "";
+            public string quit_mechanism = "";
+            public string quit_expires_at_utc = "";
+            public int editor_pid;
+            public bool editor_application_focused;
+            public bool is_playing;
+            public bool scene_dirty;
             public string validation_evidence = "unity_mcp";
         }
 

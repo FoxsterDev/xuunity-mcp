@@ -111,12 +111,14 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 {
                 }
             }
+            XUUnityLightMcpEditorQuitScheduler.RestoreFromSessionState();
             EditorApplication.update -= OnUpdate;
             EditorApplication.update += OnUpdate;
         }
 
         static void OnUpdate()
         {
+            XUUnityLightMcpEditorQuitScheduler.Tick();
             var now = EditorApplication.timeSinceStartup;
 
             if (now - _lastHeartbeatAt >= _heartbeatIntervalSeconds)

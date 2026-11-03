@@ -199,7 +199,10 @@ For a degraded, blocked or timed-out result, follow the literal
 `recommended_recovery_command` (readiness also retains `recovery_command`), and
 read its prerequisite or manual-action explanation. Do not repeatedly execute a
 state token or blindly repeat `ensure-ready`. The typed `test_filter_no_match`
-result with a concrete refresh command is the reference pattern.
+result with a concrete refresh command is the reference pattern. The command
+starts with the quoted absolute launcher path when the host knows it, so it runs
+from any working directory in bash or cmd; in PowerShell, prefix a `.cmd` or
+`.sh` launcher path with `& `.
 
 Before calling a build a deliverable, verify both its structured result summary
 and the referenced non-empty artifact on disk at handoff time. Record its path,
@@ -661,6 +664,9 @@ PlayMode route:
   --timeout-ms 240000
 ```
 
+Size `--timeout-ms` (MCP `timeoutMs`) above the expected suite duration; it
+bounds the test run including the wait across the Play Mode entry domain reload.
+
 Evidence to report:
 
 - lane: EditMode or PlayMode
@@ -907,13 +913,24 @@ before retrying:
 "$WRAPPER" request-editor-quit \
   --project-root "$PROJECT_ROOT" \
   --timeout-ms 30000 \
-  --wait-for-exit \
   --exit-timeout-ms 30000
 
 "$WRAPPER" verify-editor-closed \
   --project-root "$PROJECT_ROOT" \
   --timeout-ms 30000
 ```
+
+`request-editor-quit` waits for and verifies process exit by default; pass
+`--no-wait-for-exit` only when an unverified acknowledgement is enough
+(`closeout_classification=quit_ack_unverified`). If it fails with
+`editor_quit_ack_without_exit`, read `quit_executing_observed`,
+`quit_expired_observed`, `editor_application_focused` and `scene_dirty`, then follow
+`recommended_recovery_command`: `restore-editor-state --require-closed` when
+`host_opened_session_found=true`, otherwise close the editor manually and run
+`verify-editor-closed` (`explicit_escalation_command` carries the
+`--force-after-ms` form). The quit command never signals the editor itself. If
+it fails with `editor_quit_request_rejected`, Unity never armed an exit; read
+`quit_request_error_code` instead of waiting or restoring.
 
 Only rerun the batch helper after `same_project_editor_closed=true` and
 `process_exit_verified=true`. If `process_visibility_restricted` appears, move

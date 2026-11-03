@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND, launcher_command_name, quoted_shell_path
+from server_core import (
+    BRIDGE_ENABLE_RECOVERY_COMMAND,
+    bridge_enable_recovery_command,
+    launcher_command_prefix,
+    quoted_shell_path,
+)
 
 DISCOVERY_NEXT_ACTION_COMMANDS = {
     "scaffold_project_hook": "{launcher} project-hook-scaffold --hook-name ProjectHook --action-id project.validate --class-name ProjectHook --output-dir {hook_output_dir} --write",
@@ -16,7 +21,7 @@ DISCOVERY_NEXT_ACTION_COMMANDS = {
     "ensure_ready_or_recover_bridge": "{launcher} ensure-ready --project-root {project_root} --open-editor",
     "wait_for_bridge_or_recover_editor": "{launcher} recover-editor-session --project-root {project_root} --timeout-ms 180000",
     "recover_editor_session": "{launcher} recover-editor-session --project-root {project_root} --timeout-ms 180000",
-    "close_same_project_editor_or_use_interactive_lane": "{launcher} request-editor-quit --project-root {project_root} --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000",
+    "close_same_project_editor_or_use_interactive_lane": "{launcher} request-editor-quit --project-root {project_root} --timeout-ms 30000 --exit-timeout-ms 30000",
     "start_or_recover_editor": "{launcher} ensure-ready --project-root {project_root} --open-editor",
     "clear_stale_host_session_and_retry": "{launcher} restore-editor-state --project-root {project_root} --timeout-ms 15000",
     "refresh_host_session_if_needed": "{launcher} request-status-summary --project-root {project_root} --timeout-ms 5000",
@@ -34,11 +39,14 @@ DISCOVERY_NEXT_ACTION_COMMANDS = {
 
 
 def recommended_recovery_command_for_project(project_root: Path, next_action: str) -> str:
-    template = DISCOVERY_NEXT_ACTION_COMMANDS.get(str(next_action or "").strip())
+    action = str(next_action or "").strip()
+    template = DISCOVERY_NEXT_ACTION_COMMANDS.get(action)
     if not template:
         return ""
+    if action == "enable_bridge_and_retry":
+        return bridge_enable_recovery_command(project_root=quoted_shell_path(project_root))
     return template.format(
-        launcher=launcher_command_name(),
+        launcher=launcher_command_prefix(),
         project_root=quoted_shell_path(project_root),
         hook_output_dir=quoted_shell_path(project_root / "Temp" / "XUUnityHookScaffold"),
         unity_apiupdate_log=quoted_shell_path(

@@ -30,6 +30,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public int width;
             public int height;
             public bool is_custom;
+            public string preset_kind = "";
         }
 
         [Serializable]

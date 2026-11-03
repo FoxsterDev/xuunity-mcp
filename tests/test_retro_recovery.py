@@ -221,6 +221,7 @@ class RecoveryGuidanceTests(unittest.TestCase):
                 self.assertNotIn("ensure-ready", result["recovery_command"])
 
     @mock.patch.object(server_core, "is_windows_like_host", lambda: False)
+    @mock.patch.dict(os.environ, {"XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME": "", "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH": ""})
     def test_incident_recovery_actions_resolve_to_parseable_commands(self):
         import shlex
         for action in ("run_compile_gate_and_fix_errors", "fix_compile_errors",

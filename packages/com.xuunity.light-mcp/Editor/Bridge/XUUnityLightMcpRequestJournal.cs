@@ -137,6 +137,31 @@ namespace XUUnity.LightMcp.Editor.Bridge
             });
         }
 
+        public static void WriteEditorQuitExecuting(string requestId)
+        {
+            WriteEvent(new XUUnityLightMcpRequestJournalEvent
+            {
+                event_type = "editor_quit_executing",
+                event_at_utc = UtcNow(),
+                request_id = requestId ?? "",
+                operation = "unity.editor.quit",
+                editor_log_path = XUUnityLightMcpEditorLogAnchors.CurrentEditorLogPath(),
+            });
+        }
+
+        public static void WriteEditorQuitExpired(string requestId, string armedAtUtc)
+        {
+            WriteEvent(new XUUnityLightMcpRequestJournalEvent
+            {
+                event_type = "editor_quit_expired",
+                event_at_utc = UtcNow(),
+                request_id = requestId ?? "",
+                operation = "unity.editor.quit",
+                started_at_utc = armedAtUtc ?? "",
+                reason = "quit_intent_expired",
+            });
+        }
+
         static void WriteEvent(XUUnityLightMcpRequestJournalEvent payload)
         {
             XUUnityLightMcpFileIpcPaths.EnsureDirectories();
@@ -146,6 +171,14 @@ namespace XUUnity.LightMcp.Editor.Bridge
             payload.editor_pid = process.Id;
             payload.bridge_session_id = XUUnityLightMcpBridgeRuntimeState.BridgeSessionId;
             payload.bridge_generation = XUUnityLightMcpBridgeRuntimeState.BridgeGeneration;
+            try
+            {
+                payload.editor_application_focused = XUUnityLightMcpPlayModeLivenessTracker.EditorApplicationFocused;
+                payload.is_playing = EditorApplication.isPlaying;
+            }
+            catch
+            {
+            }
             if (string.IsNullOrWhiteSpace(payload.client_session_id))
             {
                 payload.client_session_id = ResolveClientSession(payload.request_id);

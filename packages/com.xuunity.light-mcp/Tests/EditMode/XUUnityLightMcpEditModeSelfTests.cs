@@ -383,6 +383,53 @@ namespace XUUnity.LightMcp.Tests.EditMode
         }
 
         [Test]
+        public void TestRunPayload_CarriesRequestStartTestEnvironment()
+        {
+            var payload = XUUnityLightMcpTestRunState.BuildPayloadForState(
+                new XUUnityLightMcpPersistedTestRunState
+                {
+                    project_root = "selftest",
+                    test_environment = new XUUnityLightMcpTestEnvironment
+                    {
+                        captured_at = "request_start",
+                        capture_status = "captured",
+                        render_width = 1080,
+                        render_height = 1920,
+                        preset_label = "Portrait",
+                        preset_kind = "fixed_resolution",
+                        preset_width = 1080,
+                        preset_height = 1920,
+                        render_matches_preset = "true",
+                        game_view_group = "Android",
+                        build_target = "Android"
+                    }
+                });
+
+            var environment = payload.test_environment;
+            Assert.That(environment.captured_at, Is.EqualTo("request_start"));
+            Assert.That(environment.capture_status, Is.EqualTo("captured"));
+            Assert.That(environment.render_width, Is.EqualTo(1080));
+            Assert.That(environment.render_height, Is.EqualTo(1920));
+            Assert.That(environment.preset_label, Is.EqualTo("Portrait"));
+            Assert.That(environment.preset_kind, Is.EqualTo("fixed_resolution"));
+            Assert.That(environment.preset_width, Is.EqualTo(1080));
+            Assert.That(environment.preset_height, Is.EqualTo(1920));
+            Assert.That(environment.render_matches_preset, Is.EqualTo("true"));
+            Assert.That(environment.game_view_group, Is.EqualTo("Android"));
+            Assert.That(environment.build_target, Is.EqualTo("Android"));
+
+            var legacy = XUUnityLightMcpTestRunState.BuildPayloadForState(
+                new XUUnityLightMcpPersistedTestRunState { project_root = "selftest", test_environment = null });
+            Assert.That(legacy.test_environment, Is.Not.Null);
+            Assert.That(legacy.test_environment.capture_status, Is.Empty);
+            Assert.That(legacy.test_environment.captured_at, Is.Empty);
+
+            var roundTripped = JsonUtility.FromJson<XUUnityLightMcpPersistedTestRunState>("{\"request_id\":\"legacy\"}");
+            Assert.That(roundTripped.test_environment, Is.Not.Null);
+            Assert.That(roundTripped.test_environment.capture_status, Is.Empty);
+        }
+
+        [Test]
         public void RefreshSettleTimeout_CompileChurnWinsOverSettlePhase()
         {
             Assert.That(

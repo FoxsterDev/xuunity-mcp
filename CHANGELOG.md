@@ -2,10 +2,143 @@
 
 ## Unreleased
 
+- Unity package: `unity.game_view.configure` matches only `FixedResolution`
+  Game View entries. It used to take the first size with the requested width
+  and height of any type, so `9x16` silently selected the builtin
+  aspect-ratio preset `16:9 Portrait` and reported `resolution_applied`. An
+  aspect-ratio-only match now counts as missing: without
+  `allowCreateCustomSize` the error says an aspect-ratio preset of that shape
+  exists but is not a fixed resolution; with it, a fixed-resolution custom size
+  is created. The resolved `game_view` adds `preset_kind` (`fixed_resolution`,
+  `aspect_ratio`, `free`, `unknown`). The Game View reflection probe now
+  requires `GameViewSize.sizeType`, so the capability reports unsupported
+  instead of configure adding duplicate custom sizes when it is missing.
+- Unity package: the editor-quit self-tests no longer write
+  `editor_quit_executing`/`editor_quit_expired` journal events or the
+  `editor quit executing` marker into the host project's journal and editor
+  log. `XUUnityLightMcpEditorQuitScheduler` routes the journal writers and log
+  lines through swappable seams beside `ExitAction`, and the tests cover the
+  executing-before-exit order, the expired path and throwing writers or exit.
+- Unity package: `unity.editor.quit` now exits from the bridge's
+  `EditorApplication.update` tick instead of `EditorApplication.delayCall`.
+  Unity skips `delayCall` while the editor is in Edit Mode and is not the active
+  app, so a quit sent to a background-opened (`open -g`) editor was
+  acknowledged but never ran; about 40 of 47 journaled quits ended as
+  `editor_quit_ack_without_exit`. The quit arms a one-shot intent in
+  `SessionState` (120 s expiry, re-armed after a domain reload) and fires on the
+  first update after the response and `request_completed` are written. The
+  journal records `editor_quit_executing` just before `EditorApplication.Exit`
+  (and `editor_quit_expired` for a stale intent), and the editor log gets
+  `[XUUnityLightMcp] editor quit executing request_id=<id>`. The quit
+  acknowledgement adds `quit_mechanism: editor_update_one_shot`,
+  `quit_expires_at_utc`, `editor_pid`, `editor_application_focused`,
+  `is_playing` and `scene_dirty` (open scenes or the current Prefab Mode
+  stage); `Exit` is forced and discards unsaved changes. Request journal events now carry `editor_application_focused` and
+  `is_playing`.
+- Host launcher: `request-editor-quit` now verifies process exit by default
+  (`--wait-for-exit` is the default and still accepted). `--no-wait-for-exit`
+  restores the ack-only result with `process_exit_verified: false` and
+  `closeout_classification: quit_ack_unverified`. `--force-after-ms` and the
+  30 s `--exit-timeout-ms` default are unchanged. An acknowledged quit whose
+  editor stays live fails with `editor_quit_ack_without_exit` and reports
+  `editor_pid`, `live_project_editor_pids`, `quit_executing_observed`,
+  `quit_expired_observed`, `editor_application_focused` and `scene_dirty`. Its recovery command is
+  `restore-editor-state --require-closed` only for a host-opened editor;
+  otherwise it recommends a manual close plus `verify-editor-closed` and
+  reports `--force-after-ms` as `explicit_escalation_command`. It sends no
+  signal. A quit the bridge rejects (`status: error`, for example
+  `operation_unavailable`) now fails at once with
+  `editor_quit_request_rejected` (`closeout_classification:
+  quit_request_rejected`, `quit_request_error_code`) instead of waiting for an
+  exit that was never armed; only an explicit `--force-after-ms` still
+  escalates (`quit_rejected_force_terminated`). Recovery commands no longer pass `--wait-for-exit`. Older packages
+  report `quit_mechanism: legacy_delay_call`.
 - Correct validation documentation: distinguish the focused `v0.3.84` checks
   from historical multi-version measurements and report the actual host test
   pass/skip totals. This documentation-only follow-up does not change the
   released package or its immutable tag.
+- Host launcher: compact `ensure-ready` output now reports
+  `package_import_state.dependency_declared` from the manifest declaration, so a
+  declared (including git-pinned) dependency no longer reads as `false` while
+  `status-summary` reports the package dependency as ready. The
+  `diagnostic-retro-bundle` package projections now carry the real
+  `manifest_declared`, `dependency_mode` and `alignment` fields instead of keys
+  no producer emitted. The Unity package is unchanged.
+- Host launcher: recovery and next-action commands (`recommended_recovery_command`,
+  `recovery_command`, `cleanup_command`, setup-plan manual actions, the
+  bridge-disabled `setup-plan`/`setup-apply` recipe and `recommended_refresh_command`)
+  now start with the quoted absolute path of the launcher that started the
+  host, published as `XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH` by the Python entry
+  layers, so they run from any working directory in bash and cmd. PowerShell
+  launches get a `& ` prefix; an unknown, missing or mismatched launcher path
+  falls back to the bare launcher name. Cancel, quit-closeout and play-mode
+  cleanup commands now include the launcher and a quoted project root. Restart
+  MCP clients to pick this up; after upgrading an installed launcher, restart
+  twice, because the first start still runs the previous refresh launcher. The
+  bridge-enable recipe keeps its `<plan>` placeholder. The Unity package is
+  unchanged.
+- Host recovery: `unity.tests.run_editmode` and `unity.tests.run_playmode` no
+  longer have a fixed 300 s post-reset recovery cap, so long runs no longer end
+  in `request_lifecycle_reset` at about 5 minutes after the Play Mode entry
+  reload when `timeoutMs` exceeds the suite duration. A runtime config
+  `post_reset_recovery_cap_ms` for these operations is ignored and reported
+  (`runtime-config-show` `ignored_overrides`, full-payload
+  `_xuunity_lifecycle.post_reset_recovery_ignored_override_cap_ms`); other
+  operations keep their caps. Lifecycle-reset errors and `request_reclassified`
+  journal events now carry `post_reset_recovery_mode`,
+  `post_reset_recovery_budget_ms`, `post_reset_recovery_elapsed_ms` and
+  `post_reset_recovery_stop_reason`. A response recovered after a lifecycle
+  reset now also carries `post_reset_recovery_budget_ms`,
+  `post_reset_recovery_elapsed_ms` and `post_reset_recovery_stop_reason:
+  completed` in full-payload `_xuunity_lifecycle`. Test-run recovery also
+  tolerates Unity journaling completion just before it writes the outbox
+  response. The Unity package is unchanged.
+- Test results now record the editor test stand captured when an EditMode or
+  PlayMode test request starts: a `test_environment` object with
+  `capture_status`, Game View render size, preset label, kind and pixel size,
+  `render_matches_preset`, size group and build target. The capture never opens,
+  focuses or waits on a window. It is persisted with the test result and surfaced
+  in compact MCP test payloads, request final status (full and compact) and the
+  compact CLI envelope. Older packages and batch-lane results omit it.
+- Test results now classify console errors per leaf test.
+  `console_error_pressure_detected` now means errors that no passing test
+  expected: an error counts as `expected_by_test` only when the running test
+  passed and either Unity's test framework marked a matching log in that test's
+  log scope as handled by `LogAssert.Expect`, or that log scope had
+  `LogAssert.ignoreFailingMessages` set when the error was logged. Errors
+  without that evidence (logged
+  off the main thread, outside a leaf test, during an interrupted test, or on a
+  test framework version without a readable log scope) stay pressure.
+  `console_error_count_since_request_start` keeps its raw meaning. New fields
+  `console_error_expected_by_test_count`, `console_error_not_expected_count`,
+  `console_error_classification_basis` and up to 3 `console_error_samples`
+  (type, message cut to 240 characters, `active_test`, classification, time;
+  errors that are not expected take slots first) are persisted with the test
+  result, so they survive the Play Mode exit reload, and surface in compact MCP
+  test payloads, request final status (full and compact) and the compact CLI
+  envelope. Errors logged before a domain reload are recorded and keep pressure
+  set afterwards; errors a test logs after resuming across a domain reload are
+  attributed to that test when it finishes. The counts a run reports at
+  completion are persisted with its result (`console_error_count_at_completion`,
+  `console_error_count_trust_class_at_completion`,
+  `console_error_not_expected_count_at_completion`), so request final status for
+  a completed run reports them instead of recomputing from the live editor
+  counter that later runs move. A completed or abandoned result persisted
+  without them reports its recorded attribution as
+  `lower_bound_from_recorded_attribution`, or `unavailable` when it recorded
+  none; final status never reads the live counter for a terminal run. The live
+  heartbeat count applies only while its own request is still running, so a
+  request without a result no longer reports another run's console errors.
+  An older package keeps raw-count pressure;
+  upgrade the package and the host templates together. Batch-lane results
+  report an empty basis.
+- Host launcher: when the compact CLI envelope exceeds its 8 KB budget it now
+  drops `console_error_samples`, then `test_environment`, then cuts
+  `first_failure` text before falling back to the reduced form, and lists what
+  it dropped in `compact_omitted_fields` (with `compact_truncated: true`). The
+  reduced form now keeps `test_verdict`, `total`, `passed`, `failed`,
+  `skipped`, `failure_count` and the console error pressure fields, so failing
+  runs with long failure messages keep their verdict.
 
 ## 0.3.84
 

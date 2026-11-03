@@ -1164,6 +1164,12 @@ class BridgeRuntimeTests(unittest.TestCase):
             self.assertTrue(summary["editor_cleanup_recommended"])
             self.assertIn("request-playmode-set", summary["cleanup_command"])
             self.assertIn("--action exit", summary["cleanup_command"])
+            self.assertEqual(
+                server_bridge_final_status.render_launcher_cli(
+                    "request-playmode-set", project_root, "--action", "exit", "--timeout-ms", "30000"
+                ),
+                summary["cleanup_command"],
+            )
 
     def test_build_request_final_status_does_not_call_pre_start_timeout_runtime_timeout(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

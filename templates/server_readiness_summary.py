@@ -48,7 +48,7 @@ def _compact_bridge_state(state: dict[str, Any]) -> dict[str, Any]:
 def _compact_import_state(state: dict[str, Any]) -> dict[str, Any]:
     return {
         "import_state": str(state.get("import_state") or ""),
-        "dependency_declared": bool(state.get("dependency_declared")),
+        "dependency_declared": bool(state.get("manifest_declared")),
         "lock_entry_present": bool(state.get("lock_entry_present")),
         "package_cache_present": bool(state.get("package_cache_present")),
         "bridge_state_present": bool(state.get("bridge_state_present")),

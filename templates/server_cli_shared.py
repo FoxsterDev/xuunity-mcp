@@ -10,6 +10,7 @@ from typing import Any
 from server_core import (
     ToolInvocationError,
     launcher_command_name,
+    launcher_command_prefix,
     quoted_shell_path,
     read_json,
     render_launcher_cli,
@@ -115,6 +116,7 @@ from server_editor_host import (
     build_batch_validation_command,
     build_plain_batch_build_command,
     resolve_editor_log_path,
+    try_read_host_editor_session_state,
     verify_project_editor_closed,
 )
 from server_license import build_license_capabilities

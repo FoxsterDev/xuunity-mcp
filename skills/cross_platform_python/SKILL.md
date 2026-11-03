@@ -18,6 +18,7 @@ The Python host runs on macOS daily and on Windows/Linux only when a colleague o
 ## 2. Path Flavor Is Part of the Contract
 
 - Shell-facing strings: `server_core.quoted_shell_path()` / `render_launcher_cli()` — native form + quotes on Windows-like hosts, `as_posix()` elsewhere. Never embed bare `str(path)` in a command template (see cross-platform-shell skill rule 8).
+- The launcher token is the exception: `launcher_command_prefix()` always renders the absolute launcher path with forward slashes, because bash treats a command word as a path only when it contains `/`, while cmd accepts it quoted. Route every rendered command (and the bridge-enable recipe via `bridge_enable_recovery_command()`) through it; never format a launcher-less verb.
 - Preserve `PurePath` flavor in helpers: wrapping an incoming `PureWindowsPath` in `Path(...)` on a POSIX host silently rewrites separators.
 - Durable values read later by native Windows tools must be host-native; values read by Git Bash must be POSIX (cross-platform-shell skill rule 7).
 

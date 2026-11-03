@@ -20,6 +20,31 @@ ARTIFACT_GROUP_NAMES = (
 
 COMPACT_TEST_FAILURE_LIMIT = 25
 
+TEST_ENVIRONMENT_FIELDS = (
+    "captured_at",
+    "capture_status",
+    "render_width",
+    "render_height",
+    "preset_label",
+    "preset_kind",
+    "preset_width",
+    "preset_height",
+    "render_matches_preset",
+    "game_view_group",
+    "build_target",
+)
+TEST_ENVIRONMENT_INT_FIELDS = frozenset({"render_width", "render_height", "preset_width", "preset_height"})
+TEST_ENVIRONMENT_TEXT_LIMIT = 64
+TEST_ENVIRONMENT_ENCODED_TEXT_LIMIT = 128
+
+CONSOLE_ERROR_SAMPLE_LIMIT = 3
+CONSOLE_ERROR_SAMPLE_MESSAGE_LIMIT = 240
+CONSOLE_ERROR_SAMPLE_ACTIVE_TEST_LIMIT = 160
+CONSOLE_ERROR_SAMPLE_CLASSES = ("expected_by_test", "unexpected", "unclassified")
+CONSOLE_ERROR_SAMPLE_FIELDS = ("type", "message", "active_test", "classification", "logged_at_utc")
+CONSOLE_ERROR_SAMPLE_TYPES = ("error", "exception", "assert")
+CONSOLE_ERROR_CLASSIFICATION_BASES = ("utf_log_scope", "utf_log_scope_unavailable", "none")
+
 
 def parse_utc_timestamp(value: Any) -> float | None:
     return parse_core_utc_timestamp(value)
@@ -101,6 +126,95 @@ def compact_test_failures(value: Any, limit: int = COMPACT_TEST_FAILURE_LIMIT) -
         if len(failures) >= limit:
             break
     return failures
+
+
+def _bounded_environment_text(value: Any) -> str:
+    text = str(value if value is not None else "").strip()[:TEST_ENVIRONMENT_TEXT_LIMIT]
+    while len(json.dumps(text, ensure_ascii=True)) - 2 > TEST_ENVIRONMENT_ENCODED_TEXT_LIMIT:
+        text = text[:-1]
+    return text
+
+
+def _environment_int(value: Any) -> int:
+    if isinstance(value, bool):
+        return 0
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def compact_test_environment(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or not str(value.get("capture_status") or "").strip():
+        return {}
+
+    compact: dict[str, Any] = {}
+    for key in TEST_ENVIRONMENT_FIELDS:
+        if key in TEST_ENVIRONMENT_INT_FIELDS:
+            compact[key] = _environment_int(value.get(key))
+        elif key == "render_matches_preset":
+            flag = str(value.get(key) or "").strip().lower()
+            compact[key] = flag if flag in {"true", "false"} else ""
+        else:
+            compact[key] = _bounded_environment_text(value.get(key))
+    return compact
+
+
+def _bounded_sample_text(value: Any, limit: int) -> str:
+    text = str(value if value is not None else "")
+    truncated = len(text) > limit
+    text = text[:limit]
+    while len(json.dumps(text, ensure_ascii=True)) - 2 > limit * 2:
+        text = text[:-1]
+        truncated = True
+    return text + "..." if truncated else text
+
+
+def compact_console_error_samples(value: Any, limit: int = CONSOLE_ERROR_SAMPLE_LIMIT) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+
+    samples: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        classification = str(item.get("classification") or "")
+        if classification not in CONSOLE_ERROR_SAMPLE_CLASSES:
+            classification = "unclassified"
+        sample_type = str(item.get("type") or "")
+        samples.append(
+            {
+                "type": sample_type if sample_type in CONSOLE_ERROR_SAMPLE_TYPES else "error",
+                "message": _bounded_sample_text(item.get("message"), CONSOLE_ERROR_SAMPLE_MESSAGE_LIMIT),
+                "active_test": _bounded_sample_text(item.get("active_test"), CONSOLE_ERROR_SAMPLE_ACTIVE_TEST_LIMIT),
+                "classification": classification,
+                "logged_at_utc": _bounded_sample_text(item.get("logged_at_utc"), 32),
+            }
+        )
+    samples.sort(key=lambda sample: sample["classification"] == "expected_by_test")
+    return samples[: max(0, limit)]
+
+
+def _non_negative_int(value: Any) -> int:
+    if isinstance(value, bool):
+        return 0
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def not_expected_console_error_count(source: dict[str, Any], raw_count: int, current_session_id: str) -> int:
+    expected_session = str(source.get("console_error_expected_by_test_counter_session_id") or "")
+    expected_in_session = (
+        _non_negative_int(source.get("console_error_expected_by_test_count_in_session"))
+        if expected_session and expected_session == str(current_session_id or "")
+        else 0
+    )
+    return max(
+        max(0, int(raw_count) - expected_in_session),
+        _non_negative_int(source.get("console_error_not_expected_recorded_count")),
+    )
 
 
 def test_failure_count(value: Any) -> int:

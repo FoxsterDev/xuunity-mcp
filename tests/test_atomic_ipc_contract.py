@@ -216,6 +216,36 @@ class FileIpcResponseReaderTest(unittest.TestCase):
             self.assertEqual({"status": "ok"}, recovered)
             self.assertFalse(path.is_file())
 
+    def test_grace_pickup_retries_torn_response_and_never_unlinks_it(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = make_bridge_project(Path(tmp_dir) / "Proj")
+            request_id = str(FIXED_REQUEST_ID)
+            path = server_bridge_final_status.response_path(project_root, request_id)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('{"status": "ok', encoding="utf-8")
+
+            recovered = server_bridge_final_status.take_recovered_response_with_grace(
+                project_root, request_id, grace_ms=200
+            )
+            self.assertIsNone(recovered)
+            self.assertTrue(path.is_file())
+
+            def finish_write() -> None:
+                time.sleep(0.3)
+                path.write_text(json.dumps({"status": "ok"}), encoding="utf-8")
+
+            writer = threading.Thread(target=finish_write)
+            writer.start()
+            try:
+                recovered = server_bridge_final_status.take_recovered_response_with_grace(
+                    project_root, request_id, grace_ms=5000
+                )
+            finally:
+                writer.join()
+
+            self.assertEqual({"status": "ok"}, recovered)
+            self.assertFalse(path.is_file())
+
 
 class CSharpAtomicWriterContractTest(unittest.TestCase):
     def csharp_files(self) -> list[Path]:
@@ -287,6 +317,31 @@ class CSharpAtomicWriterContractTest(unittest.TestCase):
             {"packages/com.xuunity.light-mcp/Editor/Bridge/XUUnityLightMcpBridgeBootstrap.cs": 1},
             callers,
         )
+
+    def test_editor_quit_path_does_not_use_delay_call(self) -> None:
+        # Unity skips delayCall while an Edit Mode editor is not the active app.
+        operations = CSHARP_EDITOR_ROOT / "Operations"
+        for name in ("XUUnityLightMcpEditorQuitOperation.cs", "XUUnityLightMcpEditorQuitScheduler.cs"):
+            text = (operations / name).read_text(encoding="utf-8")
+            self.assertNotIn("delayCall", text, name)
+        self.assertIn("EditorApplication.Exit", (operations / "XUUnityLightMcpEditorQuitScheduler.cs").read_text(encoding="utf-8"))
+
+    def test_editor_package_has_no_delay_call_on_request_paths(self) -> None:
+        offenders = [
+            source.relative_to(REPO_ROOT).as_posix()
+            for source in self.csharp_files()
+            if "EditorApplication.delayCall" in source.read_text(encoding="utf-8")
+        ]
+        self.assertEqual([], offenders)
+
+    def test_editor_quit_scheduler_ticks_first_on_update_and_restores_before_subscribe(self) -> None:
+        text = (CSHARP_EDITOR_ROOT / "Bridge" / "XUUnityLightMcpBridgeBootstrap.cs").read_text(encoding="utf-8")
+        restore = text.index("XUUnityLightMcpEditorQuitScheduler.RestoreFromSessionState();")
+        subscribe = text.index("EditorApplication.update += OnUpdate;")
+        self.assertLess(restore, subscribe)
+        on_update = text.index("static void OnUpdate()")
+        body = text[text.index("{", on_update) + 1:].lstrip()
+        self.assertTrue(body.startswith("XUUnityLightMcpEditorQuitScheduler.Tick();"))
 
     def test_bridge_state_and_response_writers_use_atomic_publisher(self) -> None:
         for relative in (

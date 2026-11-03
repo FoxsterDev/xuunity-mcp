@@ -389,7 +389,7 @@ Notes:
 - it expects the same Unity project editor to be closed before execution
 - another Unity editor process for a different project does not block this lane
 - if the same project editor is open, use
-  `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`
+  `request-editor-quit --project-root <project> --timeout-ms 30000 --exit-timeout-ms 30000`
   and then `verify-editor-closed --project-root <project> --timeout-ms 30000`
   before retrying
 - if batchmode is blocked by license/Hub/headless state, default

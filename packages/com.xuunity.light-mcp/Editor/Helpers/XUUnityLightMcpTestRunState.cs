@@ -19,6 +19,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             bool filterRequested,
             int requestTimeoutMs)
         {
+            var environment = XUUnityLightMcpGameViewUtility.CaptureTestEnvironment();
             lock (Gate)
             {
                 XUUnityLightMcpFileIpcPaths.EnsureDirectories();
@@ -41,7 +42,9 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     response_handoff_state = "pending",
                     console_error_count_at_request_start = XUUnityLightMcpConsoleBuffer.ErrorCount,
                     console_error_counter_session_id_at_request_start = XUUnityLightMcpConsoleBuffer.CounterSessionId,
+                    console_error_classification_basis = XUUnityLightMcpConsoleErrorClassification.BasisNone,
                     failures = new System.Collections.Generic.List<XUUnityLightMcpTestFailure>(),
+                    test_environment = environment,
                 };
 
                 PersistLocked(state);
@@ -124,7 +127,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
         }
 
-        public static void RecordTestStarted(string testName)
+        public static void RecordTestStarted(string testName, XUUnityLightMcpConsoleErrorAttribution attribution = null)
         {
             lock (Gate)
             {
@@ -136,11 +139,16 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 state.run_phase = "running";
                 state.last_started_test = testName ?? "";
                 state.last_progress_at_utc = UtcNow();
+                MergeConsoleErrorAttribution(state, attribution);
                 PersistLocked(state);
             }
         }
 
-        public static void RecordTestFinished(string testStatus, string testName, string message)
+        public static void RecordTestFinished(
+            string testStatus,
+            string testName,
+            string message,
+            XUUnityLightMcpConsoleErrorAttribution attribution = null)
         {
             lock (Gate)
             {
@@ -170,6 +178,27 @@ namespace XUUnity.LightMcp.Editor.Helpers
                         break;
                 }
 
+                MergeConsoleErrorAttribution(state, attribution);
+                PersistLocked(state);
+            }
+        }
+
+        public static void RecordConsoleErrorAttribution(XUUnityLightMcpConsoleErrorAttribution attribution)
+        {
+            if (attribution == null || attribution.IsEmpty)
+            {
+                return;
+            }
+
+            lock (Gate)
+            {
+                if (!TryLoadLocked(out var state)
+                    || !string.IsNullOrWhiteSpace(state.completed_at_utc)
+                    || !MergeConsoleErrorAttribution(state, attribution))
+                {
+                    return;
+                }
+
                 PersistLocked(state);
             }
         }
@@ -177,7 +206,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
         public static XUUnityLightMcpResponse CompleteAndBuildResponse(
             string completionBasis,
             string playmodeStateAfterSettle,
-            XUUnityLightMcpTestRunSummary finalSummary)
+            XUUnityLightMcpTestRunSummary finalSummary,
+            XUUnityLightMcpConsoleErrorAttribution attribution = null)
         {
             lock (Gate)
             {
@@ -186,7 +216,9 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     return XUUnityLightMcpResponseWriter.Error("", "missing_test_run_state", "Test run state was lost before completion.");
                 }
 
+                MergeConsoleErrorAttribution(state, attribution);
                 ApplyFinalSummaryLocked(state, finalSummary);
+                FreezeConsoleErrorOutcome(state, XUUnityLightMcpConsoleBuffer.ErrorCount, XUUnityLightMcpConsoleBuffer.CounterSessionId);
                 state.completed_at_utc = UtcNow();
                 state.run_phase = string.Equals(state.run_phase, "timed_out", StringComparison.Ordinal)
                     ? "settled_after_timeout"
@@ -314,7 +346,13 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static XUUnityLightMcpTestsPayload BuildPayloadLocked(XUUnityLightMcpPersistedTestRunState state)
         {
-            ResolveConsoleErrorPressure(state, out var consoleErrorCount, out var consoleTrustClass);
+            ResolveConsoleErrorOutcome(
+                state,
+                XUUnityLightMcpConsoleBuffer.ErrorCount,
+                XUUnityLightMcpConsoleBuffer.CounterSessionId,
+                out var consoleErrorCount,
+                out var consoleTrustClass,
+                out var notExpectedCount);
             return new XUUnityLightMcpTestsPayload
             {
                 project_root = state.project_root ?? XUUnityLightMcpFileIpcPaths.ProjectRootPath,
@@ -354,9 +392,54 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 lifecycle_churn_observed = state.lifecycle_churn_observed,
                 console_error_count_since_request_start = consoleErrorCount,
                 console_error_count_trust_class = consoleTrustClass,
-                console_error_pressure_detected = consoleErrorCount > 0,
+                console_error_pressure_detected = notExpectedCount > 0,
+                console_error_expected_by_test_count = Math.Max(0L, state.console_error_expected_by_test_count),
+                console_error_not_expected_count = notExpectedCount,
+                console_error_classification_basis = state.console_error_classification_basis ?? "",
+                console_error_samples = state.console_error_samples == null
+                    ? new System.Collections.Generic.List<XUUnityLightMcpConsoleErrorSample>()
+                    : new System.Collections.Generic.List<XUUnityLightMcpConsoleErrorSample>(state.console_error_samples),
+                test_environment = state.test_environment ?? new XUUnityLightMcpTestEnvironment(),
                 validation_evidence = "unity_mcp"
             };
+        }
+
+        internal static void FreezeConsoleErrorOutcome(
+            XUUnityLightMcpPersistedTestRunState state,
+            long currentCount,
+            string currentSessionId)
+        {
+            if (state == null)
+            {
+                return;
+            }
+
+            ResolveConsoleErrorPressure(state, currentCount, currentSessionId, out var count, out var trustClass);
+            state.console_error_count_at_completion = count;
+            state.console_error_count_trust_class_at_completion = trustClass ?? "";
+            state.console_error_not_expected_count_at_completion = ResolveNotExpectedConsoleErrorCount(state, count, currentSessionId);
+        }
+
+        internal static void ResolveConsoleErrorOutcome(
+            XUUnityLightMcpPersistedTestRunState state,
+            long currentCount,
+            string currentSessionId,
+            out long count,
+            out string trustClass,
+            out long notExpectedCount)
+        {
+            if (state != null && !string.IsNullOrEmpty(state.console_error_count_trust_class_at_completion))
+            {
+                count = Math.Max(0L, state.console_error_count_at_completion);
+                trustClass = state.console_error_count_trust_class_at_completion;
+                notExpectedCount = Math.Max(
+                    Math.Max(0L, state.console_error_not_expected_count_at_completion),
+                    Math.Max(0L, state.console_error_not_expected_recorded_count));
+                return;
+            }
+
+            ResolveConsoleErrorPressure(state, currentCount, currentSessionId, out count, out trustClass);
+            notExpectedCount = ResolveNotExpectedConsoleErrorCount(state, count, currentSessionId);
         }
 
         internal static void ResolveConsoleErrorPressure(
@@ -401,6 +484,126 @@ namespace XUUnity.LightMcp.Editor.Helpers
             trustClass = string.IsNullOrEmpty(state.console_error_counter_session_id_at_request_start)
                 ? "lower_bound_without_request_baseline"
                 : "lower_bound_after_domain_reload";
+        }
+
+        internal static long ResolveNotExpectedConsoleErrorCount(
+            XUUnityLightMcpPersistedTestRunState state,
+            long rawCount,
+            string currentSessionId)
+        {
+            if (state == null)
+            {
+                return Math.Max(0L, rawCount);
+            }
+
+            var expectedInSession = !string.IsNullOrEmpty(state.console_error_expected_by_test_counter_session_id)
+                                    && string.Equals(
+                                        state.console_error_expected_by_test_counter_session_id,
+                                        currentSessionId,
+                                        StringComparison.Ordinal)
+                ? Math.Max(0L, state.console_error_expected_by_test_count_in_session)
+                : 0L;
+            return Math.Max(
+                Math.Max(0L, rawCount - expectedInSession),
+                Math.Max(0L, state.console_error_not_expected_recorded_count));
+        }
+
+        internal static bool MergeConsoleErrorAttribution(
+            XUUnityLightMcpPersistedTestRunState state,
+            XUUnityLightMcpConsoleErrorAttribution attribution)
+        {
+            if (state == null || attribution == null || attribution.IsEmpty)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(attribution.request_id)
+                && !string.Equals(attribution.request_id, state.request_id ?? "", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            state.console_error_samples ??= new System.Collections.Generic.List<XUUnityLightMcpConsoleErrorSample>();
+            foreach (var sample in attribution.samples)
+            {
+                AddConsoleErrorSample(state.console_error_samples, sample);
+            }
+
+            var expected = Math.Max(0L, attribution.expected_by_test_count);
+            state.console_error_expected_by_test_count += expected;
+            var sessionId = attribution.counter_session_id ?? "";
+            if (!string.Equals(state.console_error_expected_by_test_counter_session_id ?? "", sessionId, StringComparison.Ordinal))
+            {
+                state.console_error_expected_by_test_counter_session_id = sessionId;
+                state.console_error_expected_by_test_count_in_session = 0L;
+            }
+
+            state.console_error_expected_by_test_count_in_session += expected;
+            state.console_error_not_expected_recorded_count += Math.Max(0L, attribution.not_expected_count);
+            state.console_error_classification_basis = MergeClassificationBasis(
+                state.console_error_classification_basis,
+                attribution.basis);
+            return true;
+        }
+
+        static void AddConsoleErrorSample(
+            System.Collections.Generic.List<XUUnityLightMcpConsoleErrorSample> samples,
+            XUUnityLightMcpConsoleErrorSample sample)
+        {
+            if (sample == null)
+            {
+                return;
+            }
+
+            if (samples.Count < XUUnityLightMcpConsoleErrorClassification.MaxSamples)
+            {
+                samples.Add(sample);
+                return;
+            }
+
+            if (IsExpectedSample(sample))
+            {
+                return;
+            }
+
+            for (var index = samples.Count - 1; index >= 0; index--)
+            {
+                if (IsExpectedSample(samples[index]))
+                {
+                    samples.RemoveAt(index);
+                    samples.Add(sample);
+                    return;
+                }
+            }
+        }
+
+        static bool IsExpectedSample(XUUnityLightMcpConsoleErrorSample sample)
+        {
+            return sample != null
+                   && string.Equals(
+                       sample.classification,
+                       XUUnityLightMcpConsoleErrorClassification.ExpectedByTest,
+                       StringComparison.Ordinal);
+        }
+
+        static string MergeClassificationBasis(string current, string incoming)
+        {
+            return ClassificationBasisRank(incoming) > ClassificationBasisRank(current) ? incoming : current ?? "";
+        }
+
+        static int ClassificationBasisRank(string basis)
+        {
+            switch (basis ?? "")
+            {
+                case XUUnityLightMcpConsoleErrorClassification.BasisLogScopeUnavailable:
+                    return 3;
+                case XUUnityLightMcpConsoleErrorClassification.BasisLogScope:
+                    return 2;
+                case XUUnityLightMcpConsoleErrorClassification.BasisNone:
+                    return 1;
+                default:
+                    return 0;
+            }
         }
 
         static string ResolveStatus(XUUnityLightMcpPersistedTestRunState state)
@@ -626,6 +829,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             state.failures ??= new System.Collections.Generic.List<XUUnityLightMcpTestFailure>();
+            state.test_environment ??= new XUUnityLightMcpTestEnvironment();
+            state.console_error_samples ??= new System.Collections.Generic.List<XUUnityLightMcpConsoleErrorSample>();
         }
     }
 

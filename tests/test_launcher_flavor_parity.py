@@ -57,6 +57,7 @@ class LauncherFlavorParityTests(unittest.TestCase):
             "XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET",
             "XUUNITY_LIGHT_UNITY_MCP_AIRROOT",
             "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME",
+            "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH",
         ):
             env.pop(key, None)
         return env
@@ -64,6 +65,7 @@ class LauncherFlavorParityTests(unittest.TestCase):
     def normalize(self, text: str) -> str:
         for name in (WRAPPER_SH.name, WRAPPER_CMD.name, WRAPPER_PS1.name):
             text = text.replace(name, NAME_TOKEN)
+        text = text.replace('& \\"', '\\"').replace('& "', '"')
         return text.replace("\r\n", "\n")
 
     def run_flavor(self, flavor: str, args: list, env: dict):

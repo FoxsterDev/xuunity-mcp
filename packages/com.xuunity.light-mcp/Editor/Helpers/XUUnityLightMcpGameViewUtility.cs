@@ -13,6 +13,16 @@ namespace XUUnity.LightMcp.Editor.Helpers
     {
         const int RepaintSettlingDelayMs = 100;
         internal const string FixedResolutionSizeTypeName = "FixedResolution";
+        internal const string AspectRatioSizeTypeName = "AspectRatio";
+        internal const int TestEnvironmentTextLimit = 64;
+        internal const string CaptureStatusCaptured = "captured";
+        internal const string CaptureStatusNotRendered = "game_view_not_rendered";
+        internal const string CaptureStatusNoGameView = "no_game_view";
+        internal const string CaptureStatusUnavailable = "unavailable";
+        internal const string PresetKindFixedResolution = "fixed_resolution";
+        internal const string PresetKindAspectRatio = "aspect_ratio";
+        internal const string PresetKindFree = "free";
+        internal const string PresetKindUnknown = "unknown";
         static readonly BindingFlags AllBindings = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
         public static XUUnityLightMcpGameViewProbeResult ProbeReflectionSurface()
@@ -33,6 +43,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 RequireProperty(sizeType, "width");
                 RequireProperty(sizeType, "height");
                 RequireProperty(sizeType, "baseText");
+                var sizeTypeProperty = RequireProperty(sizeType, "sizeType");
+                if (sizeTypeProperty.PropertyType != sizeTypeEnum)
+                {
+                    throw new InvalidOperationException(
+                        $"Property 'sizeType' on {sizeType.FullName} is {sizeTypeProperty.PropertyType.FullName} instead of {sizeTypeEnum.FullName}.");
+                }
                 RequireConstructor(sizeType, new[] { sizeTypeEnum, typeof(int), typeof(int), typeof(string) });
 
                 var instance = GetGameViewSizesInstance();
@@ -221,6 +237,178 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return false;
         }
 
+        // Request-start evidence only: never opens, focuses or repaints a window and never sleeps.
+        internal static XUUnityLightMcpTestEnvironment CaptureTestEnvironment()
+        {
+            var environment = new XUUnityLightMcpTestEnvironment
+            {
+                captured_at = "request_start",
+                capture_status = CaptureStatusUnavailable
+            };
+
+            try
+            {
+                environment.build_target = BoundTestEnvironmentText(EditorUserBuildSettings.activeBuildTarget.ToString());
+                environment.game_view_group = BoundTestEnvironmentText(GetActiveGroupName());
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                var gameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+                if (gameViewType == null || gameViewType.GetField("m_RenderTexture", AllBindings) == null)
+                {
+                    return environment;
+                }
+
+                object presetSource;
+                if (TryGetExistingRenderTarget(out var renderedWindow, out var renderWidth, out var renderHeight))
+                {
+                    environment.capture_status = CaptureStatusCaptured;
+                    environment.render_width = renderWidth;
+                    environment.render_height = renderHeight;
+                    presetSource = renderedWindow;
+                }
+                else
+                {
+                    presetSource = FindExistingGameView(gameViewType);
+                    environment.capture_status = presetSource == null ? CaptureStatusNoGameView : CaptureStatusNotRendered;
+                }
+
+                if (presetSource != null)
+                {
+                    var sizeObject = gameViewType.GetProperty("currentGameViewSize", AllBindings)?.GetValue(presetSource, null);
+                    if (sizeObject == null)
+                    {
+                        ApplyPresetToTestEnvironment(environment, "", "", 0, 0);
+                    }
+                    else
+                    {
+                        var label = ReadStringProperty(sizeObject, "baseText");
+                        if (string.IsNullOrWhiteSpace(label))
+                        {
+                            label = ReadStringProperty(sizeObject, "displayText");
+                        }
+
+                        ApplyPresetToTestEnvironment(
+                            environment,
+                            label,
+                            ReadSizeTypeName(sizeObject),
+                            ReadIntProperty(sizeObject, "width"),
+                            ReadIntProperty(sizeObject, "height"));
+                    }
+                }
+            }
+            catch
+            {
+                environment.capture_status = CaptureStatusUnavailable;
+                environment.render_width = 0;
+                environment.render_height = 0;
+                environment.preset_label = "";
+                environment.preset_kind = "";
+                environment.preset_width = 0;
+                environment.preset_height = 0;
+                environment.render_matches_preset = "";
+            }
+
+            return environment;
+        }
+
+        internal static void ApplyPresetToTestEnvironment(
+            XUUnityLightMcpTestEnvironment environment,
+            string label,
+            string sizeTypeName,
+            int width,
+            int height)
+        {
+            var kind = ClassifyPresetKind(sizeTypeName, width, height);
+            var isFixed = kind == PresetKindFixedResolution;
+            environment.preset_label = BoundTestEnvironmentText(label);
+            environment.preset_kind = kind;
+            environment.preset_width = isFixed ? width : 0;
+            environment.preset_height = isFixed ? height : 0;
+            environment.render_matches_preset =
+                isFixed && environment.capture_status == CaptureStatusCaptured
+                        && environment.render_width > 0 && environment.render_height > 0
+                    ? (environment.render_width == width && environment.render_height == height ? "true" : "false")
+                    : "";
+        }
+
+        internal static string ClassifyPresetKind(string sizeTypeName, int width, int height)
+        {
+            if (string.Equals(sizeTypeName, FixedResolutionSizeTypeName, StringComparison.Ordinal))
+            {
+                return width > 0 && height > 0 ? PresetKindFixedResolution : PresetKindUnknown;
+            }
+
+            if (string.Equals(sizeTypeName, AspectRatioSizeTypeName, StringComparison.Ordinal))
+            {
+                return width <= 0 && height <= 0 ? PresetKindFree : PresetKindAspectRatio;
+            }
+
+            return PresetKindUnknown;
+        }
+
+        internal static bool IsFixedResolutionMatch(string sizeTypeName, int width, int height, int targetWidth, int targetHeight)
+        {
+            return width == targetWidth
+                && height == targetHeight
+                && ClassifyPresetKind(sizeTypeName, width, height) == PresetKindFixedResolution;
+        }
+
+        internal static bool IsAspectRatioShapeMatch(string sizeTypeName, int width, int height, int targetWidth, int targetHeight)
+        {
+            return width == targetWidth
+                && height == targetHeight
+                && ClassifyPresetKind(sizeTypeName, width, height) == PresetKindAspectRatio;
+        }
+
+        internal static string DescribeMissingFixedResolution(int width, int height, string groupName, string aspectRatioLabel)
+        {
+            var message = $"Game View fixed resolution {width}x{height} is not available in the active group '{groupName}'. ";
+            if (aspectRatioLabel != null)
+            {
+                var name = string.IsNullOrWhiteSpace(aspectRatioLabel) ? "" : $" '{aspectRatioLabel}'";
+                message += $"An aspect-ratio preset{name} of that shape exists but is not a fixed resolution. ";
+            }
+
+            return message + "Re-run with allowCreateCustomSize=true if persistent editor user-state changes are acceptable.";
+        }
+
+        internal static string BoundTestEnvironmentText(string value)
+        {
+            var text = (value ?? "").Trim();
+            if (text.Length <= TestEnvironmentTextLimit)
+            {
+                return text;
+            }
+
+            var cut = TestEnvironmentTextLimit;
+            if (char.IsHighSurrogate(text[cut - 1]))
+            {
+                cut--;
+            }
+
+            return text.Substring(0, cut);
+        }
+
+        static UnityEngine.Object FindExistingGameView(Type gameViewType)
+        {
+            var lastFocusedGetter = gameViewType.GetProperty("lastFocusedGameView", AllBindings)?.GetGetMethod(true);
+            if (lastFocusedGetter != null
+                && lastFocusedGetter.IsStatic
+                && lastFocusedGetter.Invoke(null, null) is UnityEngine.Object lastFocused
+                && lastFocused != null)
+            {
+                return lastFocused;
+            }
+
+            var existing = Resources.FindObjectsOfTypeAll(gameViewType);
+            return existing != null && existing.Length > 0 ? existing[0] : null;
+        }
+
         static bool TryReadRenderTargetSize(object candidate, FieldInfo renderTextureField, out int width, out int height)
         {
             width = 0;
@@ -265,25 +453,24 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 : requestedLabel.Trim();
 
             var groupObject = GetGameViewGroup(activeGroupType);
-            var matchIndex = FindSizeIndex(groupObject, width, height);
+            var matchIndex = FindFixedResolutionIndex(groupObject, width, height, out var aspectRatioLabel);
             var createdCustom = false;
             if (matchIndex < 0)
             {
                 if (!allowCreateCustomSize)
                 {
                     throw new InvalidOperationException(
-                        $"Game View size {width}x{height} is not available in the active group '{activeGroupName}'. " +
-                        "Re-run with allowCreateCustomSize=true if persistent editor user-state changes are acceptable.");
+                        DescribeMissingFixedResolution(width, height, activeGroupName, aspectRatioLabel));
                 }
 
                 AddCustomSize(groupObject, width, height, label);
-                matchIndex = FindSizeIndex(groupObject, width, height);
+                matchIndex = FindFixedResolutionIndex(groupObject, width, height, out _);
                 createdCustom = true;
             }
 
             if (matchIndex < 0)
             {
-                throw new InvalidOperationException($"Unable to add or select Game View size {width}x{height}.");
+                throw new InvalidOperationException($"Unable to add or select Game View fixed resolution {width}x{height}.");
             }
 
             var gameView = EnsureGameView();
@@ -541,8 +728,9 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return groupObject;
         }
 
-        static int FindSizeIndex(object groupObject, int width, int height)
+        static int FindFixedResolutionIndex(object groupObject, int width, int height, out string aspectRatioLabel)
         {
+            aspectRatioLabel = null;
             var groupType = groupObject.GetType();
             var getBuiltinCount = groupType.GetMethod("GetBuiltinCount", AllBindings);
             var getCustomCount = groupType.GetMethod("GetCustomCount", AllBindings);
@@ -562,11 +750,18 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     continue;
                 }
 
+                var sizeTypeName = ReadSizeTypeName(sizeObject);
                 var currentWidth = ReadIntProperty(sizeObject, "width");
                 var currentHeight = ReadIntProperty(sizeObject, "height");
-                if (currentWidth == width && currentHeight == height)
+                if (IsFixedResolutionMatch(sizeTypeName, currentWidth, currentHeight, width, height))
                 {
                     return index;
+                }
+
+                if (aspectRatioLabel == null
+                    && IsAspectRatioShapeMatch(sizeTypeName, currentWidth, currentHeight, width, height))
+                {
+                    aspectRatioLabel = ReadStringProperty(sizeObject, "baseText");
                 }
             }
 
@@ -597,14 +792,22 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static XUUnityLightMcpGameViewData BuildSizeData(object sizeObject, string groupName, bool isCustom)
         {
+            var width = ReadIntProperty(sizeObject, "width");
+            var height = ReadIntProperty(sizeObject, "height");
             return new XUUnityLightMcpGameViewData
             {
                 group = groupName,
                 label = ReadStringProperty(sizeObject, "baseText"),
-                width = ReadIntProperty(sizeObject, "width"),
-                height = ReadIntProperty(sizeObject, "height"),
-                is_custom = isCustom
+                width = width,
+                height = height,
+                is_custom = isCustom,
+                preset_kind = ClassifyPresetKind(ReadSizeTypeName(sizeObject), width, height)
             };
+        }
+
+        static string ReadSizeTypeName(object sizeObject)
+        {
+            return Convert.ToString(sizeObject.GetType().GetProperty("sizeType", AllBindings)?.GetValue(sizeObject, null)) ?? "";
         }
 
         static int ReadIntProperty(object instance, string propertyName)

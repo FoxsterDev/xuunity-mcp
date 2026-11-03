@@ -113,7 +113,73 @@ done in a patch release.
 | `complete_since_request_start` | the counter session survived the whole request |
 | `lower_bound_after_domain_reload` | the baseline belongs to a previous editor domain |
 | `lower_bound_without_request_baseline` | no baseline establishes completeness |
+| `lower_bound_from_recorded_attribution` | a completed or abandoned result persisted without its completion counts; the count is the errors its classification recorded |
+| `unavailable` | a completed result that recorded neither completion counts nor classification, or no baseline and no live count |
 | empty | the payload carries no console-pressure evidence at all |
+
+### Console error classification
+
+`console_error_count_since_request_start` stays the raw error, exception and
+assert count. `console_error_pressure_detected` is true only when
+`console_error_not_expected_count` is above zero. An error counts as expected
+only when the leaf test that was running when it was logged passed and either
+Unity's test framework marked a matching log in that test's own log scope as
+handled by `LogAssert.Expect`, or that log scope had
+`LogAssert.ignoreFailingMessages` set when the error was logged. Expected errors
+are subtracted from the raw count only within
+the same console counter session. Errors that were recorded as not expected stay
+a floor across later domain reloads, so `console_error_not_expected_count` can
+exceed the raw lower-bound count. `console_error_expected_by_test_count` is the
+number of expected errors. A completed or abandoned run reports the counts it
+recorded; request final status never recomputes them from the live editor
+counter. Only a still-running request falls back to the live counter, and to the
+raw heartbeat count only while the heartbeat's `active_test_request_id` is that
+request.
+
+| `console_error_samples[].classification` | Meaning |
+| --- | --- |
+| `expected_by_test` | a passing test consumed the error with `LogAssert.Expect` or logged it while `LogAssert.ignoreFailingMessages` was set |
+| `unexpected` | logged outside a leaf test, in a failed or skipped test, or with no matching handled log |
+| `unclassified` | no log-scope evidence: logged off the main thread, before a reload interrupted the test, or on a test framework version without a readable log scope |
+
+At most 3 samples are kept; errors that are not expected take slots before
+expected ones. Messages are cut to 240 characters and test names to 160, each
+followed by `...` when cut.
+
+| `console_error_classification_basis` | Meaning |
+| --- | --- |
+| `none` | classification was active and recorded no errors |
+| `utf_log_scope` | every recorded error was classified |
+| `utf_log_scope_unavailable` | at least one error is `unclassified` and still counts as pressure |
+| empty | no classification ran: an older package or the batch lane; pressure falls back to the raw count |
+
+### `test_environment`
+
+Captured once when an editor test request starts, without opening or focusing a
+window. `render_width`/`render_height` are render-target pixels and are set only
+when `capture_status` is `captured`. `preset_width`/`preset_height` are set only
+when `preset_kind` is `fixed_resolution`. `render_matches_preset` is `"true"` or
+`"false"` only for a rendered fixed resolution, otherwise empty. In EditMode runs
+the values describe the editor stand, not a size the tests observe.
+
+| `capture_status` | Meaning |
+| --- | --- |
+| `captured` | an existing Game View had a rendered target |
+| `game_view_not_rendered` | a Game View exists but has no rendered target; only its preset is recorded |
+| `no_game_view` | no Game View window existed at request start |
+| `unavailable` | the Game View could not be read in this editor |
+| empty | a batch-lane or older-package result that took no sample; compact surfaces omit the object |
+
+`unity_game_view_configure` reports the same vocabulary as
+`game_view.preset_kind` for the size it selected. It matches only
+`fixed_resolution` entries.
+
+| `preset_kind` | Meaning |
+| --- | --- |
+| `fixed_resolution` | a pixel preset |
+| `aspect_ratio` | a ratio preset; its terms are not pixels |
+| `free` | Free Aspect |
+| `unknown` | the preset type could not be classified |
 
 ### Play-mode liveness warnings and their remediation
 
@@ -216,3 +282,21 @@ Set when the `Graphic` carrying the click renders nothing (alpha 0 through its c
 | --- | --- |
 | `editor_domain_load_vs_newest_assets_editor_input` | the verdict compares the loaded editor domain against the newest editor input under `Assets` |
 | `settled_forced_asset_refresh_covers_newest_assets_editor_input` | a completed forced refresh already covered that input, and script compilation is not failing, so no reload was owed |
+
+### Editor quit vocabulary
+
+`unity.editor.quit` arms a one-shot quit intent that the bridge's
+`EditorApplication.update` tick executes after the response is written. It
+does not use `EditorApplication.delayCall`, which Unity skips while the editor
+is in Edit Mode and is not the active app.
+
+| Value | Field | Meaning |
+| --- | --- | --- |
+| `editor_update_one_shot` | `quit_mechanism` | the package armed the update-tick quit; the acknowledgement carries `quit_expires_at_utc`, `editor_pid`, `editor_application_focused`, `is_playing` and `scene_dirty` (any open scene or the current Prefab Mode stage is dirty) |
+| `legacy_delay_call` | `quit_mechanism` | host-side label for an acknowledgement from an older package that queued the quit on `delayCall` |
+| `editor_quit_executing` | journal `event_type` | the update tick cleared the intent and is calling `EditorApplication.Exit(0)` for that `request_id`; the editor log gets `[XUUnityLightMcp] editor quit executing request_id=<id>` |
+| `editor_quit_expired` | journal `event_type` | an armed intent was older than 120 s when the tick saw it (for example after a long domain reload), so it was dropped without exiting |
+| `quit_ack_unverified` | `closeout_classification` | `request-editor-quit --no-wait-for-exit` returned the acknowledgement only; `process_exit_verified` is `false` |
+| `quit_ack_and_process_exit_verified` | `closeout_classification` | the acknowledgement was followed by verified same-project process exit |
+| `editor_quit_ack_without_exit` | `closeout_classification` and error code | the editor stayed live after the exit timeout; `quit_executing_observed` and `quit_expired_observed` say whether the journal shows `editor_quit_executing` or `editor_quit_expired` for that request; the recovery command is `restore-editor-state --require-closed` only when `host_opened_session_found` is `true` |
+| `quit_request_rejected` | `closeout_classification` (error code `editor_quit_request_rejected`) | the bridge answered the quit with `status: error`, so no exit was armed; `quit_request_error_code` carries the bridge code and no exit wait runs |

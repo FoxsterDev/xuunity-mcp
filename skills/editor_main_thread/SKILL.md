@@ -24,8 +24,13 @@ Everything the bridge does per tick runs on the editor main thread: `XUUnityLigh
 ## 3. Ticks Are Throttled and Early-Out
 
 - All periodic work goes through the interval gates in `XUUnityLightMcpBridgeBootstrap.OnUpdate` (heartbeat/pump intervals from bridge config) — never do per-frame work directly on `EditorApplication.update`.
+- The single ungated call is `XUUnityLightMcpEditorQuitScheduler.Tick()`, first in `OnUpdate`: a static-flag early-out, so an armed quit runs on the first update after its response.
 - Tick bodies must early-out cheaply when idle (`LifecycleMonitor.Tick`, scenario scheduler). New tick work needs the same shape: field checks first, I/O only when something is actually pending.
 
-## 4. Keep the Hot Path Allocation-Light
+## 4. No `delayCall` on Request Paths
+
+`EditorApplication.delayCall` does not run while the editor is unfocused in Edit Mode: Unity's native timer skips it unless the editor is the active app, in unpaused Play Mode, or attached to a remote or debugger, while `EditorApplication.update` keeps ticking. Hosts open editors in the background, so deferred work on a request path must run from the bridge's update tick (`XUUnityLightMcpEditorQuitScheduler` is the reference shape: arm state in `SessionState`, early-out tick, expiry). `tests/test_atomic_ipc_contract.py` keeps `EditorApplication.delayCall` out of `Editor/`.
+
+## 5. Keep the Hot Path Allocation-Light
 
 Per-tick allocations add up at editor frame rates. Resolve once and cache what cannot change within a domain (`WriteHeartbeat` caches the editor pid instead of allocating `Process.GetCurrentProcess()` every heartbeat); expensive probes are memory-cached and refreshed on invalidation, not per tick (`XUUnityLightMcpHealthProbe.EnsureCurrentReport`).

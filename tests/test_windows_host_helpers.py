@@ -26,6 +26,7 @@ class WindowsHostHelperTests(unittest.TestCase):
                 "OS": "",
                 "MSYSTEM": "",
                 "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME": "",
+                "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH": "",
             },
             clear=False,
         ):

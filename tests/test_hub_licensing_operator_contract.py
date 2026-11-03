@@ -2,6 +2,7 @@ import contextlib
 import datetime
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -83,9 +84,14 @@ class HubLicensingResolutionTests(unittest.TestCase):
         import argparse
         parser = server_cli_parser.build_parser()
         choices = next(action.choices for action in parser._actions if isinstance(action, argparse._SubParsersAction))
-        recipe = server_core.BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root="<path>")
+        with mock.patch.dict(
+            os.environ,
+            {"XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME": "xuunity_light_unity_mcp.sh", "XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH": ""},
+        ):
+            recipe = server_core.bridge_enable_recovery_command()
         for command in recipe.split("; then "):
-            self.assertIn(command.split()[0], choices)
+            self.assertEqual("xuunity_light_unity_mcp.sh", command.split()[0])
+            self.assertIn(command.split()[1], choices)
         self.assertIn("--plan-file <plan>", recipe)
         for path in TEMPLATES_DIR.glob("server*.py"):
             source = path.read_text(encoding="utf-8")

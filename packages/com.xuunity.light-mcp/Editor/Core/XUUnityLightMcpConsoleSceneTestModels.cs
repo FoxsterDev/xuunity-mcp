@@ -203,7 +203,63 @@ namespace XUUnity.LightMcp.Editor.Core
             public long console_error_count_since_request_start;
             public string console_error_count_trust_class = "";
             public bool console_error_pressure_detected;
+            public long console_error_expected_by_test_count;
+            public long console_error_not_expected_count;
+            public string console_error_classification_basis = "";
+            public List<XUUnityLightMcpConsoleErrorSample> console_error_samples = new();
+            public XUUnityLightMcpTestEnvironment test_environment = new();
             public string validation_evidence = "unity_mcp";
+        }
+
+        [Serializable]
+        internal sealed class XUUnityLightMcpConsoleErrorSample
+        {
+            public string type = "";
+            public string message = "";
+            public string active_test = "";
+            public string classification = "";
+            public string logged_at_utc = "";
+        }
+
+        internal sealed class XUUnityLightMcpConsoleErrorAttribution
+        {
+            public string request_id = "";
+            public string counter_session_id = "";
+            public string basis = "";
+            public long expected_by_test_count;
+            public long not_expected_count;
+            public List<XUUnityLightMcpConsoleErrorSample> samples = new();
+
+            public bool IsEmpty => expected_by_test_count <= 0 && not_expected_count <= 0 && samples.Count == 0;
+        }
+
+        internal static class XUUnityLightMcpConsoleErrorClassification
+        {
+            public const int MaxSamples = 3;
+            public const int MaxSampleMessageChars = 240;
+            public const int MaxSampleActiveTestChars = 160;
+            public const string ExpectedByTest = "expected_by_test";
+            public const string Unexpected = "unexpected";
+            public const string Unclassified = "unclassified";
+            public const string BasisNone = "none";
+            public const string BasisLogScope = "utf_log_scope";
+            public const string BasisLogScopeUnavailable = "utf_log_scope_unavailable";
+        }
+
+        [Serializable]
+        internal sealed class XUUnityLightMcpTestEnvironment
+        {
+            public string captured_at = "";
+            public string capture_status = "";
+            public int render_width;
+            public int render_height;
+            public string preset_label = "";
+            public string preset_kind = "";
+            public int preset_width;
+            public int preset_height;
+            public string render_matches_preset = "";
+            public string game_view_group = "";
+            public string build_target = "";
         }
 
         [Serializable]
@@ -253,5 +309,15 @@ namespace XUUnity.LightMcp.Editor.Core
             public bool lifecycle_churn_observed;
             public long console_error_count_at_request_start;
             public string console_error_counter_session_id_at_request_start = "";
+            public List<XUUnityLightMcpConsoleErrorSample> console_error_samples = new();
+            public long console_error_expected_by_test_count;
+            public long console_error_expected_by_test_count_in_session;
+            public string console_error_expected_by_test_counter_session_id = "";
+            public long console_error_not_expected_recorded_count;
+            public string console_error_classification_basis = "";
+            public long console_error_count_at_completion;
+            public string console_error_count_trust_class_at_completion = "";
+            public long console_error_not_expected_count_at_completion;
+            public XUUnityLightMcpTestEnvironment test_environment = new();
         }
 }

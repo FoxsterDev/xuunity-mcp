@@ -69,6 +69,27 @@ Pass criteria:
 - when closeout proof is incomplete, the wrapper surfaces one obvious follow-up
   command through `recommended_recovery_command`
 
+### 1b. Unfocused Editor Quit Smoke
+
+Open the editor in the background the way the host lane does (`open-editor`
+uses `open -g` on macOS), confirm `unity.status` reports
+`editor_application_focused=false` and `playmode_state=edit`, and do not bring
+it to the front. Then run `request-editor-quit` with no flags.
+
+Pass criteria:
+
+- the acknowledgement payload reports `quit_mechanism=editor_update_one_shot`
+- `closeout_classification=quit_ack_and_process_exit_verified` within a few
+  seconds, without activating the editor
+- the request journal has `editor_quit_executing` for the quit `request_id`,
+  and the editor log contains
+  `[XUUnityLightMcp] editor quit executing request_id=<id>` followed by the
+  normal shutdown lines
+- repeat right after a PlayMode run and right after a resolve-packages refresh
+  that reloaded the domain; both still exit
+- `editor_quit_ack_without_exit` fails the smoke; record
+  `quit_executing_observed` and `editor_application_focused` from its details
+
 ### 2. Compile Gate
 
 Changed C# scripts require a fast compile gate before EditMode, PlayMode,
@@ -556,6 +577,12 @@ Pass criteria:
   `console_error_count_since_request_start` plus its trust class; if a runtime
   timeout has positive console pressure, inspect the request-scoped console
   errors before increasing the timeout
+- test envelopes also report `console_error_expected_by_test_count`,
+  `console_error_not_expected_count` and up to 3 `console_error_samples`; a
+  green run whose only errors were consumed by `LogAssert.Expect` or logged
+  under `LogAssert.ignoreFailingMessages` reports
+  `console_error_pressure_detected: false`, and request final status for that
+  completed run keeps reporting it after later runs
 
 Precondition: any observation made while Play Mode is running is evidence only
 if `playmode_loop_liveness` is `advancing` (section 24); a play-mode

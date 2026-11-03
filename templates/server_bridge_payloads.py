@@ -6,7 +6,13 @@ from typing import Any, Callable
 
 from server_bridge_constants import COMPILE_WARNING_SAMPLE_LIMIT
 from server_health import read_editor_log_scope
-from server_operation_evidence import COMPACT_TEST_FAILURE_LIMIT, compact_test_failures, test_failure_count
+from server_operation_evidence import (
+    COMPACT_TEST_FAILURE_LIMIT,
+    compact_console_error_samples,
+    compact_test_environment,
+    compact_test_failures,
+    test_failure_count,
+)
 
 
 POST_SETTLE_COMPILE_TRUST_CONFIRMED = "confirmed"
@@ -819,14 +825,23 @@ def _compact_tests_payload(payload: dict[str, Any], operation: str) -> dict[str,
             "console_error_count_since_request_start",
             "console_error_count_trust_class",
             "console_error_pressure_detected",
+            "console_error_expected_by_test_count",
+            "console_error_not_expected_count",
+            "console_error_classification_basis",
         ),
     )
+    console_error_samples = compact_console_error_samples(payload.get("console_error_samples"))
+    if console_error_samples:
+        compact["console_error_samples"] = console_error_samples
     failures = payload.get("failures") or payload.get("first_failures")
     if isinstance(failures, list) and failures:
         compact["first_failures"] = failures[:3]
         compact["failures"] = compact_test_failures(failures)
         compact["failure_count"] = test_failure_count(failures)
         compact["failures_truncated"] = compact["failure_count"] > COMPACT_TEST_FAILURE_LIMIT
+    test_environment = compact_test_environment(payload.get("test_environment"))
+    if test_environment:
+        compact["test_environment"] = test_environment
     compact.update(_compact_post_settle_fields(payload))
     compact.update(_artifact_ref(payload))
     return compact

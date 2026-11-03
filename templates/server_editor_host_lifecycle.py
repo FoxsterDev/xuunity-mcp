@@ -10,7 +10,7 @@ import signal
 import subprocess
 import sys
 import time
-from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+from server_core import bridge_enable_recovery_command
 
 from pathlib import Path
 from typing import Any, Callable
@@ -761,7 +761,6 @@ def verify_project_editor_closed(project_root: Path, timeout_ms: int) -> dict[st
                 "request-editor-quit",
                 project_root,
                 "--timeout-ms", "30000",
-                "--wait-for-exit",
                 "--exit-timeout-ms", "30000",
             )
             if live_project_pids and process_visibility_available
@@ -939,8 +938,8 @@ def restore_host_opened_editor_state(
 
         quit_request_id = str(restoration.get("quit_request_id") or "")
         if quit_request_id:
-            restoration["recommended_recovery_command"] = (
-                f"request-final-status --project-root {project_root} --request-id {quit_request_id}"
+            restoration["recommended_recovery_command"] = render_launcher_cli(
+                "request-final-status", project_root, "--request-id", quit_request_id
             )
 
         closed_after_quit, live_project_pids = wait_for_project_editor_exit(
@@ -1394,7 +1393,7 @@ def wait_for_ready(
             "bridge_disabled",
             (
                 "Unity bridge is disabled for this project. "
-                f"Enable it with {BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} "
+                f"Enable it with {bridge_enable_recovery_command()} "
                 "and reopen Unity."
             ),
         )

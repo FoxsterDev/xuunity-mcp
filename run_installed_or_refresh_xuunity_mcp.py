@@ -315,11 +315,27 @@ def exec_run(run_path: Path, args: list[str]) -> None:
     os.execv(bash, [bash, str(run_path), *args])
 
 
+REFRESH_LAUNCHER_NAMES = ("run_installed_or_refresh_xuunity_mcp.sh", "run_installed_or_refresh_xuunity_mcp.cmd")
+
+
+def publish_launcher_env(script_dir: Path) -> None:
+    name = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME") or ""
+    if name not in REFRESH_LAUNCHER_NAMES or not (script_dir / name).is_file():
+        name = REFRESH_LAUNCHER_NAMES[1] if os.name == "nt" else REFRESH_LAUNCHER_NAMES[0]
+    launcher_path = script_dir / name
+    if launcher_path.is_file():
+        os.environ["XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME"] = name
+        os.environ["XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH"] = str(launcher_path)
+    else:
+        os.environ.pop("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH", None)
+
+
 def main(argv: list[str]) -> int:
     require_supported_python()
     reconfigure_stdio_utf8()
     os.environ.setdefault("PYTHONUTF8", "1")
     script_dir = Path(__file__).resolve().parent
+    publish_launcher_env(script_dir)
     source_root = resolve_source_root(script_dir)
     installer = source_root / "init_xuunity_light_unity_mcp.sh"
     package_json = source_root / "packages" / "com.xuunity.light-mcp" / "package.json"

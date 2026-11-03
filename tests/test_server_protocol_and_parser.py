@@ -17,6 +17,7 @@ import server
 import server_batch_lanes
 import server_batch_orchestrator
 import server_bridge_journal
+import server_core
 import server_mcp_tools
 import server_project_actions
 import server_summaries
@@ -2232,7 +2233,7 @@ actions:
         recovery_command = payload["recommended_recovery_command"].replace('\\', '/')
         self.assertIn("request-editor-quit", recovery_command)
         self.assertIn('--project-root "/tmp/FakeProject"', recovery_command)
-        self.assertIn("--timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000", recovery_command)
+        self.assertIn("--timeout-ms 30000 --exit-timeout-ms 30000", recovery_command)
         self.assertNotIn("reopen_block_reason", payload)
         self.assertFalse(bool(payload.get("reopen_blocked")))
 
@@ -2302,7 +2303,7 @@ actions:
         }
         import_state = {
             "import_state": "imported_or_bridge_state_present",
-            "dependency_declared": True,
+            "manifest_declared": True,
             "lock_entry_present": True,
             "package_cache_present": True,
             "bridge_state_present": True,
@@ -2325,7 +2326,11 @@ actions:
             mock.patch.object(server, "current_project_context_bridge_state", return_value=state),
             mock.patch.object(server, "wait_for_ready", return_value=state),
             mock.patch.object(server, "refresh_project_context"),
-            mock.patch.object(server, "inspect_package_dependency_alignment", return_value={"alignment": "file_local"}),
+            mock.patch.object(
+                server,
+                "inspect_package_dependency_alignment",
+                return_value={"alignment": "git_pinned", "dependency_mode": "git_or_remote"},
+            ),
             mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
         ):
             server.cmd_ensure_ready(args)
@@ -2338,6 +2343,7 @@ actions:
         self.assertEqual(42, payload["bridge"]["generation"])
         self.assertEqual("session-1", payload["bridge"]["session_id"])
         self.assertEqual("imported_or_bridge_state_present", payload["package_import_state"]["import_state"])
+        self.assertTrue(payload["package_import_state"]["dependency_declared"])
         self.assertEqual("none", payload["recommended_next_action"])
         self.assertIn("--include-full-payload", payload["full_payload_command"])
         self.assertNotIn("discovery", payload)
@@ -2432,7 +2438,11 @@ actions:
             mock.patch.object(server, "current_project_context_bridge_state", return_value=state),
             mock.patch.object(server, "wait_for_ready", return_value=state),
             mock.patch.object(server, "refresh_project_context"),
-            mock.patch.object(server, "inspect_package_dependency_alignment", return_value={"alignment": "file_local"}),
+            mock.patch.object(
+                server,
+                "inspect_package_dependency_alignment",
+                return_value={"alignment": "git_pinned", "dependency_mode": "git_or_remote"},
+            ),
             mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
         ):
             server.cmd_ensure_ready(args)
@@ -2687,7 +2697,7 @@ actions:
         conflict_recovery = exc.details["recommended_recovery_command"].replace('\\', '/')
         self.assertIn("request-editor-quit", conflict_recovery)
         self.assertIn('--project-root "/tmp/FakeProject"', conflict_recovery)
-        self.assertIn("--timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000", conflict_recovery)
+        self.assertIn("--timeout-ms 30000 --exit-timeout-ms 30000", conflict_recovery)
         self.assertFalse(exc.details["same_project_editor_closed"])
         self.assertFalse(exc.details["process_exit_verified"])
         self.assertEqual("editor_still_running", exc.details["closeout_classification"])
@@ -2989,6 +2999,306 @@ actions:
         force_mock.assert_called_once_with(Path("/tmp/FakeProject"), [1234], 5000)
         self.assertEqual("quit_ack_without_exit_force_terminated", emitted_payloads[0]["closeout_classification"])
         self.assertTrue(emitted_payloads[0]["termination_identity_reverified"])
+
+    QUIT_ACK_RESPONSE = {
+        "status": "ok",
+        "request_id": "quit-1",
+        "payload_json": json.dumps(
+            {
+                "outcome": "quit_requested",
+                "quit_mechanism": "editor_update_one_shot",
+                "quit_expires_at_utc": "2026-11-03T20:02:00Z",
+                "editor_pid": 1234,
+                "editor_application_focused": False,
+                "is_playing": False,
+                "scene_dirty": True,
+            }
+        ),
+    }
+    STILL_RUNNING_VERIFICATION = {
+        "same_project_editor_closed": False,
+        "live_project_editor_pids": [1234],
+        "process_visibility_available": True,
+        "process_visibility_error_code": "",
+        "process_exit_verified": False,
+        "closeout_classification": "editor_still_running",
+        "recommended_recovery_command": "request-editor-quit again",
+    }
+
+    def test_request_editor_quit_waits_for_exit_by_default(self) -> None:
+        parser = server.build_parser()
+        default_args = parser.parse_args(["request-editor-quit", "--project-root", "/tmp/FakeProject"])
+        opt_out_args = parser.parse_args(
+            ["request-editor-quit", "--project-root", "/tmp/FakeProject", "--no-wait-for-exit"]
+        )
+        self.assertTrue(default_args.wait_for_exit)
+        self.assertEqual(30000, default_args.exit_timeout_ms)
+        self.assertEqual(0, default_args.force_after_ms)
+        self.assertFalse(opt_out_args.wait_for_exit)
+
+        emitted_payloads: list[dict[str, object]] = []
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value=dict(self.QUIT_ACK_RESPONSE)),
+            mock.patch.object(
+                server,
+                "verify_project_editor_closed",
+                return_value={
+                    "same_project_editor_closed": True,
+                    "live_project_editor_pids": [],
+                    "process_visibility_available": True,
+                    "process_exit_verified": True,
+                },
+            ) as verify_mock,
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_request_editor_quit(default_args)
+
+        verify_mock.assert_called_once_with(Path("/tmp/FakeProject"), 30000)
+        payload = emitted_payloads[0]
+        self.assertEqual("quit_ack_and_process_exit_verified", payload["closeout_classification"])
+        self.assertEqual("editor_update_one_shot", payload["quit_mechanism"])
+        self.assertTrue(payload["scene_dirty"])
+        self.assertEqual(1234, payload["editor_pid"])
+
+    def test_request_editor_quit_no_wait_reports_unverified_ack(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            timeout_ms=15000,
+            wait_for_exit=False,
+            exit_timeout_ms=30000,
+            force_after_ms=0,
+        )
+        emitted_payloads: list[dict[str, object]] = []
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value=dict(self.QUIT_ACK_RESPONSE)),
+            mock.patch.object(server, "verify_project_editor_closed") as verify_mock,
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_request_editor_quit(args)
+
+        verify_mock.assert_not_called()
+        payload = emitted_payloads[0]
+        self.assertFalse(payload["process_exit_verified"])
+        self.assertTrue(payload["quit_request_accepted"])
+        self.assertEqual("quit_ack_unverified", payload["closeout_classification"])
+        self.assertEqual("quit-1", payload["quit_request_id"])
+        self.assertTrue(payload["scene_dirty"])
+
+    def test_request_editor_quit_ack_without_exit_reports_recovery_evidence(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            timeout_ms=15000,
+            wait_for_exit=True,
+            exit_timeout_ms=30000,
+            force_after_ms=0,
+        )
+        journal_events = [
+            {"event_type": "request_completed", "request_id": "quit-1"},
+            {"event_type": "editor_quit_executing", "request_id": "quit-1"},
+        ]
+        with (
+            mock.patch.object(server_core, "is_windows_like_host", return_value=False),
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value=dict(self.QUIT_ACK_RESPONSE)),
+            mock.patch.object(server, "verify_project_editor_closed", return_value=dict(self.STILL_RUNNING_VERIFICATION)),
+            mock.patch.object(server, "read_request_journal_events", return_value=journal_events) as journal_mock,
+            mock.patch.object(server, "force_terminate_verified_project_editor") as force_mock,
+            mock.patch.object(
+                server, "try_read_host_editor_session_state", return_value={"opened_by_host": True, "editor_pid": 1234}
+            ),
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_request_editor_quit(args)
+
+        force_mock.assert_not_called()
+        journal_mock.assert_called_once_with(Path("/tmp/FakeProject"), "quit-1")
+        details = ctx.exception.details
+        self.assertEqual("editor_quit_ack_without_exit", ctx.exception.code)
+        self.assertEqual(1234, details["editor_pid"])
+        self.assertEqual([1234], details["live_project_editor_pids"])
+        self.assertTrue(details["quit_executing_observed"])
+        self.assertFalse(details["quit_expired_observed"])
+        self.assertFalse(details["editor_application_focused"])
+        self.assertTrue(details["scene_dirty"])
+        self.assertFalse(details["process_exit_verified"])
+        command = details["recommended_recovery_command"]
+        self.assertTrue(command.startswith(server_core.launcher_command_prefix() + " restore-editor-state "))
+        self.assertIn("--require-closed", command)
+        self.assertNotIn("request-editor-quit", command)
+        self.assertTrue(details["host_opened_session_found"])
+        self.assertEqual("restore_editor_state_require_closed", details["recommended_next_action"])
+        self.assertEqual("restore_editor_state_require_closed", details["next_distinct_action"])
+
+    def test_request_editor_quit_ack_without_exit_for_editor_not_opened_by_host(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            timeout_ms=15000,
+            wait_for_exit=True,
+            exit_timeout_ms=30000,
+            force_after_ms=0,
+        )
+        with (
+            mock.patch.object(server_core, "is_windows_like_host", return_value=False),
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value=dict(self.QUIT_ACK_RESPONSE)),
+            mock.patch.object(server, "verify_project_editor_closed", return_value=dict(self.STILL_RUNNING_VERIFICATION)),
+            mock.patch.object(server, "read_request_journal_events", return_value=[]),
+            mock.patch.object(server, "force_terminate_verified_project_editor") as force_mock,
+            mock.patch.object(server, "try_read_host_editor_session_state", return_value=None),
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_request_editor_quit(args)
+
+        force_mock.assert_not_called()
+        details = ctx.exception.details
+        self.assertEqual("editor_quit_ack_without_exit", ctx.exception.code)
+        self.assertFalse(details["host_opened_session_found"])
+        self.assertEqual("manual_editor_close", details["recommended_next_action"])
+        self.assertEqual("manual_editor_close_or_explicit_force_after_ms", details["next_distinct_action"])
+        prefix = server_core.launcher_command_prefix()
+        self.assertTrue(details["recommended_recovery_command"].startswith(prefix + " verify-editor-closed "))
+        self.assertNotIn("restore-editor-state", details["recommended_recovery_command"])
+        escalation = details["explicit_escalation_command"]
+        self.assertTrue(escalation.startswith(prefix + " request-editor-quit "))
+        self.assertIn("--force-after-ms 30000", escalation)
+
+    def test_request_editor_quit_legacy_ack_without_exit_uses_the_single_live_pid_and_reports_expiry(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            timeout_ms=15000,
+            wait_for_exit=True,
+            exit_timeout_ms=30000,
+            force_after_ms=0,
+        )
+        legacy_ack = {"status": "ok", "request_id": "quit-1", "payload_json": json.dumps({"outcome": "quit_requested"})}
+        journal_events = [{"event_type": "editor_quit_expired", "request_id": "quit-1"}]
+        with (
+            mock.patch.object(server_core, "is_windows_like_host", return_value=False),
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value=legacy_ack),
+            mock.patch.object(server, "verify_project_editor_closed", return_value=dict(self.STILL_RUNNING_VERIFICATION)),
+            mock.patch.object(server, "read_request_journal_events", return_value=journal_events),
+            mock.patch.object(server, "force_terminate_verified_project_editor") as force_mock,
+            mock.patch.object(server, "try_read_host_editor_session_state", return_value=None),
+        ):
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_request_editor_quit(args)
+
+        force_mock.assert_not_called()
+        details = ctx.exception.details
+        self.assertEqual("legacy_delay_call", details["quit_mechanism"])
+        self.assertEqual(1234, details["editor_pid"])
+        self.assertFalse(details["quit_executing_observed"])
+        self.assertTrue(details["quit_expired_observed"])
+
+    QUIT_REJECTED_RESPONSE = {
+        "status": "error",
+        "request_id": "quit-1",
+        "error": {"code": "operation_unavailable", "message": "core capability unsupported"},
+    }
+
+    def test_request_editor_quit_rejected_skips_exit_verification(self) -> None:
+        for wait_for_exit in (True, False):
+            args = argparse.Namespace(
+                project_root="/tmp/FakeProject",
+                timeout_ms=15000,
+                wait_for_exit=wait_for_exit,
+                exit_timeout_ms=30000,
+                force_after_ms=0,
+            )
+            with (
+                mock.patch.object(server_core, "is_windows_like_host", return_value=False),
+                mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+                mock.patch.object(server, "request_editor_quit", return_value=dict(self.QUIT_REJECTED_RESPONSE)),
+                mock.patch.object(server, "verify_project_editor_closed") as verify_mock,
+                mock.patch.object(server, "force_terminate_verified_project_editor") as force_mock,
+                mock.patch.object(server, "print_json") as print_mock,
+            ):
+                with self.assertRaises(server.ToolInvocationError) as ctx:
+                    server.cmd_request_editor_quit(args)
+
+            verify_mock.assert_not_called()
+            force_mock.assert_not_called()
+            print_mock.assert_not_called()
+            details = ctx.exception.details
+            self.assertEqual("editor_quit_request_rejected", ctx.exception.code)
+            self.assertEqual("quit_request_rejected", details["closeout_classification"])
+            self.assertEqual("operation_unavailable", details["quit_request_error_code"])
+            self.assertFalse(details["quit_request_accepted"])
+            self.assertFalse(details["process_exit_verified"])
+            self.assertEqual("manual_editor_close", details["recommended_next_action"])
+            self.assertNotIn("restore-editor-state", details["recommended_recovery_command"])
+
+    def test_request_editor_quit_rejected_still_honors_explicit_force(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject",
+            timeout_ms=15000,
+            wait_for_exit=True,
+            exit_timeout_ms=30000,
+            force_after_ms=5000,
+        )
+        emitted_payloads: list[dict[str, object]] = []
+        with (
+            mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+            mock.patch.object(server, "request_editor_quit", return_value=dict(self.QUIT_REJECTED_RESPONSE)),
+            mock.patch.object(server, "verify_project_editor_closed", return_value=dict(self.STILL_RUNNING_VERIFICATION)),
+            mock.patch.object(
+                server,
+                "force_terminate_verified_project_editor",
+                return_value={"same_project_editor_closed": True, "live_project_editor_pids": [], "process_exit_verified": True},
+            ) as force_mock,
+            mock.patch.object(server, "print_json", side_effect=lambda payload: emitted_payloads.append(dict(payload))),
+        ):
+            server.cmd_request_editor_quit(args)
+
+        force_mock.assert_called_once_with(Path("/tmp/FakeProject"), [1234], 5000)
+        self.assertFalse(emitted_payloads[0]["quit_request_accepted"])
+        self.assertEqual("quit_rejected_force_terminated", emitted_payloads[0]["closeout_classification"])
+
+    def test_request_editor_quit_copies_produce_identical_payloads(self) -> None:
+        import server_cli_bridge_commands
+
+        def run(module, response, verification, journal_events, session, wait_for_exit=True):
+            emitted: list[dict[str, object]] = []
+            args = argparse.Namespace(
+                project_root="/tmp/FakeProject",
+                timeout_ms=15000,
+                wait_for_exit=wait_for_exit,
+                exit_timeout_ms=30000,
+                force_after_ms=0,
+            )
+            with (
+                mock.patch.object(server_core, "is_windows_like_host", return_value=False),
+                mock.patch.object(module, "ensure_project_root", return_value=Path("/tmp/FakeProject")),
+                mock.patch.object(module, "request_editor_quit", return_value=dict(response)),
+                mock.patch.object(module, "verify_project_editor_closed", return_value=dict(verification)) as verify_mock,
+                mock.patch.object(module, "read_request_journal_events", return_value=list(journal_events)),
+                mock.patch.object(module, "try_read_host_editor_session_state", return_value=session),
+                mock.patch.object(module, "print_json", side_effect=lambda payload: emitted.append(dict(payload))),
+            ):
+                try:
+                    module.cmd_request_editor_quit(args)
+                except server.ToolInvocationError as exc:
+                    return {"code": exc.code, "details": dict(exc.details), "verify_calls": verify_mock.call_count}
+            return {"emitted": emitted, "verify_calls": verify_mock.call_count}
+
+        closed = {"same_project_editor_closed": True, "live_project_editor_pids": [], "process_visibility_available": True}
+        executing = [{"event_type": "editor_quit_executing", "request_id": "quit-1"}]
+        host_session = {"opened_by_host": True, "editor_pid": 1234}
+        for case in (
+            (self.QUIT_ACK_RESPONSE, closed, [], None),
+            (self.QUIT_ACK_RESPONSE, self.STILL_RUNNING_VERIFICATION, [], None),
+            (self.QUIT_ACK_RESPONSE, self.STILL_RUNNING_VERIFICATION, executing, host_session),
+            (self.QUIT_REJECTED_RESPONSE, self.STILL_RUNNING_VERIFICATION, [], host_session),
+        ):
+            self.assertEqual(run(server, *case), run(server_cli_bridge_commands, *case))
+        self.assertEqual(
+            run(server, self.QUIT_REJECTED_RESPONSE, closed, [], None, wait_for_exit=False),
+            run(server_cli_bridge_commands, self.QUIT_REJECTED_RESPONSE, closed, [], None, wait_for_exit=False),
+        )
+        self.assertEqual(0, run(server, self.QUIT_REJECTED_RESPONSE, closed, [], None)["verify_calls"])
 
     def test_restore_editor_state_require_closed_fails_when_project_still_live(self) -> None:
         args = argparse.Namespace(project_root="/tmp/FakeProject", timeout_ms=15000, require_closed=True)

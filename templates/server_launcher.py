@@ -47,9 +47,29 @@ _LAUNCHER_DIR = Path(os.path.abspath(__file__)).parent
 sys.path.insert(0, str(_LAUNCHER_DIR))
 
 import server_setup_wizard
-from server_core import hidden_window_subprocess_kwargs, reconfigure_stdio_utf8
+from server_core import hidden_window_subprocess_kwargs, reconfigure_stdio_utf8, render_launcher_cli
+from server_operation_evidence import compact_console_error_samples, compact_test_environment
 
 COMPACT_OUTPUT_MAX_BYTES = 8192
+CONSOLE_ERROR_ENVELOPE_FIELDS = (
+    "console_error_count_since_request_start",
+    "console_error_pressure_detected",
+    "console_error_expected_by_test_count",
+    "console_error_not_expected_count",
+    "console_error_classification_basis",
+)
+COMPACT_SHEDDABLE_FIELDS = ("console_error_samples", "test_environment", "first_failure")
+COMPACT_FAILURE_TEXT_MAX_CHARS = 1024
+COMPACT_REDUCED_VERDICT_FIELDS = (
+    "test_verdict",
+    "total",
+    "passed",
+    "failed",
+    "skipped",
+    "failure_count",
+    "console_error_pressure_detected",
+    "console_error_not_expected_count",
+)
 
 
 def fail(message: str, exit_code: int = 1) -> "SystemExit":
@@ -59,6 +79,21 @@ def fail(message: str, exit_code: int = 1) -> "SystemExit":
 
 def launcher_display_name() -> str:
     return os.environ.get("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME") or "xuunity_light_unity_mcp.sh"
+
+
+SOURCE_LAUNCHER_NAMES = ("xuunity_light_unity_mcp.sh", "xuunity_light_unity_mcp.cmd", "xuunity_light_unity_mcp.ps1")
+REFRESH_LAUNCHER_NAMES = ("run_installed_or_refresh_xuunity_mcp.sh", "run_installed_or_refresh_xuunity_mcp.cmd")
+
+
+def publish_launcher_path_env() -> None:
+    name = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME") or ""
+    if name in REFRESH_LAUNCHER_NAMES:
+        name = "xuunity_light_unity_mcp.cmd" if os.name == "nt" else "xuunity_light_unity_mcp.sh"
+        os.environ["XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME"] = name
+    if name in SOURCE_LAUNCHER_NAMES and (_LAUNCHER_DIR.parent / name).is_file():
+        os.environ["XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH"] = str(_LAUNCHER_DIR.parent / name)
+    else:
+        os.environ.pop("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH", None)
 
 
 def directory_abspath_or_fail(value: str, env_name: str) -> str:
@@ -346,6 +381,10 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
         if isinstance(failures, list) and failures:
             envelope["first_failure"] = failures[0]
             envelope["failure_count"] = len(failures)
+        test_environment = compact_test_environment(decoded_payload.get("test_environment"))
+        if test_environment:
+            envelope["test_environment"] = test_environment
+        _copy_console_error_fields(envelope, decoded_payload)
     elif payload_type == "unity.compile.matrix":
         envelope["matrix_status"] = str(decoded_payload.get("status") or "")
         for key in ("total", "passed", "failed"):
@@ -428,6 +467,12 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
     for key in ("failure_count", "failures_truncated", "test_result_path"):
         if key not in envelope and payload.get(key) not in (None, ""):
             envelope[key] = payload.get(key)
+    if "test_environment" not in envelope:
+        test_environment = compact_test_environment(payload.get("test_environment"))
+        if test_environment:
+            envelope["test_environment"] = test_environment
+    if "console_error_pressure_detected" not in envelope:
+        _copy_console_error_fields(envelope, payload)
     pointers = _artifact_pointers(payload)
     if pointers:
         envelope["artifacts"] = pointers
@@ -446,10 +491,62 @@ def build_compact_terminal_envelope(payload: dict, exit_code: int, stderr_text: 
     return envelope
 
 
+def _copy_console_error_fields(envelope: dict, source: dict) -> None:
+    for key in CONSOLE_ERROR_ENVELOPE_FIELDS:
+        value = source.get(key)
+        if isinstance(value, (bool, int)):
+            envelope[key] = value
+        elif isinstance(value, str) and value:
+            envelope[key] = value[:64]
+    samples = compact_console_error_samples(source.get("console_error_samples"))
+    if samples:
+        envelope["console_error_samples"] = samples
+
+
+def _encode_within_compact_budget(value: dict) -> str:
+    encoded = json.dumps(value, ensure_ascii=True, separators=(",", ":"))
+    return encoded + "\n" if len(encoded.encode("utf-8")) + 1 <= COMPACT_OUTPUT_MAX_BYTES else ""
+
+
+def _bounded_failure_text(value: object, limit: int = COMPACT_FAILURE_TEXT_MAX_CHARS) -> str:
+    text = str(value if value is not None else "")
+    truncated = len(text) > limit
+    text = text[:limit]
+    while len(json.dumps(text, ensure_ascii=True)) - 2 > limit:
+        text = text[: max(0, len(text) - 64)]
+        truncated = True
+    return text + "..." if truncated else text
+
+
+def _bounded_first_failure(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            str(key)[:64]: _bounded_failure_text(item) if isinstance(item, str) else item
+            for key, item in value.items()
+            if isinstance(item, (str, int, float, bool)) or item is None
+        }
+    return _bounded_failure_text(value)
+
+
 def _bounded_compact_json(envelope: dict) -> str:
-    encoded = json.dumps(envelope, ensure_ascii=True, separators=(",", ":"))
-    if len(encoded.encode("utf-8")) + 1 <= COMPACT_OUTPUT_MAX_BYTES:
-        return encoded + "\n"
+    encoded = _encode_within_compact_budget(envelope)
+    if encoded:
+        return encoded
+    shed = dict(envelope)
+    omitted = []
+    for key in COMPACT_SHEDDABLE_FIELDS:
+        if key not in shed:
+            continue
+        if key == "first_failure":
+            shed[key] = _bounded_first_failure(shed[key])
+        else:
+            shed.pop(key)
+        omitted.append(key)
+        shed["compact_truncated"] = True
+        shed["compact_omitted_fields"] = list(omitted)
+        encoded = _encode_within_compact_budget(shed)
+        if encoded:
+            return encoded
     reduced = {
         "payload_mode": "compact_terminal_envelope",
         "outcome": envelope.get("outcome"),
@@ -462,9 +559,15 @@ def _bounded_compact_json(envelope: dict) -> str:
         "full_payload_available": True,
         "compact_truncated": True,
     }
-    encoded = json.dumps(reduced, ensure_ascii=True, separators=(",", ":"))
-    if len(encoded.encode("utf-8")) + 1 <= COMPACT_OUTPUT_MAX_BYTES:
-        return encoded + "\n"
+    for key in COMPACT_REDUCED_VERDICT_FIELDS:
+        value = envelope.get(key)
+        if isinstance(value, (bool, int)):
+            reduced[key] = value
+        elif isinstance(value, str) and value:
+            reduced[key] = value[:64]
+    encoded = _encode_within_compact_budget(reduced)
+    if encoded:
+        return encoded
     minimal = {
         "payload_mode": "compact_terminal_envelope",
         "outcome": envelope.get("outcome"),
@@ -767,9 +870,10 @@ def switch_project_to_devmode(paths: LauncherPaths, args: list) -> None:
     print("packages_lock_entry_removed=true")
     print("next_step=let Unity re-resolve packages by reopen, focus, or explicit refresh")
     print(
-        'recommended_refresh_command=%s request-project-refresh '
-        '--project-root "%s" --resolve-packages --timeout-ms 180000'
-        % (launcher_display_name(), project_root)
+        "recommended_refresh_command=%s"
+        % render_launcher_cli(
+            "request-project-refresh", project_root, "--resolve-packages", "--timeout-ms", "180000"
+        )
     )
     print(
         "recommended_refresh_args_json=%s"
@@ -944,6 +1048,7 @@ def print_mode_help(mode: str) -> None:
 
 def main(argv: list) -> int:
     reconfigure_stdio_utf8()
+    publish_launcher_path_env()
     compact_summary = False
     args = []
     for arg in argv:

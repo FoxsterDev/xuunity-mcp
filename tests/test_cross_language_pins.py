@@ -27,6 +27,7 @@ for entry in (TEMPLATES_DIR, TESTS_DIR):
         sys.path.insert(0, str(entry))
 
 import server_bridge_paths
+import server_operation_evidence
 import server_project_actions
 import server_specs
 from server_ui_interaction import RUNTIME_PLAYMODE_STATES
@@ -418,6 +419,108 @@ class ProjectActionExpansionParityTest(unittest.TestCase):
             ],
             shapes,
         )
+
+
+
+class TestEnvironmentFieldsTest(unittest.TestCase):
+    """The host projection whitelists test_environment keys, so a C# rename silently drops the field."""
+
+    MODELS = EDITOR_ROOT / "Core" / "XUUnityLightMcpConsoleSceneTestModels.cs"
+
+    def class_body(self, text: str, name: str) -> str:
+        match = re.search(r"class " + re.escape(name) + r"\s*\{(.*?)\n\s*\}", text, re.S)
+        self.assertIsNotNone(match, f"{name} is missing from the editor models")
+        return match.group(1)
+
+    def test_the_editor_model_declares_exactly_the_projected_fields(self) -> None:
+        text = self.MODELS.read_text(encoding="utf-8")
+        body = self.class_body(text, "XUUnityLightMcpTestEnvironment")
+        declared = tuple(re.findall(r"public\s+\w+\s+(\w+)\s*[;=]", body))
+        self.assertEqual(server_operation_evidence.TEST_ENVIRONMENT_FIELDS, declared)
+        for owner in ("XUUnityLightMcpTestsPayload", "XUUnityLightMcpPersistedTestRunState"):
+            self.assertIn(
+                "public XUUnityLightMcpTestEnvironment test_environment",
+                self.class_body(text, owner),
+                f"{owner} no longer carries test_environment",
+            )
+
+    def test_the_capture_statuses_and_preset_kinds_exist_in_the_editor(self) -> None:
+        text = editor_text()
+        for value in (
+            "captured",
+            "game_view_not_rendered",
+            "no_game_view",
+            "unavailable",
+            "fixed_resolution",
+            "aspect_ratio",
+            "free",
+            "unknown",
+            "request_start",
+        ):
+            self.assertIn(f'"{value}"', text, f"no editor source emits test_environment value '{value}'")
+
+
+class ConsoleErrorClassificationVocabularyTest(unittest.TestCase):
+    """The host re-projects console error samples by whitelist, so a C# rename silently drops the evidence."""
+
+    MODELS = EDITOR_ROOT / "Core" / "XUUnityLightMcpConsoleSceneTestModels.cs"
+    ATTRIBUTION = EDITOR_ROOT / "TestFramework" / "Helpers" / "XUUnityLightMcpTestLogAttribution.cs"
+
+    def class_body(self, text: str, name: str) -> str:
+        match = re.search(r"class " + re.escape(name) + r"\s*\{(.*?)\n\s*\}", text, re.S)
+        self.assertIsNotNone(match, f"{name} is missing from the editor models")
+        return match.group(1)
+
+    def constant(self, text: str, name: str) -> str:
+        match = re.search(r"const\s+\w+\s+" + re.escape(name) + r"\s*=\s*([^;]+);", text)
+        self.assertIsNotNone(match, f"constant {name} is missing from the editor models")
+        return match.group(1).strip()
+
+    def test_the_sample_model_declares_exactly_the_projected_fields(self) -> None:
+        body = self.class_body(self.MODELS.read_text(encoding="utf-8"), "XUUnityLightMcpConsoleErrorSample")
+        declared = tuple(re.findall(r"public\s+\w+\s+(\w+)\s*[;=]", body))
+        self.assertEqual(server_operation_evidence.CONSOLE_ERROR_SAMPLE_FIELDS, declared)
+
+    def test_limits_classes_and_bases_match_the_host(self) -> None:
+        text = self.MODELS.read_text(encoding="utf-8")
+        self.assertEqual(str(server_operation_evidence.CONSOLE_ERROR_SAMPLE_LIMIT), self.constant(text, "MaxSamples"))
+        self.assertEqual(
+            str(server_operation_evidence.CONSOLE_ERROR_SAMPLE_MESSAGE_LIMIT), self.constant(text, "MaxSampleMessageChars")
+        )
+        self.assertEqual(
+            str(server_operation_evidence.CONSOLE_ERROR_SAMPLE_ACTIVE_TEST_LIMIT),
+            self.constant(text, "MaxSampleActiveTestChars"),
+        )
+        literals = set(re.findall(r'const\s+string\s+\w+\s*=\s*"([^"]*)"', text))
+        for value in server_operation_evidence.CONSOLE_ERROR_SAMPLE_CLASSES + server_operation_evidence.CONSOLE_ERROR_CLASSIFICATION_BASES:
+            self.assertIn(value, literals, f"no editor constant emits console error value '{value}'")
+        attribution = self.ATTRIBUTION.read_text(encoding="utf-8")
+        for value in server_operation_evidence.CONSOLE_ERROR_SAMPLE_TYPES:
+            self.assertIn(f'"{value}"', attribution, f"no editor source emits console error sample type '{value}'")
+
+    def test_payload_and_persisted_state_carry_the_fields_the_host_reads(self) -> None:
+        text = self.MODELS.read_text(encoding="utf-8")
+        payload = self.class_body(text, "XUUnityLightMcpTestsPayload")
+        for field in (
+            "console_error_expected_by_test_count",
+            "console_error_not_expected_count",
+            "console_error_classification_basis",
+            "console_error_samples",
+        ):
+            self.assertRegex(payload, r"public\s+[\w<>]+\s+" + field + r"\b")
+        persisted = self.class_body(text, "XUUnityLightMcpPersistedTestRunState")
+        for field in (
+            "console_error_samples",
+            "console_error_expected_by_test_count",
+            "console_error_expected_by_test_count_in_session",
+            "console_error_expected_by_test_counter_session_id",
+            "console_error_not_expected_recorded_count",
+            "console_error_classification_basis",
+            "console_error_count_at_completion",
+            "console_error_count_trust_class_at_completion",
+            "console_error_not_expected_count_at_completion",
+        ):
+            self.assertRegex(persisted, r"public\s+[\w<>]+\s+" + field + r"\b")
 
 
 if __name__ == "__main__":

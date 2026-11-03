@@ -299,6 +299,8 @@ namespace XUUnity.LightMcp.Editor.Core
             public string reclassified_status = "";
             public int previous_bridge_generation;
             public string previous_bridge_session_id = "";
+            public bool editor_application_focused;
+            public bool is_playing;
         }
 
         [Serializable]

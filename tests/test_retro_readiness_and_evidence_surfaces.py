@@ -29,18 +29,23 @@ for candidate in (TEMPLATES_DIR, RUNNER_DIR):
         sys.path.insert(0, str(candidate))
 
 import run_multi_project
+import server
 import server_batch_lanes
 import server_batch_orchestrator
 import server_batch_reporting
+import server_bridge_final_status
 import server_bridge_payloads
 import server_bridge_state
+import server_cli_commands
+import server_discovery
 import server_editor_host
 import server_editor_host_lifecycle
 import server_editor_host_paths
 import server_health
 import server_launcher
 import server_operation_evidence
-from server_bridge_paths import test_result_path
+import server_project_context
+from server_bridge_paths import bridge_state_path, test_result_path
 from server_core import ToolInvocationError, read_json, write_json
 from server_readiness_summary import build_ensure_ready_summary
 
@@ -389,6 +394,187 @@ class CompleteFailureListTests(unittest.TestCase):
         self.assertTrue(envelope["retry_recommended"])
 
 
+
+def captured_test_environment(**overrides: object) -> dict:
+    environment = {
+        "captured_at": "request_start",
+        "capture_status": "captured",
+        "render_width": 1440,
+        "render_height": 3200,
+        "preset_label": "XUUnity 1440x3200",
+        "preset_kind": "fixed_resolution",
+        "preset_width": 1440,
+        "preset_height": 3200,
+        "render_matches_preset": "true",
+        "game_view_group": "Android",
+        "build_target": "Android",
+    }
+    environment.update(overrides)
+    return environment
+
+
+class TestEnvironmentSurfaceTests(unittest.TestCase):
+    """A layout assertion that depends on the Game view failed with no record of the stand it ran on."""
+
+    def test_the_projection_keeps_only_the_known_fields_and_bounds_text(self) -> None:
+        compact = server_operation_evidence.compact_test_environment(
+            captured_test_environment(junk_key="x", preset_label="L" * 500, render_width="1440", preset_height=-5)
+        )
+
+        self.assertEqual(server_operation_evidence.TEST_ENVIRONMENT_FIELDS, tuple(compact))
+        self.assertEqual(64, len(compact["preset_label"]))
+        self.assertEqual(1440, compact["render_width"])
+        self.assertEqual(0, compact["preset_height"])
+        self.assertEqual("true", compact["render_matches_preset"])
+
+    def test_non_ascii_labels_stay_within_the_encoded_budget(self) -> None:
+        compact = server_operation_evidence.compact_test_environment(
+            captured_test_environment(preset_label="\U0001F600" * 100, game_view_group="\u0436" * 100)
+        )
+
+        for key in ("preset_label", "game_view_group"):
+            encoded = json.dumps(compact[key], ensure_ascii=True)
+            self.assertLessEqual(len(encoded) - 2, server_operation_evidence.TEST_ENVIRONMENT_ENCODED_TEXT_LIMIT)
+            self.assertTrue(compact[key])
+        self.assertLessEqual(len(json.dumps(compact, ensure_ascii=True, separators=(",", ":"))), 900)
+
+    def test_an_unrecognised_match_flag_is_reported_as_not_comparable(self) -> None:
+        for flag in ("", "maybe", None):
+            compact = server_operation_evidence.compact_test_environment(
+                captured_test_environment(render_matches_preset=flag)
+            )
+            self.assertEqual("", compact["render_matches_preset"])
+        self.assertEqual(
+            "false",
+            server_operation_evidence.compact_test_environment(
+                captured_test_environment(render_matches_preset="False")
+            )["render_matches_preset"],
+        )
+
+    def test_absent_or_uncaptured_environment_is_omitted(self) -> None:
+        for value in (None, "captured", [], {}, {"captured_at": "", "capture_status": "", "render_width": 0}):
+            self.assertEqual({}, server_operation_evidence.compact_test_environment(value))
+
+        for operation in ("unity.tests.run_editmode", "unity.tests.run_playmode"):
+            for payload in (
+                {"status": "passed", "total": 1, "passed": 1},
+                {"status": "passed", "total": 1, "passed": 1, "test_environment": {"capture_status": ""}},
+            ):
+                compact = server_bridge_payloads.compact_operation_payload(payload, operation)
+                self.assertNotIn("test_environment", compact)
+
+    def test_the_compact_test_payload_carries_the_environment(self) -> None:
+        raw = captured_test_environment(junk_key="x", preset_label="L" * 500)
+        payload = {"status": "failed", "total": 1, "failed": 1, "failures": failures(1), "test_environment": raw}
+        without = server_bridge_payloads.compact_operation_payload(
+            {key: value for key, value in payload.items() if key != "test_environment"}, "unity.tests.run_playmode"
+        )
+
+        compact = server_bridge_payloads.compact_operation_payload(payload, "unity.tests.run_playmode")
+
+        environment = compact["test_environment"]
+        self.assertNotIn("junk_key", environment)
+        self.assertEqual((1440, 3200), (environment["render_width"], environment["render_height"]))
+        self.assertEqual("Android", environment["game_view_group"])
+        added = len(json.dumps(compact, ensure_ascii=True, separators=(",", ":"))) - len(
+            json.dumps(without, ensure_ascii=True, separators=(",", ":"))
+        )
+        self.assertLessEqual(added, 400)
+
+    def _verdict_summary(self, persisted: dict) -> dict:
+        return server_bridge_final_status.build_test_verdict_summary(
+            project_root=Path("/tmp/FakeProject"),
+            request_id="req-environment",
+            operation="unity.tests.run_playmode",
+            response_payload=None,
+            persisted_test_result=persisted,
+            request_submitted=True,
+            request_started=True,
+            request_completed=True,
+            completion_status="ok",
+            operation_outcome="completed_ok",
+            active_state={"playmode_state": "edit"},
+            bridge_changed_since_submission=True,
+        )
+
+    def test_final_status_recovers_the_environment_from_the_persisted_result(self) -> None:
+        persisted = {
+            "run_phase": "response_written",
+            "completed_at_utc": "2026-11-03T10:00:02Z",
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "failures": failures(1),
+            "test_environment": captured_test_environment(
+                capture_status="game_view_not_rendered",
+                render_width=0,
+                render_height=0,
+                preset_kind="aspect_ratio",
+                preset_width=0,
+                preset_height=0,
+                render_matches_preset="",
+            ),
+        }
+
+        summary = self._verdict_summary(persisted)
+        self.assertEqual("game_view_not_rendered", summary["test_environment"]["capture_status"])
+        self.assertEqual("aspect_ratio", summary["test_environment"]["preset_kind"])
+
+        compact = server_bridge_final_status.build_compact_final_status_projection(
+            {"operation": "unity.tests.run_playmode", **summary}
+        )
+        self.assertEqual(summary["test_environment"], compact["test_environment"])
+
+        legacy = self._verdict_summary({key: value for key, value in persisted.items() if key != "test_environment"})
+        self.assertNotIn("test_environment", legacy)
+        self.assertNotIn(
+            "test_environment",
+            server_bridge_final_status.build_compact_final_status_projection(
+                {"operation": "unity.tests.run_playmode", **legacy}
+            ),
+        )
+
+    def test_the_terminal_envelope_carries_the_environment_within_the_byte_ceiling(self) -> None:
+        decoded = {
+            "status": "failed",
+            "total": 1,
+            "failed": 1,
+            "failures": [{"name": "Layout.Test", "message": "m" * 2000}],
+            "test_environment": captured_test_environment(preset_label="L" * 10000),
+        }
+        envelope = server_launcher.build_compact_terminal_envelope(
+            {
+                "action": "request",
+                "request_id": "req-environment",
+                "payload_type": "unity.tests.run_playmode",
+                "payload_json": json.dumps(decoded),
+            },
+            0,
+        )
+
+        self.assertEqual(1440, envelope["test_environment"]["render_width"])
+        self.assertEqual("Android", envelope["test_environment"]["game_view_group"])
+        self.assertEqual(64, len(envelope["test_environment"]["preset_label"]))
+        encoded = server_launcher._bounded_compact_json(envelope)
+        self.assertLessEqual(len(encoded.encode("utf-8")), server_launcher.COMPACT_OUTPUT_MAX_BYTES)
+        self.assertEqual(3200, json.loads(encoded)["test_environment"]["render_height"])
+
+    def test_the_final_status_envelope_falls_back_to_the_top_level_environment(self) -> None:
+        envelope = server_launcher.build_compact_terminal_envelope(
+            {
+                "action": "request-final-status",
+                "test_verdict": "failed",
+                "test_environment": captured_test_environment(),
+            },
+            0,
+        )
+        self.assertEqual("captured", envelope["test_environment"]["capture_status"])
+
+        legacy = server_launcher.build_compact_terminal_envelope(
+            {"action": "request-final-status", "test_verdict": "passed"}, 0
+        )
+        self.assertNotIn("test_environment", legacy)
+
 class ExpectedDomainReloadTests(unittest.TestCase):
     def _payload(self) -> dict:
         return {
@@ -617,6 +803,172 @@ class BatchTerminalRecordTests(unittest.TestCase):
         self.assertTrue(details["editor_quit_by_wrapper"])
         self.assertEqual("gui", record["lane"])
         self.assertEqual({}, run_multi_project.terminal_record_from_run({}, {"summary": 1}))
+
+
+GIT_PINNED_DEPENDENCY = "https://example.invalid/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.84"
+PATH_BEARING_PRODUCER_KEYS = {
+    "dependency",
+    "resolved_dependency_path",
+    "manifest_path",
+    "manifest_dependency",
+    "lock_path",
+    "lock_dependency",
+    "lock_version",
+    "lock_hash",
+    "package_cache_root",
+    "package_cache_paths",
+    "bridge_state_path",
+    "repo_local_package_source",
+    "warning",
+}
+
+
+class PackageDependencySurfaceAgreementTests(unittest.TestCase):
+    def _make_project(self, tmp: str, dependency: str | None) -> Path:
+        root = Path(tmp) / "Project"
+        (root / "Assets").mkdir(parents=True)
+        (root / "ProjectSettings").mkdir()
+        (root / "ProjectSettings" / "ProjectVersion.txt").write_text("m_EditorVersion: 6000.0.58f2\n", encoding="utf-8")
+        (root / "Packages").mkdir()
+        dependencies = {"com.unity.ugui": "2.0.0"}
+        if dependency is not None:
+            dependencies[server_project_context.LIGHTWEIGHT_PACKAGE_NAME] = dependency
+        (root / "Packages" / "manifest.json").write_text(json.dumps({"dependencies": dependencies}), encoding="utf-8")
+        if dependency is not None:
+            lock = {
+                "dependencies": {
+                    server_project_context.LIGHTWEIGHT_PACKAGE_NAME: {
+                        "version": dependency,
+                        "depth": 0,
+                        "source": "git",
+                        "dependencies": {},
+                        "hash": "abc123",
+                    }
+                }
+            }
+            (root / "Packages" / "packages-lock.json").write_text(json.dumps(lock), encoding="utf-8")
+            (root / "Library" / "PackageCache" / f"{server_project_context.LIGHTWEIGHT_PACKAGE_NAME}@abc123").mkdir(parents=True)
+            write_json(bridge_state_path(root), {"health_status": "healthy"})
+        return root
+
+    def _surfaces(self, root: Path) -> tuple[dict, dict, dict, dict]:
+        state = server_project_context.inspect_light_mcp_import_state(root)
+        alignment = server_project_context.inspect_package_dependency_alignment(root)
+        summary = build_ensure_ready_summary(
+            root,
+            {
+                "bridge_state": {"health_status": "healthy"},
+                "discovery": {},
+                "package_import_state": state,
+                "package_import_state_before_ready": state,
+            },
+        )
+        prereq = server_discovery._build_host_prerequisites(
+            discovery={},
+            transport_state={},
+            package_dependency_alignment=alignment,
+            stale_request_artifacts=None,
+        )["checks"]["package_dependency"]
+        return state, alignment, summary, prereq
+
+    def test_git_pinned_dependency_is_declared_on_both_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state, alignment, summary, prereq = self._surfaces(self._make_project(tmp, GIT_PINNED_DEPENDENCY))
+
+        self.assertEqual("git_pinned", alignment["alignment"])
+        self.assertEqual("ready", prereq["status"])
+        self.assertTrue(state["manifest_declared"])
+        self.assertIs(True, summary["package_import_state"]["dependency_declared"])
+        self.assertIs(True, summary["package_import_state_before_ready"]["dependency_declared"])
+
+    def test_undeclared_dependency_is_missing_on_both_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state, _, summary, prereq = self._surfaces(self._make_project(tmp, None))
+
+        self.assertEqual("not_declared", state["import_state"])
+        self.assertIs(False, summary["package_import_state"]["dependency_declared"])
+        self.assertEqual("missing", prereq["status"])
+        self.assertEqual("package_dependency_missing", prereq["code"])
+
+    def test_file_dependency_is_declared_on_both_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            _, _, summary, prereq = self._surfaces(self._make_project(tmp, "file:../SomePkg"))
+
+        self.assertIs(True, summary["package_import_state"]["dependency_declared"])
+        self.assertTrue(prereq["ready"])
+
+    def test_compact_ensure_ready_command_reports_the_real_producer_declaration(self) -> None:
+        emitted: list[dict] = []
+        args = types.SimpleNamespace(
+            project_root="",
+            open_editor=False,
+            unity_app=None,
+            editor_log_path=None,
+            background_open=False,
+            timeout_ms=120000,
+            heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+            include_full_payload=False,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, GIT_PINNED_DEPENDENCY)
+            args.project_root = str(root)
+            ready_state = {"health_status": "healthy", "playmode_state": "edit", "compiler_error_count": 0}
+            with ExitStack() as stack:
+                stack.enter_context(mock.patch.object(server, "resolve_editor_log_path", return_value=root / "Editor.log"))
+                stack.enter_context(mock.patch.object(server, "build_project_discovery_report", return_value={}))
+                stack.enter_context(mock.patch.object(server, "maybe_fail_fast_offline_ensure_ready_without_open"))
+                stack.enter_context(mock.patch.object(server, "current_project_context_bridge_state", return_value=ready_state))
+                stack.enter_context(mock.patch.object(server, "wait_for_ready", return_value=ready_state))
+                stack.enter_context(mock.patch.object(server, "refresh_project_context"))
+                stack.enter_context(mock.patch.object(server, "print_json", side_effect=lambda payload: emitted.append(dict(payload))))
+                server.cmd_ensure_ready(args)
+
+        self.assertEqual(1, len(emitted))
+        payload = emitted[0]
+        self.assertEqual("compact_ensure_ready", payload["payload_mode"])
+        self.assertEqual("imported_or_bridge_state_present", payload["package_import_state"]["import_state"])
+        self.assertIs(True, payload["package_import_state"]["dependency_declared"])
+        self.assertIs(True, payload["package_import_state_before_ready"]["dependency_declared"])
+
+    def test_diagnostic_bundle_projection_keys_exist_in_producers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, GIT_PINNED_DEPENDENCY)
+            import_keys = set(server_project_context.inspect_light_mcp_import_state(root))
+            alignment_keys = set(server_project_context.inspect_package_dependency_alignment(root))
+
+        projected_import = set(server_cli_commands._DIAGNOSTIC_PACKAGE_IMPORT_KEYS)
+        projected_alignment = set(server_cli_commands._DIAGNOSTIC_PACKAGE_ALIGNMENT_KEYS)
+        self.assertLessEqual(projected_import, import_keys)
+        self.assertLessEqual(projected_alignment, alignment_keys)
+        self.assertFalse(projected_import & PATH_BEARING_PRODUCER_KEYS)
+        self.assertFalse(projected_alignment & PATH_BEARING_PRODUCER_KEYS)
+
+    def test_diagnostic_bundle_carries_declaration_and_alignment_without_host_paths(self) -> None:
+        emitted: list[dict] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, GIT_PINNED_DEPENDENCY)
+            with ExitStack() as stack:
+                stack.enter_context(mock.patch.object(server_cli_commands, "ensure_project_root", return_value=root))
+                stack.enter_context(mock.patch.object(server_cli_commands, "build_project_discovery_report", return_value={}))
+                stack.enter_context(mock.patch.object(server_cli_commands, "current_project_context_host_session_state", return_value={}))
+                stack.enter_context(mock.patch.object(server_cli_commands, "resolve_hub_licensing_ipc", return_value=({}, None)))
+                stack.enter_context(mock.patch.object(server_cli_commands, "find_latest_request_event", return_value=None))
+                stack.enter_context(mock.patch.object(server_cli_commands, "resolve_editor_log_path", return_value=root / "Editor.log"))
+                stack.enter_context(
+                    mock.patch.object(server_cli_commands, "print_json", side_effect=lambda payload: emitted.append(dict(payload)))
+                )
+                server_cli_commands.cmd_diagnostic_retro_bundle(types.SimpleNamespace(project_root=str(root)))
+
+        self.assertEqual(1, len(emitted))
+        bundle = emitted[0]
+        self.assertIs(True, bundle["package_import"]["manifest_declared"])
+        self.assertEqual("git_pinned", bundle["package_alignment"]["alignment"])
+        self.assertEqual("git_or_remote", bundle["package_alignment"]["dependency_mode"])
+        encoded = json.dumps(bundle)
+        self.assertNotIn(str(root), encoded)
+        self.assertNotIn(json.dumps(str(root))[1:-1], encoded)
+        self.assertNotIn("example.invalid", encoded)
 
 
 if __name__ == "__main__":

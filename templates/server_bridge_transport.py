@@ -5,7 +5,7 @@ import json
 import socket
 import time
 import uuid
-from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+from server_core import bridge_enable_recovery_command
 
 from pathlib import Path
 from typing import Any
@@ -13,6 +13,7 @@ from typing import Any
 from server_bridge_constants import (
     DEFAULT_BRIDGE_TRANSPORT,
     DEFAULT_CONFIGURED_BRIDGE_TRANSPORT,
+    POST_RESET_RECOVERY_RESPONSE_KEY,
     SUPPORTED_BRIDGE_TRANSPORTS,
     TCP_LOOPBACK_BRIDGE_TRANSPORT,
 )
@@ -80,6 +81,33 @@ def _record_delivery_best_effort(
         # Delivery accounting must never turn a usable Unity response into a
         # host-side failure. The response itself remains the primary result.
         pass
+
+
+def _post_reset_recovery_fields(
+    post_reset_recovery_cap_ms: int,
+    recovery_timeout_ms: int,
+    recovered_status: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "post_reset_recovery_mode": "capped" if int(post_reset_recovery_cap_ms or 0) > 0 else "caller_deadline",
+        "post_reset_recovery_budget_ms": int(recovery_timeout_ms),
+        "post_reset_recovery_elapsed_ms": int(recovered_status.get("post_reset_recovery_elapsed_ms") or 0),
+        "post_reset_recovery_stop_reason": str(recovered_status.get("post_reset_recovery_stop_reason") or ""),
+    }
+
+
+def _with_post_reset_recovery_fields(
+    response: dict[str, Any],
+    post_reset_recovery_cap_ms: int,
+    recovery_timeout_ms: int,
+    recovered_status: dict[str, Any],
+) -> dict[str, Any]:
+    if isinstance(response, dict):
+        response[POST_RESET_RECOVERY_RESPONSE_KEY] = _post_reset_recovery_fields(
+            post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
+        )
+    return response
+
 
 class BridgeTransportAdapter:
     name = "unknown"
@@ -224,6 +252,7 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
                 current_state=state,
                 poll_timeout_ms=recovery_timeout_ms,
             )
+            state = read_best_effort_bridge_state(project_root) or state
             if recovered_response is not None:
                 _record_delivery_best_effort(
                     project_root=project_root,
@@ -234,8 +263,17 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
                     observed=True,
                     source="file_outbox_recovery_after_lifecycle_reset",
                 )
-                return recovered_response, request_id, request_started_at
+                return (
+                    _with_post_reset_recovery_fields(
+                        recovered_response, post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
+                    ),
+                    request_id,
+                    request_started_at,
+                )
 
+            recovery_fields = _post_reset_recovery_fields(
+                post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
+            )
             current_generation, current_session_id = bridge_identity_from_state(state)
             processed = bool(
                 recovered_status.get("request_started")
@@ -260,6 +298,7 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
                     "previous_bridge_session_id": initial_session_id,
                     "bridge_generation": current_generation,
                     "bridge_session_id": current_session_id,
+                    **recovery_fields,
                 },
             )
             try:
@@ -279,6 +318,7 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
                 retryable_hint=retryable,
                 request_processed_hint=processed,
                 poll_timeout_ms=0,
+                **recovery_fields,
             )
 
         recovered_response, _ = try_recover_completed_response_after_reset(
@@ -534,6 +574,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                         current_state=current_state,
                         poll_timeout_ms=recovery_timeout_ms,
                     )
+                    current_state = read_best_effort_bridge_state(project_root) or current_state
                     if recovered_response is not None:
                         _record_delivery_best_effort(
                             project_root=project_root,
@@ -544,7 +585,13 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                             observed=True,
                             source="file_outbox_recovery_after_transport_restart",
                         )
-                        return recovered_response, request_id, request_started_at
+                        return (
+                            _with_post_reset_recovery_fields(
+                                recovered_response, post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
+                            ),
+                            request_id,
+                            request_started_at,
+                        )
 
                     request_processed = bool(
                         recovered_status.get("request_started")
@@ -553,6 +600,9 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                         == request_id
                     )
                     retryable = not request_processed
+                    recovery_fields = _post_reset_recovery_fields(
+                        post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
+                    )
                     current_generation, current_session_id = bridge_identity_from_state(current_state)
                     journal_path = write_host_request_journal_event(
                         project_root,
@@ -571,6 +621,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                             "previous_bridge_session_id": initial_session_id,
                             "bridge_generation": current_generation,
                             "bridge_session_id": current_session_id,
+                            **recovery_fields,
                         },
                     )
                     raise build_lifecycle_reset_tool_error(
@@ -587,6 +638,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                         transport_host=host,
                         transport_port=port,
                         poll_timeout_ms=0,
+                        **recovery_fields,
                     )
             _record_delivery_best_effort(
                 project_root=project_root,
@@ -610,6 +662,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                 current_state=state,
                 poll_timeout_ms=recovery_timeout_ms,
             )
+            state = read_best_effort_bridge_state(project_root) or state
             if recovered_response is not None:
                 _record_delivery_best_effort(
                     project_root=project_root,
@@ -620,8 +673,17 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                     observed=True,
                     source="file_outbox_recovery_after_lifecycle_reset",
                 )
-                return recovered_response, request_id, request_started_at
+                return (
+                    _with_post_reset_recovery_fields(
+                        recovered_response, post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
+                    ),
+                    request_id,
+                    request_started_at,
+                )
 
+            recovery_fields = _post_reset_recovery_fields(
+                post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
+            )
             current_generation, current_session_id = bridge_identity_from_state(state)
             processed = bool(
                 recovered_status.get("request_started")
@@ -646,6 +708,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                     "previous_bridge_session_id": initial_session_id,
                     "bridge_generation": current_generation,
                     "bridge_session_id": current_session_id,
+                    **recovery_fields,
                 },
             )
             raise build_lifecycle_reset_tool_error(
@@ -662,6 +725,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                 transport_host=host,
                 transport_port=port,
                 poll_timeout_ms=0,
+                **recovery_fields,
             )
 
         recovered_response, _ = try_recover_completed_response_after_reset(
@@ -754,7 +818,7 @@ def invoke_bridge_transport(
             "bridge_disabled",
             (
                 "Unity bridge is disabled for this project. "
-                f"Enable it with {BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} "
+                f"Enable it with {bridge_enable_recovery_command()} "
                 "and reopen Unity."
             ),
             {

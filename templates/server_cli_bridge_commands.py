@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+from server_core import bridge_enable_recovery_command
+from server_bridge_runtime import read_request_journal_events
 
 from server_cli_shared import *
 from server_bridge_final_status import build_compact_final_status_projection
@@ -89,7 +90,7 @@ def cmd_recover_editor_session(args):
             payload["recovery_classification"] = recovery_classification
             payload["recovery_recommended_next_action"] = next_action
             payload["recommended_recovery_command"] = recovery_command_template.format(
-                launcher=launcher_command_name(),
+                launcher=launcher_command_prefix(),
                 project_root=quoted_shell_path(project_root),
             )
             if recovery_classification == "compile_red_confirmed":
@@ -147,7 +148,7 @@ def cmd_bridge_state(args):
     if not bridge_enabled(project_root):
         raise SystemExit(
             "Bridge is disabled for this project. Enable it with "
-            f"{BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} and reopen Unity."
+            f"{bridge_enable_recovery_command()} and reopen Unity."
         )
     state_path = bridge_state_path(project_root)
     if not state_path.is_file():
@@ -544,17 +545,106 @@ def cmd_request_loading_timing(args):
         raise SystemExit(1)
 
 
-def cmd_request_editor_quit(args):
-    project_root = ensure_project_root(args.project_root)
-    response = request_editor_quit(str(project_root), args.timeout_ms)
-    response["quit_request_accepted"] = response.get("status") == "ok"
-    response["process_exit_verified"] = False
+EDITOR_QUIT_ACK_FIELDS = (
+    "quit_mechanism",
+    "quit_expires_at_utc",
+    "editor_application_focused",
+    "is_playing",
+    "scene_dirty",
+)
+
+
+def editor_quit_ack_payload(response: dict[str, Any]) -> dict[str, Any]:
+    raw = response.get("payload_json")
+    if isinstance(raw, str) and raw:
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+    payload = response.get("payload")
+    return dict(payload) if isinstance(payload, dict) else {}
+
+
+def editor_quit_journal_event_types(
+    project_root: Path,
+    request_id: str,
+    read_request_journal_events_fn: Any,
+) -> set[str]:
+    if not request_id:
+        return set()
+    try:
+        events = read_request_journal_events_fn(project_root, request_id)
+    except Exception:
+        return set()
+    return {str(event.get("event_type") or "") for event in events}
+
+
+def raise_editor_quit_request_rejected(project_root: Path, response: dict[str, Any]) -> None:
+    error = response.get("error") if isinstance(response.get("error"), dict) else {}
+    error_code = str(error.get("code") or response.get("status") or "unknown")
+    payload = {
+        "action": "request_editor_quit",
+        "project_root": str(project_root),
+        "quit_request": response,
+        "quit_request_accepted": False,
+        "quit_request_id": str(response.get("request_id") or ""),
+        "quit_request_status": str(response.get("status") or ""),
+        "quit_request_error_code": error_code,
+        "quit_request_error_message": str(error.get("message") or ""),
+        "process_exit_verified": False,
+        "closeout_classification": "quit_request_rejected",
+        "recommended_next_action": "manual_editor_close",
+        "next_distinct_action": "resolve_quit_request_error_or_manual_editor_close",
+        "recommended_recovery_command": render_launcher_cli(
+            "verify-editor-closed", project_root, "--timeout-ms", "30000"
+        ),
+    }
+    raise ToolInvocationError(
+        "editor_quit_request_rejected",
+        (
+            f"Unity rejected the quit request ({error_code}), so no exit was armed. "
+            "Close the editor manually, then verify closure."
+        ),
+        payload,
+    )
+
+
+def run_request_editor_quit(
+    args,
+    *,
+    ensure_project_root_fn: Any,
+    request_editor_quit_fn: Any,
+    verify_project_editor_closed_fn: Any,
+    force_terminate_verified_project_editor_fn: Any,
+    read_request_journal_events_fn: Any,
+    read_host_editor_session_state_fn: Any,
+    print_json_fn: Any,
+) -> None:
+    project_root = ensure_project_root_fn(args.project_root)
+    response = request_editor_quit_fn(str(project_root), args.timeout_ms)
+    quit_request_accepted = response.get("status") == "ok"
     force_after_ms = max(0, int(getattr(args, "force_after_ms", 0) or 0))
-    if not bool(getattr(args, "wait_for_exit", False)) and force_after_ms <= 0:
-        print_json(response)
+    if not quit_request_accepted and force_after_ms <= 0:
+        raise_editor_quit_request_rejected(project_root, response)
+    ack = editor_quit_ack_payload(response)
+    ack_fields = {key: ack.get(key) for key in EDITOR_QUIT_ACK_FIELDS}
+    ack_fields["quit_mechanism"] = str(
+        ack.get("quit_mechanism") or ("legacy_delay_call" if quit_request_accepted else "")
+    )
+    editor_pid = int(ack.get("editor_pid") or 0)
+    response["quit_request_accepted"] = quit_request_accepted
+    response["process_exit_verified"] = False
+    if not bool(getattr(args, "wait_for_exit", True)) and force_after_ms <= 0:
+        response.update(ack_fields)
+        response["editor_pid"] = editor_pid
+        response["quit_request_id"] = str(response.get("request_id") or "")
+        response["closeout_classification"] = "quit_ack_unverified"
+        print_json_fn(response)
         return
 
-    verification = verify_project_editor_closed(
+    verification = verify_project_editor_closed_fn(
         project_root,
         force_after_ms if force_after_ms > 0 else args.exit_timeout_ms,
     )
@@ -562,16 +652,21 @@ def cmd_request_editor_quit(args):
         "action": "request_editor_quit",
         "project_root": str(project_root),
         "quit_request": response,
-        "quit_request_accepted": response.get("status") == "ok",
+        "quit_request_accepted": quit_request_accepted,
         "quit_request_id": str(response.get("request_id") or ""),
         "quit_request_status": str(response.get("status") or ""),
+        "editor_pid": editor_pid,
     }
+    payload.update(ack_fields)
     payload.update(verification)
+    live_pids = list(payload.get("live_project_editor_pids") or [])
+    if editor_pid <= 0 and len(live_pids) == 1:
+        payload["editor_pid"] = int(live_pids[0])
     if bool(payload.get("same_project_editor_closed")):
         payload["closeout_classification"] = "quit_ack_and_process_exit_verified"
         payload["recommended_next_action"] = "none"
         payload["next_distinct_action"] = "rerun_closed_editor_batch_lane"
-        print_json(payload)
+        print_json_fn(payload)
         return
 
     if not bool(payload.get("process_visibility_available")):
@@ -581,29 +676,51 @@ def cmd_request_editor_quit(args):
         raise ToolInvocationError(
             "process_visibility_restricted",
             (
-                "Unity quit request was acknowledged, but host process visibility is unavailable, "
-                "so process exit cannot be verified."
+                f"Unity quit request was {'acknowledged' if quit_request_accepted else 'rejected'}, "
+                "but host process visibility is unavailable, so process exit cannot be verified."
             ),
             payload,
         )
 
     if force_after_ms > 0:
-        forced = force_terminate_verified_project_editor(
+        forced = force_terminate_verified_project_editor_fn(
             project_root,
             list(payload.get("live_project_editor_pids") or []),
             min(10000, max(1000, force_after_ms)),
         )
         payload.update(forced)
         payload["force_after_ms"] = force_after_ms
-        payload["closeout_classification"] = "quit_ack_without_exit_force_terminated"
+        payload["closeout_classification"] = (
+            "quit_ack_without_exit_force_terminated" if quit_request_accepted else "quit_rejected_force_terminated"
+        )
         payload["recommended_next_action"] = "none"
         payload["next_distinct_action"] = "rerun_closed_editor_batch_lane"
-        print_json(payload)
+        print_json_fn(payload)
         return
 
+    journal_event_types = editor_quit_journal_event_types(
+        project_root, payload["quit_request_id"], read_request_journal_events_fn
+    )
+    payload["quit_executing_observed"] = "editor_quit_executing" in journal_event_types
+    payload["quit_expired_observed"] = "editor_quit_expired" in journal_event_types
     payload["closeout_classification"] = "editor_quit_ack_without_exit"
-    payload["recommended_next_action"] = "manual_editor_close"
-    payload["next_distinct_action"] = "manual_editor_close_or_terminate_then_verify_closed"
+    session = read_host_editor_session_state_fn(project_root) or {}
+    payload["host_opened_session_found"] = bool(session.get("opened_by_host"))
+    if payload["host_opened_session_found"]:
+        payload["recommended_next_action"] = "restore_editor_state_require_closed"
+        payload["next_distinct_action"] = "restore_editor_state_require_closed"
+        payload["recommended_recovery_command"] = render_launcher_cli(
+            "restore-editor-state", project_root, "--timeout-ms", "30000", "--require-closed"
+        )
+    else:
+        payload["recommended_next_action"] = "manual_editor_close"
+        payload["next_distinct_action"] = "manual_editor_close_or_explicit_force_after_ms"
+        payload["recommended_recovery_command"] = render_launcher_cli(
+            "verify-editor-closed", project_root, "--timeout-ms", "30000"
+        )
+        payload["explicit_escalation_command"] = render_launcher_cli(
+            "request-editor-quit", project_root, "--timeout-ms", "30000", "--force-after-ms", "30000"
+        )
     raise ToolInvocationError(
         "editor_quit_ack_without_exit",
         (
@@ -611,6 +728,19 @@ def cmd_request_editor_quit(args):
             f"Live editor pid(s): {', '.join(str(pid) for pid in payload.get('live_project_editor_pids') or [])}."
         ),
         payload,
+    )
+
+
+def cmd_request_editor_quit(args):
+    run_request_editor_quit(
+        args,
+        ensure_project_root_fn=ensure_project_root,
+        request_editor_quit_fn=request_editor_quit,
+        verify_project_editor_closed_fn=verify_project_editor_closed,
+        force_terminate_verified_project_editor_fn=force_terminate_verified_project_editor,
+        read_request_journal_events_fn=read_request_journal_events,
+        read_host_editor_session_state_fn=try_read_host_editor_session_state,
+        print_json_fn=print_json,
     )
 
 

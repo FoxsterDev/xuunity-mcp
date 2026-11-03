@@ -34,6 +34,7 @@ from server_bridge_final_status import (
     peek_response_payload,
     read_persisted_test_result,
     resolve_post_reset_recovery_timeout_ms,
+    take_recovered_response_with_grace,
     try_take_recovered_response,
 )
 from server_bridge_journal import (
@@ -138,18 +139,15 @@ def try_recover_completed_response_after_reset(
     current_state: dict[str, Any] | None,
     poll_timeout_ms: int,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-    final_status = build_request_final_status(
-        project_root,
-        request_id,
-        operation,
-        current_state=current_state,
-        poll_timeout_ms=poll_timeout_ms,
-        return_reclassified_terminal_immediately=False,
-    )
-
-    if bool(final_status.get("request_completed")):
-        recovered_response = try_take_recovered_response(project_root, request_id)
-        if recovered_response is not None:
-            return recovered_response, final_status
-
-    return None, final_status
+    original_reader = _final_status.read_request_journal_events
+    _final_status.read_request_journal_events = read_request_journal_events
+    try:
+        return _final_status.try_recover_completed_response_after_reset(
+            project_root,
+            request_id=request_id,
+            operation=operation,
+            current_state=current_state,
+            poll_timeout_ms=poll_timeout_ms,
+        )
+    finally:
+        _final_status.read_request_journal_events = original_reader

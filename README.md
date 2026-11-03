@@ -836,7 +836,7 @@ Popular MCP tools:
 Host helper commands include `setup-plan`, `setup-apply`, `uninstall-plan`,
 `uninstall-apply`, `validate-setup`, `install-test-framework`,
 `license-capabilities`, `ensure-ready`, `verify-editor-closed`,
-`request-editor-quit --wait-for-exit`, `restore-editor-state`,
+`request-editor-quit`, `restore-editor-state`,
 `recover-editor-session`, `batch-compile`, `batch-compile-matrix`,
 `batch-editmode-tests`, `batch-build-config-compile-matrix`,
 `batch-build-player`, `project-action-list`, `project-action-invoke`,
@@ -1194,7 +1194,7 @@ Troubleshooting:
   deep debugging.
 - Long operation timed out: recover with `request-final-status`.
 - Closed-project batch refused because the editor is open: run
-  `request-editor-quit --project-root <project> --timeout-ms 30000 --wait-for-exit --exit-timeout-ms 30000`,
+  `request-editor-quit --project-root <project> --timeout-ms 30000 --exit-timeout-ms 30000`,
   then `verify-editor-closed --project-root <project> --timeout-ms 30000`.
   If live PIDs remain, close or terminate the editor explicitly, verify again,
   then rerun the batch helper.

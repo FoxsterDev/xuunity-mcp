@@ -322,6 +322,12 @@ Current reconnect policy:
 - delivery remains `host_delivery_pending` while the original tracked request
   is still inside its timeout; it becomes unproven only after the deadline or
   an explicit response-channel loss event
+- `unity.tests.run_editmode` and `unity.tests.run_playmode` recover across a
+  lifecycle reset (such as the Play Mode entry domain reload) against the
+  caller's remaining `timeoutMs`, with no fixed post-reset cap; a runtime
+  config `post_reset_recovery_cap_ms` for them is ignored and listed under
+  `runtime-config-show` `ignored_overrides`, while other operations keep their
+  caps
 - explicitly idempotent operations can be retried once automatically
 - non-idempotent operations stay fail-fast and surface the lifecycle-reset evidence instead of retrying blindly
 - deferred async operations now retain active-request ownership until their completion callback, which makes `request_abandoned` reachable during real in-flight reloads instead of only in theory
@@ -373,6 +379,29 @@ Current native settle-watcher start:
   existing editor is reused with requested arguments only when its process
   command proves them; later successful licensing evidence supersedes earlier
   transient channel errors in the same log
+- `unity.editor.quit` exits from the bridge's `EditorApplication.update` tick,
+  not from `EditorApplication.delayCall`. Unity's native timer runs delay calls
+  only while the editor is the active app, in unpaused Play Mode, or attached to
+  a remote or debugger; `update` keeps ticking. A background-opened (`open -g`)
+  editor in Edit Mode therefore acknowledged the quit and never ran it (about 40
+  of 47 journaled quits). The operation arms an intent in `SessionState`
+  (request id, armed time, 120 s expiry) and returns; the response and the
+  `request_completed` journal entry are written synchronously inside the same
+  `PumpOnce`, so the first statement of the next `OnUpdate` clears the intent,
+  journals `editor_quit_executing`, logs the marker line and calls
+  `EditorApplication.Exit(0)`. The exit cannot beat the response. The bootstrap
+  re-arms the intent from `SessionState` after a domain reload, and an intent
+  older than 120 s is dropped with `editor_quit_expired`. `Exit` is forced
+  (no `wantsToQuit`, no save prompt), so the acknowledgement reports
+  `scene_dirty` (open scenes or the current Prefab Mode stage) for the host to
+  surface discarded changes
+- `request-editor-quit` verifies process exit by default; `--no-wait-for-exit`
+  is the explicit ack-only opt-out (`quit_ack_unverified`). An acknowledged quit
+  that does not exit fails with `editor_quit_ack_without_exit`; the recovery
+  command is `restore-editor-state --require-closed` for a host-opened editor
+  and a manual close plus `verify-editor-closed` otherwise. A rejected quit
+  (`status: error`) fails at once with `quit_request_rejected` and skips the
+  exit wait. The command never signals the editor on its own
 - `request-editor-quit --force-after-ms` is an explicit escalation only: after
   the graceful wait it requires one current same-project editor PID, rechecks
   identity, terminates that PID, and verifies exit
@@ -613,7 +642,12 @@ every object the widened scope reaches, and it silently picks the first same-nam
 `unity.game_view.configure` is intentionally conservative:
 
 - by default it does not create a new custom size
-- if the requested size is missing, it fails explicitly
+- only a `FixedResolution` entry matches; an aspect-ratio preset of the same
+  shape (Unity's builtin `16:9 Portrait` stores `9x16`) never counts, and the
+  error names it when one exists
+- if the requested fixed resolution is missing, it fails explicitly
+- the resolved `game_view` reports `preset_kind` (`fixed_resolution`,
+  `aspect_ratio`, `free` or `unknown`)
 - persistent editor user-state change requires:
   - `allowCreateCustomSize=true`
 

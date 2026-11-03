@@ -6,7 +6,7 @@ import json
 import time
 import subprocess
 from server_host_call_timing import measure_host_stage, timed_host_call
-from server_core import BRIDGE_ENABLE_RECOVERY_COMMAND
+from server_core import bridge_enable_recovery_command
 
 from contextlib import nullcontext
 from pathlib import Path
@@ -117,6 +117,7 @@ from server_bridge_runtime import (
     wait_for_editor_idle,
     wait_for_playmode_state,
 )
+from server_bridge_constants import POST_RESET_RECOVERY_RESPONSE_KEY
 from server_bridge_paths import test_result_path
 from server_editor_host import (
     activate_unity_editor,
@@ -705,19 +706,6 @@ def build_status_summary_from_context(
     return summary
 
 
-def recommended_recovery_command_for_project(project_root: Path, next_action: str) -> str:
-    template = DISCOVERY_NEXT_ACTION_COMMANDS.get(str(next_action or "").strip())
-    if not template:
-        return ""
-    return template.format(
-        launcher=launcher_command_name(),
-        project_root=quoted_shell_path(project_root),
-        unity_apiupdate_log=quoted_shell_path(
-            project_root / "Library" / "XUUnityLightMcp" / "logs" / "unity_apiupdate.log"
-        ),
-    )
-
-
 def enrich_error_details_with_discovery(project_root: Path, details: dict[str, Any] | None = None) -> dict[str, Any]:
     return enrich_error_details_with_discovery_data(
         project_root,
@@ -939,7 +927,7 @@ def recover_project_bridge_for_reconciliation(
                 "bridge_disabled",
                 (
                     "Unity bridge is disabled for this project. "
-                    f"Enable it with {BRIDGE_ENABLE_RECOVERY_COMMAND.format(project_root='<path>')} "
+                    f"Enable it with {bridge_enable_recovery_command()} "
                     "and reopen Unity."
                 ),
             ),
@@ -1151,6 +1139,8 @@ def resolve_operation_lifecycle_policy(project_root: Path, operation: str) -> di
         "retry_on_transport_response_missing": False,
         "retry_on_transport_connect_failed": False,
         "post_reset_recovery_cap_ms": 0,
+        "post_reset_recovery_caller_deadline": False,
+        "post_reset_recovery_ignored_override_cap_ms": 0,
     }
     policy.update(OPERATION_LIFECYCLE_POLICIES.get(operation, {}))
     policy.update(resolve_operation_lifecycle_policy_overrides(project_root, operation))
@@ -1209,7 +1199,13 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                     "bridge_generation": bridge_identity_from_state(pre_request_state)[0],
                     "bridge_session_id": bridge_identity_from_state(pre_request_state)[1],
                 },
+                "post_reset_recovery_mode": (
+                    "capped" if int(policy.get("post_reset_recovery_cap_ms") or 0) > 0 else "caller_deadline"
+                ),
             }
+            ignored_override_cap_ms = int(policy.get("post_reset_recovery_ignored_override_cap_ms") or 0)
+            if ignored_override_cap_ms > 0:
+                lifecycle["post_reset_recovery_ignored_override_cap_ms"] = ignored_override_cap_ms
 
             dispatch_started = False
             pre_idle_state = pre_request_state
@@ -1300,6 +1296,9 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                     post_reset_recovery_cap_ms=int(policy.get("post_reset_recovery_cap_ms") or 0),
                 )
                 lifecycle["transport"] = transport_metadata
+                post_reset_recovery = response.pop(POST_RESET_RECOVERY_RESPONSE_KEY, None)
+                if isinstance(post_reset_recovery, dict):
+                    lifecycle.update(post_reset_recovery)
 
                 if operation == "unity.playmode.set":
                     expected_playmode_state = expected_playmode_state_for_action(str(args.get("action") or ""))

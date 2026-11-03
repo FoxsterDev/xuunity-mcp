@@ -292,10 +292,25 @@ def build_parser() -> argparse.ArgumentParser:
     loading_timing_cmd.add_argument("--timeout-ms", type=int, default=5000)
     loading_timing_cmd.set_defaults(func_name="cmd_request_loading_timing")
 
-    editor_quit_cmd = sub.add_parser("request-editor-quit", help="Send a direct unity.editor.quit request through the active bridge transport.")
+    editor_quit_cmd = sub.add_parser(
+        "request-editor-quit",
+        help="Send unity.editor.quit through the active bridge transport and verify the same-project editor process exits.",
+    )
     editor_quit_cmd.add_argument("--project-root", required=True)
     editor_quit_cmd.add_argument("--timeout-ms", type=int, default=15000)
-    editor_quit_cmd.add_argument("--wait-for-exit", action="store_true")
+    editor_quit_cmd.add_argument(
+        "--wait-for-exit",
+        dest="wait_for_exit",
+        action="store_true",
+        default=True,
+        help="Verify process exit after the quit acknowledgement (default).",
+    )
+    editor_quit_cmd.add_argument(
+        "--no-wait-for-exit",
+        dest="wait_for_exit",
+        action="store_false",
+        help="Return after the quit acknowledgement without verifying exit; reports closeout_classification quit_ack_unverified.",
+    )
     editor_quit_cmd.add_argument("--exit-timeout-ms", type=int, default=30000)
     editor_quit_cmd.add_argument(
         "--force-after-ms",

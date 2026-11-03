@@ -1661,7 +1661,7 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_tests_run_editmode": {
         "bridgeOperation": "unity.tests.run_editmode",
-        "description": "Run Unity EditMode tests and return normalized result accounting plus console-error pressure observed since request start.",
+        "description": "Run Unity EditMode tests and return normalized result accounting plus console-error pressure since request start, excluding errors a passing test consumed with LogAssert.Expect.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1687,14 +1687,19 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "default": False,
                     "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
                 },
-                "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
+                "timeoutMs": {
+                    "type": "integer",
+                    "default": 300000,
+                    "minimum": 1000,
+                    "description": "Budget for the Unity test run itself, including the wait across any domain reload during the run; size it above the suite duration."
+                }
             },
             "required": ["projectRoot"]
         }
     },
     "unity_tests_run_playmode": {
         "bridgeOperation": "unity.tests.run_playmode",
-        "description": "Run Unity PlayMode tests and return normalized result accounting plus console-error pressure observed since request start.",
+        "description": "Run Unity PlayMode tests and return normalized result accounting plus console-error pressure since request start, excluding errors a passing test consumed with LogAssert.Expect.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1720,7 +1725,12 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "default": False,
                     "description": "When true, return the full bridge payload including lifecycle snapshots instead of the compact decision summary."
                 },
-                "timeoutMs": {"type": "integer", "default": 300000, "minimum": 1000}
+                "timeoutMs": {
+                    "type": "integer",
+                    "default": 300000,
+                    "minimum": 1000,
+                    "description": "Budget for the Unity test run itself, including the wait across the Play Mode entry domain reload; size it above the suite duration."
+                }
             },
             "required": ["projectRoot"]
         }
@@ -1765,7 +1775,10 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_game_view_configure": {
         "bridgeOperation": "unity.game_view.configure",
-        "description": "Set the active Unity Game View to a specific fixed resolution.",
+        "description": (
+            "Set the active Unity Game View to a specific fixed resolution. Only FixedResolution entries match; "
+            "an aspect-ratio preset of the same shape (for example 9x16) never counts."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1777,7 +1790,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "allowCreateCustomSize": {
                     "type": "boolean",
                     "default": False,
-                    "description": "When false, fail if the requested size is not already available in Unity Game View."
+                    "description": "When false, fail if the requested fixed resolution is not already available in Unity Game View."
                 },
                 "includeFullPayload": {
                     "type": "boolean",

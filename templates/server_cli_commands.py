@@ -74,6 +74,7 @@ from server_bridge_runtime import (
     cleanup_stale_request_artifacts,
     default_editor_log_path,
     logs_dir,
+    read_request_journal_events,
     request_journal_dir,
     scenario_results_dir,
 )
@@ -99,6 +100,7 @@ from server_editor_host import (
     resolve_editor_log_path,
     verify_project_editor_closed,
     force_terminate_verified_project_editor,
+    try_read_host_editor_session_state,
 )
 from server_license import build_license_capabilities
 from server_license import license_capabilities_cache_path
@@ -272,6 +274,7 @@ from server_cli_setup_commands import (
     cmd_validate_setup,
 )
 from server_cli_bridge_commands import (
+    run_request_editor_quit,
     cmd_bridge_state,
     cmd_ensure_ready,
     cmd_open_editor,
@@ -351,78 +354,15 @@ def _compat_dep(name: str) -> Any:
 
 
 def cmd_request_editor_quit(args):
-    ensure_project_root_fn = _compat_dep("ensure_project_root")
-    request_editor_quit_fn = _compat_dep("request_editor_quit")
-    verify_project_editor_closed_fn = _compat_dep("verify_project_editor_closed")
-    force_terminate_verified_project_editor_fn = _compat_dep("force_terminate_verified_project_editor")
-    print_json_fn = _compat_dep("print_json")
-
-    project_root = ensure_project_root_fn(args.project_root)
-    response = request_editor_quit_fn(str(project_root), args.timeout_ms)
-    response["quit_request_accepted"] = response.get("status") == "ok"
-    response["process_exit_verified"] = False
-    force_after_ms = max(0, int(getattr(args, "force_after_ms", 0) or 0))
-    if not bool(getattr(args, "wait_for_exit", False)) and force_after_ms <= 0:
-        print_json_fn(response)
-        return
-
-    verification = verify_project_editor_closed_fn(
-        project_root,
-        force_after_ms if force_after_ms > 0 else args.exit_timeout_ms,
-    )
-    payload = {
-        "action": "request_editor_quit",
-        "project_root": str(project_root),
-        "quit_request": response,
-        "quit_request_accepted": response.get("status") == "ok",
-        "quit_request_id": str(response.get("request_id") or ""),
-        "quit_request_status": str(response.get("status") or ""),
-    }
-    payload.update(verification)
-    if bool(payload.get("same_project_editor_closed")):
-        payload["closeout_classification"] = "quit_ack_and_process_exit_verified"
-        payload["recommended_next_action"] = "none"
-        payload["next_distinct_action"] = "rerun_closed_editor_batch_lane"
-        print_json_fn(payload)
-        return
-
-    if not bool(payload.get("process_visibility_available")):
-        payload["closeout_classification"] = "process_visibility_restricted"
-        payload["recommended_next_action"] = "restore_host_process_visibility"
-        payload["next_distinct_action"] = "restore_host_process_visibility"
-        raise ToolInvocationError(
-            "process_visibility_restricted",
-            (
-                "Unity quit request was acknowledged, but host process visibility is unavailable, "
-                "so process exit cannot be verified."
-            ),
-            payload,
-        )
-
-    if force_after_ms > 0:
-        forced = force_terminate_verified_project_editor_fn(
-            project_root,
-            list(payload.get("live_project_editor_pids") or []),
-            min(10000, max(1000, force_after_ms)),
-        )
-        payload.update(forced)
-        payload["force_after_ms"] = force_after_ms
-        payload["closeout_classification"] = "quit_ack_without_exit_force_terminated"
-        payload["recommended_next_action"] = "none"
-        payload["next_distinct_action"] = "rerun_closed_editor_batch_lane"
-        print_json_fn(payload)
-        return
-
-    payload["closeout_classification"] = "editor_quit_ack_without_exit"
-    payload["recommended_next_action"] = "manual_editor_close"
-    payload["next_distinct_action"] = "manual_editor_close_or_terminate_then_verify_closed"
-    raise ToolInvocationError(
-        "editor_quit_ack_without_exit",
-        (
-            "Unity quit request was acknowledged, but the same-project editor process is still live. "
-            f"Live editor pid(s): {', '.join(str(pid) for pid in payload.get('live_project_editor_pids') or [])}."
-        ),
-        payload,
+    run_request_editor_quit(
+        args,
+        ensure_project_root_fn=_compat_dep("ensure_project_root"),
+        request_editor_quit_fn=_compat_dep("request_editor_quit"),
+        verify_project_editor_closed_fn=_compat_dep("verify_project_editor_closed"),
+        force_terminate_verified_project_editor_fn=_compat_dep("force_terminate_verified_project_editor"),
+        read_request_journal_events_fn=_compat_dep("read_request_journal_events"),
+        read_host_editor_session_state_fn=_compat_dep("try_read_host_editor_session_state"),
+        print_json_fn=_compat_dep("print_json"),
     )
 
 
@@ -1174,6 +1114,16 @@ def _resolve_cli_project_root(value: str) -> Path:
     return ensure_project_root(value)
 
 
+_DIAGNOSTIC_PACKAGE_ALIGNMENT_KEYS = ("package_name", "dependency_mode", "alignment")
+_DIAGNOSTIC_PACKAGE_IMPORT_KEYS = (
+    "import_state",
+    "manifest_declared",
+    "lock_entry_present",
+    "package_cache_present",
+    "bridge_state_present",
+)
+
+
 def _diagnostic_request_fingerprint(request_id: str) -> str:
     if not request_id:
         return ""
@@ -1352,24 +1302,12 @@ def cmd_diagnostic_retro_bundle(args):
         "project_unity_version": project_version,
         "package_alignment": {
             key: package_alignment.get(key)
-            for key in (
-                "package_name",
-                "manifest_dependency",
-                "lock_dependency_version",
-                "lock_entry_present",
-                "alignment_status",
-            )
+            for key in _DIAGNOSTIC_PACKAGE_ALIGNMENT_KEYS
             if key in package_alignment
         },
         "package_import": {
             key: package_import.get(key)
-            for key in (
-                "import_state",
-                "dependency_declared",
-                "lock_entry_present",
-                "package_cache_present",
-                "bridge_state_present",
-            )
+            for key in _DIAGNOSTIC_PACKAGE_IMPORT_KEYS
             if key in package_import
         },
         "license_capability": {
