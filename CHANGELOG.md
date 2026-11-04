@@ -2,6 +2,88 @@
 
 ## Unreleased
 
+Building a new UI feature end to end (generated art, new prefabs, wiring,
+Play Mode checks) still needed a project-side editor hook: the MCP could not
+create a prefab, could not point a field at another component, and left an
+unfocused editor's Play Mode at 0 fps without saying how to fix it. This
+release closes those gaps.
+
+### Added
+
+- `unity_prefab_create` (`unity.prefab.create`) creates a new prefab from a
+  typed node spec. It starts from an empty root (RectTransform by default),
+  applies the `unity_prefab_mutate` op vocabulary, runs the same
+  post-validation, and only then saves. `add_component` accepts any concrete
+  component type here (Image, Button, TextMeshProUGUI, layout groups, project
+  scripts), because a new asset has nothing to break. Missing folders are
+  created, an existing asset is refused unless `overwrite=true`, and the root
+  is built in a preview scene; `open_scene_dirtied` reports if an open scene
+  was dirtied anyway.
+- `unity_prefab_mutate` and `unity_prefab_create` write component and
+  `GameObject` references. The target is a path inside the same prefab
+  (`Root/Child` or `Root/Child#ComponentType`, including objects created
+  earlier in the same transaction) or a prefab asset path or GUID. The target is
+  checked against the field's declared type, and an ambiguous or mismatched
+  target fails as `prefab_mutation_reference_component_ambiguous` or
+  `prefab_mutation_reference_type_mismatch`. Identity fields (`m_Script`,
+  `m_GameObject`, hierarchy and prefab links) stay refused, so a component still
+  cannot be swapped for another type.
+- Array elements: `field.Array.data[i]` with `i` equal to the current size
+  appends; `field.Array.size` sets the size. A write past the end fails as
+  `prefab_mutation_array_index_out_of_range` instead of padding.
+- New op `create_child` (empty child, RectTransform under UI), and
+  `siblingIndex` / `afterSibling` placement for it and for
+  `create_child_from_template`. `set_rect_transform` also takes `offsetMin`,
+  `offsetMax`, `localScale` and `stretch`.
+- `unity_playmode_set` takes `backgroundExecution: managed | project_owned`,
+  with any action or with the new `action: "configure"`. It persists
+  `background_execution_enabled` in the project's bridge config and reports
+  `background_execution_mode`, `background_execution_change` and
+  `application_run_in_background`.
+- `XUUnityLightMcpMutationDelta.FromWrittenAssets(written, created, prefsKeys)`
+  and `delta.AttachTo(payloadJson)` let a mutating project hook report a valid
+  `xuunity.mutation-delta.v1` in one line.
+- `unity_tests_run_editmode` and `unity_tests_run_playmode` take
+  `allowDirtySceneDiscard`: saved dirty scenes are reloaded from disk and
+  untitled ones dropped before the run.
+
+### Changed
+
+- Managed background execution sets `runInBackground` just before Play Mode
+  entry (Unity reads it there) and restores the project's value once Edit Mode
+  is re-entered (Unity writes its entry value back after `ExitingPlayMode`),
+  instead of holding it for the whole editor session. `ProjectSettings.asset`
+  only sees the managed value if the project is saved during Play Mode. Live on
+  6000.0.58f2 with the editor unfocused: about 3000 frames per ~1 s liveness sample managed,
+  about 14 project-owned; `runInBackground: 0` on disk after Play Mode cycles
+  and an editor quit.
+- A Play Mode throttled while the editor is unfocused now reports the
+  remediation
+  `enable_background_execution_with_unity_playmode_set_background_execution_managed_or_focus_the_unity_editor`
+  while background execution is not managed. With managed background execution,
+  and for a focused throttle, the remediation is unchanged.
+- The `dirty_scene` test refusal now describes each dirty scene (untitled, or
+  saved with its root count), says that editor startup, a Play Mode cycle or an
+  editor script can cause it, and names `allowDirtySceneDiscard`.
+- `requireVisible` in UI selectors accepts a transparent raycast hit area that
+  has a visible descendant, the same rule `unity_ui_click` uses. Such nodes
+  report `visible_via_descendant` and `visible_descendant_path`.
+  `unity_ui_query` reports `inactive_subtrees_skipped` when `includeInactive`
+  is false.
+- `unity_project_action_invoke` and `project_action` scenario steps inject a
+  catalog payload field declared as `string_const_<value>` (for example
+  `operation: string_const_reset_state`). A hook used to receive no value
+  unless the caller repeated it, and could silently run its default branch
+  while the action reported success. A caller value that differs from the
+  constant is refused as `project_action_payload_const_conflict`.
+
+### Fixed
+
+- `add_component` reported `applied` when Unity refused to attach the
+  component (for example a script from an editor-only assembly); the next
+  operation then failed with an unrelated `prefab_mutation_component_not_found`.
+  It now fails as `prefab_mutation_component_add_failed`.
+
 ## 0.3.85
 
 Release tag: `v0.3.85`

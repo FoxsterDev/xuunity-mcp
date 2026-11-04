@@ -75,8 +75,10 @@ Background execution is opt-in, because an editor-time
 `Application.runInBackground` assignment is backed by the project setting
 `PlayerSettings.runInBackground` and can reach a consumer's committed
 `ProjectSettings.asset`. The bridge changes it only when the project's bridge
-config sets `background_execution_enabled: true`, and then restores the original
-value on bridge disable or editor quit. It never requests native OS focus.
+config sets `background_execution_enabled: true` (`unity_playmode_set
+{backgroundExecution: "managed"}` writes it), applies it only while Play Mode
+runs, and restores the original value on Play Mode exit, bridge disable, or
+editor quit. It never requests native OS focus.
 Status and currency payloads report `background_execution_mode`; Play Mode
 evidence still requires an advancing point-of-use liveness sample.
 

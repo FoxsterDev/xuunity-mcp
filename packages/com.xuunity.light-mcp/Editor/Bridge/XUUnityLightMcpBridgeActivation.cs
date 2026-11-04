@@ -15,6 +15,12 @@ namespace XUUnity.LightMcp.Editor.Bridge
             return LoadConfig().enabled;
         }
 
+        public static void InvalidateConfig()
+        {
+            _loaded = false;
+            _cachedConfig = null;
+        }
+
         public static XUUnityLightMcpBridgeConfig LoadConfig()
         {
             if (_loaded)

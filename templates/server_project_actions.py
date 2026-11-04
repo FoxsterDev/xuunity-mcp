@@ -380,6 +380,32 @@ def refuse_missing_host_scoped_payload(
     )
 
 
+STRING_CONST_PAYLOAD_PREFIX = "string_const_"
+
+
+def inject_catalog_const_payload(action_record: dict[str, Any], payload: dict[str, Any]) -> list[str]:
+    injected: list[str] = []
+    for key, declared in dict(action_record.get("payload_schema") or {}).items():
+        token = str(declared or "").strip()
+        if key == "action" or not token.startswith(STRING_CONST_PAYLOAD_PREFIX):
+            continue
+        value = token[len(STRING_CONST_PAYLOAD_PREFIX):]
+        if key in payload and str(payload.get(key)) != value:
+            raise ToolInvocationError(
+                "project_action_payload_const_conflict",
+                (
+                    f"Project action '{action_record.get('action_id')}' declares {key}={token}, so {key} is always "
+                    f"'{value}'; the caller passed '{payload.get(key)}'. Drop the field or invoke the action that "
+                    "owns that value."
+                ),
+                {"action_id": str(action_record.get("action_id") or ""), "field": key, "const_value": value},
+            )
+        if key not in payload:
+            injected.append(key)
+        payload[key] = value
+    return injected
+
+
 def project_action_catalog_payload(catalog: dict[str, Any]) -> dict[str, Any]:
     actions = list(catalog.get("actions") or [])
     return {
@@ -474,6 +500,7 @@ def build_project_action_scenario(
         )
 
     hook_payload = dict(action_payload)
+    inject_catalog_const_payload(action_record, hook_payload)
     refuse_missing_host_scoped_payload(action_record, hook_payload)
     hook_payload["action"] = action_id
     effective_scenario_name = scenario_name.strip() if scenario_name else ""
@@ -724,6 +751,7 @@ def normalize_project_action_step(
     fail_if_catalog_payload_action_conflicts(action_record, step_id=step_id)
 
     hook_payload = dict(payload)
+    inject_catalog_const_payload(action_record, hook_payload)
     refuse_missing_host_scoped_payload(action_record, hook_payload, step_id=step_id)
     hook_payload["action"] = canonical_action_id
     normalized = {

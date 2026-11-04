@@ -466,8 +466,11 @@ unchanged; the transaction still succeeds, and `no_op_count` carries the total.
 **The object-reference policy is split by what the reference points at.** Asset
 references (`Sprite`, `Material`, `TMP_FontAsset`, meshes, ScriptableObjects) are
 writable, addressed by project path or GUID, with an optional sub-asset name for a
-sliced sprite. Component and `GameObject` references stay refused, because that is
-the case where a write could swap a component for another type. The earlier blanket
+sliced sprite. Component and `GameObject` references are writable when the target
+is inside the same prefab or is a prefab asset, and the resolved object must fit the
+field's declared type. What stays refused is the set of identity fields (`m_Script`,
+`m_GameObject`, hierarchy and prefab links), because those are the writes that could
+swap a component for another type. The earlier blanket
 refusal of all object references was the only remaining reason to hand-edit prefab
 YAML, and the ordering hazard that came with it — an Editor-API write silently
 overwriting an out-of-band edit from the editor's stale in-memory copy.

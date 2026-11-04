@@ -279,7 +279,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 status = "supported",
                 reason = "",
                 recommended_action = "Preview every transaction before approving it; a failed operation discards the whole batch.",
-                operations = new List<string> { "unity.prefab.mutate" }
+                operations = new List<string> { "unity.prefab.mutate", "unity.prefab.create" }
             };
         }
 

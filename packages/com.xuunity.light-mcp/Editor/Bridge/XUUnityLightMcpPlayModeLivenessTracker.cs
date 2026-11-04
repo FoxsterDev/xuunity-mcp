@@ -12,6 +12,8 @@ namespace XUUnity.LightMcp.Editor.Bridge
         public const string UnprovenUnfocusedWarning = "playmode_liveness_unproven_editor_unfocused";
         public const string ThrottledRemediation = "focus_the_unity_editor_or_set_interaction_mode_to_no_throttling";
         public const string UnprovenRemediation = "wait_for_playmode_liveness_sample_and_retry";
+        public const string BackgroundExecutionRemediation =
+            "enable_background_execution_with_unity_playmode_set_background_execution_managed_or_focus_the_unity_editor";
 
         const double MIN_SAMPLE_INTERVAL_SECONDS = 1.0d;
         const int ADVANCING_FRAME_THRESHOLD = 2;
@@ -95,12 +97,26 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         internal static string ResolveRemediation(string warning)
         {
+            return ResolveRemediation(
+                warning,
+                XUUnityLightMcpBackgroundExecution.Mode == XUUnityLightMcpBackgroundExecution.ManagedMode);
+        }
+
+        internal static string ResolveRemediation(string warning, bool backgroundExecutionManaged)
+        {
             if (string.IsNullOrEmpty(warning))
             {
                 return "";
             }
 
-            return warning == UnprovenUnfocusedWarning ? UnprovenRemediation : ThrottledRemediation;
+            if (warning == UnprovenUnfocusedWarning)
+            {
+                return UnprovenRemediation;
+            }
+
+            return warning == ThrottledUnfocusedWarning && !backgroundExecutionManaged
+                ? BackgroundExecutionRemediation
+                : ThrottledRemediation;
         }
 
         static void ResetBaseline(int frameCount, double now, bool isPlaying)

@@ -868,16 +868,21 @@ TOOLS: dict[str, dict[str, Any]] = {
         "bridgeOperation": "unity.prefab.mutate",
         "description": (
             "Apply a typed, atomic prefab transaction through the Editor API - never raw YAML. Supported ops: "
-            "set_serialized_field, set_rect_transform, set_canvas_group, set_active, delete_child, "
+            "set_serialized_field, set_rect_transform, set_canvas_group, set_active, delete_child, create_child, "
             "create_child_from_template, add_component, remove_component. Previews by default; approve plus "
             "previewOnly=false is required to write. Any failing operation or failed post-validation discards the "
             "whole batch. A write that leaves the serialized value unchanged is reported as status no_op, never as "
             "applied, and counted in no_op_count. Enum properties are index-addressed: numberValue is the member "
             "index and out-of-range input is rejected, so pass stringValue to set an enum by member name. "
             "Asset-typed object references (Sprite, Material, TMP_FontAsset, ...) are writable by asset path or "
-            "GUID; component and GameObject references stay refused so a component can never be swapped for "
-            "another type. If the prefab file changed on disk since this session wrote it, the transaction is "
-            "refused as prefab_mutation_asset_drifted instead of overwriting the out-of-band edit."
+            "GUID. Component and GameObject references are writable when the target is inside the same prefab "
+            "(stringValue 'Root/Child' or 'Root/Child#ComponentType', including objects created earlier in the same "
+            "transaction) or is a prefab asset; the target is checked against the field's declared type, and "
+            "identity fields (m_Script, m_GameObject, hierarchy and prefab links) stay refused, so a component can "
+            "never be swapped for another type. Array elements are addressed as 'field.Array.data[i]'; writing "
+            "index == current size appends, or set 'field.Array.size' first. If the prefab file changed on disk "
+            "since this session wrote it, the transaction is refused as prefab_mutation_asset_drifted instead of "
+            "overwriting the out-of-band edit."
         ),
         "inputSchema": {
             "type": "object",
@@ -887,7 +892,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "operations": {
                     "type": "array",
                     "items": {"type": "object"},
-                    "description": "Typed operations [{op, path, componentType, propertyPath, stringValue|numberValue|boolValue|x,y,z,w, templatePath, childName, assetSubAssetName, valueKind}]. On an enum property, numberValue is the member index and stringValue is the member name. On an asset-typed object reference, stringValue is a project-relative asset path or a 32-character GUID, optionally with assetSubAssetName (or a path#SubAsset suffix) for a sub-asset such as a sliced sprite. A plain path or GUID whose main asset does not fit the field resolves to its only sub-asset that does, such as the sprite of a single-sprite texture; valueKind=\"null\" clears the reference."
+                    "description": "Typed operations [{op, path, componentType, propertyPath, stringValue|numberValue|boolValue|x,y,z,w, templatePath, childName, siblingIndex, afterSibling, assetSubAssetName, valueKind}]. create_child adds an empty child (RectTransform under UI) named childName; create_child_from_template nests a prefab instance; both honour siblingIndex or afterSibling. set_rect_transform propertyPath: anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax, localScale, or stretch (full-parent fill). On an enum property, numberValue is the member index and stringValue is the member name. On an asset-typed object reference, stringValue is a project-relative asset path or a 32-character GUID, optionally with assetSubAssetName (or a path#SubAsset suffix) for a sub-asset such as a sliced sprite. A plain path or GUID whose main asset does not fit the field resolves to its only sub-asset that does, such as the sprite of a single-sprite texture; valueKind=\"null\" clears the reference."
                 },
                 "previewOnly": {"type": "boolean", "default": True},
                 "approve": {
@@ -907,6 +912,38 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "timeoutMs": {"type": "integer", "default": 60000, "minimum": 1000}
             },
             "required": ["projectRoot", "prefabPath", "operations"]
+        }
+    },
+    "unity_prefab_create": {
+        "bridgeOperation": "unity.prefab.create",
+        "description": (
+            "Create a new prefab asset from a typed node spec through the Editor API, with no project-side builder. "
+            "Starts from an empty root (RectTransform by default) named rootName, applies the same op vocabulary as "
+            "unity_prefab_mutate (create_child, create_child_from_template, add_component of any concrete component "
+            "type such as Image, Button, TextMeshProUGUI or layout groups, set_rect_transform, set_serialized_field "
+            "including in-prefab component references and sprite sub-assets), runs post-validation, and only then "
+            "saves. Paths start with the root name. Previews by default; approve plus previewOnly=false writes. An "
+            "existing asset is refused unless overwrite=true. The root is built in a preview scene so open scenes are "
+            "not dirtied; open_scene_dirtied reports if one was anyway."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "prefabPath": {"type": "string", "description": "Project-relative Assets/... path ending in .prefab; missing folders are created."},
+                "rootName": {"type": "string", "description": "Root GameObject name; defaults to the file name."},
+                "rootIsRectTransform": {"type": "boolean", "default": True},
+                "operations": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Typed operations in unity_prefab_mutate shape, applied in order to the new root."
+                },
+                "previewOnly": {"type": "boolean", "default": True},
+                "approve": {"type": "boolean", "default": False},
+                "overwrite": {"type": "boolean", "default": False},
+                "timeoutMs": {"type": "integer", "default": 60000, "minimum": 1000}
+            },
+            "required": ["projectRoot", "prefabPath"]
         }
     },
     "unity_ui_click": {
@@ -1666,6 +1703,11 @@ TOOLS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
+                "allowDirtySceneDiscard": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When open scenes are dirty (editor startup, a Play Mode cycle or an editor script can cause it), reload saved scenes from disk and drop untitled ones before the run instead of refusing with dirty_scene."
+                },
                 "testNames": {
                     "type": "array",
                     "items": {"type": "string"}
@@ -1704,6 +1746,11 @@ TOOLS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
+                "allowDirtySceneDiscard": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "When open scenes are dirty (editor startup, a Play Mode cycle or an editor script can cause it), reload saved scenes from disk and drop untitled ones before the run instead of refusing with dirty_scene."
+                },
                 "testNames": {
                     "type": "array",
                     "items": {"type": "string"}
@@ -1754,14 +1801,25 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_playmode_set": {
         "bridgeOperation": "unity.playmode.set",
-        "description": "Request a Unity play mode state transition or pause control.",
+        "description": (
+            "Request a Unity play mode state transition or pause control. backgroundExecution='managed' keeps Play "
+            "Mode advancing while the editor is unfocused (the fix for playmode_throttled_editor_unfocused): it "
+            "persists background_execution_enabled in the project's bridge config and sets runInBackground only while "
+            "Play Mode runs, restoring the project's value on exit. 'project_owned' turns it off. Combine it with any "
+            "action, or use action='configure' to change only the setting."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
                 "action": {
                     "type": "string",
-                    "enum": ["enter", "exit", "pause", "resume"]
+                    "enum": ["enter", "exit", "pause", "resume", "configure"]
+                },
+                "backgroundExecution": {
+                    "type": "string",
+                    "enum": ["managed", "project_owned"],
+                    "description": "Optional. managed = Play Mode advances while the editor is unfocused; project_owned = leave runInBackground to the project."
                 },
                 "includeFullPayload": {
                     "type": "boolean",

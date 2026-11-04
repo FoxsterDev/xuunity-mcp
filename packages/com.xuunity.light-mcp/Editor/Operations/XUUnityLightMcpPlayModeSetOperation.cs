@@ -21,7 +21,52 @@ namespace XUUnity.LightMcp.Editor.Operations
             if (string.IsNullOrWhiteSpace(action))
             {
                 return XUUnityLightMcpResponseWriter.Error(request.request_id, "missing_action",
-                    "unity.playmode.set requires action: enter, exit, pause, or resume.");
+                    "unity.playmode.set requires action: enter, exit, pause, resume, or configure.");
+            }
+
+            var backgroundChange = "";
+            var requestedBackground = (args.backgroundExecution ?? "").Trim().ToLowerInvariant();
+            if (requestedBackground.Length > 0)
+            {
+                if (requestedBackground != XUUnityLightMcpBackgroundExecution.ManagedMode
+                    && requestedBackground != XUUnityLightMcpBackgroundExecution.ProjectOwnedMode)
+                {
+                    return XUUnityLightMcpResponseWriter.Error(request.request_id, "invalid_args",
+                        "backgroundExecution must be 'managed' or 'project_owned'.");
+                }
+
+                var before = XUUnityLightMcpBackgroundExecution.Mode;
+                if (!XUUnityLightMcpBackgroundExecution.TrySetConfigured(
+                        requestedBackground == XUUnityLightMcpBackgroundExecution.ManagedMode,
+                        out var configError))
+                {
+                    return XUUnityLightMcpResponseWriter.Error(request.request_id, "bridge_config_write_failed", configError);
+                }
+
+                backgroundChange = before == requestedBackground ? "unchanged" : $"{before}->{requestedBackground}";
+            }
+            else if (action == "configure")
+            {
+                return XUUnityLightMcpResponseWriter.Error(request.request_id, "invalid_args",
+                    "action 'configure' requires backgroundExecution: managed or project_owned.");
+            }
+
+            if (action == "configure")
+            {
+                var configured = new XUUnityLightMcpPlayModeSetPayload
+                {
+                    project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath,
+                    requested_action = action,
+                    outcome = "configured",
+                    request_completed_at_utc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                };
+                FillBackgroundEvidence(configured, backgroundChange);
+                var currentState = XUUnityLightMcpPlayModeStateOperation.BuildPayload();
+                configured.is_playing = currentState.is_playing;
+                configured.is_paused = currentState.is_paused;
+                configured.playmode_state = currentState.playmode_state;
+                XUUnityLightMcpPlayModeStateOperation.PopulateLivenessEvidence(configured, currentState.playmode_state);
+                return XUUnityLightMcpResponseWriter.Success(request.request_id, OperationName, JsonUtility.ToJson(configured));
             }
 
             var targetState = ResolveTargetState(action);
@@ -36,7 +81,7 @@ namespace XUUnity.LightMcp.Editor.Operations
                     "pause" => PausePlayMode(),
                     "resume" => ResumePlayMode(),
                     _ => throw new InvalidOperationException(
-                        $"Unsupported play mode action '{action}'. Valid actions: enter, exit, pause, resume.")
+                        $"Unsupported play mode action '{action}'. Valid actions: enter, exit, pause, resume, configure.")
                 };
             }
             catch (Exception ex)
@@ -62,12 +107,20 @@ namespace XUUnity.LightMcp.Editor.Operations
                 playmode_state = state.playmode_state
             };
             XUUnityLightMcpPlayModeStateOperation.PopulateLivenessEvidence(payload, state.playmode_state);
+            FillBackgroundEvidence(payload, backgroundChange);
 
             return XUUnityLightMcpResponseWriter.Success(
                 request.request_id,
                 OperationName,
                 JsonUtility.ToJson(payload)
             );
+        }
+
+        static void FillBackgroundEvidence(XUUnityLightMcpPlayModeSetPayload payload, string change)
+        {
+            payload.background_execution_mode = XUUnityLightMcpBackgroundExecution.Mode;
+            payload.background_execution_change = change;
+            payload.application_run_in_background = Application.runInBackground;
         }
 
         static string EnterPlayMode()

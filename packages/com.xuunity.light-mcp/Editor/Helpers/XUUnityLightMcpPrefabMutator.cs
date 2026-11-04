@@ -15,6 +15,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
         {
             "set_serialized_field",
             "set_rect_transform",
+            "create_child",
             "set_canvas_group",
             "set_active",
             "delete_child",
@@ -163,7 +164,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
             GameObject root,
             XUUnityLightMcpPrefabMutationOperation operation,
             int index,
-            HashSet<string> allowedComponentTypes)
+            HashSet<string> allowedComponentTypes,
+            bool allowAnyComponentType = false)
         {
             var change = new XUUnityLightMcpPrefabMutationChange
             {
@@ -182,7 +184,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             switch (change.op)
             {
                 case "set_serialized_field":
-                    return SetSerializedField(change, target, operation);
+                    return SetSerializedField(change, root.transform, target, operation);
                 case "set_rect_transform":
                     return SetRectTransform(change, target, operation);
                 case "set_canvas_group":
@@ -193,8 +195,10 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     return DeleteChild(change, target);
                 case "create_child_from_template":
                     return CreateChildFromTemplate(change, target, operation);
+                case "create_child":
+                    return CreateChild(change, target, operation);
                 case "add_component":
-                    return AddComponent(change, target, operation, allowedComponentTypes);
+                    return AddComponent(change, target, operation, allowedComponentTypes, allowAnyComponentType);
                 case "remove_component":
                     return RemoveComponent(change, target, operation, allowedComponentTypes);
                 default:
@@ -204,6 +208,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static XUUnityLightMcpPrefabMutationChange SetSerializedField(
             XUUnityLightMcpPrefabMutationChange change,
+            Transform root,
             Transform target,
             XUUnityLightMcpPrefabMutationOperation operation)
         {
@@ -213,7 +218,20 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             using var serialized = new SerializedObject(component);
-            var property = serialized.FindProperty(operation.propertyPath ?? "");
+            var propertyPath = operation.propertyPath ?? "";
+            var property = serialized.FindProperty(propertyPath);
+            if (property == null)
+            {
+                if (TryAppendArrayElement(serialized, propertyPath, out var appendError))
+                {
+                    property = serialized.FindProperty(propertyPath);
+                }
+                else if (appendError.Length > 0)
+                {
+                    return Fail(change, "prefab_mutation_array_index_out_of_range", appendError);
+                }
+            }
+
             if (property == null)
             {
                 return Fail(
@@ -222,8 +240,18 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     $"'{operation.componentType}' has no serialized property '{operation.propertyPath}'.");
             }
 
+            if (IsIdentityProperty(property.propertyPath))
+            {
+                return Fail(
+                    change,
+                    "prefab_mutation_value_incompatible",
+                    $"'{property.propertyPath}' is an object-identity field (owning GameObject, script, hierarchy "
+                    + "or prefab link); rewriting it would detach or swap the component, so a component can never "
+                    + "be swapped for another type through this API.");
+            }
+
             change.before = DescribeProperty(property);
-            if (!TryAssign(property, operation, out var assignErrorCode, out var assignError))
+            if (!TryAssign(property, root, operation, out var assignErrorCode, out var assignError))
             {
                 return Fail(change, assignErrorCode, assignError);
             }
@@ -267,11 +295,27 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 case "sizeDelta":
                     rect.sizeDelta = new Vector2(operation.x, operation.y);
                     break;
+                case "offsetMin":
+                    rect.offsetMin = new Vector2(operation.x, operation.y);
+                    break;
+                case "offsetMax":
+                    rect.offsetMax = new Vector2(operation.x, operation.y);
+                    break;
+                case "localScale":
+                    rect.localScale = new Vector3(operation.x, operation.y, Mathf.Approximately(operation.z, 0f) ? 1f : operation.z);
+                    break;
+                case "stretch":
+                    rect.anchorMin = Vector2.zero;
+                    rect.anchorMax = Vector2.one;
+                    rect.offsetMin = Vector2.zero;
+                    rect.offsetMax = Vector2.zero;
+                    break;
                 default:
                     return Fail(
                         change,
                         "prefab_mutation_property_not_found",
-                        "propertyPath must be anchorMin, anchorMax, pivot, anchoredPosition, or sizeDelta.");
+                        "propertyPath must be anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, "
+                        + "offsetMax, localScale, or stretch.");
             }
 
             change.after = DescribeRect(rect, field);
@@ -389,6 +433,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 instance.name = operation.childName.Trim();
             }
 
+            ApplySiblingPlacement(instance.transform, operation);
+
             change.before = "absent";
             change.after = $"created:{instance.name}";
             change.inverse_op = "delete_child";
@@ -396,14 +442,58 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return change;
         }
 
+        static XUUnityLightMcpPrefabMutationChange CreateChild(
+            XUUnityLightMcpPrefabMutationChange change,
+            Transform target,
+            XUUnityLightMcpPrefabMutationOperation operation)
+        {
+            var childName = (operation.childName ?? "").Trim();
+            if (childName.Length == 0)
+            {
+                return Fail(change, "prefab_mutation_child_name_required", "create_child requires childName.");
+            }
+
+            var child = target is RectTransform || target.GetComponentInParent<Canvas>(true) != null
+                ? new GameObject(childName, typeof(RectTransform))
+                : new GameObject(childName);
+            child.transform.SetParent(target, false);
+            child.layer = target.gameObject.layer;
+            ApplySiblingPlacement(child.transform, operation);
+            change.before = "absent";
+            change.after = $"created:{childName}";
+            change.inverse_op = "delete_child";
+            change.status = "applied";
+            return change;
+        }
+
+        static void ApplySiblingPlacement(Transform child, XUUnityLightMcpPrefabMutationOperation operation)
+        {
+            var afterSibling = (operation.afterSibling ?? "").Trim();
+            if (afterSibling.Length > 0 && child.parent != null)
+            {
+                var anchor = child.parent.Find(afterSibling);
+                if (anchor != null && anchor != child)
+                {
+                    child.SetSiblingIndex(Math.Min(anchor.GetSiblingIndex() + 1, child.parent.childCount - 1));
+                    return;
+                }
+            }
+
+            if (operation.siblingIndex >= 0)
+            {
+                child.SetSiblingIndex(operation.siblingIndex);
+            }
+        }
+
         static XUUnityLightMcpPrefabMutationChange AddComponent(
             XUUnityLightMcpPrefabMutationChange change,
             Transform target,
             XUUnityLightMcpPrefabMutationOperation operation,
-            HashSet<string> allowedComponentTypes)
+            HashSet<string> allowedComponentTypes,
+            bool allowAnyComponentType)
         {
             var typeName = (operation.componentType ?? "").Trim();
-            if (!allowedComponentTypes.Contains(typeName))
+            if (!allowAnyComponentType && !allowedComponentTypes.Contains(typeName))
             {
                 return Fail(
                     change,
@@ -420,6 +510,14 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     $"Component type '{typeName}' could not be resolved.");
             }
 
+            if (type.IsAbstract || type == typeof(Transform) || type == typeof(RectTransform))
+            {
+                return Fail(
+                    change,
+                    "prefab_mutation_component_type_unresolved",
+                    $"'{typeName}' is abstract or a transform and cannot be added.");
+            }
+
             if (target.GetComponent(type) != null)
             {
                 return Fail(
@@ -428,7 +526,16 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     $"'{change.object_path}' already has a {typeName}.");
             }
 
-            target.gameObject.AddComponent(type);
+            var added = target.gameObject.AddComponent(type);
+            if (added == null || target.GetComponent(type) == null)
+            {
+                return Fail(
+                    change,
+                    "prefab_mutation_component_add_failed",
+                    $"Unity refused to add '{typeName}' to '{change.object_path}' (for example an editor-only script, "
+                    + "or a component that conflicts with one already present); see the console for its reason.");
+            }
+
             change.before = "absent";
             change.after = $"added:{typeName}";
             change.inverse_op = "remove_component";
@@ -538,6 +645,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static bool TryAssign(
             SerializedProperty property,
+            Transform root,
             XUUnityLightMcpPrefabMutationOperation operation,
             out string errorCode,
             out string error)
@@ -553,6 +661,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     property.boolValue = operation.boolValue;
                     return true;
                 case SerializedPropertyType.Integer:
+                case SerializedPropertyType.ArraySize:
                     property.intValue = (int)Math.Round(operation.numberValue);
                     return true;
                 case SerializedPropertyType.Float:
@@ -570,11 +679,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 case SerializedPropertyType.Enum:
                     return TryAssignEnum(property, operation, out errorCode, out error);
                 case SerializedPropertyType.ObjectReference:
-                    return TryAssignObjectReference(property, operation, out errorCode, out error);
+                    return TryAssignObjectReference(property, root, operation, out errorCode, out error);
                 default:
                     error =
                         $"Property '{property.propertyPath}' is a {property.propertyType}; this transaction API "
-                        + "only sets string, bool, int, float, enum, color, Vector2, Vector3, and asset-typed "
+                        + "only sets string, bool, int, float, enum, color, Vector2, Vector3, array size, and "
                         + "object-reference fields.";
                     return false;
             }
@@ -623,6 +732,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static bool TryAssignObjectReference(
             SerializedProperty property,
+            Transform root,
             XUUnityLightMcpPrefabMutationOperation operation,
             out string errorCode,
             out string error)
@@ -630,19 +740,15 @@ namespace XUUnity.LightMcp.Editor.Helpers
             errorCode = "prefab_mutation_value_incompatible";
             error = "";
             var declared = XUUnityLightMcpPrefabInspector.DeclaredTypeName(property.type);
-            if (IsSceneBoundReferenceType(declared))
-            {
-                error =
-                    $"Property '{property.propertyPath}' holds a {declared} reference. Component and GameObject "
-                    + "references stay out of scope so a component can never be swapped for another type; only "
-                    + "asset-typed references such as Sprite, Material, or TMP_FontAsset are writable.";
-                return false;
-            }
-
             if (string.Equals((operation.valueKind ?? "").Trim(), "null", StringComparison.OrdinalIgnoreCase))
             {
                 property.objectReferenceValue = null;
                 return true;
+            }
+
+            if (IsSceneBoundReferenceType(declared))
+            {
+                return TryAssignSceneBoundReference(property, root, declared, operation, out errorCode, out error);
             }
 
             var requested = (operation.stringValue ?? "").Trim();
@@ -684,6 +790,175 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             property.objectReferenceValue = asset;
             return true;
+        }
+
+        static bool TryAssignSceneBoundReference(
+            SerializedProperty property,
+            Transform root,
+            string declared,
+            XUUnityLightMcpPrefabMutationOperation operation,
+            out string errorCode,
+            out string error)
+        {
+            errorCode = "prefab_mutation_reference_required";
+            error = "";
+            var requested = (operation.stringValue ?? "").Trim();
+            if (requested.Length == 0)
+            {
+                error =
+                    $"Property '{property.propertyPath}' holds a {declared} reference; pass stringValue as a path "
+                    + "inside this prefab (optionally 'path#ComponentType'), or a prefab asset path or GUID. Use "
+                    + "valueKind=\"null\" to clear it.";
+                return false;
+            }
+
+            var wantsAsset = string.Equals((operation.valueKind ?? "").Trim(), "asset", StringComparison.OrdinalIgnoreCase)
+                             || LooksLikeAssetGuid(requested)
+                             || requested.StartsWith("Assets/", StringComparison.Ordinal)
+                             || requested.StartsWith("Packages/", StringComparison.Ordinal);
+            SplitObjectReference(requested, out var objectPath, out var componentName);
+
+            GameObject owner;
+            if (wantsAsset)
+            {
+                var assetPath = LooksLikeAssetGuid(objectPath) ? AssetDatabase.GUIDToAssetPath(objectPath) : objectPath;
+                owner = string.IsNullOrEmpty(assetPath) ? null : AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+                if (owner == null)
+                {
+                    errorCode = "prefab_mutation_asset_not_found";
+                    error = $"'{objectPath}' is not a prefab asset, so it cannot fill the {declared} field '{property.propertyPath}'.";
+                    return false;
+                }
+            }
+            else
+            {
+                if (!TryResolveUnique(root.gameObject, objectPath, out var resolved, out var resolveCode, out var resolveError))
+                {
+                    errorCode = resolveCode == "prefab_mutation_target_not_found"
+                        ? "prefab_mutation_reference_target_not_found"
+                        : "prefab_mutation_reference_target_ambiguous";
+                    error = $"Reference target for '{property.propertyPath}': {resolveError}";
+                    return false;
+                }
+
+                owner = resolved.gameObject;
+            }
+
+            if (string.Equals(declared, "GameObject", StringComparison.Ordinal))
+            {
+                if (componentName.Length > 0)
+                {
+                    error = $"'{property.propertyPath}' is a GameObject field; drop the '#{componentName}' suffix.";
+                    return false;
+                }
+
+                property.objectReferenceValue = owner;
+                return true;
+            }
+
+            var matches = new List<Component>();
+            foreach (var candidate in owner.GetComponents<Component>())
+            {
+                if (candidate == null || !XUUnityLightMcpPrefabInspector.TypeChainContains(candidate.GetType(), declared))
+                {
+                    continue;
+                }
+
+                if (componentName.Length > 0
+                    && !XUUnityLightMcpPrefabInspector.TypeChainContains(candidate.GetType(), componentName))
+                {
+                    continue;
+                }
+
+                matches.Add(candidate);
+            }
+
+            if (matches.Count != 1)
+            {
+                errorCode = matches.Count == 0
+                    ? "prefab_mutation_reference_type_mismatch"
+                    : "prefab_mutation_reference_component_ambiguous";
+                error = matches.Count == 0
+                    ? $"'{objectPath}' has no component assignable to the {declared} field '{property.propertyPath}'"
+                      + (componentName.Length > 0 ? $" matching '{componentName}'." : ".")
+                    : $"'{objectPath}' has {matches.Count} components assignable to {declared}; name one with "
+                      + "'path#ComponentType'.";
+                return false;
+            }
+
+            property.objectReferenceValue = matches[0];
+            return true;
+        }
+
+        static void SplitObjectReference(string requested, out string objectPath, out string componentName)
+        {
+            objectPath = requested;
+            componentName = "";
+            var separator = requested.LastIndexOf('#');
+            if (separator <= 0 || separator >= requested.Length - 1)
+            {
+                return;
+            }
+
+            objectPath = requested.Substring(0, separator).Trim();
+            componentName = requested.Substring(separator + 1).Trim();
+        }
+
+        static bool TryAppendArrayElement(SerializedObject serialized, string propertyPath, out string error)
+        {
+            error = "";
+            const string marker = ".Array.data[";
+            var markerIndex = propertyPath.LastIndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex <= 0)
+            {
+                return false;
+            }
+
+            var close = propertyPath.IndexOf(']', markerIndex);
+            if (close < 0
+                || !int.TryParse(
+                    propertyPath.Substring(markerIndex + marker.Length, close - markerIndex - marker.Length),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var elementIndex))
+            {
+                return false;
+            }
+
+            var array = serialized.FindProperty(propertyPath.Substring(0, markerIndex));
+            if (array == null || !array.isArray)
+            {
+                return false;
+            }
+
+            if (elementIndex != array.arraySize)
+            {
+                error =
+                    $"'{propertyPath}' is past the end of an array of size {array.arraySize}. Elements may only be "
+                    + "appended in order (index == current size), or set '<field>.Array.size' first.";
+                return false;
+            }
+
+            array.arraySize = elementIndex + 1;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            serialized.Update();
+            return true;
+        }
+
+        static readonly HashSet<string> IdentityPropertyNames = new(StringComparer.Ordinal)
+        {
+            "m_GameObject",
+            "m_Script",
+            "m_Father",
+            "m_Children",
+            "m_PrefabInstance",
+            "m_PrefabAsset",
+            "m_CorrespondingSourceObject",
+        };
+
+        static bool IsIdentityProperty(string propertyPath)
+        {
+            return IdentityPropertyNames.Contains(propertyPath ?? "");
         }
 
         static void SplitAssetReference(
@@ -936,6 +1211,10 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 "pivot" => rect.pivot.ToString(),
                 "anchoredPosition" => rect.anchoredPosition.ToString(),
                 "sizeDelta" => rect.sizeDelta.ToString(),
+                "offsetMin" => rect.offsetMin.ToString(),
+                "offsetMax" => rect.offsetMax.ToString(),
+                "localScale" => rect.localScale.ToString(),
+                "stretch" => $"{rect.anchorMin}{rect.anchorMax}{rect.offsetMin}{rect.offsetMax}",
                 _ => "",
             };
         }

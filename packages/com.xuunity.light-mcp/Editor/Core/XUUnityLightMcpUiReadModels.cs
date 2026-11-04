@@ -107,6 +107,8 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool active_self;
         public bool active_in_hierarchy;
         public bool visible;
+        public bool visible_via_descendant;
+        public string visible_descendant_path = "";
         public bool interactable = true;
         public bool interactable_known;
         public float effective_alpha = 1f;
@@ -236,6 +238,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool out_of_scope;
         public bool truncated;
         public int scanned_node_count;
+        public int inactive_subtrees_skipped;
         public bool has_text;
         public string text = "";
         public List<string> texts = new();
@@ -508,6 +511,8 @@ namespace XUUnity.LightMcp.Editor.Core
         public string templatePath = "";
         public string childName = "";
         public string assetSubAssetName = "";
+        public int siblingIndex = -1;
+        public string afterSibling = "";
     }
 
     [Serializable]
@@ -519,6 +524,18 @@ namespace XUUnity.LightMcp.Editor.Core
         public string expectedSha256 = "";
         public XUUnityLightMcpPrefabMutationOperation[] operations = Array.Empty<XUUnityLightMcpPrefabMutationOperation>();
         public string[] allowedComponentTypes = Array.Empty<string>();
+    }
+
+    [Serializable]
+    internal sealed class XUUnityLightMcpPrefabCreateArgs
+    {
+        public string prefabPath = "";
+        public string rootName = "";
+        public bool rootIsRectTransform = true;
+        public bool approve;
+        public bool previewOnly = true;
+        public bool overwrite;
+        public XUUnityLightMcpPrefabMutationOperation[] operations = Array.Empty<XUUnityLightMcpPrefabMutationOperation>();
     }
 
     [Serializable]
@@ -563,6 +580,8 @@ namespace XUUnity.LightMcp.Editor.Core
         public List<XUUnityLightMcpPrefabMutationChange> changes = new();
         public XUUnityLightMcpPrefabValidatePayload post_validation;
         public string reversible_patch_json = "";
+        public bool prefab_created;
+        public bool open_scene_dirtied;
         public List<XUUnityLightMcpUiDiagnostic> warnings = new();
         public List<XUUnityLightMcpUiDiagnostic> errors = new();
         public string recommended_next_action = "";

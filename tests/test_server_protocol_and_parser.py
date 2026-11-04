@@ -964,6 +964,33 @@ actions:
             )
             self.assertIn("Configs/Satellite", scenario["steps"][1]["hookPayloadJson"])
 
+    def test_catalog_string_const_payload_is_injected_and_guarded(self) -> None:
+        action = {
+            "action_id": "feature.reset_state",
+            "hook_name": "example.feature",
+            "payload_schema": {"operation": "string_const_reset_state", "player_id": "required_string"},
+        }
+        scenario = server_project_actions.build_project_action_scenario(
+            action_record=action,
+            action_payload={"player_id": "p1"},
+        )
+        hook_payload = json.loads(scenario["steps"][1]["hookPayloadJson"])
+        self.assertEqual("reset_state", hook_payload["operation"])
+        self.assertEqual("p1", hook_payload["player_id"])
+
+        same = server_project_actions.build_project_action_scenario(
+            action_record=action,
+            action_payload={"operation": "reset_state"},
+        )
+        self.assertEqual("reset_state", json.loads(same["steps"][1]["hookPayloadJson"])["operation"])
+
+        with self.assertRaises(server.ToolInvocationError) as ctx:
+            server_project_actions.build_project_action_scenario(
+                action_record=action,
+                action_payload={"operation": "build_prefabs"},
+            )
+        self.assertEqual("project_action_payload_const_conflict", ctx.exception.code)
+
     def test_apply_then_gate_project_action_builds_authoritative_settle_sequence(self) -> None:
         action = {
             "action_id": "project.apply_profile",

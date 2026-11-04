@@ -179,16 +179,26 @@ namespace XUUnity.LightMcp.Editor.Operations
             }
         }
 
-        static string ApplyOperations(
+        internal static string ApplyOperations(
             XUUnityLightMcpPrefabMutationArgs args,
             GameObject contents,
             HashSet<string> allowed,
             XUUnityLightMcpPrefabMutationPayload payload)
         {
-            var operations = args.operations ?? Array.Empty<XUUnityLightMcpPrefabMutationOperation>();
+            return ApplyOperations(args.operations, contents, allowed, payload, false);
+        }
+
+        internal static string ApplyOperations(
+            XUUnityLightMcpPrefabMutationOperation[] requested,
+            GameObject contents,
+            HashSet<string> allowed,
+            XUUnityLightMcpPrefabMutationPayload payload,
+            bool allowAnyComponentType)
+        {
+            var operations = requested ?? Array.Empty<XUUnityLightMcpPrefabMutationOperation>();
             for (var index = 0; index < operations.Length; index++)
             {
-                var change = XUUnityLightMcpPrefabMutator.Apply(contents, operations[index], index, allowed);
+                var change = XUUnityLightMcpPrefabMutator.Apply(contents, operations[index], index, allowed, allowAnyComponentType);
                 payload.changes.Add(change);
                 if (string.Equals(change.status, "failed", StringComparison.Ordinal))
                 {
@@ -199,7 +209,7 @@ namespace XUUnity.LightMcp.Editor.Operations
             return null;
         }
 
-        static XUUnityLightMcpPrefabValidatePayload ValidateContents(
+        internal static XUUnityLightMcpPrefabValidatePayload ValidateContents(
             GameObject contents,
             XUUnityLightMcpPrefabMutationPayload payload)
         {
@@ -230,7 +240,7 @@ namespace XUUnity.LightMcp.Editor.Operations
             return validation;
         }
 
-        static string BuildReversiblePatch(XUUnityLightMcpPrefabMutationPayload payload)
+        internal static string BuildReversiblePatch(XUUnityLightMcpPrefabMutationPayload payload)
         {
             var inverse = new List<string>();
             for (var index = payload.changes.Count - 1; index >= 0; index--)
@@ -260,7 +270,7 @@ namespace XUUnity.LightMcp.Editor.Operations
                    + "]}";
         }
 
-        static int CountStatus(List<XUUnityLightMcpPrefabMutationChange> changes, string status)
+        internal static int CountStatus(List<XUUnityLightMcpPrefabMutationChange> changes, string status)
         {
             var count = 0;
             foreach (var change in changes)
@@ -279,7 +289,7 @@ namespace XUUnity.LightMcp.Editor.Operations
             return (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
-        static string FileSha256(string path)
+        internal static string FileSha256(string path)
         {
             try
             {

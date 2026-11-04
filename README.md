@@ -1112,10 +1112,13 @@ running app, and trust them only while `playmode_loop_liveness` is `advancing`.
 Background execution is opt-in. In the editor `Application.runInBackground` is
 backed by the project setting `PlayerSettings.runInBackground`, so the bridge
 leaves it alone unless `background_execution_enabled: true` is set in the
-project's bridge config; status and currency payloads report
+project's bridge config. Set it with `unity_playmode_set
+{backgroundExecution: "managed"}` (alone with `action: "configure"`, or together
+with `action: "enter"`); an unfocused throttle names that call in its
+remediation. Status and currency payloads report
 `background_execution_mode=project_owned` or `managed`. When it is managed, the
-bridge captures the project's original value and restores it when the bridge is
-disabled or the editor quits. It deliberately does not steal OS focus:
+bridge sets the value only while Play Mode runs and restores the project's
+original value on Play Mode exit, bridge disable, or editor quit. It deliberately does not steal OS focus:
 `native_autofocus_enabled=false` is reported in status/currency payloads, and
 point-of-use player-loop liveness remains the acceptance gate.
 
@@ -1127,8 +1130,14 @@ as a sliced sprite, via `assetSubAssetName` or a `path#SubAsset` suffix. The
 lookup follows the field's declared type: a name shared by a texture and its
 single-mode sprite resolves to the sprite, and a plain path or GUID resolves to
 its only sub-asset that fits the field when the main asset does not. Component
-and `GameObject` references stay out of scope by design, so a component can never
-be swapped for another type. There is therefore no remaining reason to hand-edit
+and `GameObject` references are written by in-prefab path (`Root/Child` or
+`Root/Child#ComponentType`) or prefab asset path, checked against the field's
+declared type; identity fields such as `m_Script` and `m_GameObject` stay
+refused, so a component can never be swapped for another type. Array elements
+are appended with `field.Array.data[i]` where `i` is the current size. New
+prefabs come from `unity_prefab_create`, which applies the same ops to an empty
+root, so a feature's views can be built and wired without a project-side
+builder hook. There is therefore no remaining reason to hand-edit
 prefab YAML; if you do edit a serialized asset out of band anyway, run
 `unity_project_refresh` before the next transaction, because a mutation writes
 from the editor's in-memory copy and would otherwise overwrite the edit. Pass the

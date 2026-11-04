@@ -111,7 +111,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 }
             }
 
-            if (selector.requireVisible && !node.visible)
+            if (selector.requireVisible && !node.visible && !node.visible_via_descendant)
             {
                 return false;
             }

@@ -28,6 +28,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
         public List<XUUnityLightMcpUiDiagnostic> Warnings = new();
         public List<XUUnityLightMcpUiDiagnostic> Errors = new();
         public bool Truncated;
+        public int InactiveSubtreesSkipped;
         public string TruncationReason = "";
         public bool ComponentDetailsComplete = true;
 
@@ -128,7 +129,35 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 }
             }
 
+            MarkVisibleViaDescendant(result.Nodes);
             return result;
+        }
+
+        internal static void MarkVisibleViaDescendant(List<XUUnityLightMcpUiNode> nodes)
+        {
+            var visibleDescendant = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (var index = nodes.Count - 1; index >= 0; index--)
+            {
+                var node = nodes[index];
+                visibleDescendant.TryGetValue(node.path, out var descendantPath);
+                if (!node.visible
+                    && node.active_in_hierarchy
+                    && node.raycast_target_known
+                    && node.raycast_target
+                    && !string.IsNullOrEmpty(descendantPath))
+                {
+                    node.visible_via_descendant = true;
+                    node.visible_descendant_path = descendantPath;
+                }
+
+                var propagated = node.visible ? node.path : descendantPath;
+                if (!string.IsNullOrEmpty(propagated)
+                    && !string.IsNullOrEmpty(node.parent_path)
+                    && !visibleDescendant.ContainsKey(node.parent_path))
+                {
+                    visibleDescendant[node.parent_path] = propagated;
+                }
+            }
         }
 
         /// <summary>
@@ -786,6 +815,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             var gameObject = transform.gameObject;
             if (!options.IncludeInactive && !gameObject.activeInHierarchy)
             {
+                result.InactiveSubtreesSkipped++;
                 return;
             }
 

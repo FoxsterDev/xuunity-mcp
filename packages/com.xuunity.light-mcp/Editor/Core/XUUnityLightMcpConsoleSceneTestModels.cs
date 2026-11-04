@@ -269,6 +269,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public string[] groupNames = null;
             public string[] categoryNames = null;
             public string[] assemblyNames = null;
+            public bool allowDirtySceneDiscard;
         }
 
         [Serializable]

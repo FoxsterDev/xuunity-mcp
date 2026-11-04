@@ -1228,7 +1228,7 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 Is.EqualTo(XUUnityLightMcpPlayModeLivenessTracker.UnprovenUnfocusedWarning));
             Assert.That(XUUnityLightMcpPlayModeLivenessTracker.ResolveWarning("unknown", true), Is.Empty);
             Assert.That(
-                XUUnityLightMcpPlayModeLivenessTracker.ResolveRemediation("playmode_throttled_editor_unfocused"),
+                XUUnityLightMcpPlayModeLivenessTracker.ResolveRemediation("playmode_throttled_editor_unfocused", true),
                 Is.EqualTo("focus_the_unity_editor_or_set_interaction_mode_to_no_throttling"));
             Assert.That(
                 XUUnityLightMcpPlayModeLivenessTracker.ResolveRemediation("playmode_throttled"),

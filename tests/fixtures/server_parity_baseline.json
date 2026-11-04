@@ -213,8 +213,8 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "67c999d7009f67842e0ef8b849b340a880921e7e15c5ad426b9d348758b53f01",
-    "tool_count": 69,
+    "sha256": "1a865d11689911f11440c989104ed99b1ef134184ce325e79026fbdddb3f6402",
+    "tool_count": 70,
     "tool_names": [
       "xuunity_setup_plan",
       "xuunity_setup_apply",
@@ -248,6 +248,7 @@
       "unity_prefab_validate",
       "unity_prefab_render",
       "unity_prefab_mutate",
+      "unity_prefab_create",
       "unity_ui_click",
       "unity_ui_tree_snapshot",
       "unity_ui_query",

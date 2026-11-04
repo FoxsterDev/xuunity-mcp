@@ -47,13 +47,23 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             var dirtyScenes = GetDirtyOpenScenes();
+            if (dirtyScenes.Count > 0 && ReadAllowDirtySceneDiscard(request.args_json) && !EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                DiscardDirtyScenes();
+                dirtyScenes = GetDirtyOpenScenes();
+            }
+
             if (dirtyScenes.Count > 0)
             {
-                var sceneList = string.Join(", ", dirtyScenes.Select(FormatSceneForMessage));
+                var sceneList = string.Join("; ", dirtyScenes.Select(FormatSceneForMessage));
                 errorResponse = XUUnityLightMcpResponseWriter.Error(
                     request.request_id,
                     "dirty_scene",
-                    $"Cannot run {modeLabel} tests while open scenes have unsaved changes: {sceneList}");
+                    $"Cannot run {modeLabel} tests while open scenes have unsaved changes: {sceneList}. "
+                    + "Unity does not record which objects changed; editor startup, a Play Mode cycle, or an editor "
+                    + "script that creates or edits scene objects all mark a scene dirty without a user edit. Pass "
+                    + "allowDirtySceneDiscard=true to reload saved scenes from disk and drop untitled ones, or save "
+                    + "the scenes first.");
                 return false;
             }
 
@@ -171,8 +181,57 @@ namespace XUUnity.LightMcp.Editor.Helpers
         static string FormatSceneForMessage(Scene scene)
         {
             var name = string.IsNullOrEmpty(scene.name) ? "(untitled)" : scene.name;
-            var path = string.IsNullOrEmpty(scene.path) ? "(unsaved)" : scene.path;
-            return $"'{name}' ({path})";
+            if (string.IsNullOrEmpty(scene.path))
+            {
+                return $"'{name}' (never saved, no asset on disk; discarding it loses nothing that was saved)";
+            }
+
+            var roots = scene.isLoaded ? scene.rootCount : 0;
+            return $"'{name}' ({scene.path}, {roots} root objects, modified in memory since load)";
+        }
+
+        static bool ReadAllowDirtySceneDiscard(string argsJson)
+        {
+            if (string.IsNullOrWhiteSpace(argsJson))
+            {
+                return false;
+            }
+
+            try
+            {
+                return JsonUtility.FromJson<XUUnityLightMcpTestsArgs>(argsJson)?.allowDirtySceneDiscard ?? false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static void DiscardDirtyScenes()
+        {
+            var saved = EditorSceneManager.GetSceneManagerSetup()
+                .Where(setup => !string.IsNullOrEmpty(setup.path))
+                .ToArray();
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            if (saved.Length == 0)
+            {
+                return;
+            }
+
+            if (!saved.Any(setup => setup.isActive))
+            {
+                saved[0].isActive = true;
+            }
+
+            foreach (var setup in saved)
+            {
+                if (setup.isActive)
+                {
+                    setup.isLoaded = true;
+                }
+            }
+
+            EditorSceneManager.RestoreSceneManagerSetup(saved);
         }
     }
 }

@@ -81,6 +81,7 @@ namespace XUUnity.LightMcp.Editor.Core
         internal sealed class XUUnityLightMcpPlayModeSetArgs
         {
             public string action = "";
+            public string backgroundExecution = "";
         }
 
         [Serializable]
@@ -99,6 +100,9 @@ namespace XUUnity.LightMcp.Editor.Core
             public bool is_playing;
             public bool is_paused;
             public bool is_playing_or_will_change_playmode;
+            public string background_execution_mode = "";
+            public string background_execution_change = "";
+            public bool application_run_in_background;
             public string validation_evidence = "unity_mcp";
         }
 

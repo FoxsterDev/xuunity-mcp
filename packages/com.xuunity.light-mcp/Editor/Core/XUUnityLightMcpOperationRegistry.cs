@@ -35,6 +35,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.asset.snapshot", new XUUnityLightMcpAssetSnapshotOperation() },
             { "unity.prefab.validate", new XUUnityLightMcpPrefabValidateOperation() },
             { "unity.prefab.mutate", new XUUnityLightMcpPrefabMutateOperation() },
+            { "unity.prefab.create", new XUUnityLightMcpPrefabCreateOperation() },
             { "unity.ui.tree_snapshot", new XUUnityLightMcpUiTreeSnapshotOperation() },
             { "unity.ui.query", new XUUnityLightMcpUiQueryOperation() },
             { "unity.ui.exists", new XUUnityLightMcpUiExistsOperation() },

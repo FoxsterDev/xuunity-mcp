@@ -57,6 +57,7 @@ namespace XUUnity.LightMcp.Editor.Operations
             payload.target = result.Target;
             CopyEditorTruth(payload, payload.target);
             payload.scanned_node_count = result.Nodes.Count;
+            payload.inactive_subtrees_skipped = result.InactiveSubtreesSkipped;
             payload.warnings = result.Warnings;
             payload.errors.AddRange(result.Errors);
             payload.out_of_scope = HasOutOfScopeDiagnostic(payload.errors) || HasOutOfScopeDiagnostic(payload.warnings);

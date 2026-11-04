@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace XUUnity.LightMcp.Editor.ScenarioHooks
 {
@@ -15,6 +17,59 @@ namespace XUUnity.LightMcp.Editor.ScenarioHooks
         public int added_count;
         public int removed_count;
         public int changed_count;
+
+        public static XUUnityLightMcpMutationDelta FromWrittenAssets(
+            IEnumerable<string> writtenAssetPaths,
+            IEnumerable<string> createdAssetPaths = null,
+            IEnumerable<string> changedPrefsKeys = null)
+        {
+            var created = Distinct(createdAssetPaths);
+            var changed = Distinct(writtenAssetPaths);
+            changed.ExceptWith(created);
+            var prefs = Distinct(changedPrefsKeys);
+            var unit = prefs.Count > 0 ? "assets_and_prefs" : "assets";
+            var touched = new List<string>(created);
+            touched.AddRange(changed);
+            touched.AddRange(prefs);
+            touched.Sort(StringComparer.Ordinal);
+            var target = touched.Count == 0 ? "none" : string.Join(",", touched);
+            if (target.Length > 160)
+            {
+                target = target.Substring(0, 157) + "...";
+            }
+
+            var existing = changed.Count + prefs.Count;
+            return Create(unit, target, existing, existing + created.Count, created.Count, 0, existing);
+        }
+
+        public string AttachTo(string payloadJson)
+        {
+            var delta = JsonUtility.ToJson(this);
+            var body = (payloadJson ?? "").Trim();
+            if (body.Length < 2 || body[0] != '{' || body[body.Length - 1] != '}')
+            {
+                return "{\"mutation_delta\":" + delta + "}";
+            }
+
+            var inner = body.Substring(1, body.Length - 2).Trim();
+            return inner.Length == 0
+                ? "{\"mutation_delta\":" + delta + "}"
+                : "{" + inner + ",\"mutation_delta\":" + delta + "}";
+        }
+
+        static HashSet<string> Distinct(IEnumerable<string> values)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var value in values ?? Array.Empty<string>())
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    result.Add(value.Trim().Replace('\\', '/'));
+                }
+            }
+
+            return result;
+        }
 
         public static XUUnityLightMcpMutationDelta Create(
             string unit,

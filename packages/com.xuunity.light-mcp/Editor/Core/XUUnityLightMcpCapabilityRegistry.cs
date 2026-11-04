@@ -56,6 +56,7 @@ namespace XUUnity.LightMcp.Editor.Core
             { "unity.asset.snapshot", CoreCapability },
             { "unity.prefab.validate", CoreCapability },
             { "unity.prefab.mutate", PrefabMutationCapability },
+            { "unity.prefab.create", PrefabMutationCapability },
             { "unity.prefab.render", UiRenderCapability },
             { "unity.ui.click", UiInteractionCapability },
             { "unity.ui.tree_snapshot", UiReadCapability },
