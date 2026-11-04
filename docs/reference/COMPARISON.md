@@ -240,10 +240,10 @@ Release validation status for the current XUUnity Light package:
 
 | Area | Status | Caveat |
 | --- | --- | --- |
-| Current package source | `Git UPM available` | Source package is `v0.3.85` at `packages/com.xuunity.light-mcp`; `v0.3.85` is the current Git UPM release target. OpenUPM publication is still pending. |
+| Current package source | `Git UPM available` | Source package is `v0.3.86` at `packages/com.xuunity.light-mcp`; `v0.3.86` is the current Git UPM release target. OpenUPM publication is still pending. |
 | macOS host tools | `Repo-verified` | Host Python unittest suite passed for `v0.3.56`: `813` tests with `13` expected skips, superseding the `v0.3.42` baseline of `310` tests. |
 | Compact MCP envelopes | `Repo-verified` | Scenario decision verdicts, compact operation summaries, authoritative post-settle compile/test/refresh fields, and compact `unity_status_summary` defaults are documented with `includeFullPayload=true` recovery. |
-| Package self-tests | `Source verified` | Focused `v0.3.85` checks ran on macOS Unity `6000.0.58f2`; see [current scopes and historical records](STATUS.md#current-validation-evidence). Earlier multi-version runs are not current release coverage. |
+| Package self-tests | `Source verified` | Focused `v0.3.86` checks ran on macOS Unity `6000.0.58f2`; see [current scopes and historical records](STATUS.md#current-validation-evidence). Earlier multi-version runs are not current release coverage. |
 | Multi-project compile matrix | `Repo-verified summary` | Historical public summary evidence records `9/9` projects and `38/38` compile lanes passing after the registry-native package path update; this is not the current release consumer matrix. |
 | Linux host tools | `Template provided` / portable path | Unix launcher is bash-compatible and avoids zsh-only expansion, but should still be smoke-tested on a Linux Unity workstation. |
 | Native Windows clients | `Template provided` | Windows JSON/TOML configs plus `run.cmd` and `run.ps1` are included and statically validated; native Windows MCP connection still needs host smoke validation. |

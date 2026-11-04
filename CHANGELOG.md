@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.86
+
+Release tag: `v0.3.86`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.86
+```
+
 Building a new UI feature end to end (generated art, new prefabs, wiring,
 Play Mode checks) still needed a project-side editor hook: the MCP could not
 create a prefab, could not point a field at another component, and left an
@@ -83,6 +93,34 @@ release closes those gaps.
   component (for example a script from an editor-only assembly); the next
   operation then failed with an unrelated `prefab_mutation_component_not_found`.
   It now fails as `prefab_mutation_component_add_failed`.
+
+### Validation
+
+- Host Python suite: 1280 tests passed, 14 platform skips.
+- Package self-test lane on Unity `6000.0.58f2` in a clean project with uGUI
+  and TextMeshPro, package resolved from the local source: EditMode core
+  209/209, TextMeshPro 6/6, uGUI 57/57; PlayMode uGUI 19 passed with 6 skipped,
+  PlayMode core 6/6.
+- The new tools were driven through the MCP server against a live editor:
+  `unity_prefab_create` preview, write, refusal of an existing asset; a
+  wrong-type reference rolled back; `unity_prefab_validate` passed on the
+  result; `unity_playmode_set` switched background execution both ways while
+  keeping the other `bridge_config.json` keys.
+- Background execution was measured live with the editor unfocused on
+  `6000.0.58f2`: about 3000 frames per ~1 s liveness sample when managed,
+  about 14 when project-owned, and `ProjectSettings.asset` kept
+  `runInBackground: 0` after Play Mode cycles and an editor quit.
+
+### Known limitations
+
+- `Unity Package CI` remains waived (no runner Unity license); the local
+  licensed lane above is the package evidence.
+- Live runs were on macOS with Unity `6000.0.58f2` only. Other Unity versions
+  and Windows/Linux are covered by host tests and fixtures, not a live run.
+- The `allowDirtySceneDiscard` path of the test tools is covered by host tests
+  only; it was not exercised against a dirty scene live.
+- Catalog payload tokens other than `string_const_` (`*_default_*`,
+  `required_*`) remain descriptive; the hook still owns those defaults.
 
 ## 0.3.85
 

@@ -30,7 +30,7 @@ registries, directories, and comparison sites.
 Git UPM package URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.85
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.86
 ```
 
 Host helper init:
