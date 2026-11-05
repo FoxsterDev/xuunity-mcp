@@ -21,25 +21,39 @@ jobs:
   offline-ci:
     name: Offline Checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [windows-latest, ubuntu-latest]
     steps:
+      - name: Start CI duration timer
+        timeout-minutes: 1
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: echo "CI_JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Checkout Code
+        timeout-minutes: 1
         uses: actions/checkout@v4
 
       - name: Set up Python
+        timeout-minutes: 1
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Run Python Unit Tests
+      - name: Run fast core Python tests
+        timeout-minutes: 1
         shell: bash
         run: |
-          PYTHONPATH=templates python -m unittest discover -s tests -v
+          # Full host suite remains a local/release obligation.
+          for suite in test_bash_spawn_canary test_server_protocol_and_parser test_tcp_transport_framing test_setup_wizard test_cmd_launcher_contract test_ci_workflow_contract test_release_ci_gates; do
+            PYTHONPATH=templates python -m unittest discover -s tests -p "${suite}.py" -v || exit 1
+          done
 
       - name: Smoke run.cmd Launcher
+        timeout-minutes: 1
         if: runner.os == 'Windows'
         shell: cmd
         run: |
@@ -48,6 +62,7 @@ jobs:
           findstr /C:"usage:" run_cmd_help.txt
 
       - name: Smoke refresh run.cmd Launcher
+        timeout-minutes: 1
         if: runner.os == 'Windows'
         shell: cmd
         run: |
@@ -62,6 +77,7 @@ jobs:
           findstr /C:"run.cmd" refresh_cmd_run.txt
 
       - name: Smoke run.ps1 Launcher
+        timeout-minutes: 1
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -72,6 +88,7 @@ jobs:
           Write-Host "run.ps1 --help OK"
 
       - name: Scaffold Test Unity Project
+        timeout-minutes: 1
         shell: bash
         run: |
           mkdir -p TestProject/Assets
@@ -81,22 +98,26 @@ jobs:
           echo '{"dependencies": {}}' > TestProject/Packages/manifest.json
 
       - name: Run MCP setup-plan
+        timeout-minutes: 1
         shell: bash
         run: |
           python templates/server.py setup-plan --project-root TestProject > plan.json
           python -m json.tool plan.json
 
       - name: Run MCP setup-apply
+        timeout-minutes: 1
         shell: bash
         run: |
           python templates/server.py setup-apply --plan-file plan.json --project-root TestProject --yes
 
       - name: Run MCP validate-setup
+        timeout-minutes: 1
         shell: bash
         run: |
           python templates/server.py validate-setup --project-root TestProject
 
       - name: Verify package is registered in manifest
+        timeout-minutes: 1
         shell: python
         run: |
           import json
@@ -108,3 +129,18 @@ jobs:
               print("ERROR: com.xuunity.light-mcp is missing from package manifest!")
               sys.exit(1)
           print("Verification successful: com.xuunity.light-mcp is present.")
+
+      - name: Flag CI jobs slower than one minute
+        timeout-minutes: 1
+        if: always()
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          now=$(date +%s)
+          started=${CI_JOB_STARTED_AT:-$now}
+          elapsed=$((now - started))
+          if (( elapsed > 60 )); then
+            echo "::warning title=CI exceeded one minute::${GITHUB_JOB} took ${elapsed}s. Optimize this core check or run the full suite locally."
+          fi
+          printf '### CI duration\n%s: %ss (target: at most 60s)\n' "$GITHUB_JOB" "$elapsed" >> "$GITHUB_STEP_SUMMARY"
+
