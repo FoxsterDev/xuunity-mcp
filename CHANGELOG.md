@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Hosted integration tests now run fast core protocol, TCP transport, setup,
+  launcher and release-gate contracts on Linux and Windows. The full host suite
+  and macOS checks run locally; the release gate still requires Integration Tests.
+- Core CI jobs report a warning when their duration exceeds 60 seconds. Each
+  step has a one-minute limit so a slow check fails instead of running unbounded.
+
 ## 0.3.86
 
 Release tag: `v0.3.86`
