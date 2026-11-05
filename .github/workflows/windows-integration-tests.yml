@@ -143,4 +143,3 @@ jobs:
             echo "::warning title=CI exceeded one minute::${GITHUB_JOB} took ${elapsed}s. Optimize this core check or run the full suite locally."
           fi
           printf '### CI duration\n%s: %ss (target: at most 60s)\n' "$GITHUB_JOB" "$elapsed" >> "$GITHUB_STEP_SUMMARY"
-
