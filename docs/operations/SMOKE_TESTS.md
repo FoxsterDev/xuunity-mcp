@@ -332,6 +332,10 @@ terminal predicates. When `continueWhen` is omitted, an unmatched successful
 payload now keeps polling until a terminal predicate matches or the step times
 out. Supply `continueWhen` only when unmatched payloads should be treated as a
 contract error instead of normal waiting.
+A plain wait needs only `pollPayload` and `passWhen`: `startPayload` is
+optional (no start action runs) and `failWhen` defaults to
+`payload.status == 'failed'`. A scenario refused as invalid lists every
+validation error in one message.
 
 ### 3a. Profile Apply Then Gate
 

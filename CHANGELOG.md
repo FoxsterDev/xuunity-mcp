@@ -39,6 +39,12 @@
   longest of the last journaled runs of the same operation, never less than the
   declared 300000 ms, so a full suite that takes longer than five minutes no
   longer ends in `transport_response_missing` by default.
+- A scenario refused as invalid lists every validation error with its step id
+  in one message, instead of the first one only.
+- `project_defined_hook_poll_until` no longer needs `startPayload` and
+  `failWhen` for a plain wait: without `startPayload` no start action runs, and
+  `failWhen` defaults to `payload.status == 'failed'`. Explicit predicates still
+  take precedence and unmatched successful payloads keep polling.
 
 ### Added
 

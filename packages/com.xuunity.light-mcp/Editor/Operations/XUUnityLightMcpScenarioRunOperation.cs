@@ -56,24 +56,41 @@ namespace XUUnity.LightMcp.Editor.Operations
             }
         }
 
+        const int MaxListedValidationErrors = 8;
+
         public static string BuildValidationErrorMessage(XUUnityLightMcpScenarioValidatePayload validation)
         {
-            var firstIssue = validation?.issues != null && validation.issues.Count > 0
-                ? validation.issues[0]
-                : null;
-            if (firstIssue == null)
+            var issues = validation?.issues;
+            if (issues == null || issues.Count == 0)
             {
                 return "Scenario validation failed with no issue details.";
             }
 
-            var stepContext = string.IsNullOrWhiteSpace(firstIssue.stepId)
-                ? ""
-                : $" at step '{firstIssue.stepId}'";
-            var remainingCount = Math.Max(0, (validation?.error_count ?? 1) - 1);
-            var remainingSummary = remainingCount > 0
-                ? $" ({remainingCount} additional validation error(s); run unity.scenario.validate for the full list.)"
+            var errors = issues.FindAll(issue => string.Equals(issue.severity, "error", StringComparison.Ordinal));
+            if (errors.Count == 0)
+            {
+                errors = issues;
+            }
+
+            var listed = new System.Text.StringBuilder();
+            var shown = Math.Min(errors.Count, MaxListedValidationErrors);
+            for (var i = 0; i < shown; i++)
+            {
+                var issue = errors[i];
+                listed.Append(i == 0 ? "" : "; ");
+                if (!string.IsNullOrWhiteSpace(issue.stepId))
+                {
+                    listed.Append($"step '{issue.stepId}': ");
+                }
+
+                listed.Append($"{issue.code}: {issue.message}");
+            }
+
+            var remainder = errors.Count - shown;
+            var remainderSummary = remainder > 0
+                ? $" ({remainder} more; run unity.scenario.validate for the full list.)"
                 : "";
-            return $"Scenario validation failed{stepContext}: {firstIssue.code}: {firstIssue.message}{remainingSummary}";
+            return $"Scenario validation failed with {errors.Count} error(s): {listed}{remainderSummary}";
         }
     }
 }

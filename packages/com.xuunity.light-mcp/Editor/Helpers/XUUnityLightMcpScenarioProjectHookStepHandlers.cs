@@ -86,6 +86,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 state.pollUntilNextPollUtc = now.ToString("yyyy-MM-ddTHH:mm:ssZ");
                 state.pollUntilPollCount = 0;
                 state.waitingUntilUtc = state.pollUntilNextPollUtc;
+                if (string.IsNullOrWhiteSpace(step.startPayloadJson))
+                {
+                    stepResult.status = "running";
+                    stepResult.outcome = "hook_poll_until_started_without_start_action";
+                    return false;
+                }
 
                 var startResult = ExecuteScenarioHook(hook, step.startPayloadJson, out var durationSeconds);
                 stepResult.duration_seconds = durationSeconds;
@@ -182,7 +188,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return true;
             }
 
-            if (PredicateMatches(step.failWhen, payloadJson))
+            if (PredicateMatches(EffectiveFailWhen(step), payloadJson))
             {
                 stepResult.status = "failed";
                 stepResult.outcome = string.IsNullOrWhiteSpace(pollResult.outcome)
@@ -234,6 +240,13 @@ namespace XUUnity.LightMcp.Editor.Helpers
             ClearPollUntilState(state);
             return true;
         }
+        internal const string DefaultPollUntilFailWhen = "payload.status == 'failed'";
+
+        internal static string EffectiveFailWhen(XUUnityLightMcpScenarioStepDefinition step)
+        {
+            return string.IsNullOrWhiteSpace(step?.failWhen) ? DefaultPollUntilFailWhen : step.failWhen;
+        }
+
         public static void CaptureTerminalPollUntilArtifacts(
             XUUnityLightMcpScenarioStepDefinition step,
             XUUnityLightMcpScenarioStepResult stepResult)

@@ -325,11 +325,6 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 AddIssue(payload, "error", hookErrorCode, hookErrorMessage, stepId, index);
             }
 
-            if (string.IsNullOrWhiteSpace(step.startPayloadJson))
-            {
-                AddIssue(payload, "error", "missing_start_payload", "project_defined_hook_poll_until requires startPayload or startPayloadJson.", stepId, index);
-            }
-
             if (string.IsNullOrWhiteSpace(step.pollPayloadJson))
             {
                 AddIssue(payload, "error", "missing_poll_payload", "project_defined_hook_poll_until requires pollPayload or pollPayloadJson.", stepId, index);
@@ -340,7 +335,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 AddIssue(payload, "error", "invalid_pass_when", "project_defined_hook_poll_until passWhen must use payload.<field> == 'value'.", stepId, index);
             }
 
-            if (!IsSupportedPayloadEqualityPredicate(step.failWhen))
+            if (!string.IsNullOrWhiteSpace(step.failWhen) && !IsSupportedPayloadEqualityPredicate(step.failWhen))
             {
                 AddIssue(payload, "error", "invalid_fail_when", "project_defined_hook_poll_until failWhen must use payload.<field> == 'value'.", stepId, index);
             }

@@ -122,7 +122,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
         "rerunHealthProbe": {"type": "boolean"},
         "hookName": {"type": "string"},
         "hookPayloadJson": {"type": "string"},
-        "startPayload": {"type": "object"},
+        "startPayload": {"type": "object", "description": "Optional poll-until start action payload; omit it for a plain wait that only polls."},
         "startPayloadJson": {"type": "string"},
         "pollPayload": {"type": "object"},
         "pollPayloadJson": {"type": "string"},
@@ -132,7 +132,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
         },
         "failWhen": {
             "type": "string",
-            "description": "Poll-until predicate using payload.<field> == 'value'.",
+            "description": "Poll-until predicate using payload.<field> == 'value'. Defaults to payload.status == 'failed'; a failed hook call always fails the step.",
         },
         "continueWhen": {
             "type": "string",

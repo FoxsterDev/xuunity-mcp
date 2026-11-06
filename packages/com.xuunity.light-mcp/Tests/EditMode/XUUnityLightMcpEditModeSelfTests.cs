@@ -1455,7 +1455,7 @@ namespace XUUnity.LightMcp.Tests.EditMode
         }
 
         [Test]
-        public void ScenarioValidation_ReportsFirstCauseInline()
+        public void ScenarioValidation_ReportsEveryErrorInOneRefusal()
         {
             var validation = new XUUnityLightMcpScenarioValidatePayload
             {
@@ -1469,14 +1469,51 @@ namespace XUUnity.LightMcp.Tests.EditMode
                         message = "No scenario hook registered as 'example.missing'.",
                         stepId = "vendor_gate",
                     },
+                    new()
+                    {
+                        code = "invalid_pass_when",
+                        message = "passWhen must use payload.<field> == 'value'.",
+                        stepId = "wait_ready",
+                    },
+                    new()
+                    {
+                        severity = "warning",
+                        code = "advisory_only",
+                        message = "not an error",
+                    },
                 },
             };
 
             var message = XUUnityLightMcpScenarioRunOperation.BuildValidationErrorMessage(validation);
-            Assert.That(message, Does.Contain("hook_not_found"));
+            Assert.That(message, Does.Contain("2 error(s)"));
+            Assert.That(message, Does.Contain("step 'vendor_gate': hook_not_found"));
             Assert.That(message, Does.Contain("example.missing"));
-            Assert.That(message, Does.Contain("step 'vendor_gate'"));
-            Assert.That(message, Does.Contain("1 additional validation error"));
+            Assert.That(message, Does.Contain("step 'wait_ready': invalid_pass_when"));
+            Assert.That(message, Does.Not.Contain("advisory_only"));
+        }
+
+        [Test]
+        public void PollUntil_PlainWaitNeedsNoStartPayloadOrFailWhen()
+        {
+            var payload = new XUUnityLightMcpScenarioValidatePayload();
+            var step = new XUUnityLightMcpScenarioStepDefinition
+            {
+                kind = "project_defined_hook_poll_until",
+                hookName = "xuunity.selftest.missing_hook_for_validation",
+                pollPayloadJson = "{\"action\":\"probe\"}",
+                passWhen = "payload.status == 'ready'",
+                timeoutSeconds = 5,
+            };
+
+            XUUnityLightMcpScenarioValidator.ValidateProjectDefinedHookPollUntilStep(payload, step, "wait", 0);
+
+            Assert.That(payload.issues.ConvertAll(issue => issue.code), Has.No.Member("missing_start_payload"));
+            Assert.That(payload.issues.ConvertAll(issue => issue.code), Has.No.Member("invalid_fail_when"));
+            Assert.That(
+                XUUnityLightMcpScenarioProjectHookStepHandlers.EffectiveFailWhen(step),
+                Is.EqualTo("payload.status == 'failed'"));
+            step.failWhen = "payload.state == 'broken'";
+            Assert.That(XUUnityLightMcpScenarioProjectHookStepHandlers.EffectiveFailWhen(step), Is.EqualTo("payload.state == 'broken'"));
         }
 
         [Test]
