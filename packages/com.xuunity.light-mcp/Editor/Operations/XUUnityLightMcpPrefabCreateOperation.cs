@@ -222,27 +222,27 @@ namespace XUUnity.LightMcp.Editor.Operations
             AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));
         }
 
-        static HashSet<int> SnapshotDirtyScenes()
+        static HashSet<Scene> SnapshotDirtyScenes()
         {
-            var dirty = new HashSet<int>();
+            var dirty = new HashSet<Scene>();
             for (var index = 0; index < SceneManager.sceneCount; index++)
             {
                 var scene = SceneManager.GetSceneAt(index);
                 if (scene.IsValid() && scene.isDirty)
                 {
-                    dirty.Add(scene.handle);
+                    dirty.Add(scene);
                 }
             }
 
             return dirty;
         }
 
-        static bool DirtiedSince(HashSet<int> dirtyBefore)
+        static bool DirtiedSince(HashSet<Scene> dirtyBefore)
         {
             for (var index = 0; index < SceneManager.sceneCount; index++)
             {
                 var scene = SceneManager.GetSceneAt(index);
-                if (scene.IsValid() && scene.isDirty && !dirtyBefore.Contains(scene.handle))
+                if (scene.IsValid() && scene.isDirty && !dirtyBefore.Contains(scene))
                 {
                     return true;
                 }

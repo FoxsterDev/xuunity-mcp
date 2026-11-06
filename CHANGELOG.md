@@ -12,6 +12,11 @@
 
 ### Fixed
 
+- The package compiles on Unity 6000.5 and 6000.6 again. `unity_prefab_create`
+  used the implicit `SceneHandle` to `int` conversion, which those versions turn
+  into compile error CS0619, so the bridge never loaded there. A package
+  self-test that loaded the `LegacyRuntime.ttf` built-in font also failed on
+  Unity 2021.3, where that font is named `Arial.ttf`.
 - Editor-domain currency could report `current` while tests ran old code. A
   forced `unity_project_refresh` that settled after the newest script edit was
   taken as proof that Unity owed no recompile (`v0.3.71`); when the edit landed

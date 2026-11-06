@@ -241,7 +241,7 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
                 var title = root.transform.Find("Title");
                 title.SetParent(holder.transform, false);
                 title.GetComponent<Text>().text = "Hidden title";
-                title.GetComponent<Text>().font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                title.GetComponent<Text>().font = BuiltinUiFont();
                 title.GetComponent<Text>().fontSize = 20;
                 title.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
                 title.GetComponent<RectTransform>().sizeDelta = new Vector2(220f, 60f);
@@ -792,6 +792,15 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             });
             Assert.That(response.status, Is.EqualTo("ok"));
             return JsonUtility.FromJson<XUUnityLightMcpUiClickPayload>(response.payload_json);
+        }
+
+        static Font BuiltinUiFont()
+        {
+#if UNITY_2022_2_OR_NEWER
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+#else
+            return Resources.GetBuiltinResource<Font>("Arial.ttf");
+#endif
         }
     }
 }
