@@ -53,6 +53,28 @@
   `--strict-payload`, scenario step field, or `strictPayload: true` on the
   catalog entry) refuses with `project_action_payload_contract_violation`
   before anything runs in Unity.
+- Android device lane: nine host-side tools that run `adb` directly and keep
+  working while the editor is busy, replacing the hand-written shell loops
+  device perf work needed. `unity_device_list`, `unity_device_install`
+  (classified refusals for signature conflicts, downgrades and conflicting
+  providers; the dex is compiled to `verify` by default so cold-start timing is
+  not inflated by `run-from-apk`), `unity_device_app` (cold, warm or hot launch
+  with Unity command-line args, wait for a logcat marker, stop, info, clear
+  data, uninstall), `unity_device_logcat` (capture to a file, grep, tail),
+  `unity_device_files` (pull and list from the app's external files dir,
+  Download or `/data/local/tmp`), `unity_device_screen` (screenshot with the
+  device descriptor), `unity_device_frame_pacing` (SurfaceFlinger present gaps
+  of the app's surface: fps, percentiles, counts over 33/50/100/250/500 ms, top
+  gaps, sampling holes reported separately), `unity_device_metrics` (meminfo,
+  thermal, CPU) and `unity_device_coldstart_ab` (install each build, run N cold
+  starts until the ready marker, report ready time and the longest frame gap
+  before it, with medians per build).
+- Device safety: `serial` is required when more than one device is attached;
+  state-changing operations need `allowMutating`; uninstall, clear data and
+  `uninstallFirst` also need `approve` and a package listed under
+  `device.packages` in the MCP runtime config. A signature conflict names the
+  data loss of replacing the installed app. No operation types text into the
+  device.
 
 ## 0.3.86
 

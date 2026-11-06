@@ -49,6 +49,8 @@ HIDDEN_WINDOW_FILES = (
     "server_launcher.py",
     "server_workspace_effects.py",
     "server_hub_licensing.py",
+    "server_device_android.py",
+    "server_device_tools.py",
 )
 
 

@@ -1,0 +1,5 @@
+com.android.systemui.ImageWallpaper#0
+SurfaceView - com.example.game/com.unity3d.player.UnityPlayerActivity#0
+com.example.game/com.unity3d.player.UnityPlayerActivity#0
+StatusBar#0
+NavigationBar#0

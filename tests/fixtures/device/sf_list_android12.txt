@@ -1,0 +1,6 @@
+Display 0 name="Built-in Screen"#0
+Background for SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity]#0
+SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity]#0
+com.example.game/com.unity3d.player.UnityPlayerActivity#0
+ActivityRecord{3f2a1c u0 com.example.game/com.unity3d.player.UnityPlayerActivity t123}#0
+StatusBar#0

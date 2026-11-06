@@ -1,0 +1,7 @@
+Dexopt state:
+  [com.other.app]
+    path: /data/app/~~a/com.other.app-1/base.apk
+      arm64: [status=speed-profile] [reason=bg-dexopt]
+  [com.example.game]
+    path: /data/app/~~b/com.example.game-2/base.apk
+      arm64: [status=verify] [reason=cmdline] [primary-abi]

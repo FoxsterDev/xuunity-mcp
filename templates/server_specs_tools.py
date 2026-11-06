@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from server_specs_scenario import SCENARIO_DEFINITION_SCHEMA
+from server_specs_device import DEVICE_TOOLS
 
 TOOLS: dict[str, dict[str, Any]] = {
     "xuunity_setup_plan": {
@@ -2181,3 +2182,5 @@ TOOLS: dict[str, dict[str, Any]] = {
         }
     },
 }
+
+TOOLS.update(DEVICE_TOOLS)

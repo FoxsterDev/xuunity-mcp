@@ -1,0 +1,5 @@
+  1520.104000  1180  1213 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.example.game/com.unity3d.player.UnityPlayerActivity} from uid 2000
+  1520.412000  9876  9876 I Unity   : APP_READY early mention ignored? no
+  1524.900000  9876  9901 I Unity   : AppLoading Started
+  1530.311000  9876  9876 I Unity   : APP_READY
+  1531.000000  1180  1213 I ActivityTaskManager: Fully drawn com.example.game/com.unity3d.player.UnityPlayerActivity: +10s896ms

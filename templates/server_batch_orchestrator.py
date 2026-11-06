@@ -71,7 +71,9 @@ from server_mcp_tools import (
     call_unity_scenario_result_summary_tool as call_unity_scenario_result_summary_tool_base,
     call_unity_scenario_run_and_wait_tool as call_unity_scenario_run_and_wait_tool_base,
     call_unity_status_summary_tool as call_unity_status_summary_tool_base,
+    validate_declared_argument_types,
 )
+from server_device_tools import DEVICE_TOOL_HANDLERS
 from server_readiness_summary import build_ensure_ready_summary
 from server_bridge_payloads import (
     bridge_response_to_tool_result as bridge_response_to_tool_result_data,
@@ -2913,6 +2915,22 @@ def invoke_project_action_from_catalog(
     return result, wait_for_result and not bool(result.get("succeeded"))
 
 
+def _device_tool_handler(name: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    def handler(arguments: dict[str, Any]) -> dict[str, Any]:
+        validate_declared_argument_types(name, TOOLS[name], arguments)
+        project_root_value = arguments.get("projectRoot")
+        if not isinstance(project_root_value, str) or not project_root_value.strip():
+            raise JsonRpcError(-32602, "projectRoot is required.")
+        try:
+            project_root = ensure_project_root(project_root_value)
+            payload = DEVICE_TOOL_HANDLERS[name](project_root, arguments)
+        except ToolInvocationError as exc:
+            return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+        return mcp_json_result(payload)
+
+    return handler
+
+
 def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
     return call_tool_base(
         name,
@@ -2925,6 +2943,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "xuunity_uninstall_apply": call_xuunity_uninstall_apply_tool,
             "xuunity_setup_validate": call_xuunity_setup_validate_tool,
             "unity_license_capabilities": call_unity_license_capabilities_tool,
+            **{tool_name: _device_tool_handler(tool_name) for tool_name in DEVICE_TOOL_HANDLERS},
             "unity_status_summary": call_unity_status_summary_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
             "unity_scenario_result_summary": call_unity_scenario_result_summary_tool,

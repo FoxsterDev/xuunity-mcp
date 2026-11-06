@@ -809,6 +809,9 @@ Popular MCP tools:
 `xuunity_setup_plan` | `xuunity_setup_apply` | `xuunity_setup_validate` |
 `xuunity_uninstall_plan` | `xuunity_uninstall_apply` |
 `unity_license_capabilities` |
+`unity_device_list` | `unity_device_install` | `unity_device_app` |
+`unity_device_logcat` | `unity_device_files` | `unity_device_screen` |
+`unity_device_frame_pacing` | `unity_device_metrics` | `unity_device_coldstart_ab` |
 `unity_status_summary` | `unity_capabilities` | `unity_health_probe` |
 `unity_console_tail` | `unity_console_grep` | `unity_loading_timing` |
 `unity_scene_snapshot` | `unity_scene_open` | `unity_scene_assert` |

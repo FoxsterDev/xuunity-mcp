@@ -1,0 +1,7 @@
+Display 4619827259835644672 HWC layers:
+Background for SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity](BLAST)#412
+SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity](BLAST)#411
+com.example.game/com.unity3d.player.UnityPlayerActivity#408
+ActivityRecord{9b1 u0 com.example.game/com.unity3d.player.UnityPlayerActivity t57}#404
+Splash Screen com.example.game#399
+StatusBar#90
