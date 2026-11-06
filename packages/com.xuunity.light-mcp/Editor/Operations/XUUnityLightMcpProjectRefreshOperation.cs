@@ -1,5 +1,6 @@
 using System;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEditor.PackageManager;
 using UnityEngine;
 using XUUnity.LightMcp.Editor.Bridge;
@@ -43,6 +44,14 @@ namespace XUUnity.LightMcp.Editor.Operations
                     XUUnityLightMcpHealthProbe.RunProbeAndPersist();
                 }
 
+                var compileRequestReason = "";
+                var content = XUUnityLightMcpEditorInputSnapshot.Compare(XUUnityLightMcpFileIpcPaths.ProjectRootPath);
+                if (content.ContentChanged && !EditorApplication.isCompiling && !EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    CompilationPipeline.RequestScriptCompilation();
+                    compileRequestReason = "editor_input_content_changed_without_compile";
+                }
+
                 var payload = new XUUnityLightMcpProjectRefreshPayload
                 {
                     project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath,
@@ -56,6 +65,10 @@ namespace XUUnity.LightMcp.Editor.Operations
                     playmode_state_after_request = XUUnityLightMcpPlayModeStateOperation.ResolvePlayModeState(),
                     settle_request_id = request.request_id,
                     settle_phase = XUUnityLightMcpBridgeRuntimeState.RefreshSettlePhase,
+                    script_compilation_requested = compileRequestReason.Length > 0,
+                    script_compilation_request_reason = compileRequestReason,
+                    changed_editor_input_count = content.changed_count,
+                    changed_editor_inputs = content.changed_paths.ToArray(),
                 };
 
                 return XUUnityLightMcpResponseWriter.Success(

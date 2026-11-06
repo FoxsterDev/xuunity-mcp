@@ -10,6 +10,24 @@
 - Core CI jobs report a warning when their duration exceeds 60 seconds. Each
   step has a one-minute limit so a slow check fails instead of running unbounded.
 
+### Fixed
+
+- Editor-domain currency could report `current` while tests ran old code. A
+  forced `unity_project_refresh` that settled after the newest script edit was
+  taken as proof that Unity owed no recompile (`v0.3.71`); when the edit landed
+  while a test run held assembly reload, Unity imported it but never compiled,
+  and the next test run executed the previous assemblies. The scan also ignored
+  scripts in embedded and local (`file:`) packages. Currency now compares the
+  content of every `.cs`, `.asmdef`, `.asmref` and `.rsp` file under `Assets/`,
+  embedded packages and local packages with a snapshot taken when the loaded
+  assemblies were compiled: touching a file without changing it stays
+  `current`, a real edit without a compile reads `stale` and names the files.
+  `unity_project_refresh` requests the missing compile, its verdict is
+  `inconclusive` (`editor_domain_stale`) instead of `passed` while sources are
+  newer than the loaded code, and `unity_tests_run_editmode` /
+  `unity_tests_run_playmode` refuse with `editor_domain_stale` unless
+  `allowStaleEditorDomain=true`.
+
 ## 0.3.86
 
 Release tag: `v0.3.86`

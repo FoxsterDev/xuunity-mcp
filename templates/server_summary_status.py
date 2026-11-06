@@ -139,6 +139,9 @@ def build_status_summary(
         "newest_editor_input_path": str(effective.get("newest_editor_input_path") or ""),
         "newest_editor_input_write_utc": str(effective.get("newest_editor_input_write_utc") or ""),
         "editor_input_count": int(effective.get("editor_input_count") or 0),
+        "editor_input_content_state": str(effective.get("editor_input_content_state") or ""),
+        "changed_editor_input_count": int(effective.get("changed_editor_input_count") or 0),
+        "changed_editor_inputs": list(effective.get("changed_editor_inputs") or [])[:8],
         "editor_domain_currency_reason": str(effective.get("editor_domain_currency_reason") or ""),
         "editor_domain_currency_basis": str(effective.get("editor_domain_currency_basis") or ""),
         "editor_domain_currency_recommended_next_action": str(

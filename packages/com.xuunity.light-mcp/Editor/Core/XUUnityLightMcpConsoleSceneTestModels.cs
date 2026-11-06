@@ -270,6 +270,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public string[] categoryNames = null;
             public string[] assemblyNames = null;
             public bool allowDirtySceneDiscard;
+            public bool allowStaleEditorDomain;
         }
 
         [Serializable]

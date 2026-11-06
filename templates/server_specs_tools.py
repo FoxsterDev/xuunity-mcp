@@ -1708,6 +1708,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "default": False,
                     "description": "When open scenes are dirty (editor startup, a Play Mode cycle or an editor script can cause it), reload saved scenes from disk and drop untitled ones before the run instead of refusing with dirty_scene."
                 },
+                "allowStaleEditorDomain": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Run even when compile inputs changed since the loaded editor domain was compiled. By default the run is refused with editor_domain_stale, because it would execute the previously compiled assemblies; unity_project_refresh requests the missing compile."
+                },
                 "testNames": {
                     "type": "array",
                     "items": {"type": "string"}
@@ -1750,6 +1755,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "type": "boolean",
                     "default": False,
                     "description": "When open scenes are dirty (editor startup, a Play Mode cycle or an editor script can cause it), reload saved scenes from disk and drop untitled ones before the run instead of refusing with dirty_scene."
+                },
+                "allowStaleEditorDomain": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Run even when compile inputs changed since the loaded editor domain was compiled. By default the run is refused with editor_domain_stale, because it would execute the previously compiled assemblies; unity_project_refresh requests the missing compile."
                 },
                 "testNames": {
                     "type": "array",

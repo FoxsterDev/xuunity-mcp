@@ -46,6 +46,18 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return false;
             }
 
+            if (!ReadTestsArgs(request.args_json).allowStaleEditorDomain
+                && TryDescribeStaleEditorDomain(out var staleMessage))
+            {
+                errorResponse = XUUnityLightMcpResponseWriter.Error(
+                    request.request_id,
+                    "editor_domain_stale",
+                    $"Cannot run {modeLabel} tests: {staleMessage} The tests would execute the previously compiled "
+                    + "assemblies. Run unity_project_refresh (it requests the missing compile), or pass "
+                    + "allowStaleEditorDomain=true to run the loaded code anyway.");
+                return false;
+            }
+
             var dirtyScenes = GetDirtyOpenScenes();
             if (dirtyScenes.Count > 0 && ReadAllowDirtySceneDiscard(request.args_json) && !EditorApplication.isPlayingOrWillChangePlaymode)
             {
@@ -192,19 +204,43 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static bool ReadAllowDirtySceneDiscard(string argsJson)
         {
+            return ReadTestsArgs(argsJson).allowDirtySceneDiscard;
+        }
+
+        static XUUnityLightMcpTestsArgs ReadTestsArgs(string argsJson)
+        {
             if (string.IsNullOrWhiteSpace(argsJson))
             {
-                return false;
+                return new XUUnityLightMcpTestsArgs();
             }
 
             try
             {
-                return JsonUtility.FromJson<XUUnityLightMcpTestsArgs>(argsJson)?.allowDirtySceneDiscard ?? false;
+                return JsonUtility.FromJson<XUUnityLightMcpTestsArgs>(argsJson) ?? new XUUnityLightMcpTestsArgs();
             }
             catch
             {
+                return new XUUnityLightMcpTestsArgs();
+            }
+        }
+
+        internal static bool TryDescribeStaleEditorDomain(out string message)
+        {
+            message = "";
+            var currency = XUUnityLightMcpProjectActionCurrency.Capture();
+            if (!string.Equals(currency.editor_domain_currency, "stale", StringComparison.Ordinal)
+                || !string.Equals(
+                    currency.currency_basis,
+                    XUUnityLightMcpProjectActionCurrency.ContentSnapshotCurrencyBasis,
+                    StringComparison.Ordinal))
+            {
                 return false;
             }
+
+            var listed = currency.changed_editor_inputs ?? Array.Empty<string>();
+            message = $"{currency.changed_editor_input_count} compile input(s) changed since the loaded editor domain was compiled"
+                + (listed.Length > 0 ? $" ({string.Join(", ", listed)})." : ".");
+            return true;
         }
 
         internal static void DiscardDirtyScenes()

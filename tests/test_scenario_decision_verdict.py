@@ -726,6 +726,46 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual("idle_wait_after", normalized["playmode_state_after_settle_source"])
         self.assertEqual("confirmed", normalized["playmode_state_after_settle_trust_class"])
 
+    def test_refresh_never_reports_passed_while_changed_inputs_could_not_be_compiled(self) -> None:
+        idle = {
+            "heartbeat_utc": "2026-11-05T20:09:00Z",
+            "refresh_settle_phase": "settled",
+            "refresh_settle_request_id": "req-refresh",
+            "refresh_settle_completed_utc": "2026-11-05T20:09:01Z",
+            "is_compiling": False,
+            "is_updating": False,
+            "playmode_state": "edit",
+            "script_compilation_failed": False,
+            "compiler_error_count": 0,
+        }
+        base = {"outcome": "refresh_requested", "settle_request_id": "req-refresh"}
+
+        uncompiled = server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
+            {**base, "changed_editor_input_count": 1, "changed_editor_inputs": ["Packages/a/A.cs"],
+             "script_compilation_requested": False},
+            {"idle_wait_after": dict(idle)},
+        )
+        compile_requested = server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
+            {**base, "changed_editor_input_count": 1, "script_compilation_requested": True},
+            {"idle_wait_after": dict(idle)},
+        )
+
+        self.assertEqual("inconclusive", uncompiled["post_settle_compile"])
+        self.assertEqual("editor_domain_stale", uncompiled["post_settle_compile_trust_class"])
+        self.assertEqual(
+            "rerun_unity_project_refresh_to_compile",
+            uncompiled["post_settle_compile_recommended_next_action"],
+        )
+        self.assertEqual("passed", compile_requested["post_settle_compile"])
+        self.assertEqual("confirmed", compile_requested["post_settle_compile_trust_class"])
+
+        unity_already_compiling = server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
+            {**base, "changed_editor_input_count": 1, "script_compilation_requested": False,
+             "editor_is_compiling_after_request": True},
+            {"idle_wait_after": dict(idle)},
+        )
+        self.assertEqual("passed", unity_already_compiling["post_settle_compile"])
+
     def test_refresh_playmode_state_is_qualified_after_lifecycle_reset(self) -> None:
         normalized = server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
             {

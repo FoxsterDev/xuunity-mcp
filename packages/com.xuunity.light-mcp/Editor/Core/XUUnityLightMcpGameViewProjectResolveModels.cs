@@ -114,6 +114,10 @@ namespace XUUnity.LightMcp.Editor.Core
             public string playmode_state_after_settle = "edit";
             public string settle_request_id = "";
             public string settle_phase = "";
+            public bool script_compilation_requested;
+            public string script_compilation_request_reason = "";
+            public int changed_editor_input_count;
+            public string[] changed_editor_inputs = Array.Empty<string>();
             public string validation_evidence = "unity_mcp";
         }
 

@@ -180,6 +180,9 @@ namespace XUUnity.LightMcp.Editor.Core
             public string editor_domain_currency_reason = "";
             public string editor_domain_currency_basis = "";
             public string editor_domain_currency_recommended_next_action = "";
+            public string editor_input_content_state = "";
+            public int changed_editor_input_count;
+            public string[] changed_editor_inputs = Array.Empty<string>();
             public bool application_run_in_background;
             public bool native_autofocus_enabled;
             public string background_execution_mode = "";

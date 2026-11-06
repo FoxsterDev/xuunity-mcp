@@ -13,6 +13,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
     {
         const string DomainLoadCurrencyBasis = "editor_domain_load_vs_newest_assets_editor_input";
         const string SettledForcedAssetRefreshCurrencyBasis = "settled_forced_asset_refresh_covers_newest_assets_editor_input";
+        internal const string ContentSnapshotCurrencyBasis = "compiled_editor_input_content_snapshot";
 
         static readonly HashSet<string> EditorInputExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -43,15 +44,36 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 background_execution_mode = XUUnityLightMcpBackgroundExecution.Mode,
             };
 
-            var scanSucceeded = TryFindNewestEditorInput(
-                Path.Combine(XUUnityLightMcpFileIpcPaths.ProjectRootPath, "Assets"),
-                out var newestPath,
-                out var newestWriteUtc,
-                out var inputCount,
-                out var scanError);
+            var content = XUUnityLightMcpEditorInputSnapshot.Compare(XUUnityLightMcpFileIpcPaths.ProjectRootPath);
+            bool scanSucceeded;
+            string newestPath;
+            string newestWriteUtc;
+            int inputCount;
+            var scanError = "";
+            if (content.state == XUUnityLightMcpEditorInputSnapshot.StateFailed)
+            {
+                scanSucceeded = TryFindNewestEditorInput(
+                    Path.Combine(XUUnityLightMcpFileIpcPaths.ProjectRootPath, "Assets"),
+                    out newestPath,
+                    out newestWriteUtc,
+                    out inputCount,
+                    out scanError);
+            }
+            else
+            {
+                scanSucceeded = true;
+                newestPath = content.newest_path;
+                newestWriteUtc = content.newest_write_utc;
+                inputCount = content.input_count;
+            }
+
             payload.newest_editor_input_path = newestPath;
             payload.newest_editor_input_write_utc = newestWriteUtc;
             payload.editor_input_count = inputCount;
+            payload.editor_input_content_state = content.state;
+            payload.editor_input_content_basis_utc = content.basis_utc;
+            payload.changed_editor_input_count = content.changed_count;
+            payload.changed_editor_inputs = content.changed_paths.ToArray();
             payload.script_compilation_failed = EditorUtility.scriptCompilationFailed;
             payload.settled_forced_asset_refresh_requested_utc =
                 XUUnityLightMcpBridgeRuntimeState.SettledForcedAssetRefreshRequestedUtc;
@@ -61,6 +83,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 scanSucceeded,
                 payload.settled_forced_asset_refresh_requested_utc,
                 payload.script_compilation_failed,
+                content.state,
+                content.changed_count,
                 out var editorDomainCurrent,
                 out var currencyKnown,
                 out var currencyReason,
@@ -115,6 +139,57 @@ namespace XUUnity.LightMcp.Editor.Helpers
             out string reason,
             out string currencyBasis)
         {
+            return ClassifyEditorDomainCurrency(
+                editorDomainLoadedUtc,
+                newestEditorInputWriteUtc,
+                scanSucceeded,
+                settledForcedAssetRefreshRequestedUtc,
+                scriptCompilationFailed,
+                XUUnityLightMcpEditorInputSnapshot.StateUnavailable,
+                0,
+                out editorDomainCurrent,
+                out currencyKnown,
+                out reason,
+                out currencyBasis);
+        }
+
+        public static string ClassifyEditorDomainCurrency(
+            string editorDomainLoadedUtc,
+            string newestEditorInputWriteUtc,
+            bool scanSucceeded,
+            string settledForcedAssetRefreshRequestedUtc,
+            bool scriptCompilationFailed,
+            string contentState,
+            int changedInputCount,
+            out bool editorDomainCurrent,
+            out bool currencyKnown,
+            out string reason,
+            out string currencyBasis)
+        {
+            if (scanSucceeded
+                && string.Equals(contentState, XUUnityLightMcpEditorInputSnapshot.StateReady, StringComparison.Ordinal)
+                && (changedInputCount > 0 || !scriptCompilationFailed))
+            {
+                currencyKnown = true;
+                currencyBasis = ContentSnapshotCurrencyBasis;
+                if (changedInputCount > 0)
+                {
+                    editorDomainCurrent = false;
+                    reason = scriptCompilationFailed
+                        ? "editor_input_content_changed_since_compile_with_failed_script_compilation"
+                        : "editor_input_content_changed_since_compile";
+                    return "stale";
+                }
+
+                editorDomainCurrent = true;
+                reason = TryParseUtc(newestEditorInputWriteUtc, out var newestUtc)
+                    && TryParseUtc(editorDomainLoadedUtc, out var loadedUtc)
+                    && newestUtc > loadedUtc
+                        ? "editor_inputs_touched_without_content_change"
+                        : "editor_input_content_matches_compiled_snapshot";
+                return "current";
+            }
+
             editorDomainCurrent = false;
             currencyKnown = false;
             reason = "";

@@ -18,6 +18,7 @@ from server_operation_evidence import (
 POST_SETTLE_COMPILE_TRUST_CONFIRMED = "confirmed"
 POST_SETTLE_COMPILE_TRUST_EDITOR_STILL_BUSY = "editor_still_busy"
 POST_SETTLE_COMPILE_TRUST_DEFERRED_DURING_PLAYMODE = "deferred_during_playmode"
+POST_SETTLE_COMPILE_TRUST_EDITOR_DOMAIN_STALE = "editor_domain_stale"
 PLAYING_PLAYMODE_STATES = {"playing", "paused", "transitioning"}
 STRUCTURAL_COMPILER_LOG_MAX_CHARS = 2_000_000
 STRUCTURAL_COMPILER_DIAGNOSTIC_SOURCE = "editor_log_bridge_generation_scope"
@@ -78,15 +79,24 @@ def _attach_post_settle_compile_truth(
     )
     post_settle_failed = script_compilation_failed or post_settle_error_count > 0
     compiling_or_updating = bool(idle_wait_after.get("is_compiling")) or bool(idle_wait_after.get("is_updating"))
+    domain_stale_by_content = (
+        _int_or_zero(normalized.get("changed_editor_input_count")) > 0
+        and not bool(normalized.get("script_compilation_requested"))
+        and not bool(normalized.get("editor_is_compiling_after_request"))
+    )
     if compiling_or_updating:
         post_settle_compile = "inconclusive"
     elif post_settle_failed:
         post_settle_compile = "failed"
+    elif domain_stale_by_content:
+        post_settle_compile = "inconclusive"
     else:
         post_settle_compile = "passed"
 
     if compiling_or_updating:
         trust_class = POST_SETTLE_COMPILE_TRUST_EDITOR_STILL_BUSY
+    elif not post_settle_failed and domain_stale_by_content:
+        trust_class = POST_SETTLE_COMPILE_TRUST_EDITOR_DOMAIN_STALE
     elif playmode_defers_asset_import and _editor_was_playing(idle_wait_after):
         trust_class = POST_SETTLE_COMPILE_TRUST_DEFERRED_DURING_PLAYMODE
     else:
@@ -99,6 +109,12 @@ def _attach_post_settle_compile_truth(
             "this compile verdict is not authoritative"
         )
         normalized["post_settle_compile_recommended_next_action"] = "exit_play_mode_then_rerun_refresh"
+    elif trust_class == POST_SETTLE_COMPILE_TRUST_EDITOR_DOMAIN_STALE:
+        normalized["post_settle_compile_note"] = (
+            "compile inputs changed since the loaded editor domain was compiled and the refresh could not request "
+            "a compile (Play Mode or a compile already running); the loaded assemblies are older than the sources"
+        )
+        normalized["post_settle_compile_recommended_next_action"] = "rerun_unity_project_refresh_to_compile"
     elif trust_class == POST_SETTLE_COMPILE_TRUST_EDITOR_STILL_BUSY:
         normalized["post_settle_compile_note"] = (
             "the editor was still compiling or importing at settle, so this compile verdict is not final"
@@ -1017,6 +1033,9 @@ def _compact_project_action_currency_payload(payload: dict[str, Any], operation:
             "newest_editor_input_path",
             "newest_editor_input_write_utc",
             "editor_input_count",
+            "editor_input_content_state",
+            "changed_editor_input_count",
+            "changed_editor_inputs",
             "settled_forced_asset_refresh_requested_utc",
             "script_compilation_failed",
             "currency_basis",

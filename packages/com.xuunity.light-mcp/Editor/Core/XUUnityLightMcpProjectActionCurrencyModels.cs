@@ -26,6 +26,10 @@ namespace XUUnity.LightMcp.Editor.Core
         public string newest_editor_input_path = "";
         public string newest_editor_input_write_utc = "";
         public int editor_input_count;
+        public string editor_input_content_state = "";
+        public string editor_input_content_basis_utc = "";
+        public int changed_editor_input_count;
+        public string[] changed_editor_inputs = Array.Empty<string>();
         public string settled_forced_asset_refresh_requested_utc = "";
         public bool script_compilation_failed;
         public string currency_basis = "editor_domain_load_vs_newest_assets_editor_input";
