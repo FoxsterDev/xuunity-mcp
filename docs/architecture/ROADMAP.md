@@ -599,6 +599,17 @@ Likely operation families:
 Done when:
 - an agent can run a dev build on a device, collect evidence, and reason about a bottleneck with no manual profiler clicking
 
+Status (Android, phases 1–2 shipped after `v0.3.86`):
+- host-side `adb` tools, independent of the editor main thread: `unity_device_list`,
+  `unity_device_install`, `unity_device_app`, `unity_device_logcat`,
+  `unity_device_files`, `unity_device_screen`, `unity_device_metrics`;
+- frame pacing (`unity_device_frame_pacing`) and the cold-start A/B harness
+  (`unity_device_coldstart_ab`), which covers the device A-vs-B comparison
+  planned for Wave 6;
+- still open: profiler capture (a one-shot `-profiler-log-file` capture can stop
+  after a few frames on low-end devices, so it needs a growth check), the
+  editor Profiler connection to a player, native dialog input, and iOS.
+
 ### Wave 6: Evidence Analysis
 
 Goal:

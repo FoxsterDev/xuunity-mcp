@@ -371,7 +371,8 @@ consumer incident.
 
 ## 12. Non-Goals
 
-- device automation or profiler scope;
+- device automation or profiler scope (amended after `v0.3.86`: the Android device
+  lane in ROADMAP Wave 5 is now in scope; profiler capture and iOS remain out);
 - runtime-in-player MCP;
 - broad arbitrary mutation or reflection;
 - OpenUPM, catalog, marketing, or discovery work in place of product work;
