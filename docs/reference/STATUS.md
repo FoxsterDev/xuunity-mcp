@@ -4,7 +4,7 @@ Date: `2026-10-27`
 Status: `active public status snapshot`
 
 XUUnity Light Unity MCP is a working same-host Unity Editor automation service
-for MCP-capable AI agents. The current released source line is `v0.3.86`.
+for MCP-capable AI agents. The current released source line is `v0.3.87`.
 
 The offline validation-acceptance evaluator now treats saved helper measurements
 as authoritative. Receipt metadata cannot hide warnings, missing rebuild evidence,
@@ -62,7 +62,7 @@ com.xuunity.light-mcp
 Current Git UPM URL:
 
 ```text
-https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.86
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.87
 ```
 
 Current package path:
@@ -502,19 +502,19 @@ Implemented host-side MCP tools and helpers:
 
 ## Current Validation Evidence
 
-Current release evidence for `v0.3.86`:
+Current release evidence for `v0.3.87`:
 
 | Area | Evidence | Result |
 | --- | --- | --- |
-| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.86`, `unity=2021.3`, no hard Test Framework dependency |
+| Package metadata | `packages/com.xuunity.light-mcp/package.json` | `name=com.xuunity.light-mcp`, `version=0.3.87`, `unity=2021.3`, no hard Test Framework dependency |
 | Host Python tests | `scripts/testing/run_host_python_tests.sh` | `1196` tests run, `1182` passed, `14` skipped, zero failures/errors. Skips cover native Windows behavior and the manual-only Unity workflow contract. |
 | Focused Unity checks | macOS Unity `6000.0.58f2`, primary display | Refresh `29/29`, RenderAndClick `23/23`, fixed-portrait interaction `4/4`, asynchronous interaction `4/4`, no skips. Separate targeted scopes; no current cross-version matrix claim. See [evidence boundaries](#current-source-evidence-boundaries). |
-| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.86`: `42/42`. |
-| Git tag visibility | Remote Git refs and GitHub Release | [`v0.3.86`](https://github.com/FoxsterDev/xuunity-mcp/releases/tag/v0.3.86) is published at `c84bb74fa61123e3a7917e7098ca34d7d6c7b79e`; the tag remains immutable. |
+| Public site checks | `scripts/testing/run_site_ui_checks.sh` | Public site Playwright checks passed for `v0.3.87`: `42/42`. |
+| Git tag visibility | Remote Git refs and GitHub Release | [`v0.3.87`](https://github.com/FoxsterDev/xuunity-mcp/releases/tag/v0.3.87) is published at `c84bb74fa61123e3a7917e7098ca34d7d6c7b79e`; the tag remains immutable. |
 
 ## Historical Validation Records
 
-The following measurements were not rerun as a cross-version `v0.3.86` matrix.
+The following measurements were not rerun as a cross-version `v0.3.87` matrix.
 Original counts and explicitly named release versions are retained. Record links
 show where the observations were documented; they do not independently establish
 the exact source loaded by every historical Editor session.
@@ -546,7 +546,7 @@ the exact source loaded by every historical Editor session.
 - Multi-project compile matrix: [recorded 2026-07-02](https://github.com/FoxsterDev/xuunity-mcp/blob/669e9125a3f9e6eb93f002fdf06af2342295b33e/docs/reference/STATUS.md).
 
 Cross-platform capabilities and historical observations (live observations in
-this table are not new `v0.3.86` measurements):
+this table are not new `v0.3.87` measurements):
 
 | Target | Status | Notes |
 | --- | --- | --- |
@@ -568,7 +568,7 @@ Use Git UPM for production consumers:
 ```json
 {
   "dependencies": {
-    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.86"
+    "com.xuunity.light-mcp": "https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.87"
   }
 }
 ```
@@ -594,7 +594,7 @@ Rules:
 
 - `devmode` points a Unity project at the local package working tree.
 - `prodmode` pins the Unity project to the published release tag that matches
-  the package version, for example `#v0.3.86`.
+  the package version, for example `#v0.3.87`.
 - `prodmode` refuses to pin when that release tag is not visible on `origin`.
 - both modes remove the package lock entry so Unity re-resolves honestly.
 

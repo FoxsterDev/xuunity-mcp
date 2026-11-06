@@ -2,58 +2,23 @@
 
 ## Unreleased
 
-### Changed
+## 0.3.87
 
-- Hosted integration tests now run fast core protocol, TCP transport, setup,
-  launcher and release-gate contracts on Linux and Windows. The full host suite
-  and macOS checks run locally; the release gate still requires Integration Tests.
-- Core CI jobs report a warning when their duration exceeds 60 seconds. Each
-  step has a one-minute limit so a slow check fails instead of running unbounded.
+Release tag: `v0.3.87`
 
-### Fixed
+Current Git UPM install URL:
 
-- On Unity 6000.5 and newer an asset import worker process overwrote the
-  bridge state, so every request was refused with
-  `bridge_owned_by_non_main_process`. The lifecycle monitor, the heartbeat
-  writer and the compile-input snapshot now stay inactive in import workers.
-- The package compiles on Unity 6000.5 and 6000.6 again. `unity_prefab_create`
-  used the implicit `SceneHandle` to `int` conversion, which those versions turn
-  into compile error CS0619, so the bridge never loaded there. A package
-  self-test that loaded the `LegacyRuntime.ttf` built-in font also failed on
-  Unity 2021.3, where that font is named `Arial.ttf`.
-- Editor-domain currency could report `current` while tests ran old code. A
-  forced `unity_project_refresh` that settled after the newest script edit was
-  taken as proof that Unity owed no recompile (`v0.3.71`); when the edit landed
-  while a test run held assembly reload, Unity imported it but never compiled,
-  and the next test run executed the previous assemblies. The scan also ignored
-  scripts in embedded and local (`file:`) packages. Currency now compares the
-  content of every `.cs`, `.asmdef`, `.asmref` and `.rsp` file under `Assets/`,
-  embedded packages and local packages with a snapshot taken when the loaded
-  assemblies were compiled: touching a file without changing it stays
-  `current`, a real edit without a compile reads `stale` and names the files.
-  `unity_project_refresh` requests the missing compile, its verdict is
-  `inconclusive` (`editor_domain_stale`) instead of `passed` while sources are
-  newer than the loaded code, and `unity_tests_run_editmode` /
-  `unity_tests_run_playmode` refuse with `editor_domain_stale` unless
-  `allowStaleEditorDomain=true`.
-- Error responses no longer repeat the same blocks. Every transport error
-  carried `request_final_status` and `bridge_stabilization` twice, once at the
-  top level and again inside `error.details`, and the lifecycle-reset error
-  embedded the full final status; a full-suite test call that timed out cost
-  about 20 KB. The copies inside `error.details` are dropped and the reset
-  error carries the compact projection plus the full-payload recovery command.
-- Compact `unity_project_action_invoke` keeps one currency verdict (now with
-  `currency_reason`) instead of three copies of the preflight.
-- A test run without filters and without `timeoutMs` now waits 1.5 times the
-  longest of the last journaled runs of the same operation, never less than the
-  declared 300000 ms, so a full suite that takes longer than five minutes no
-  longer ends in `transport_response_missing` by default.
-- A scenario refused as invalid lists every validation error with its step id
-  in one message, instead of the first one only.
-- `project_defined_hook_poll_until` no longer needs `startPayload` and
-  `failWhen` for a plain wait: without `startPayload` no start action runs, and
-  `failWhen` defaults to `payload.status == 'failed'`. Explicit predicates still
-  take precedence and unmatched successful payloads keep polling.
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.87
+```
+
+Tests could run old code while the MCP reported the editor as current, a
+running test suite could not be stopped, and every Android device step
+(install, cold launch, logcat, frame pacing, A/B comparison) had to be
+scripted by hand outside the MCP. This release fixes the stale-code verdict,
+adds test cancellation and an Android device lane, checks project action
+payloads before dispatch, makes error responses smaller, and restores the
+package on Unity 6000.5 and 6000.6.
 
 ### Added
 
@@ -107,6 +72,105 @@
   already gone is closed the same way; the journal records a non-retryable
   cancellation and the final status reads `unity_cancelled_confirmed`. Older
   Test Framework versions get `test_framework_has_no_cancel_api`.
+
+### Fixed
+
+- On Unity 6000.5 and newer an asset import worker process overwrote the
+  bridge state, so every request was refused with
+  `bridge_owned_by_non_main_process`. The lifecycle monitor, the heartbeat
+  writer and the compile-input snapshot now stay inactive in import workers.
+- The package compiles on Unity 6000.5 and 6000.6 again. `unity_prefab_create`
+  used the implicit `SceneHandle` to `int` conversion, which those versions turn
+  into compile error CS0619, so the bridge never loaded there. A package
+  self-test that loaded the `LegacyRuntime.ttf` built-in font also failed on
+  Unity 2021.3, where that font is named `Arial.ttf`.
+- Editor-domain currency could report `current` while tests ran old code. A
+  forced `unity_project_refresh` that settled after the newest script edit was
+  taken as proof that Unity owed no recompile (`v0.3.71`); when the edit landed
+  while a test run held assembly reload, Unity imported it but never compiled,
+  and the next test run executed the previous assemblies. The scan also ignored
+  scripts in embedded and local (`file:`) packages. Currency now compares the
+  content of every `.cs`, `.asmdef`, `.asmref` and `.rsp` file under `Assets/`,
+  embedded packages and local packages with a snapshot taken when the loaded
+  assemblies were compiled: touching a file without changing it stays
+  `current`, a real edit without a compile reads `stale` and names the files.
+  `unity_project_refresh` requests the missing compile, its verdict is
+  `inconclusive` (`editor_domain_stale`) instead of `passed` while sources are
+  newer than the loaded code, and `unity_tests_run_editmode` /
+  `unity_tests_run_playmode` refuse with `editor_domain_stale` unless
+  `allowStaleEditorDomain=true`.
+- Error responses no longer repeat the same blocks. Every transport error
+  carried `request_final_status` and `bridge_stabilization` twice, once at the
+  top level and again inside `error.details`, and the lifecycle-reset error
+  embedded the full final status; a full-suite test call that timed out cost
+  about 20 KB. The copies inside `error.details` are dropped and the reset
+  error carries the compact projection plus the full-payload recovery command.
+- Compact `unity_project_action_invoke` keeps one currency verdict (now with
+  `currency_reason`) instead of three copies of the preflight.
+- A test run without filters and without `timeoutMs` now waits 1.5 times the
+  longest of the last journaled runs of the same operation, never less than the
+  declared 300000 ms, so a full suite that takes longer than five minutes no
+  longer ends in `transport_response_missing` by default.
+- A scenario refused as invalid lists every validation error with its step id
+  in one message, instead of the first one only.
+- `project_defined_hook_poll_until` no longer needs `startPayload` and
+  `failWhen` for a plain wait: without `startPayload` no start action runs, and
+  `failWhen` defaults to `payload.status == 'failed'`. Explicit predicates still
+  take precedence and unmatched successful payloads keep polling.
+
+### Changed
+
+- Hosted integration tests now run fast core protocol, TCP transport, setup,
+  launcher and release-gate contracts on Linux and Windows. The full host suite
+  and macOS checks run locally; the release gate still requires Integration Tests.
+- Core CI jobs report a warning when their duration exceeds 60 seconds. Each
+  step has a one-minute limit so a slow check fails instead of running unbounded.
+
+### Validation
+
+- Host Python suite: 1325 tests passed, 14 platform skips.
+- Package self-tests in clean generated projects with the package resolved
+  from local source, macOS, on Unity 2021.3.58f1, 2022.3.62f3, 6000.0.58f2,
+  6000.1.13f1, 6000.2.14f1, 6000.3.23f1, 6000.4.4f1, 6000.5.10f1 and
+  6000.6.0b3: EditMode core 216/216 and PlayMode core 6/6 on every version;
+  on 2021.3.58f1 also TextMeshPro 6/6, uGUI 57/57, PlayMode uGUI 19 passed
+  with 6 skipped.
+- Editor-domain currency, live on Unity 6000.0.58f2 with an embedded test
+  package: touching a script kept `current`; a content edit made while an
+  EditMode test was running read `stale` after the run and named the file;
+  the next test run was refused with `editor_domain_stale`; a refresh
+  compiled, the domain read `current`, and the test then ran the new code.
+- `unity_tests_cancel`, live on Unity 6000.0.58f2: an EditMode run cancelled
+  during a long test completed as `cancelled` (1 passed, 2 not run) about
+  2.6 s after the call; a PlayMode run cancelled the same way returned the
+  editor to Edit Mode.
+- Android device lane on a low-end Android 12 phone: one
+  `unity_device_coldstart_ab` call installed two builds (downgrade allowed),
+  confirmed the dex at `verify`, and ran 3 cold starts per build. The longest
+  splash freeze matched an earlier manual measurement (595–607 ms against
+  584–606 ms for the faster build). Ready times were about 1.2 s above that
+  earlier measurement on the day of the run; the same offset appeared with
+  frame sampling turned off, so it is device state, not the sampler.
+- Project action payload validation was run against a real project catalog:
+  a string passed for an `int_array` field was refused in strict mode before
+  any editor call, and reported as a warning otherwise.
+
+### Known limitations
+
+- `Unity Package CI` remains waived (no runner Unity license); the local
+  licensed lane above is the package evidence.
+- Live Unity runs were on macOS only. Windows and Linux are covered by host
+  tests and CI, not by a live editor run.
+- The currency fix's forced compile (`RequestScriptCompilation`) is covered by
+  unit tests; in the live runs Unity started the compile itself, so that
+  branch was not exercised against the exact import-without-compile race.
+- Test cancellation needs Test Framework 1.4 or newer; with older versions
+  `unity_tests_cancel` reports `test_framework_has_no_cancel_api`.
+- The device lane is Android only. Profiler capture, the editor Profiler
+  connection to a player, native dialog input and iOS are not included.
+- Frame pacing reads SurfaceFlinger; the layer selection is tested against
+  layer lists from Android 10, 12 (two devices) and 14 formats, and live on
+  one Android 12 phone.
 
 ## 0.3.86
 
