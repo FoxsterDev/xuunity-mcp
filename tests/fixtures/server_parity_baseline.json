@@ -213,8 +213,8 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "c50015b5381ec0dea7979fd7a3d291bae7064b2476085e667934a9ebe0291887",
-    "tool_count": 79,
+    "sha256": "6e8e68b188ff784fa568eb49498e0055b7f82f825c6de0d9f9e76f56d72e7010",
+    "tool_count": 80,
     "tool_names": [
       "xuunity_setup_plan",
       "xuunity_setup_apply",
@@ -294,7 +294,8 @@
       "unity_device_screen",
       "unity_device_frame_pacing",
       "unity_device_metrics",
-      "unity_device_coldstart_ab"
+      "unity_device_coldstart_ab",
+      "unity_tests_cancel"
     ]
   },
   "request_final_status_projection": {

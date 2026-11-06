@@ -177,6 +177,9 @@ namespace XUUnity.LightMcp.Editor.Core
             public int passed;
             public int failed;
             public int skipped;
+            public int not_run;
+            public bool cancelled;
+            public string cancel_requested_at_utc = "";
             public double duration_seconds;
             public List<XUUnityLightMcpTestFailure> failures = new();
             public string started_at_utc = "";
@@ -274,6 +277,31 @@ namespace XUUnity.LightMcp.Editor.Core
         }
 
         [Serializable]
+        internal sealed class XUUnityLightMcpTestsCancelArgs
+        {
+            public string requestId = "";
+        }
+
+        [Serializable]
+        internal sealed class XUUnityLightMcpTestsCancelPayload
+        {
+            public string backend_id = "xuunity.light_unity_mcp";
+            public string request_id = "";
+            public string operation = "";
+            public string run_guid = "";
+            public bool cancel_requested;
+            public bool cancel_accepted;
+            public string cancel_api = "";
+            public string reason = "";
+            public string playmode_state = "";
+            public int passed_so_far;
+            public int failed_so_far;
+            public string last_started_test = "";
+            public string recommended_next_action = "";
+            public string validation_evidence = "unity_mcp";
+        }
+
+        [Serializable]
         internal sealed class XUUnityLightMcpPersistedTestRunState
         {
             public string request_id = "";
@@ -301,6 +329,9 @@ namespace XUUnity.LightMcp.Editor.Core
             public List<XUUnityLightMcpTestFailure> failures = new();
             public string last_started_test = "";
             public string last_finished_test = "";
+            public string run_guid = "";
+            public string cancel_requested_at_utc = "";
+            public bool cancelled;
             public string completion_basis = "";
             public string playmode_state_after_settle = "";
             public string playmode_state_after_test_callbacks = "";

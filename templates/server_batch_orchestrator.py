@@ -23,8 +23,13 @@ from server_registry import (
 )
 
 # Core imports
-from server_core import ToolInvocationError, launcher_command_name, quoted_shell_path, read_json, write_json
-from server_bridge_journal import summarize_request_attribution, record_request_refused_event
+from server_core import ToolInvocationError, launcher_command_name, quoted_shell_path, read_json, render_launcher_cli, write_json
+from server_bridge_journal import (
+    read_request_journal_events,
+    record_request_refused_event,
+    summarize_request_attribution,
+    write_host_request_journal_event,
+)
 from server_specs import (
     OPERATION_LIFECYCLE_POLICIES,
     SCENARIO_DEFINITION_SCHEMA,
@@ -73,6 +78,7 @@ from server_mcp_tools import (
     call_unity_status_summary_tool as call_unity_status_summary_tool_base,
     validate_declared_argument_types,
 )
+from server_bridge_final_status import build_compact_final_status_projection
 from server_device_tools import DEVICE_TOOL_HANDLERS
 from server_readiness_summary import build_ensure_ready_summary
 from server_bridge_payloads import (
@@ -2915,6 +2921,57 @@ def invoke_project_action_from_catalog(
     return result, wait_for_result and not bool(result.get("succeeded"))
 
 
+def call_unity_tests_cancel_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    validate_declared_argument_types("unity_tests_cancel", TOOLS["unity_tests_cancel"], arguments)
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+    request_id = _optional_string_arg(arguments, "requestId")
+    if not request_id:
+        raise JsonRpcError(-32602, "unity_tests_cancel requires requestId (the test run's request id). Nothing was executed.")
+    wait = _optional_bool_arg(arguments, "waitForCompletion", True)
+    wait_timeout_ms = int(arguments.get("waitTimeoutMs") or 120000)
+    try:
+        project_root = ensure_project_root(project_root_value)
+        response = invoke_bridge(str(project_root), "unity.tests.cancel", {"requestId": request_id}, 30000)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+    result = bridge_response_to_tool_result(response, include_full_payload=False)
+    if result.get("isError"):
+        return result
+    payload = dict(result.get("structuredContent") or {})
+    payload["action"] = "unity_tests_cancel"
+    accepted = bool(payload.get("cancel_accepted"))
+    if accepted:
+        journal_path = write_host_request_journal_event(
+            project_root,
+            "request_cancel_requested",
+            {
+                "request_id": request_id,
+                "operation": str(payload.get("operation") or ""),
+                "reason": "operator_cancelled_test_run",
+                "retryable": False,
+                "cancellation_status": "cancellation_accepted_by_unity_test_runner",
+            },
+        )
+        payload["journal_event_path"] = str(journal_path)
+    if accepted and wait:
+        deadline = time.monotonic() + wait_timeout_ms / 1000.0
+        completed = False
+        while time.monotonic() < deadline:
+            events = read_request_journal_events(project_root, request_id)
+            if any(str(event.get("event_type") or "") == "request_completed" for event in events):
+                completed = True
+                break
+            time.sleep(1.0)
+        payload["run_completed_after_cancel"] = completed
+        if completed:
+            final_status = build_request_final_status_from_context(project_root, request_id, str(payload.get("operation") or ""))
+            payload["request_final_status"] = build_compact_final_status_projection(final_status)
+    payload["recommended_recovery_command"] = render_launcher_cli("request-final-status", project_root, "--request-id", request_id)
+    return mcp_json_result(payload, is_error=not accepted)
+
+
 def _device_tool_handler(name: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def handler(arguments: dict[str, Any]) -> dict[str, Any]:
         validate_declared_argument_types(name, TOOLS[name], arguments)
@@ -2944,6 +3001,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "xuunity_setup_validate": call_xuunity_setup_validate_tool,
             "unity_license_capabilities": call_unity_license_capabilities_tool,
             **{tool_name: _device_tool_handler(tool_name) for tool_name in DEVICE_TOOL_HANDLERS},
+            "unity_tests_cancel": call_unity_tests_cancel_tool,
             "unity_status_summary": call_unity_status_summary_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
             "unity_scenario_result_summary": call_unity_scenario_result_summary_tool,

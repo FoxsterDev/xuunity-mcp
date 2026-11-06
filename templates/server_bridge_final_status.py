@@ -1022,7 +1022,9 @@ def build_test_verdict_summary(
         )
     )
 
-    if source_payload is not None and (run_phase == "timed_out" or runtime_timeout_observed):
+    if source_payload is not None and bool(source_payload.get("cancelled")) and (request_completed or source_completed):
+        test_verdict = "cancelled"
+    elif source_payload is not None and (run_phase == "timed_out" or runtime_timeout_observed):
         test_verdict = "runtime_timeout"
     elif source_payload is not None and (request_completed or source_completed):
         if total <= 0:
@@ -1059,6 +1061,9 @@ def build_test_verdict_summary(
     if test_verdict == "test_filter_no_match":
         recommended_next_action = "refresh_project_once_then_retry_same_filter"
         trust_class = "unity_completed_filter_no_match"
+    elif test_verdict == "cancelled":
+        recommended_next_action = "none"
+        trust_class = "unity_cancelled_confirmed"
     elif test_verdict == "runtime_timeout":
         recommended_next_action = "inspect_test_timeout_or_raise_budget"
         trust_class = "unity_failed_confirmed"

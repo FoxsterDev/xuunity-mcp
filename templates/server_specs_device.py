@@ -170,4 +170,17 @@ DEVICE_TOOLS: dict[str, dict] = {
             "required": ["projectRoot", "package", "builds"],
         },
     },
+    "unity_tests_cancel": {
+        "description": "Cancel a running EditMode or PlayMode test run by its request id (TestRunnerApi.CancelTestRun, Test Framework 1.4+). The current test is marked canceled and the rest not run; the run completes with status cancelled and partial counts, a PlayMode run returns to Edit Mode, and the journal records a non-retryable cancellation.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "requestId": {"type": "string", "description": "request_id of the active unity_tests_run_editmode or unity_tests_run_playmode call."},
+                "waitForCompletion": {"type": "boolean", "default": True},
+                "waitTimeoutMs": {"type": "integer", "default": 120000, "minimum": 1000},
+            },
+            "required": ["projectRoot", "requestId"],
+        },
+    },
 }

@@ -75,6 +75,14 @@
   `device.packages` in the MCP runtime config. A signature conflict names the
   data loss of replacing the installed app. No operation types text into the
   device.
+- `unity_tests_cancel {requestId}` stops a running EditMode or PlayMode run
+  (`TestRunnerApi.CancelTestRun`, Test Framework 1.4 or newer). Before, a run
+  known to execute the wrong code could only be waited out, and nothing else
+  could run meanwhile. The run completes with status `cancelled`, the counts so
+  far and `not_run`; a PlayMode run returns to Edit Mode; a run whose runner is
+  already gone is closed the same way; the journal records a non-retryable
+  cancellation and the final status reads `unity_cancelled_confirmed`. Older
+  Test Framework versions get `test_framework_has_no_cancel_api`.
 
 ## 0.3.86
 

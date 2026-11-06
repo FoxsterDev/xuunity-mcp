@@ -392,6 +392,7 @@ Implemented host-side MCP tools and helpers:
 
 - `unity_status`
 - `unity_license_capabilities`
+- `unity_tests_cancel`
 - `unity_device_list`
 - `unity_device_install`
 - `unity_device_app`

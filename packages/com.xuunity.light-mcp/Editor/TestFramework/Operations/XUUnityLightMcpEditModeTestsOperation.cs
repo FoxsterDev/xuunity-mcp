@@ -84,7 +84,7 @@ namespace XUUnity.LightMcp.Editor.Operations
                 try
                 {
                     ActiveRequestId = request.request_id;
-                    Api.Execute(new ExecutionSettings(filter));
+                    XUUnityLightMcpTestRunState.RecordRunGuid(Api.Execute(new ExecutionSettings(filter)));
                 }
                 catch (Exception ex)
                 {
@@ -129,6 +129,27 @@ namespace XUUnity.LightMcp.Editor.Operations
                 EnsureApi();
                 ActiveRequestId = state.request_id;
                 Callbacks.Restore(state);
+            }
+        }
+
+        internal static bool TryCompleteCancelledRun(string requestId)
+        {
+            lock (Mutex)
+            {
+                if (string.IsNullOrWhiteSpace(ActiveRequestId)
+                    || !string.Equals(ActiveRequestId, requestId, StringComparison.Ordinal)
+                    || !Callbacks.IsActive)
+                {
+                    return false;
+                }
+
+                var response = XUUnityLightMcpTestRunState.CompleteAndBuildResponse(
+                    "operator_cancelled_test_run",
+                    XUUnityLightMcpPlayModeStateOperation.ResolvePlayModeState(),
+                    XUUnityLightMcpTestRunState.SummaryFromActiveState(),
+                    XUUnityLightMcpTestLogAttribution.TakePending());
+                OnRunCompleted(response);
+                return true;
             }
         }
 

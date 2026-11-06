@@ -11,6 +11,7 @@ namespace XUUnity.LightMcp.Editor.TestFramework
         {
             XUUnityLightMcpOperationRegistry.Register(new XUUnityLightMcpEditModeTestsOperation());
             XUUnityLightMcpOperationRegistry.Register(new XUUnityLightMcpPlayModeTestsOperation());
+            XUUnityLightMcpOperationRegistry.Register(new XUUnityLightMcpTestsCancelOperation());
             XUUnityLightMcpCapabilityRegistry.RegisterProvider(
                 XUUnityLightMcpCapabilityRegistry.EditModeTestsCapability,
                 BuildEditModeTestsCapability);

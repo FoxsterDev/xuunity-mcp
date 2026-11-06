@@ -52,6 +52,62 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
         }
 
+        public static void RecordRunGuid(string runGuid)
+        {
+            lock (Gate)
+            {
+                if (TryLoadLocked(out var state))
+                {
+                    state.run_guid = runGuid ?? "";
+                    PersistLocked(state);
+                }
+            }
+        }
+
+        public static XUUnityLightMcpTestRunSummary SummaryFromActiveState()
+        {
+            lock (Gate)
+            {
+                if (!TryLoadLocked(out var state))
+                {
+                    return new XUUnityLightMcpTestRunSummary();
+                }
+
+                return new XUUnityLightMcpTestRunSummary
+                {
+                    total = Math.Max(0, state.total),
+                    passed = Math.Max(0, state.passed),
+                    failed = Math.Max(0, state.failed),
+                    skipped = Math.Max(0, state.skipped),
+                    failures = state.failures == null
+                        ? new System.Collections.Generic.List<XUUnityLightMcpTestFailure>()
+                        : new System.Collections.Generic.List<XUUnityLightMcpTestFailure>(state.failures),
+                };
+            }
+        }
+
+        public static bool TryMarkCancelRequested(string requestId, out XUUnityLightMcpPersistedTestRunState state)
+        {
+            lock (Gate)
+            {
+                if (!TryLoadLocked(out state)
+                    || !string.IsNullOrWhiteSpace(state.completed_at_utc)
+                    || (!string.IsNullOrWhiteSpace(requestId)
+                        && !string.Equals(state.request_id, requestId, StringComparison.Ordinal)))
+                {
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(state.cancel_requested_at_utc))
+                {
+                    state.cancel_requested_at_utc = UtcNow();
+                    PersistLocked(state);
+                }
+
+                return true;
+            }
+        }
+
         public static bool TryLoadPending(out XUUnityLightMcpPersistedTestRunState state)
         {
             lock (Gate)
@@ -230,6 +286,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 state.playmode_state_after_settle_source = "unity_test_callbacks";
                 state.playmode_state_accounting_consistent = true;
                 state.playmode_state_accounting_note = "";
+                state.cancelled = !string.IsNullOrWhiteSpace(state.cancel_requested_at_utc);
                 state.status = ResolveStatus(state);
                 state.test_verdict = state.status;
                 state.recommended_next_action = ResolveRecommendedNextAction(state);
@@ -361,6 +418,9 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 passed = Math.Max(0, state.passed),
                 failed = Math.Max(0, state.failed),
                 skipped = Math.Max(0, state.skipped),
+                not_run = Math.Max(0, state.total - state.passed - state.failed - state.skipped),
+                cancelled = state.cancelled,
+                cancel_requested_at_utc = state.cancel_requested_at_utc ?? "",
                 duration_seconds = CalculateDurationSeconds(state.started_at_utc, state.completed_at_utc),
                 failures = state.failures == null
                     ? new System.Collections.Generic.List<XUUnityLightMcpTestFailure>()
@@ -611,6 +671,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
             if (state == null)
             {
                 return "infrastructure_error";
+            }
+
+            if (state.cancelled)
+            {
+                return "cancelled";
             }
 
             return IsRequestedFilterZeroMatch(state)

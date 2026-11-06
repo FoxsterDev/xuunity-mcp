@@ -817,7 +817,7 @@ Popular MCP tools:
 `unity_scene_snapshot` | `unity_scene_open` | `unity_scene_assert` |
 `unity_compile_player_scripts` | `unity_compile_matrix` |
 `unity_compile_build_config_matrix` | `unity_tests_run_editmode` |
-`unity_tests_run_playmode` | `unity_playmode_state` | `unity_playmode_set` |
+`unity_tests_run_playmode` | `unity_tests_cancel` | `unity_playmode_state` | `unity_playmode_set` |
 `unity_build_player` |
 `unity_game_view_configure` | `unity_game_view_screenshot` |
 `unity_scenario_validate` | `unity_scenario_run_and_wait` |
