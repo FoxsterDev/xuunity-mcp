@@ -81,6 +81,15 @@
   `device.packages` in the MCP runtime config. A signature conflict names the
   data loss of replacing the installed app. No operation types text into the
   device.
+- The frame sampler matches the package exactly (an app id that is a prefix of
+  another, such as `com.example.game` and `com.example.gamedev`, no longer picks
+  the other app's layer), skips input-sink and activity-record layers that never
+  present frames, and keeps re-listing layers until the app's SurfaceView
+  appears. An install cut off by the adb transport is retried once and reported
+  as `install_transport_failed`, and `unity_device_coldstart_ab` reports how
+  often the adb server restarted during the run, because another adb client
+  (often an editor's bundled Android SDK) can restart it and silently undo the
+  dex compile.
 - `unity_tests_cancel {requestId}` stops a running EditMode or PlayMode run
   (`TestRunnerApi.CancelTestRun`, Test Framework 1.4 or newer). Before, a run
   known to execute the wrong code could only be waited out, and nothing else

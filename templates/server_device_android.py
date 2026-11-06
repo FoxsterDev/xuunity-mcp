@@ -35,6 +35,10 @@ STATE_REMEDIATION = {
 }
 
 
+ADB_DAEMON_RESTART_MARKERS = ("daemon not running", "daemon started successfully", "server version")
+ADB_DAEMON_RESTARTS: list[str] = []
+
+
 @dataclass
 class AdbResult:
     returncode: int
@@ -45,6 +49,10 @@ class AdbResult:
     @property
     def ok(self) -> bool:
         return self.returncode == 0 and not self.timed_out
+
+    @property
+    def daemon_restarted(self) -> bool:
+        return any(marker in self.stderr for marker in ADB_DAEMON_RESTART_MARKERS)
 
 
 def _executable_name() -> str:
@@ -136,7 +144,10 @@ def run_adb(
     except OSError as exc:
         return AdbResult(-1, b"" if binary else "", str(exc))
     stdout: Any = completed.stdout if binary else _decode(completed.stdout)
-    return AdbResult(completed.returncode, stdout, _decode(completed.stderr))
+    result = AdbResult(completed.returncode, stdout, _decode(completed.stderr))
+    if result.daemon_restarted:
+        ADB_DAEMON_RESTARTS.append(" ".join(args[:3]))
+    return result
 
 
 def _decode(data: Any) -> str:

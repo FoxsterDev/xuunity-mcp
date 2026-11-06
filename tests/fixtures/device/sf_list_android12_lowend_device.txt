@@ -1,0 +1,11 @@
+d289ca3 ActivityRecordInputSink com.example.gamedev/com.unity3d.player.UnityPlayerActivity#0
+ActivityRecord{3168ba0 u0 com.example.gamedev/com.unity3d.player.UnityPlayerActivity#0
+30fbc1e ActivityRecordInputSink com.example.other/com.unity3d.player.UnityPlayerActivity#0
+ActivityRecord{6386cff u0 com.example.other/com.unity3d.player.UnityPlayerActivity#0
+c26e3a8 com.example.other/com.unity3d.player.UnityPlayerActivity#0
+6211e72 ActivityRecordInputSink com.example.game/com.unity3d.player.UnityPlayerActivity#0
+ActivityRecord{18ce2c3 u0 com.example.game/com.unity3d.player.UnityPlayerActivity#0
+e71303a com.example.game/com.unity3d.player.UnityPlayerActivity#0
+Background for SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity]#0
+SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity]#0
+SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity](BLAST)#0

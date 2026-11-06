@@ -37,6 +37,10 @@ class LayerSelectionTests(unittest.TestCase):
         expected = {
             "sf_list_android10.txt": ("SurfaceView - com.example.game/com.unity3d.player.UnityPlayerActivity#0", "surfaceview"),
             "sf_list_android12.txt": ("SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity]#0", "surfaceview"),
+            "sf_list_android12_lowend_device.txt": (
+                "SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity](BLAST)#0",
+                "surfaceview_blast",
+            ),
             "sf_list_android14.txt": (
                 "SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity](BLAST)#411",
                 "surfaceview_blast",
@@ -45,6 +49,21 @@ class LayerSelectionTests(unittest.TestCase):
         for name, (layer, basis) in expected.items():
             with self.subTest(name=name):
                 self.assertEqual((layer, basis), metrics.select_app_layer(fixture(name), PACKAGE))
+
+    def test_a_package_prefix_of_another_app_and_input_sinks_never_match(self) -> None:
+        listing = "\n".join(
+            [
+                "d289ca3 ActivityRecordInputSink com.example.gamedev/com.unity3d.player.UnityPlayerActivity#0",
+                "SurfaceView[com.example.gamedev/com.unity3d.player.UnityPlayerActivity](BLAST)#88",
+                "ActivityRecordInputSink com.example.game/com.unity3d.player.UnityPlayerActivity#3",
+            ]
+        )
+        self.assertEqual(("", "no_layer_for_package"), metrics.select_app_layer(listing, PACKAGE))
+        listing += "\nSurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity](BLAST)#91"
+        self.assertEqual(
+            ("SurfaceView[com.example.game/com.unity3d.player.UnityPlayerActivity](BLAST)#91", "surfaceview_blast"),
+            metrics.select_app_layer(listing, PACKAGE),
+        )
 
     def test_an_unknown_package_yields_no_layer(self) -> None:
         self.assertEqual(("", "no_layer_for_package"), metrics.select_app_layer(fixture("sf_list_android14.txt"), "com.other"))
@@ -87,6 +106,24 @@ class FramePacingTests(unittest.TestCase):
         self.assertEqual(1, len(accumulator.sample_gaps))
         self.assertEqual(1, stats["gaps_excluded_for_sample_holes"])
         self.assertLess(stats["gap_max_ms"], 20)
+
+    def test_a_real_low_end_device_capture_reproduces_the_measured_splash_freeze(self) -> None:
+        capture = json.loads(fixture("lowend_android12_coldstart_presents.json"))
+        accumulator = metrics.PresentAccumulator()
+        for sample in capture["samples"]:
+            accumulator.add_sample(sample)
+
+        stats = metrics.frame_gap_stats(
+            accumulator.sorted_presents(),
+            window_start_s=capture["launch_monotonic_s"],
+            window_end_s=capture["marker_monotonic_s"],
+            sample_gaps=accumulator.sample_gaps,
+        )
+
+        self.assertEqual([], accumulator.sample_gaps)
+        self.assertEqual(capture["expected_frames_until_marker"], stats["frames"])
+        self.assertEqual(capture["expected_longest_gap_before_marker_ms"], stats["gap_max_ms"])
+        self.assertLess(len(accumulator.presents), sum(len(sample) for sample in capture["samples"]))
 
     def test_the_window_limits_gaps_to_launch_until_marker(self) -> None:
         presents = [int(seconds * 1e9) for seconds in (1519.0, 1520.2, 1520.3, 1521.3, 1530.2, 1531.5)]
@@ -260,6 +297,18 @@ class SafetyRuleTests(unittest.TestCase):
         self.assertEqual("install_refused_signature_conflict", details["result_trust_class"])
         self.assertIn("deletes its local data", details["data_loss_warning"])
 
+    def test_an_install_cut_off_without_an_install_code_is_a_transport_failure(self) -> None:
+        apk = self.project / "a.apk"
+        apk.write_bytes(b"PK")
+        cut = android.AdbResult(1, "Performing Streamed Install\n\nadb: failed to install a.apk:", "")
+        with mock.patch.object(tools, "run_adb", return_value=cut) as run, mock.patch.object(tools.time, "sleep"):
+            with self.assertRaises(ToolInvocationError) as raised:
+                tools.install_apk(self.project, "A", {"allowMutating": True}, apk, PACKAGE)
+        self.assertEqual(2, run.call_count)
+        self.assertEqual(2, raised.exception.details["install_attempts"])
+        self.assertEqual("install_transport_failed", raised.exception.details["result_trust_class"])
+        self.assertEqual("check_adb_devices_then_retry_install", raised.exception.details["recommended_next_action"])
+
     def test_a_downgrade_is_refused_until_allowed(self) -> None:
         apk = self.project / "a.apk"
         apk.write_bytes(b"PK")
@@ -290,10 +339,11 @@ class ColdStartSummaryTests(unittest.TestCase):
                 {"marker_found": True, "ready_seconds": 10.48, "longest_gap_before_marker_ms": 1134},
                 {"marker_found": True, "ready_seconds": 10.44, "longest_gap_before_marker_ms": 1134},
                 {"marker_found": False, "ready_seconds": None, "longest_gap_before_marker_ms": None},
+                {"marker_found": True, "ready_seconds": 12.0, "longest_gap_before_marker_ms": None},
             ]
         )
-        self.assertEqual(3, summary["runs_with_marker"])
-        self.assertEqual(10.44, summary["ready_seconds_median"])
+        self.assertEqual(4, summary["runs_with_marker"])
+        self.assertEqual(10.46, summary["ready_seconds_median"])
         self.assertEqual(1134, summary["longest_gap_before_marker_ms_median"])
 
 

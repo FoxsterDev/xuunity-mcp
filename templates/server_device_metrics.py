@@ -9,9 +9,21 @@ GAP_THRESHOLDS_MS = (33, 50, 100, 250, 500)
 TOP_GAP_COUNT = 10
 
 
+SURFACE_LAYER_BASES = frozenset({"surfaceview_blast", "surfaceview"})
+NON_PRESENTING_LAYER_MARKERS = ("Background for", "ActivityRecordInputSink", "InputSink", "ActivityRecord{", "Splash Screen")
+
+
+def _owns_layer(layer: str, package: str) -> bool:
+    return re.search(rf"(?<![\w.]){re.escape(package)}(?=[/#\])\s]|$)", layer) is not None
+
+
 def select_app_layer(layer_list: str, package: str) -> tuple[str, str]:
     layers = [line.strip() for line in layer_list.splitlines() if line.strip()]
-    owned = [layer for layer in layers if package in layer and not layer.startswith("Background for")]
+    owned = [
+        layer
+        for layer in layers
+        if _owns_layer(layer, package) and not any(marker in layer for marker in NON_PRESENTING_LAYER_MARKERS)
+    ]
     ranked = (
         ("surfaceview_blast", lambda layer: layer.startswith("SurfaceView[") and "(BLAST)" in layer),
         ("surfaceview", lambda layer: layer.startswith("SurfaceView[") or layer.startswith("SurfaceView -")),
@@ -129,8 +141,12 @@ def median(values: Iterable[float]) -> float | None:
 
 
 def summarize_build_runs(runs: list[dict[str, Any]]) -> dict[str, Any]:
-    ready = [run.get("ready_seconds") for run in runs if run.get("marker_found")]
-    longest = [run.get("longest_gap_before_marker_ms") for run in runs if run.get("marker_found")]
+    ready = [run.get("ready_seconds") for run in runs if run.get("marker_found") and run.get("ready_seconds") is not None]
+    longest = [
+        run.get("longest_gap_before_marker_ms")
+        for run in runs
+        if run.get("marker_found") and run.get("longest_gap_before_marker_ms") is not None
+    ]
     return {
         "runs": len(runs),
         "runs_with_marker": len(ready),

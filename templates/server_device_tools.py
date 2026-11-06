@@ -13,6 +13,7 @@ from typing import Any, Callable
 from server_artifact_registry import register_artifact
 from server_core import ToolInvocationError, hidden_window_subprocess_kwargs
 from server_device_android import (
+    ADB_DAEMON_RESTARTS,
     build_launch_shell_command,
     classify_install_output,
     device_shell_command,
@@ -28,6 +29,7 @@ from server_device_android import (
     run_adb,
 )
 from server_device_metrics import (
+    SURFACE_LAYER_BASES,
     PresentAccumulator,
     frame_gap_stats,
     parse_latency,
@@ -185,15 +187,22 @@ def install_apk(
         command.append("-d")
     command.append(str(apk_path))
     started = time.monotonic()
-    result = run_adb(command, serial=serial, timeout_seconds=float(arguments.get("installTimeoutSeconds") or 600))
-    text = f"{result.stdout}\n{result.stderr}"
-    trust_class, failure_code = classify_install_output(text)
+    attempts = 0
+    while True:
+        attempts += 1
+        result = run_adb(command, serial=serial, timeout_seconds=float(arguments.get("installTimeoutSeconds") or 600))
+        text = f"{result.stdout}\n{result.stderr}"
+        trust_class, failure_code = classify_install_output(text)
+        if result.ok or failure_code or attempts >= 2:
+            break
+        time.sleep(3)
     payload: dict[str, Any] = {
         "operation": "device.install",
         "serial": serial,
         "apk_path": str(apk_path),
         "package": package,
         "install_seconds": round(time.monotonic() - started, 2),
+        "install_attempts": attempts,
     }
     if result.ok and "Success" in text and not failure_code:
         payload["result_trust_class"] = "device_truth_confirmed"
@@ -212,6 +221,9 @@ def install_apk(
         )
     elif trust_class == "install_refused_downgrade":
         payload["recommended_next_action"] = "retry_with_allowDowngrade"
+    elif not failure_code:
+        payload["result_trust_class"] = "install_transport_failed"
+        payload["recommended_next_action"] = "check_adb_devices_then_retry_install"
     raise ToolInvocationError("device_install_refused", f"Install refused: {failure_code or 'unknown'}.", payload)
 
 
@@ -263,6 +275,7 @@ class FrameSampler:
         self.accumulator = PresentAccumulator()
         self.layer = ""
         self.layer_basis = ""
+        self.layers_seen: list[str] = []
         self.refresh_ns = 0
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -273,9 +286,12 @@ class FrameSampler:
     def _run(self) -> None:
         with self.raw_path.open("a", encoding="utf-8") as raw:
             while not self._stop.is_set():
-                if not self.layer:
+                if self.layer_basis not in SURFACE_LAYER_BASES:
                     listing = run_adb(["shell", "dumpsys SurfaceFlinger --list"], serial=self.serial, timeout_seconds=10)
-                    self.layer, self.layer_basis = select_app_layer(listing.stdout, self.package)
+                    layer, basis = select_app_layer(listing.stdout, self.package)
+                    if layer and layer != self.layer:
+                        self.layer, self.layer_basis = layer, basis
+                        self.layers_seen.append(layer)
                 if self.layer:
                     sample = run_adb(
                         ["shell", device_shell_command(["dumpsys", "SurfaceFlinger", "--latency", self.layer])],
@@ -362,6 +378,7 @@ def launch_and_measure(
         window_end = marker_s if marker_s is not None else None
         result["frame_layer"] = sampler.layer
         result["frame_layer_basis"] = sampler.layer_basis
+        result["frame_layers_seen"] = sampler.layers_seen
         result["frame_samples"] = sampler.accumulator.sample_count
         result["frame_sample_holes"] = sampler.accumulator.sample_gaps
         before_marker = frame_gap_stats(
@@ -588,6 +605,7 @@ def tool_device_coldstart_ab(project_root: Path, arguments: dict[str, Any]) -> d
         raise ToolInvocationError("device_builds_required", "builds must list at least one {label, apkPath}.", {})
     runs = int(arguments.get("runs") or 3)
     session = new_session_dir(project_root, f"coldstart_ab_{package}")
+    daemon_restarts_before = len(ADB_DAEMON_RESTARTS)
     descriptor = device_descriptor(serial)
     per_build: list[dict[str, Any]] = []
     for index, build in enumerate(builds):
@@ -621,6 +639,7 @@ def tool_device_coldstart_ab(project_root: Path, arguments: dict[str, Any]) -> d
         build_record["runs"] = run_results
         build_record["summary"] = summarize_build_runs(run_results)
         per_build.append(build_record)
+        (session / "coldstart_ab.partial.json").write_text(json.dumps(per_build, indent=2), encoding="utf-8")
 
     table = [
         {
@@ -648,6 +667,12 @@ def tool_device_coldstart_ab(project_root: Path, arguments: dict[str, Any]) -> d
         if all(record["summary"]["runs_with_marker"] == runs for record in per_build)
         else "device_marker_timeout",
     }
+    report["adb_daemon_restarts_observed"] = len(ADB_DAEMON_RESTARTS) - daemon_restarts_before
+    if report["adb_daemon_restarts_observed"]:
+        report["adb_daemon_warning"] = (
+            "The adb server restarted during the run (another adb client, often an editor's bundled Android SDK, "
+            "can restart it). Install, dexopt and timing results of the affected runs need a re-check."
+        )
     report_path = session / "coldstart_ab.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     if bool(arguments.get("registerArtifact", True)):
