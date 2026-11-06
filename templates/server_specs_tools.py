@@ -1743,7 +1743,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "type": "integer",
                     "default": 300000,
                     "minimum": 1000,
-                    "description": "Budget for the Unity test run itself, including the wait across any domain reload during the run; size it above the suite duration."
+                    "description": "Budget for the Unity test run itself, including the wait across any domain reload during the run; size it above the suite duration. When omitted for a run without filters, the default grows to 1.5x the longest of the last journaled runs of the same operation (never below 300000)."
                 }
             },
             "required": ["projectRoot"]
@@ -1791,7 +1791,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "type": "integer",
                     "default": 300000,
                     "minimum": 1000,
-                    "description": "Budget for the Unity test run itself, including the wait across the Play Mode entry domain reload; size it above the suite duration."
+                    "description": "Budget for the Unity test run itself, including the wait across the Play Mode entry domain reload; size it above the suite duration. When omitted for a run without filters, the default grows to 1.5x the longest of the last journaled runs of the same operation (never below 300000)."
                 }
             },
             "required": ["projectRoot"]

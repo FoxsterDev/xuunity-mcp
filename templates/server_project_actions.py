@@ -972,6 +972,10 @@ def _attach_project_action_currency_fields(payload: dict[str, Any], currency: di
     payload["native_autofocus_enabled"] = bool(currency.get("native_autofocus_enabled"))
     payload["background_execution_mode"] = str(currency.get("background_execution_mode") or "")
     payload["currency_recommended_next_action"] = str(currency.get("recommended_next_action") or "")
+    payload["currency_reason"] = str(currency.get("reason") or "")
+    changed_inputs = list(currency.get("changed_editor_inputs") or [])
+    if changed_inputs:
+        payload["changed_editor_inputs"] = changed_inputs[:8]
 
 
 def build_project_action_invocation_payload(
@@ -1012,7 +1016,8 @@ def build_project_action_invocation_payload(
     if payload_validation["status"] != "ok":
         payload["payload_validation"] = payload_validation
     if initial_currency:
-        payload["project_action_currency_preflight"] = initial_currency
+        if include_full_payload:
+            payload["project_action_currency_preflight"] = initial_currency
         _attach_project_action_currency_fields(payload, initial_currency)
     if include_full_payload:
         payload["scenario"] = scenario
@@ -1041,7 +1046,8 @@ def build_project_action_invocation_payload(
         payload["project_defined_hook_summary"] = summary["project_defined_hook_summary"]
     currency_summary = summary.get("project_action_currency")
     if isinstance(currency_summary, dict):
-        payload["project_action_currency"] = currency_summary
+        if include_full_payload:
+            payload["project_action_currency"] = currency_summary
         final_currency = currency_summary.get("final")
     else:
         final_currency = None

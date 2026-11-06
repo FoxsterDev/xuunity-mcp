@@ -1315,6 +1315,8 @@ actions:
         self.assertEqual("compact_project_action_invoke", structured["payload_mode"])
         self.assertNotIn("scenario", structured)
         self.assertNotIn("scenario_summary", structured)
+        self.assertNotIn("project_action_currency_preflight", structured)
+        self.assertNotIn("project_action_currency", structured)
         self.assertTrue(structured["full_payload_available"])
         self.assertEqual({"includeFullPayload": True}, structured["full_payload_tool_arguments"])
 

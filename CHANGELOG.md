@@ -27,6 +27,18 @@
   newer than the loaded code, and `unity_tests_run_editmode` /
   `unity_tests_run_playmode` refuse with `editor_domain_stale` unless
   `allowStaleEditorDomain=true`.
+- Error responses no longer repeat the same blocks. Every transport error
+  carried `request_final_status` and `bridge_stabilization` twice, once at the
+  top level and again inside `error.details`, and the lifecycle-reset error
+  embedded the full final status; a full-suite test call that timed out cost
+  about 20 KB. The copies inside `error.details` are dropped and the reset
+  error carries the compact projection plus the full-payload recovery command.
+- Compact `unity_project_action_invoke` keeps one currency verdict (now with
+  `currency_reason`) instead of three copies of the preflight.
+- A test run without filters and without `timeoutMs` now waits 1.5 times the
+  longest of the last journaled runs of the same operation, never less than the
+  declared 300000 ms, so a full suite that takes longer than five minutes no
+  longer ends in `transport_response_missing` by default.
 
 ### Added
 

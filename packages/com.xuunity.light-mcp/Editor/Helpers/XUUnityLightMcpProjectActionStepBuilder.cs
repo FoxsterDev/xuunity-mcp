@@ -17,6 +17,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             "catalogPath",
             "requiresFreshAssets",
             "assetRefreshStepId",
+            "strictPayload",
         };
 
         const string CurrencySuffix = "__currency";

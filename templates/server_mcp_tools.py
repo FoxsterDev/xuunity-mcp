@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from server_bridge_final_status import build_compact_final_status_projection
 from server_mcp_protocol import JsonRpcError
+from server_test_suite_timeout import is_unfiltered_test_run, suite_aware_default_timeout_ms
 
 
 def tool_error_result(
@@ -558,6 +559,9 @@ def call_tool(
         args.get("timeoutMs"),
         tool.get("inputSchema", {}).get("properties", {}).get("timeoutMs", {}).get("default", 5000),
     )
+
+    if args.get("timeoutMs") is None and is_unfiltered_test_run(tool["bridgeOperation"], args):
+        timeout_ms, _ = suite_aware_default_timeout_ms(resolved_project_root, tool["bridgeOperation"], timeout_ms)
 
     bridge_args = dict(args)
     include_full_payload = bool(bridge_args.pop("includeFullPayload", False))

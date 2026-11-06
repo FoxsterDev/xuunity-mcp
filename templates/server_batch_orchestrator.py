@@ -432,6 +432,9 @@ def build_request_final_status_from_context(
     )
 
 
+PROMOTED_ONLY_ERROR_DETAIL_KEYS = ("request_final_status", "bridge_stabilization")
+
+
 def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
     details = dict(exc.details or {})
     error: dict[str, Any] = {
@@ -505,6 +508,9 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
     ):
         if key in details:
             payload[key] = details[key]
+    for key in PROMOTED_ONLY_ERROR_DETAIL_KEYS:
+        if key in payload and isinstance(error.get("details"), dict):
+            error["details"].pop(key, None)
     return payload
 
 
