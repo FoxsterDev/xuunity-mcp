@@ -62,3 +62,4 @@ this router plus the local docs as the source of truth.
 - In standalone mode, this directory is the git repo root.
 - In `AIFoxsterDevHub`, `AIRoot/Operations/XUUnityLightUnityMcp/` is a nested git repo inside `AIRoot/`.
 - Review, status, commits, and tags for MCP changes should be handled from the MCP repo root, not only from `AIFoxsterDevHub` or `AIRoot`.
+- Every commit, including merges and tags, is authored and committed as `FoxsterDev <foxsterdev@gmail.com>`. Check `git config user.name` and `git config user.email` before committing and set them in the repo config when they differ. Merge pull requests locally and push, because the GitHub merge button records the account profile identity instead. Do not add co-author trailers.
