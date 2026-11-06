@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.Compilation;
+using XUUnity.LightMcp.Editor.Bridge;
 using XUUnity.LightMcp.Editor.Core;
 
 namespace XUUnity.LightMcp.Editor.Helpers
@@ -56,6 +57,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static XUUnityLightMcpEditorInputSnapshot()
         {
+            if (XUUnityLightMcpBridgeProcessIdentity.ResolveCurrentProcessClass()
+                == XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass)
+            {
+                return;
+            }
+
             var basisUtc = ResolveDomainBasisUtc(SessionState.GetString(CompileStartedSessionKey, ""), DateTime.UtcNow);
             StartBuild(XUUnityLightMcpFileIpcPaths.ProjectRootPath, basisUtc);
             CompilationPipeline.compilationStarted += OnCompilationStarted;

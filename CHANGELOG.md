@@ -12,6 +12,10 @@
 
 ### Fixed
 
+- On Unity 6000.5 and newer an asset import worker process overwrote the
+  bridge state, so every request was refused with
+  `bridge_owned_by_non_main_process`. The lifecycle monitor, the heartbeat
+  writer and the compile-input snapshot now stay inactive in import workers.
 - The package compiles on Unity 6000.5 and 6000.6 again. `unity_prefab_create`
   used the implicit `SceneHandle` to `int` conversion, which those versions turn
   into compile error CS0619, so the bridge never loaded there. A package

@@ -18,7 +18,10 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         public static void InitializeIfNeeded()
         {
-            if (_initialized || !XUUnityLightMcpBridgeActivation.IsEnabled())
+            if (_initialized
+                || !XUUnityLightMcpBridgeActivation.IsEnabled()
+                || XUUnityLightMcpBridgeProcessIdentity.ResolveCurrentProcessClass()
+                == XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass)
             {
                 return;
             }

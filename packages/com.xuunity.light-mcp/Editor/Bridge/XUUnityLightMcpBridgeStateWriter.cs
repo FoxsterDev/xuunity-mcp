@@ -22,6 +22,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         public static void WriteHeartbeat(string lastError = "")
         {
+            if (BridgeProcessClass == XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass)
+            {
+                return;
+            }
+
             XUUnityLightMcpFileIpcPaths.EnsureDirectories();
             var report = XUUnityLightMcpHealthProbe.EnsureCurrentReport();
             var playmodeState = XUUnityLightMcpPlayModeStateOperation.ResolvePlayModeState();
