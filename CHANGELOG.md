@@ -28,6 +28,20 @@
   `unity_tests_run_playmode` refuse with `editor_domain_stale` unless
   `allowStaleEditorDomain=true`.
 
+### Added
+
+- `unity_project_action_invoke` checks payload keys and types against the
+  catalog entry before dispatch. A key the catalog does not declare, or a
+  declared key with the wrong JSON type (for example the string `"1,2,36"` for
+  an `int_array` field), used to reach the hook and be dropped silently by its
+  JSON binding. The existing token grammar (`bool_*`, `int_*`, `*_array`,
+  `float_*`/`decimal_*`, `string_*`/`required_string`, `enum[...]`,
+  `list[...]`) is now enforced; other tokens stay descriptive. Problems come
+  back as `payload_validation` warnings, and `strictPayload` (tool argument,
+  `--strict-payload`, scenario step field, or `strictPayload: true` on the
+  catalog entry) refuses with `project_action_payload_contract_violation`
+  before anything runs in Unity.
+
 ## 0.3.86
 
 Release tag: `v0.3.86`

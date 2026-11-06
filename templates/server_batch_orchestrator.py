@@ -2403,6 +2403,7 @@ def call_unity_project_action_invoke_tool(arguments: dict[str, Any]) -> dict[str
             wait_for_result=wait_for_result,
             allow_mutating=allow_mutating,
             include_full_payload=include_full_payload,
+            strict_payload=_optional_bool_arg(arguments, "strictPayload", False),
         )
     except ToolInvocationError as exc:
         return mcp_json_result(build_tool_error_payload(exc), is_error=True)
@@ -2789,6 +2790,7 @@ def invoke_project_action_from_catalog(
     wait_for_result: bool,
     allow_mutating: bool,
     include_full_payload: bool = True,
+    strict_payload: bool = False,
 ) -> tuple[dict[str, Any], bool]:
     catalog = load_project_action_catalog(project_root, catalog_path)
     action_record = resolve_project_action(catalog, requested_action)
@@ -2810,6 +2812,7 @@ def invoke_project_action_from_catalog(
         action_record=action_record,
         action_payload=action_payload,
         scenario_name=scenario_name,
+        strict_payload=strict_payload,
     )
     currency_response = invoke_bridge(
         str(project_root),

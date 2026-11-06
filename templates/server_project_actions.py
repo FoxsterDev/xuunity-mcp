@@ -25,6 +25,7 @@ PROJECT_ACTION_STEP_KEYS = frozenset(
         "catalogPath",
         "requiresFreshAssets",
         "assetRefreshStepId",
+        "strictPayload",
     }
 )
 
@@ -341,6 +342,7 @@ def normalize_project_action_record(
         "requires_fresh_assets": bool(action_raw.get("requiresFreshAssets")),
         "required_payload_fields": _as_string_list(action_raw.get("requiredPayloadFields")),
         "settle_policy": str(action_raw.get("settlePolicy") or "").strip(),
+        "strict_payload": bool(action_raw.get("strictPayload")),
     }
 
 
@@ -404,6 +406,123 @@ def inject_catalog_const_payload(action_record: dict[str, Any], payload: dict[st
             injected.append(key)
         payload[key] = value
     return injected
+
+
+PAYLOAD_RESERVED_KEYS = {"action"}
+
+
+def _declared_payload_kind(token: str) -> str:
+    text = str(token or "").strip().lower()
+    if text.startswith("enum_int["):
+        return ""
+    if text.startswith("enum["):
+        return "enum"
+    if text.startswith("list[") or text.startswith("int_array") or text.endswith("_array") or "_array_" in text:
+        return "array"
+    if text.startswith("bool"):
+        return "bool"
+    if text.startswith("int"):
+        return "int"
+    if text.startswith("float") or text.startswith("decimal") or text.startswith("double"):
+        return "number"
+    if text.startswith("string") or text.startswith("required_string") or text.startswith("optional_string"):
+        return "string"
+    return ""
+
+
+def _enum_values(token: str) -> list[str]:
+    text = str(token or "").strip()
+    inner = text[text.index("[") + 1 : text.rindex("]")] if "[" in text and "]" in text else ""
+    return [item.strip() for item in inner.split(",") if item.strip()]
+
+
+def _payload_value_matches(kind: str, token: str, value: Any) -> bool:
+    if kind == "bool":
+        return isinstance(value, bool)
+    if kind == "int":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if kind == "string":
+        return isinstance(value, str)
+    if kind == "array":
+        return isinstance(value, list)
+    if kind == "enum":
+        return isinstance(value, str) and value in _enum_values(token)
+    return True
+
+
+def _json_type_name(value: Any) -> str:
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return "null" if value is None else type(value).__name__
+
+
+def validate_project_action_payload(
+    action_record: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    strict: bool = False,
+    step_id: str = "",
+) -> dict[str, Any]:
+    schema = dict(action_record.get("payload_schema") or {})
+    undeclared = sorted(str(key) for key in payload if key not in schema and key not in PAYLOAD_RESERVED_KEYS)
+    mismatches: list[dict[str, Any]] = []
+    for key, value in payload.items():
+        if key in PAYLOAD_RESERVED_KEYS or key not in schema:
+            continue
+        token = str(schema.get(key) or "")
+        kind = _declared_payload_kind(token)
+        if kind and not _payload_value_matches(kind, token, value):
+            mismatches.append({"key": str(key), "declared": token, "actual_type": _json_type_name(value)})
+    missing_required = sorted(
+        str(key)
+        for key, token in schema.items()
+        if str(token or "").strip().lower().startswith("required") and key not in payload
+    )
+    result: dict[str, Any] = {
+        "status": "ok" if not (undeclared or mismatches or missing_required) else "warning",
+        "strict": bool(strict),
+        "undeclared_payload_keys": undeclared,
+        "payload_type_mismatches": mismatches,
+        "missing_required_payload_keys": missing_required,
+    }
+    if result["status"] == "ok" or not strict:
+        return result
+
+    details = {"action_id": str(action_record.get("action_id") or ""), **result}
+    details["status"] = "refused"
+    if step_id:
+        details["step_id"] = step_id
+    problems = []
+    if undeclared:
+        problems.append(f"undeclared key(s) {', '.join(undeclared)}")
+    if mismatches:
+        problems.append(
+            "wrong type for "
+            + ", ".join(f"{item['key']} (declared {item['declared']}, got {item['actual_type']})" for item in mismatches)
+        )
+    if missing_required:
+        problems.append(f"missing required key(s) {', '.join(missing_required)}")
+    raise ToolInvocationError(
+        "project_action_payload_contract_violation",
+        (
+            f"Project action '{details['action_id']}' payload does not match its catalog entry: "
+            + "; ".join(problems)
+            + ". Nothing was dispatched. Fix the payload or declare the keys in project_actions.yaml."
+        ),
+        details,
+    )
 
 
 def project_action_catalog_payload(catalog: dict[str, Any]) -> dict[str, Any]:
@@ -482,6 +601,7 @@ def build_project_action_scenario(
     action_record: dict[str, Any],
     action_payload: dict[str, Any],
     scenario_name: str = "",
+    strict_payload: bool = False,
 ) -> dict[str, Any]:
     hook_name = str(action_record.get("hook_name") or "").strip()
     action_id = str(action_record.get("action_id") or "").strip()
@@ -499,6 +619,11 @@ def build_project_action_scenario(
             {"action_id": action_id, "payload_action": str(action_payload.get("action") or "")},
         )
 
+    validate_project_action_payload(
+        action_record,
+        action_payload,
+        strict=strict_payload or bool(action_record.get("strict_payload")),
+    )
     hook_payload = dict(action_payload)
     inject_catalog_const_payload(action_record, hook_payload)
     refuse_missing_host_scoped_payload(action_record, hook_payload)
@@ -750,6 +875,12 @@ def normalize_project_action_step(
         )
     fail_if_catalog_payload_action_conflicts(action_record, step_id=step_id)
 
+    validate_project_action_payload(
+        action_record,
+        payload,
+        strict=bool(step.get("strictPayload")) or bool(action_record.get("strict_payload")),
+        step_id=step_id,
+    )
     hook_payload = dict(payload)
     inject_catalog_const_payload(action_record, hook_payload)
     refuse_missing_host_scoped_payload(action_record, hook_payload, step_id=step_id)
@@ -877,6 +1008,9 @@ def build_project_action_invocation_payload(
         "run_id": str(run_payload.get("run_id") or ""),
         "run_start_status": str(run_payload.get("status") or ""),
     }
+    payload_validation = validate_project_action_payload(action_record, action_payload)
+    if payload_validation["status"] != "ok":
+        payload["payload_validation"] = payload_validation
     if initial_currency:
         payload["project_action_currency_preflight"] = initial_currency
         _attach_project_action_currency_fields(payload, initial_currency)

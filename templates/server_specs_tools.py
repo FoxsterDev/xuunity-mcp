@@ -308,6 +308,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "default": False,
                     "description": "Must be true for actions whose catalog entry declares mutates."
                 },
+                "strictPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Refuse before dispatch when payload keys are undeclared in the catalog, have the wrong type for their declared token, or a required key is missing. Without it these come back as payload_validation warnings. A catalog entry can opt in with strictPayload: true."
+                },
                 "waitForResult": {"type": "boolean", "default": True},
                 "timeoutMs": {"type": "integer", "default": 600000, "minimum": 1000},
                 "pollIntervalMs": {"type": "integer", "default": 1000, "minimum": 100},

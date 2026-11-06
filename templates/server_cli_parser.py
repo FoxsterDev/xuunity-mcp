@@ -355,6 +355,7 @@ def build_parser() -> argparse.ArgumentParser:
     project_action_invoke_cmd.add_argument("--catalog-file")
     project_action_invoke_cmd.add_argument("--scenario-name", default="")
     project_action_invoke_cmd.add_argument("--allow-mutating", action="store_true")
+    project_action_invoke_cmd.add_argument("--strict-payload", action="store_true")
     project_action_invoke_cmd.add_argument("--no-wait", action="store_true")
     project_action_invoke_cmd.add_argument("--timeout-ms", type=int, default=None)
     project_action_invoke_cmd.add_argument("--poll-interval-ms", type=int, default=1000)

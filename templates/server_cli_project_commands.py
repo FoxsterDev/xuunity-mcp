@@ -27,6 +27,7 @@ def cmd_project_action_invoke(args):
         poll_interval_ms=args.poll_interval_ms,
         wait_for_result=not bool(args.no_wait),
         allow_mutating=bool(args.allow_mutating),
+        strict_payload=bool(getattr(args, "strict_payload", False)),
     )
     print_json(result)
     if is_error:
