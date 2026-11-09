@@ -322,9 +322,12 @@ def build_editor_idle_timeout_details(
         and busy_reason in TRANSIENT_BUSY_REASONS_FOR_RETRY
     )
     frozen = bool(last_state) and (not pid_alive or (heartbeat_stale and not stale_while_busy))
-    if frozen:
+    if frozen and not pid_alive:
         classification = "editor_state_frozen"
         next_action = "recover_editor_session"
+    elif frozen:
+        classification = "editor_alive_but_unresponsive"
+        next_action = "inspect_editor_log_and_observe"
     elif stale_while_busy:
         classification = "editor_busy_heartbeat_stale"
         next_action = "wait_for_editor_idle_then_retry"

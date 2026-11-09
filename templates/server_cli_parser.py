@@ -742,6 +742,12 @@ def build_parser() -> argparse.ArgumentParser:
     recover_editor_cmd.add_argument("--open-editor", action="store_true")
     recover_editor_cmd.add_argument("--force-compile-probe", action="store_true")
     recover_editor_cmd.add_argument(
+        "--force-terminate",
+        action="store_true",
+        help="Allow closing a live host-opened editor (quit, then terminate the verified pid). Without it a live editor is only observed.",
+    )
+    recover_editor_cmd.add_argument("--observe-timeout-ms", type=int, default=30000)
+    recover_editor_cmd.add_argument(
         "--compile-preflight",
         default="auto",
         choices=["auto", "off"],

@@ -336,6 +336,7 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
                 self.assertEqual(["quit_editor", "batch_compile", "reopen_editor"], [step["step"] for step in details["recovery_steps"]])
                 self.assertEqual(opened_by_host, details["opened_by_host"])
                 self.assertEqual(opened_by_host, "restore-editor-state" in details["recovery_steps"][0]["command"])
+                self.assertEqual(opened_by_host, "--force-terminate" in details["recommended_recovery_command"])
                 self.assertGreaterEqual(details["editor_log_idle_seconds"], 20.0)
 
     def test_a_moving_log_keeps_polling_past_the_compile_block(self) -> None:
@@ -756,15 +757,17 @@ class StaleHeartbeatRetryHintTests(unittest.TestCase):
             with self.subTest(age=age, busy_reason=busy_reason):
                 details = self._details(age=age, busy_reason=busy_reason)
 
-                self.assertEqual("editor_state_frozen", details["classification"])
+                self.assertEqual("editor_alive_but_unresponsive", details["classification"])
+                self.assertTrue(details["state_frozen"])
                 self.assertFalse(details["retry_recommended"])
-                self.assertEqual("recover_editor_session", details["recommended_next_action"])
+                self.assertEqual("inspect_editor_log_and_observe", details["recommended_next_action"])
 
     def test_a_dead_pid_is_never_retryable(self) -> None:
         details = self._details(age=183.4, busy_reason="asset_import", alive=False)
 
         self.assertEqual("editor_state_frozen", details["classification"])
         self.assertFalse(details["retry_recommended"])
+        self.assertEqual("recover_editor_session", details["recommended_next_action"])
 
 
 class GuiFallbackQuitAnnotationTests(unittest.TestCase):

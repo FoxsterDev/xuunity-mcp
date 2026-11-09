@@ -46,6 +46,17 @@
   packages; `.cs`, `.asmdef`, `.asmref`, `.rsp`); a newer input marks the
   diagnostics `stale` (`source_tree_changed`, `compiler_diagnostics_newer_input`)
   and the existing single refresh decides. Only the red path pays the scan.
+- A frozen heartbeat no longer leads to closing a live editor. After ten
+  seconds of main-thread blocking the idle timeout recommended
+  `recover-editor-session`, which quit and then terminated a host-opened editor
+  with no save prompt. A live pid now reads `editor_alive_but_unresponsive`
+  with a non-destructive `inspect_editor_log_and_observe`; a dead pid keeps
+  `editor_state_frozen`. `recover-editor-session` closes a live editor only with
+  the new `--force-terminate`; without it, it waits for the bridge and reports
+  `live_editor_bridge_attached`, `live_editor_refused` or
+  `live_editor_not_host_owned` (exit 1) instead of a false `recovered`. Error
+  enrichment never pairs `recover_editor_session` with an `observe_only` health
+  policy for a live pid. The docs claimed this gate before it existed.
 
 ## 0.3.87
 

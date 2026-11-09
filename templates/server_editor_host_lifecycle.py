@@ -1385,7 +1385,11 @@ def _startup_modal_block_error(
     session = try_read_host_editor_session_state(project_root) or {}
     opened_by_host = bool(session.get("opened_by_host")) and int(session.get("editor_pid") or 0) in live_editor_pids
     recover_command = render_launcher_cli(
-        "recover-editor-session", project_root, "--force-compile-probe", "--open-editor"
+        "recover-editor-session",
+        project_root,
+        *(("--force-terminate",) if opened_by_host else ()),
+        "--force-compile-probe",
+        "--open-editor",
     )
     quit_step = (
         render_launcher_cli("restore-editor-state", project_root, "--timeout-ms", "30000")
