@@ -35,6 +35,7 @@ from server_core import (
     write_json,
 )
 from server_host_platform import (
+    host_standalone_build_target,
     current_host_platform_adapter,
     host_path_to_local_path,
     is_wsl,
@@ -54,6 +55,11 @@ from server_hub_licensing import (
 )
 
 from server_licensing_state import guard_editor_licensing_launch, editor_license_evidence
+from server_health import (
+    STARTUP_MODAL_FINGERPRINT_LOG_CODES,
+    STARTUP_MODAL_QUIESCENCE_SECONDS,
+    compile_error_lines_from_log,
+)
 
 ACTIVATION_DELAY_SECONDS = 0.35
 UNITY_EDITOR_ROOTS_ENV = "XUUNITY_UNITY_EDITOR_ROOTS"
@@ -1227,9 +1233,10 @@ def _readiness_error_from_log_observation(
 
 def _editor_log_idle_seconds(editor_log_path: Path) -> float | None:
     try:
-        return max(0.0, time.time() - float(editor_log_path.stat().st_mtime))
+        modified_at = float(editor_log_path.stat().st_mtime)
     except OSError:
         return None
+    return max(0.0, time.time() - modified_at)
 
 
 def _startup_blocker_observation(
@@ -1353,6 +1360,82 @@ def _safe_mode_dialog_is_blocking(editor_log_path: Path, readiness_error: ToolIn
     return blocking
 
 
+def _startup_modal_block_error(
+    project_root: Path,
+    editor_log_path: Path,
+    readiness_error: ToolInvocationError,
+    log_text: str,
+    startup_stage: str,
+) -> ToolInvocationError | None:
+    """Unity logs no marker while the "Enter Safe Mode?" prompt is up; this is the status_summary fingerprint."""
+
+    details = readiness_error.details or {}
+    if str(details.get("editor_log_observation_code") or "") not in STARTUP_MODAL_FINGERPRINT_LOG_CODES:
+        return None
+    live_editor_pids = [int(pid) for pid in details.get("observed_live_editor_pids") or [] if int(pid or 0) > 0]
+    if not live_editor_pids:
+        return None
+    bridge_pid = int(details.get("observed_bridge_pid") or 0)
+    if bool(details.get("observed_bridge_pid_alive")) and bridge_pid in live_editor_pids:
+        return None
+    idle_seconds = _editor_log_idle_seconds(editor_log_path)
+    if idle_seconds is None or idle_seconds < STARTUP_MODAL_QUIESCENCE_SECONDS:
+        return None
+
+    compile_error_lines, compile_error_line_count = compile_error_lines_from_log(log_text)
+    session = try_read_host_editor_session_state(project_root) or {}
+    opened_by_host = bool(session.get("opened_by_host")) and int(session.get("editor_pid") or 0) in live_editor_pids
+    recover_command = render_launcher_cli(
+        "recover-editor-session",
+        project_root,
+        *(("--force-terminate",) if opened_by_host else ()),
+        "--force-compile-probe",
+        "--open-editor",
+    )
+    quit_step = (
+        render_launcher_cli("restore-editor-state", project_root, "--timeout-ms", "30000")
+        if opened_by_host
+        else "Choose Quit in the Unity startup dialog; this wrapper does not click editor dialogs."
+    )
+    modal_details = dict(details)
+    modal_details.update(
+        {
+            "readiness_condition": "editor_startup_modal_blocked",
+            "startup_stage": startup_stage,
+            "startup_modal_block_basis": "live_editor_compile_markers_no_live_bridge_quiescent_log",
+            "editor_log_idle_seconds": round(idle_seconds, 3),
+            "startup_modal_quiescence_seconds": STARTUP_MODAL_QUIESCENCE_SECONDS,
+            "compile_state": "unmeasured",
+            "compile_observation_source": "editor_log_unverified",
+            "compile_errors_observed_in_log": compile_error_line_count,
+            "compile_error_lines": compile_error_lines,
+            "opened_by_host": opened_by_host,
+            "recommended_next_action": "quit_editor_batch_compile_then_reopen",
+            "recommended_recovery_command": (
+                recover_command if opened_by_host else f"{quit_step} Then run: {recover_command}"
+            ),
+            "recovery_steps": [
+                {"step": "quit_editor", "command": quit_step},
+                {
+                    "step": "batch_compile",
+                    "command": render_launcher_cli(
+                        "batch-compile", project_root, "--target", host_standalone_build_target()
+                    ),
+                },
+                {"step": "reopen_editor", "command": render_launcher_cli("ensure-ready", project_root, "--open-editor")},
+            ],
+        }
+    )
+    summary = (
+        "The Unity editor is alive, the MCP bridge never attached, and Editor.log has been idle for "
+        f"~{round(idle_seconds)}s after compile errors written during this wait: the editor is most likely "
+        "blocked on the 'Enter Safe Mode?' startup dialog. Quit it, run the batch compile, fix the errors, "
+        "then reopen. The compile errors are a log observation, not a measured compile verdict."
+    )
+    modal_details["readiness_summary"] = summary
+    return ToolInvocationError("editor_startup_modal_blocked", summary, modal_details)
+
+
 def _startup_log_observation_after_ready(
     readiness_error: ToolInvocationError,
     state: dict[str, Any],
@@ -1402,6 +1485,7 @@ def wait_for_ready(
     deadline = started_at + (timeout_ms / 1000.0)
     state: dict[str, Any] | None = None
     last_readiness_error: ToolInvocationError | None = None
+    last_log_text = ""
     while time.time() < deadline:
         state = try_read_bridge_state(project_root)
         if bridge_state_is_ready(state, heartbeat_max_age_seconds):
@@ -1420,7 +1504,8 @@ def wait_for_ready(
                 state["startup_log_observation"] = _startup_log_observation_after_ready(last_readiness_error, state)
             return state
 
-        classification = classify_editor_log(read_recent_editor_log(editor_log_path, started_at), startup_policy)
+        recent_log_text = read_recent_editor_log(editor_log_path, started_at)
+        classification = classify_editor_log(recent_log_text, startup_policy)
         if classification:
             code, message = classification
             if code in {
@@ -1437,6 +1522,12 @@ def wait_for_ready(
                     editor_log_path, readiness_error
                 ):
                     raise readiness_error
+                modal_error = _startup_modal_block_error(
+                    project_root, editor_log_path, readiness_error, recent_log_text, "waiting_for_bridge_readiness"
+                )
+                if modal_error is not None:
+                    raise modal_error
+                last_log_text = recent_log_text
                 # A bridge can attach or finish import immediately after the log
                 # moves. Do not turn that normal startup race into a blocking
                 # verdict; retain the typed condition for the timeout path and
@@ -1497,6 +1588,11 @@ def wait_for_ready(
         time.sleep(1.0)
 
     if last_readiness_error is not None:
+        modal_error = _startup_modal_block_error(
+            project_root, editor_log_path, last_readiness_error, last_log_text, "readiness_deadline_reached"
+        )
+        if modal_error is not None:
+            raise modal_error
         if last_readiness_error.code == "startup_safe_mode_dialog_observed":
             last_readiness_error.details["dialog_block_basis"] = "readiness_deadline_reached_with_safe_mode_markers"
         last_readiness_error.details["startup_stage"] = "readiness_deadline_reached"

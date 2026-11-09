@@ -4,6 +4,7 @@ from typing import Any
 
 from server_specs_scenario import SCENARIO_DEFINITION_SCHEMA
 from server_specs_device import DEVICE_TOOLS
+from server_specs_startup import STARTUP_POLICIES
 
 TOOLS: dict[str, dict[str, Any]] = {
     "xuunity_setup_plan": {
@@ -214,6 +215,41 @@ TOOLS: dict[str, dict[str, Any]] = {
             },
             "required": ["projectRoot"]
         }
+    },
+    "unity_ensure_ready": {
+        "description": (
+            "Wait until the project's Unity bridge is ready, the same as the ensure-ready CLI. With openEditor=true a "
+            "closed editor is launched, after a batch compile when compile inputs changed since the last recorded "
+            "compile. Failures keep the CLI's typed codes and recovery commands, for example "
+            "editor_startup_modal_blocked, editor_open_refused_compile_red, launch_blocked_probable_modal and "
+            "editor_process_alive_bridge_never_attached."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "openEditor": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Launch the editor when it is not running. Without it the tool only waits for a live editor's bridge.",
+                },
+                "backgroundOpen": {"type": "boolean", "default": False},
+                "compilePreflight": {
+                    "type": "string",
+                    "enum": ["auto", "off"],
+                    "default": "auto",
+                    "description": "auto runs the batch compile before opening a closed editor whose compile inputs changed and refuses the open on red.",
+                },
+                "startupPolicy": {
+                    "type": "string",
+                    "enum": sorted(STARTUP_POLICIES),
+                    "default": "fail_fast_on_interactive_compile_block",
+                },
+                "includeFullPayload": {"type": "boolean", "default": False},
+                "timeoutMs": {"type": "integer", "default": 120000, "minimum": 1000},
+            },
+            "required": ["projectRoot"],
+        },
     },
     "unity_request_final_status": {
         "description": "Resolve a compact final delivery disposition for one request id from the request journal and current bridge state. Set includeFullPayload=true for journal paths, discovery, timing, and artifact evidence.",

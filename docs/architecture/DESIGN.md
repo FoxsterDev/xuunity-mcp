@@ -354,6 +354,10 @@ Current multi-project lifecycle baseline:
   - `bridge_disabled`
   - `bridge_owned_by_non_main_process`
   - `editor_process_alive_bridge_never_attached`
+  - `editor_startup_modal_blocked`: a live project editor, compile markers
+    written during the wait, no live bridge state and an Editor.log idle for
+    20 s or more; the error carries the CS lines and a quit, batch compile,
+    reopen recovery
   - `launch_blocked_probable_modal`, with the live editor PID, Editor.log path,
     log idle time, and the last matched licensing/API-updater/dialog line
 - reconciliation is used not only for diagnostics but also for recovery decisions in:

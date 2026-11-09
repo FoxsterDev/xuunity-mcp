@@ -306,6 +306,18 @@ def enrich_error_details_with_discovery_data(
     ):
         enriched["recommended_next_action"] = preferred_next_action
 
+    if (
+        str(enriched.get("recommended_next_action") or "") == "recover_editor_session"
+        and bool(enriched.get("editor_pid_alive"))
+        and str(discovery.get("host_health_termination_policy") or "observe_only") == "observe_only"
+    ):
+        observe_action = str(discovery.get("host_health_recommended_next_action") or "")
+        if observe_action in {"", "none", "recover_editor_session"}:
+            observe_action = "inspect_editor_log_and_observe"
+        enriched["recommended_next_action"] = observe_action
+        enriched["recommended_recovery_command"] = ""
+        current_next_action = ""
+
     next_action = str(enriched.get("recommended_next_action") or "")
     if next_action and (
         not str(enriched.get("recommended_recovery_command") or "")

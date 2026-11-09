@@ -6,6 +6,7 @@ from typing import Any
 
 from server_bridge_constants import COMPILE_RED_FAIL_FAST_OPERATIONS
 from server_core import ToolInvocationError, parse_utc_timestamp
+from server_editor_input_snapshot import newest_editor_input_after
 from server_recovery_commands import recommended_recovery_command_for_project
 
 COMPILE_GATED_PLAYMODE_ACTIONS = frozenset({"enter"})
@@ -70,12 +71,20 @@ def compiler_diagnostics_trust_from_state(state: dict[str, Any] | None, project_
             except OSError:
                 stale_reason = "diagnostic_file_unavailable"
                 break
+        newest_input = ""
+        if not stale_reason and root is not None:
+            newest_input, _ = newest_editor_input_after(root, captured)
+            if newest_input:
+                stale_reason = "source_tree_changed"
     if stale_reason:
-        return {
+        stale = {
             "compiler_diagnostics_trust_class": COMPILER_DIAGNOSTICS_TRUST_STALE,
             "compiler_diagnostics_note": "Cached diagnostics require one project refresh and a post-settle verdict.",
             "compiler_diagnostics_stale_reason": stale_reason,
         }
+        if stale_reason == "source_tree_changed":
+            stale["compiler_diagnostics_newer_input"] = newest_input
+        return stale
     return {"compiler_diagnostics_trust_class": COMPILER_DIAGNOSTICS_TRUST_CONFIRMED}
 
 

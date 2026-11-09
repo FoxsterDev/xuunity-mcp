@@ -48,6 +48,7 @@ from server_batch_orchestrator import (
     refresh_project_context,
     request_editor_quit,
     run_batch_build_config_compile_matrix_probe,
+    run_editor_open_compile_preflight,
     run_self_json_command,
     run_self_json_command_with_completed,
     DISCOVERY_STATUS_FALLBACK_ERROR_CODES,
@@ -427,6 +428,7 @@ def cmd_ensure_ready(args):
         "package_import_state_before_ready": package_import_state_before_ready,
     }
     payload["discovery"] = build_project_discovery_report_fn(project_root)
+    launch_started: float | None = None
 
     try:
         maybe_fail_fast_ensure_ready_package_state_fn(
@@ -470,6 +472,36 @@ def cmd_ensure_ready(args):
             }
         elif args.open_editor:
             unity_app = detect_unity_app_path_for_project_fn(project_root, args.unity_app)
+            if int(payload["discovery"].get("detected_editor_count") or 0) == 0:
+                preflight = _compat_dep("run_editor_open_compile_preflight")(
+                    project_root,
+                    timeout_ms=args.timeout_ms,
+                    mode=str(getattr(args, "compile_preflight", "auto") or "auto"),
+                )
+                payload["compile_preflight"] = preflight
+                if preflight.get("verdict") == "red":
+                    raise ToolInvocationError(
+                        "editor_open_refused_compile_red",
+                        (
+                            "Compile inputs changed while the editor was closed and the batch compile is red, so "
+                            "the GUI editor was not opened: it would stop on the 'Enter Safe Mode?' dialog. Fix "
+                            "the compile errors, then rerun ensure-ready --open-editor."
+                        ),
+                        {
+                            "fail_fast_reason": "ensure_ready_compile_red_before_gui_open",
+                            "reopen_blocked": True,
+                            "reopen_block_reason": "compile_red_before_gui_open",
+                            "compile_state": "batch_compile_red",
+                            "compile_errors_observed": preflight.get("compile_errors_observed", 0),
+                            "compile_error_lines": preflight.get("compile_error_lines", []),
+                            "compile_preflight": preflight,
+                            "recommended_next_action": "fix_compile_errors_before_gui_reopen",
+                            "recommended_recovery_command": render_launcher_cli(
+                                "ensure-ready", project_root, "--open-editor"
+                            ),
+                        },
+                    )
+            launch_started = time.monotonic()
             payload["launch"] = open_unity_editor_fn(
                 project_root,
                 log_path,
@@ -515,6 +547,7 @@ def cmd_ensure_ready(args):
         )
         if (
             args.open_editor
+            and exc.code != "editor_startup_modal_blocked"
             and import_state in {"declared_not_resolved", "resolved_not_cached"}
             and live_editor_pids
             and not bridge_state_present
@@ -526,14 +559,28 @@ def cmd_ensure_ready(args):
                 "ensure-ready", project_root, "--open-editor"
             )
             details["live_project_editor_pids"] = live_editor_pids
-        raise enrich_tool_invocation_error_with_discovery_fn(
+        enriched = enrich_tool_invocation_error_with_discovery_fn(
             project_root,
             ToolInvocationError(exc.code, exc.message, details),
         )
+        if (
+            enriched.code != "editor_startup_modal_blocked"
+            and str(enriched.details.get("host_health_reason") or "") == "startup_modal_dialog_block"
+        ):
+            enriched.details["stronger_diagnosis_source"] = "status_summary"
+            enriched.details["stronger_diagnosis"] = "startup_modal_dialog_block"
+            enriched.details["recommended_next_action"] = "request-status-summary"
+            enriched.details["recommended_recovery_command"] = render_launcher_cli(
+                "request-status-summary", project_root, "--include-full-payload"
+            )
+        raise enriched
 
     payload["bridge_state"] = state
     if payload.get("launch") and not bool(payload["launch"].get("reused_existing_editor")):
         update_host_editor_session_pid_fn(project_root, int(state.get("editor_pid") or 0))
+        if launch_started is not None:
+            payload["launch"]["editor_opened_by_this_call"] = True
+            payload["launch"]["launch_duration_seconds"] = round(time.monotonic() - launch_started, 3)
     refresh_project_context_fn(project_root)
     payload["discovery_after_ready"] = build_project_discovery_report_fn(project_root)
     payload["package_dependency"] = inspect_package_dependency_alignment_fn(project_root)

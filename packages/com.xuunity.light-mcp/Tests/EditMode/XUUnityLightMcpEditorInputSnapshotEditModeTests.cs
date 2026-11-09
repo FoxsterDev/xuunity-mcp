@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using NUnit.Framework;
+using UnityEngine;
+using XUUnity.LightMcp.Editor.Bridge;
+using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Helpers;
 
 namespace XUUnity.LightMcp.Tests.EditMode
@@ -155,6 +158,68 @@ namespace XUUnity.LightMcp.Tests.EditMode
             Assert.That(
                 XUUnityLightMcpEditorInputSnapshot.ResolveDomainBasisUtc("2026-11-05T18:00:00.0000000Z", loaded),
                 Is.EqualTo(loaded));
+        }
+
+        [Test]
+        public void PersistedSnapshotRoundTripsPathsHashesAndCompileOutcome()
+        {
+            Write("Assets/Scripts/Dirty.cs", "class Dirty {}");
+            File.SetLastWriteTimeUtc(Path.Combine(_root, "Assets/Scripts/Dirty.cs"), EditedUtc);
+            var snapshot = XUUnityLightMcpEditorInputSnapshot.CaptureSnapshot(_root, CompiledUtc);
+            var path = XUUnityLightMcpEditorInputSnapshot.PersistedSnapshotPath(_root);
+
+            var persisted = XUUnityLightMcpEditorInputSnapshot.ToPersisted(
+                snapshot,
+                XUUnityLightMcpEditorInputSnapshot.TriggerCompilationFinished,
+                XUUnityLightMcpEditorInputSnapshot.CompileOutcomeFailed,
+                2,
+                4242);
+            Assert.That(XUUnityLightMcpEditorInputSnapshot.TryPersist(path, persisted), Is.True);
+
+            var read = JsonUtility.FromJson<XUUnityLightMcpPersistedEditorInputSnapshot>(File.ReadAllText(path));
+            Assert.That(read.trigger, Is.EqualTo("compilation_finished"));
+            Assert.That(read.compile_outcome, Is.EqualTo("failed"));
+            Assert.That(read.compile_error_count, Is.EqualTo(2));
+            Assert.That(read.editor_pid, Is.EqualTo(4242));
+            Assert.That(read.basis_utc, Is.EqualTo("2026-11-05T16:45:00.0000000Z"));
+            Assert.That(read.paths.Count, Is.EqualTo(4));
+            Assert.That(read.hashes.Count, Is.EqualTo(4));
+            var boardIndex = read.paths.IndexOf("Assets/Scripts/Board.cs");
+            Assert.That(read.hashes[boardIndex], Is.EqualTo(snapshot.Hashes["Assets/Scripts/Board.cs"]));
+            Assert.That(read.dirty_at_capture, Is.EqualTo(new[] { "Assets/Scripts/Dirty.cs" }));
+        }
+
+        [Test]
+        public void HashMatchesTheHostFnvVectors()
+        {
+            Write("Assets/a.bin", "a");
+            Write("Assets/foobar.bin", "foobar");
+
+            Assert.That(XUUnityLightMcpEditorInputSnapshot.HashFile(Path.Combine(_root, "Assets/a.bin")), Is.EqualTo("1:af63dc4c8601ec8c"));
+            Assert.That(XUUnityLightMcpEditorInputSnapshot.HashFile(Path.Combine(_root, "Assets/foobar.bin")), Is.EqualTo("6:85944171f73967e8"));
+        }
+
+        [Test]
+        public void ImportWorkerProcessesAreNotCaptured()
+        {
+            Assert.That(XUUnityLightMcpEditorInputSnapshot.ShouldCapture(XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass), Is.False);
+            Assert.That(XUUnityLightMcpEditorInputSnapshot.ShouldCapture(XUUnityLightMcpBridgeProcessIdentity.MainEditorProcessClass), Is.True);
+            Assert.That(XUUnityLightMcpEditorInputSnapshot.ShouldCapture(XUUnityLightMcpBridgeProcessIdentity.BatchProcessClass), Is.True);
+        }
+
+        [Test]
+        public void TheLiveProjectSnapshotIsPersistedForThisEditor()
+        {
+            var projectRoot = XUUnityLightMcpFileIpcPaths.ProjectRootPath;
+            XUUnityLightMcpEditorInputSnapshot.Compare(projectRoot);
+            var path = XUUnityLightMcpEditorInputSnapshot.PersistedSnapshotPath(projectRoot);
+
+            Assert.That(File.Exists(path), Is.True, path);
+            var read = JsonUtility.FromJson<XUUnityLightMcpPersistedEditorInputSnapshot>(File.ReadAllText(path));
+            Assert.That(new[] { "domain_load", "compilation_finished" }, Does.Contain(read.trigger));
+            Assert.That(read.editor_pid, Is.EqualTo(System.Diagnostics.Process.GetCurrentProcess().Id));
+            Assert.That(read.paths.Count, Is.EqualTo(read.hashes.Count));
+            Assert.That(read.paths.Count, Is.EqualTo(read.input_count));
         }
 
         string _reason;

@@ -2,6 +2,87 @@
 
 ## Unreleased
 
+### Added
+
+- A closed editor is no longer opened on red code. The package now writes the
+  RG-42 compile-input snapshot (content hashes of every `.cs`, `.asmdef`,
+  `.asmref` and `.rsp` under Assets, embedded and local packages, plus the
+  last compile outcome) to `Library/XUUnityLightMcp/state/editor_input_snapshot.json`
+  at domain load and after each compile; an import worker writes nothing.
+  `ensure-ready --open-editor` and `recover-editor-session` compare the
+  inputs with that file while the editor is closed. When content changed, or
+  the last recorded compile failed, they run the existing batch compile probe
+  first; a red probe (CS lines in the batch log) refuses the GUI open with
+  `editor_open_refused_compile_red` / `reopen_blocked`. A touch without a
+  content change, a missing snapshot or an inconclusive probe opens as before.
+  `--compile-preflight off` skips the check. A project without a
+  `*BuildConfiguration.asset` falls back to `batch-compile` for the host's
+  standalone target; the probe never falls back to a GUI editor.
+- `unity_ensure_ready` brings `ensure-ready` to the MCP surface. An agent no
+  longer has to leave the MCP to open or wait for an editor: the tool takes
+  `openEditor`, `backgroundOpen`, `compilePreflight`, `startupPolicy`,
+  `timeoutMs` and `includeFullPayload`, runs the CLI command, and returns its
+  payload or its typed error code and recovery command unchanged.
+
+### Fixed
+
+- `ensure-ready` no longer waits out its whole timeout on the "Enter Safe Mode?"
+  startup dialog. Unity logs no marker while the dialog is up, so the wait read
+  the log as an ordinary compile block and ended as
+  `poll_bridge_bootstrap_attached_then_retry`, while `status_summary` already
+  had the right answer. The wait now applies the same fingerprint (live project
+  editor, compile markers written during the wait, no live bridge state,
+  Editor.log idle for 20 s) in the poll loop and at the deadline, and ends as
+  `editor_startup_modal_blocked` with the CS lines, `compile_state: unmeasured`
+  and a quit, batch compile, reopen recovery. A moving log or a bridge that
+  attaches keeps polling. When the wait ends with a weaker code while host
+  health holds `startup_modal_dialog_block`, the error points at
+  `request-status-summary`. A local `file:` package no longer
+  replaces that recovery with a package re-resolve.
+- `status_summary` no longer shows `compiler_error_count: 0` beside an Editor.log
+  full of CS errors with nothing to say which is current. Without a live
+  bridge it now adds `compile_state: unmeasured`, `compiler_error_count_source`
+  (`stale_bridge_state` or `none`) and, when the log holds compile errors,
+  `compile_errors_observed_in_log`, `compile_error_lines` and
+  `compile_observation_source: editor_log_unverified`. The log count never
+  goes into `compiler_error_count`, which stays a bridge measurement.
+- The compile gate no longer refuses a request after a cross-file fix. It
+  judged fresh diagnostics only by the files the errors named, so fixing the
+  other file (the usual fix for CS1061 or CS0246), adding a file or editing an
+  `.asmdef` still read `compile_broken`. It now also scans every compile input
+  with the same enumerator as the input snapshot (Assets, embedded and local
+  packages; `.cs`, `.asmdef`, `.asmref`, `.rsp`); a newer input marks the
+  diagnostics `stale` (`source_tree_changed`, `compiler_diagnostics_newer_input`)
+  and the existing single refresh decides. Only the red path pays the scan.
+- A frozen heartbeat no longer leads to closing a live editor. After ten
+  seconds of main-thread blocking the idle timeout recommended
+  `recover-editor-session`, which quit and then terminated a host-opened editor
+  with no save prompt. A live pid now reads `editor_alive_but_unresponsive`
+  with a non-destructive `inspect_editor_log_and_observe`; a dead pid keeps
+  `editor_state_frozen`. `recover-editor-session` closes a live editor only with
+  the new `--force-terminate`; without it, it waits for the bridge and reports
+  `live_editor_bridge_attached`, `live_editor_refused` or
+  `live_editor_not_host_owned` (exit 1) instead of a false `recovered`. Error
+  enrichment never pairs `recover_editor_session` with an `observe_only` health
+  policy for a live pid. The docs claimed this gate before it existed.
+- A dead editor's state file no longer reads as healthy. `bridge_stabilization`
+  (and the `status_summary` fields built from it) reported `health_status:
+  healthy`, `transport_listener_state: listening`, `request_flow_state: usable`
+  and `transport_ready_for_requests: true` beside `host_health_classification:
+  offline`; `transport_state.listener_state` still said `listening`. Without a
+  live editor they now read `editor_not_running`, `no_live_editor`,
+  `not_ready` and `false`; the file's values stay visible as
+  `recorded_health_status`, `recorded_transport_listener_state` and
+  `transport_state.recorded_listener_state`. `blocking_reasons` are unchanged.
+- An editor the host opened is now visible with its launch time.
+  `status_summary` adds `editor_opened_by_host`, `editor_opened_at_utc` and
+  `editor_launch_duration_seconds`; the host session records
+  `bridge_ready_at_utc` and `launch_duration_seconds` when the bridge first
+  attaches; the compact `ensure-ready` launch block adds
+  `editor_opened_by_this_call` and `launch_duration_seconds`. An editor the
+  host opened also reads as host-opened while it is blocked before its bridge
+  attaches.
+
 ## 0.3.87
 
 Release tag: `v0.3.87`

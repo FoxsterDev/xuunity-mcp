@@ -463,6 +463,7 @@ Implemented host-side MCP tools and helpers:
 - `unity_prefab_mutate`
 - `unity_ui_click`
 - `unity_maintenance_prune`
+- `unity_ensure_ready`
 - `project-discovery-report`
 - `registry-context-report`
 - `registry-prune-contexts`

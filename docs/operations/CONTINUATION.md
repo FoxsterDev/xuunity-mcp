@@ -243,16 +243,20 @@ alone as a portfolio compile verdict.
 
 ### Two-Step Editor Recovery
 
-`recover-editor-session` clears stale bridge state; it does **not** open an
-editor. Its response says so (`recommended_next_action:
-open_editor_or_ensure_ready`), but the two steps are easy to conflate:
+`recover-editor-session` clears stale bridge state and, with `--open-editor`,
+reopens the editor. Without `--open-editor` it reports `recovered` and opens
+nothing, so the lane still needs `ensure-ready --project-root <path> --open-editor`.
 
-1. `recover-editor-session --project-root <path>` — clears a stale
-   `bridge_state.json` whose `editor_pid` is dead
-2. `ensure-ready --project-root <path> --open-editor` — brings the lane up
+With a live project editor it closes nothing unless `--force-terminate` is
+passed. It waits up to `--observe-timeout-ms` (30 s) for the bridge instead and
+reports `live_editor_bridge_attached`, `live_editor_refused` (host-opened; the
+response carries `force_terminate_command`) or `live_editor_not_host_owned`
+(quit it in Unity). `--force-terminate` quits a host-opened editor and then
+terminates its verified pid; unsaved scene and prefab edits are lost.
 
-Both are needed after a stale-bridge classification. Only the second one gives
-you a working interactive lane.
+With the editor closed, it compares the compile inputs with the snapshot the
+package wrote after its last compile and runs the batch compile probe when they
+changed; a red probe sets `reopen_blocked`.
 
 ### Alive Editor Without an Attached Bridge
 
@@ -268,12 +272,16 @@ to force-kill a process or discard unsaved work.
 ### A Frozen Heartbeat Is Not a Current Busy Reason
 
 An idle timeout reports PID liveness, `state_frozen`, `busy_reason_detail` and
-`busy_reason_as_of_utc`. A dead PID or heartbeat beyond the waiter's freshness
-limit yields `editor_state_frozen` and a `recover-editor-session` command.
-Read `busy_reason` as the last observation at that timestamp. A live process
-with a frozen heartbeat may be blocked, compiling, or otherwise unable to pump;
-the snapshot does not prove a crash. Inspect current process/log evidence before
-choosing a restart. Recovery refuses a live PID; do not bypass that safety gate.
+`busy_reason_as_of_utc`. A dead PID yields `editor_state_frozen` and a
+`recover-editor-session` command. A live PID whose heartbeat is older than the
+waiter's freshness limit yields `editor_alive_but_unresponsive` with
+`inspect_editor_log_and_observe`: the process may be blocked, compiling or
+waiting on a dialog, and the snapshot does not prove a crash. Read
+`busy_reason` as the last observation at that timestamp. Thresholds: heartbeat
+fresh under 5 s, stale from 15 s, ANR suspected from 30 s (`status_summary`
+host health); the idle waiter's own limit is `--heartbeat-max-age-seconds`
+(10 s). `recover-editor-session` refuses a live PID unless `--force-terminate`
+is passed.
 
 ### Lanes That Refuse During Play Mode
 

@@ -82,6 +82,45 @@ class DiagnosticFreshnessTests(unittest.TestCase):
             self.assertEqual("stale", gate.compiler_diagnostics_trust_from_state(state, root)["compiler_diagnostics_trust_class"])
             self.assertTrue(gate.fail_if_compile_broken_for_operation(root, "unity.tests.run_editmode", state))
 
+    def test_a_fix_in_any_compile_input_makes_the_diagnostics_stale(self):
+        cases = (
+            ("Assets/Component.cs", "source_tree_changed"),
+            ("Assets/New/Added.cs", "source_tree_changed"),
+            ("Assets/Game.asmdef", "source_tree_changed"),
+            ("Packages/com.example.core/Runtime/Core.cs", "source_tree_changed"),
+        )
+        for relative, reason in cases:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                state = red_state(root)
+                package = root / "Packages" / "com.example.core"
+                package.mkdir(parents=True)
+                (package / "package.json").write_text("{}", encoding="utf-8")
+                os.utime(package / "package.json", (1700000000, 1700000000))
+                self.assertEqual("confirmed", gate.compiler_diagnostics_trust_from_state(state, root)["compiler_diagnostics_trust_class"])
+                changed = root / relative
+                changed.parent.mkdir(parents=True, exist_ok=True)
+                changed.write_text("fixed", encoding="utf-8")
+                os.utime(changed, (1800000000, 1800000000))
+                trust = gate.compiler_diagnostics_trust_from_state(state, root)
+                self.assertEqual("stale", trust["compiler_diagnostics_trust_class"])
+                self.assertEqual(reason, trust["compiler_diagnostics_stale_reason"])
+                self.assertEqual(relative, trust["compiler_diagnostics_newer_input"])
+                self.assertTrue(gate.fail_if_compile_broken_for_operation(root, "unity.tests.run_editmode", state))
+
+    def test_non_input_and_ignored_files_keep_a_fresh_error_confirmed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = red_state(root)
+            for relative in ("Assets/Art/icon.png", "Assets/Samples~/Old.cs", "Assets/.hidden/Tmp.cs"):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x", encoding="utf-8")
+                os.utime(path, (1800000000, 1800000000))
+            self.assertEqual("confirmed", gate.compiler_diagnostics_trust_from_state(state, root)["compiler_diagnostics_trust_class"])
+            with self.assertRaises(ToolInvocationError):
+                gate.fail_if_compile_broken_for_operation(root, "unity.tests.run_editmode", state)
+
     def test_prior_generation_and_undated_legacy_diagnostics_require_refresh(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -201,7 +240,12 @@ class RecoveryGuidanceTests(unittest.TestCase):
                 self.assertEqual(alive, result["editor_pid_alive"])
                 self.assertEqual("beforeAssemblyReload", result["busy_reason_detail"])
                 self.assertEqual("2026-01-01T00:00:00Z", result["busy_reason_as_of_utc"])
-                self.assertIn("recover-editor-session" if frozen else "request-status-summary", result["recommended_recovery_command"])
+                expected = "request-status-summary"
+                if frozen:
+                    expected = "project-discovery-report" if alive else "recover-editor-session"
+                self.assertIn(expected, result["recommended_recovery_command"])
+                if alive:
+                    self.assertNotIn("recover-editor-session", result["recommended_recovery_command"])
 
     def test_timeout_retains_a_dead_pid_snapshot_from_disk(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -265,11 +309,102 @@ class ArchivedBoundaryReplayTests(unittest.TestCase):
         with mock.patch.object(state_owner, "pid_is_alive", return_value=fixture["pid_alive"]), mock.patch.object(state_owner.time, "time", return_value=now):
             result = state_owner.build_editor_idle_timeout_details(Path("/example"), last_state=state,
                 reason="before unity.tests.run_editmode", timeout_ms=1000, heartbeat_max_age_seconds=10, require_healthy_bridge=False)
-        self.assertEqual("editor_state_frozen", result["classification"])
+        self.assertEqual("editor_alive_but_unresponsive", result["classification"])
+        self.assertTrue(result["state_frozen"])
         self.assertTrue(result["editor_pid_alive"])
         self.assertEqual("AssetPostprocessor activity", result["busy_reason_detail"])
         self.assertEqual(stamp, result["busy_reason_as_of_utc"])
-        self.assertIn("recover-editor-session", result["recommended_recovery_command"])
+        self.assertEqual("inspect_editor_log_and_observe", result["recommended_next_action"])
+        self.assertNotIn("recover-editor-session", result["recommended_recovery_command"])
+
+
+class LiveEditorRecoveryAuthorityTests(unittest.TestCase):
+    """RG-01: recover-editor-session never quits or kills a live editor without --force-terminate."""
+
+    def run_recover(self, *, opened_by_host, force_terminate, observe_returncode=1, observe_payload=None):
+        import server_cli_bridge_commands as commands
+
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject", timeout_ms=180000, close_timeout_ms=1000, open_editor=True,
+            force_compile_probe=False, compile_preflight="off", heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block", force_terminate=force_terminate,
+            observe_timeout_ms=30000,
+        )
+        restore = mock.Mock(return_value={"closeout_verified": True})
+        terminate = mock.Mock(return_value=True)
+        observe = mock.Mock(return_value=(observe_payload or {"error": {"code": "editor_process_alive_bridge_never_attached", "details": {}}}, mock.Mock(returncode=observe_returncode, stderr="")))
+        stdout = io.StringIO()
+        code = 0
+        patches = {
+            "ensure_project_root": mock.Mock(return_value=Path("/tmp/FakeProject")),
+            "refresh_project_context": mock.Mock(),
+            "build_project_discovery_report": mock.Mock(return_value={"detected_editor_pids": [os.getpid()]}),
+            "current_project_context_host_session_state": mock.Mock(return_value={"opened_by_host": opened_by_host, "editor_pid": os.getpid()}),
+            "restore_host_opened_editor_state": restore,
+            "run_self_json_command_with_completed": observe,
+            "run_editor_open_compile_preflight": mock.Mock(return_value={"verdict": "skipped"}),
+        }
+        with mock.patch.multiple(commands, **patches), mock.patch.object(state_owner, "pid_is_alive", return_value=True), redirect_stdout(stdout):
+            with mock.patch("server_editor_host_lifecycle.terminate_editor_pid", terminate):
+                try:
+                    commands.cmd_recover_editor_session(args)
+                except SystemExit as exc:
+                    code = int(exc.code or 0)
+        return json.loads(stdout.getvalue()), code, restore, terminate, observe
+
+    def test_a_live_host_opened_editor_is_observed_not_closed(self):
+        payload, code, restore, terminate, observe = self.run_recover(opened_by_host=True, force_terminate=False)
+        self.assertEqual(1, code)
+        self.assertEqual("live_editor_refused", payload["recovery_classification"])
+        self.assertEqual("observe_only_without_force_terminate", payload["live_editor_policy"])
+        self.assertIn("--force-terminate", payload["force_terminate_command"])
+        restore.assert_not_called()
+        terminate.assert_not_called()
+        observe_args = observe.call_args.args[0]
+        self.assertNotIn("--open-editor", observe_args)
+        self.assertEqual("30000", observe_args[observe_args.index("--timeout-ms") + 1])
+
+    def test_a_live_editor_the_host_did_not_open_is_never_reported_recovered(self):
+        payload, code, restore, terminate, _ = self.run_recover(opened_by_host=False, force_terminate=False)
+        self.assertEqual(1, code)
+        self.assertEqual("live_editor_not_host_owned", payload["recovery_classification"])
+        self.assertEqual("", payload["force_terminate_command"])
+        restore.assert_not_called()
+        terminate.assert_not_called()
+
+    def test_a_live_editor_whose_bridge_attaches_is_reported_as_such(self):
+        payload, code, restore, _, _ = self.run_recover(opened_by_host=True, force_terminate=False, observe_returncode=0, observe_payload={"verdict": "ready"})
+        self.assertEqual(0, code)
+        self.assertEqual("live_editor_bridge_attached", payload["recovery_classification"])
+        restore.assert_not_called()
+
+    def test_a_modal_recommendation_for_a_host_opened_editor_carries_the_explicit_authority(self):
+        modal = {"error": {"code": "editor_startup_modal_blocked", "details": {
+            "recommended_next_action": "quit_editor_batch_compile_then_reopen",
+            "recommended_recovery_command": "launcher recover-editor-session --project-root /tmp/FakeProject --force-compile-probe --open-editor",
+        }}}
+        payload, code, restore, _, _ = self.run_recover(opened_by_host=True, force_terminate=False, observe_payload=modal)
+        self.assertEqual(1, code)
+        self.assertEqual("quit_editor_batch_compile_then_reopen", payload["recovery_recommended_next_action"])
+        self.assertIn("--force-terminate", payload["recommended_recovery_command"])
+        restore.assert_not_called()
+
+    def test_force_terminate_is_the_only_path_to_the_closeout(self):
+        payload, code, restore, _, observe = self.run_recover(opened_by_host=True, force_terminate=True, observe_returncode=0, observe_payload={"verdict": "ready"})
+        restore.assert_called_once()
+        self.assertTrue(payload["closeout_attempted"])
+
+    def test_enrichment_never_pairs_a_kill_recommendation_with_an_observe_only_policy(self):
+        from server_project_reporting import enrich_error_details_with_discovery_data
+
+        enriched = enrich_error_details_with_discovery_data(
+            Path("/project"),
+            details={"recommended_next_action": "recover_editor_session", "editor_pid_alive": True},
+            discovery={"host_health_termination_policy": "observe_only", "host_health_recommended_next_action": "inspect_editor_log_and_observe"},
+            recommended_recovery_command_for_project=recommended_recovery_command_for_project,
+        )
+        self.assertEqual("inspect_editor_log_and_observe", enriched["recommended_next_action"])
+        self.assertNotIn("recover-editor-session", enriched["recommended_recovery_command"])
 
 
 class SetupAndCatalogGuidanceTests(unittest.TestCase):

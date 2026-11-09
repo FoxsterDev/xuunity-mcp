@@ -69,6 +69,8 @@ def _compact_launch(payload: dict[str, Any]) -> dict[str, Any]:
         "editor_pid": _int_or_zero(launch.get("editor_pid")),
         "unity_app": str(launch.get("unity_app") or ""),
         "editor_log_path": str(launch.get("editor_log_path") or ""),
+        "editor_opened_by_this_call": bool(launch.get("editor_opened_by_this_call")),
+        "launch_duration_seconds": launch.get("launch_duration_seconds"),
     }
 
 
@@ -166,6 +168,14 @@ def build_ensure_ready_summary(
     launch = _compact_launch(payload)
     if launch:
         summary["launch"] = launch
+
+    compile_preflight = payload.get("compile_preflight")
+    if isinstance(compile_preflight, dict) and compile_preflight:
+        summary["compile_preflight"] = {
+            key: compile_preflight.get(key)
+            for key in ("verdict", "reason", "run_compile_probe", "compile_errors_observed")
+            if key in compile_preflight
+        }
 
     startup_log_observation = bridge_state.get("startup_log_observation")
     if isinstance(startup_log_observation, dict) and startup_log_observation:

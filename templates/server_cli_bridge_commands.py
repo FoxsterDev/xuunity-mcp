@@ -24,6 +24,57 @@ def _final_status_cli_payload(summary: dict[str, Any], include_full_payload: boo
             compact[key] = summary.get(key)
     return compact
 
+def _observe_live_editor_without_closing(args, project_root: Path, payload: dict[str, Any], opened_by_host: bool) -> None:
+    payload["live_editor_policy"] = "observe_only_without_force_terminate"
+    observe_timeout_ms = max(1000, min(int(args.timeout_ms), int(getattr(args, "observe_timeout_ms", 30000) or 30000)))
+    ensure_payload, ensure_completed = run_self_json_command_with_completed(
+        [
+            "ensure-ready",
+            "--project-root",
+            str(project_root),
+            "--timeout-ms",
+            str(observe_timeout_ms),
+            "--heartbeat-max-age-seconds",
+            str(args.heartbeat_max_age_seconds),
+            "--startup-policy",
+            str(args.startup_policy),
+        ]
+    )
+    payload["observe_ready"] = ensure_payload or {}
+    if ensure_completed.returncode == 0:
+        payload["recovery_classification"] = "live_editor_bridge_attached"
+        payload["recovery_recommended_next_action"] = "none"
+        payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
+        print_json(payload)
+        return
+
+    error_payload = dict((ensure_payload or {}).get("error") or {})
+    details = dict(error_payload.get("details") or {})
+    payload["observe_error"] = {
+        "code": str(error_payload.get("code") or "ensure_ready_failed"),
+        "message": str(error_payload.get("message") or truncate_text(ensure_completed.stderr or "", 400)),
+    }
+    payload["recovery_classification"] = "live_editor_refused" if opened_by_host else "live_editor_not_host_owned"
+    next_action = str(details.get("recommended_next_action") or "inspect_editor_log_and_observe")
+    command = str(details.get("recommended_recovery_command") or "")
+    if opened_by_host and "recover-editor-session" in command and "--force-terminate" not in command:
+        command += " --force-terminate"
+    payload["recovery_recommended_next_action"] = next_action
+    payload["recommended_recovery_command"] = command or recommended_recovery_command_for_project(project_root, next_action)
+    payload["force_terminate_command"] = (
+        render_launcher_cli("recover-editor-session", project_root, "--force-terminate") if opened_by_host else ""
+    )
+    payload["refusal_reason"] = (
+        "A live project editor is running. recover-editor-session never quits or terminates it without "
+        "--force-terminate, because unsaved scene and prefab edits would be lost."
+        if opened_by_host
+        else "A live project editor the host did not open is running; this command cannot close it. Quit it in Unity."
+    )
+    payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
+    print_json(payload)
+    raise SystemExit(1)
+
+
 def cmd_recover_editor_session(args):
     project_root = ensure_project_root(args.project_root)
     refresh_project_context(project_root)
@@ -40,7 +91,15 @@ def cmd_recover_editor_session(args):
     }
 
     host_session_state = current_project_context_host_session_state(project_root)
-    if bool(host_session_state.get("opened_by_host")):
+    live_editor_pids = [int(pid) for pid in initial_discovery.get("detected_editor_pids") or [] if int(pid or 0) > 0]
+    opened_by_host = bool(host_session_state.get("opened_by_host"))
+    payload["live_editor_pids"] = live_editor_pids
+    payload["force_terminate"] = bool(getattr(args, "force_terminate", False))
+    if live_editor_pids and not payload["force_terminate"]:
+        _observe_live_editor_without_closing(args, project_root, payload, opened_by_host)
+        return
+
+    if opened_by_host:
         payload["closeout_attempted"] = True
         closeout = restore_host_opened_editor_state(project_root, args.close_timeout_ms, request_editor_quit)
         payload["closeout"] = closeout
@@ -96,6 +155,23 @@ def cmd_recover_editor_session(args):
             if recovery_classification == "compile_red_confirmed":
                 payload["reopen_blocked"] = True
                 payload["reopen_block_reason"] = "compile_red_after_batch_restore"
+            payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
+            print_json(payload)
+            raise SystemExit(1)
+    elif not detected_editor_pids:
+        preflight = run_editor_open_compile_preflight(
+            project_root,
+            timeout_ms=args.timeout_ms,
+            mode=str(getattr(args, "compile_preflight", "auto") or "auto"),
+        )
+        payload["compile_preflight"] = preflight
+        payload["compile_probe_attempted"] = bool(preflight.get("run_compile_probe"))
+        if preflight.get("verdict") == "red":
+            payload["recovery_classification"] = "compile_red_confirmed"
+            payload["recovery_recommended_next_action"] = "fix_compile_errors_before_gui_reopen"
+            payload["recommended_recovery_command"] = render_launcher_cli("project-discovery-report", project_root)
+            payload["reopen_blocked"] = True
+            payload["reopen_block_reason"] = "compile_red_before_gui_open"
             payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
             print_json(payload)
             raise SystemExit(1)

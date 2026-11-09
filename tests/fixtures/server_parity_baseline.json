@@ -28,7 +28,8 @@
     "bridge_process_class_source": "legacy_state",
     "bridge_session_id": "session-parity",
     "bridge_state_writer_trust_class": "legacy_unclassified",
-    "health_status": "unstable",
+    "health_status": "editor_not_running",
+    "liveness_gated": true,
     "listener_required": true,
     "pending_request_count": 2,
     "request_flow_state": "not_ready",
@@ -36,7 +37,9 @@
     "safe_to_retry": false,
     "stabilized": false,
     "transport": "tcp_loopback",
-    "transport_listener_state": "closed",
+    "recorded_health_status": "unstable",
+    "recorded_transport_listener_state": "closed",
+    "transport_listener_state": "no_live_editor",
     "transport_ready_for_requests": false
   },
   "call_tool_error": {
@@ -213,8 +216,8 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "e4e53fc3e67c0e51ad0bfb38d4b1dca2724e4635316a47466a01b958092c4037",
-    "tool_count": 80,
+    "sha256": "f5802724064c121f941e461c911033432ba5eb4dc0bb09a3a15d48278e0c5720",
+    "tool_count": 81,
     "tool_names": [
       "xuunity_setup_plan",
       "xuunity_setup_apply",
@@ -228,6 +231,7 @@
       "unity_build_target_get",
       "unity_build_target_switch",
       "unity_status_summary",
+      "unity_ensure_ready",
       "unity_request_final_status",
       "unity_project_refresh",
       "unity_project_action_list",

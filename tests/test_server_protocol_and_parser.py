@@ -1,4 +1,5 @@
 import argparse
+from contextlib import ExitStack
 import contextlib
 import io
 import json
@@ -2574,6 +2575,65 @@ actions:
         self.assertEqual("reopen_project_for_clean_resolve", ctx.exception.details["recommended_next_action"])
         self.assertEqual("close_and_reopen_unity_to_resolve_package", ctx.exception.details["next_distinct_action"])
         self.assertEqual([2468], ctx.exception.details["live_project_editor_pids"])
+
+    def test_ensure_ready_timeout_points_at_a_stronger_status_summary_diagnosis(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject", open_editor=True, unity_app=None, editor_log_path=None,
+            background_open=False, timeout_ms=120000, heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block",
+        )
+        import_state = {"import_state": "resolved", "bridge_state_present": True}
+
+        def enrich(_, exc):
+            details = dict(exc.details)
+            details.update({"host_health_reason": "startup_modal_dialog_block", "recommended_next_action": "poll_bridge_bootstrap_attached_then_retry"})
+            return server.ToolInvocationError(exc.code, exc.message, details)
+
+        for code, expect_hint in (("editor_not_ready_bridge_not_attached", True), ("editor_startup_modal_blocked", False)):
+            with self.subTest(code=code), ExitStack() as stack:
+                stack.enter_context(mock.patch.object(server, "ensure_project_root", return_value=Path("/tmp/FakeProject")))
+                stack.enter_context(mock.patch.object(server, "resolve_editor_log_path", return_value=Path("/tmp/editor.log")))
+                stack.enter_context(mock.patch.object(server, "build_project_discovery_report", return_value={}))
+                stack.enter_context(mock.patch.object(server, "current_project_context_bridge_state", return_value={}))
+                stack.enter_context(mock.patch.object(server, "inspect_light_mcp_import_state", return_value=import_state))
+                stack.enter_context(mock.patch.object(server, "detect_unity_app_path_for_project", return_value=Path("/Applications/Unity.app")))
+                stack.enter_context(mock.patch.object(server, "open_unity_editor", return_value={"reused_existing_editor": True, "editor_pid": 2468}))
+                stack.enter_context(mock.patch.object(server, "enrich_tool_invocation_error_with_discovery", side_effect=enrich))
+                stack.enter_context(mock.patch.object(server, "wait_for_ready", side_effect=server.ToolInvocationError(code, "waited")))
+                with self.assertRaises(server.ToolInvocationError) as ctx:
+                    server.cmd_ensure_ready(args)
+                details = ctx.exception.details
+                self.assertEqual(expect_hint, details.get("stronger_diagnosis_source") == "status_summary")
+                self.assertEqual(expect_hint, "request-status-summary" in str(details.get("recommended_recovery_command") or ""))
+
+    def test_a_startup_modal_is_not_rewritten_as_an_unimported_package(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject", open_editor=True, unity_app=None, editor_log_path=None,
+            background_open=False, timeout_ms=120000, heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block", compile_preflight="off",
+        )
+        modal = server.ToolInvocationError("editor_startup_modal_blocked", "modal", {
+            "recommended_next_action": "quit_editor_batch_compile_then_reopen",
+            "recommended_recovery_command": "launcher recover-editor-session --force-terminate",
+        })
+        with ExitStack() as stack:
+            for name, value in (
+                ("ensure_project_root", mock.Mock(return_value=Path("/tmp/FakeProject"))),
+                ("resolve_editor_log_path", mock.Mock(return_value=Path("/tmp/editor.log"))),
+                ("build_project_discovery_report", mock.Mock(return_value={"detected_editor_pids": [2468], "detected_editor_count": 1})),
+                ("current_project_context_bridge_state", mock.Mock(return_value={})),
+                ("inspect_light_mcp_import_state", mock.Mock(return_value={"import_state": "resolved_not_cached", "bridge_state_present": False})),
+                ("detect_unity_app_path_for_project", mock.Mock(return_value=Path("/Applications/Unity.app"))),
+                ("open_unity_editor", mock.Mock(return_value={"reused_existing_editor": False, "editor_pid": 2468})),
+                ("enrich_tool_invocation_error_with_discovery", mock.Mock(side_effect=lambda _, exc: exc)),
+                ("wait_for_ready", mock.Mock(side_effect=modal)),
+            ):
+                stack.enter_context(mock.patch.object(server, name, value))
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_ensure_ready(args)
+        self.assertEqual("editor_startup_modal_blocked", ctx.exception.code)
+        self.assertEqual("quit_editor_batch_compile_then_reopen", ctx.exception.details["recommended_next_action"])
+        self.assertNotIn("package_import_diagnosis", ctx.exception.details)
 
     def test_ensure_ready_fails_fast_when_package_not_declared(self) -> None:
         args = argparse.Namespace(

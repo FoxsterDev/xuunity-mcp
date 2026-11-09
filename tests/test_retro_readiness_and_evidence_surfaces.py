@@ -45,6 +45,7 @@ import server_health
 import server_launcher
 import server_operation_evidence
 import server_project_context
+import server_core
 from server_bridge_paths import bridge_state_path, test_result_path
 from server_core import ToolInvocationError, read_json, write_json
 from server_readiness_summary import build_ensure_ready_summary
@@ -116,7 +117,7 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
         self.stderr = io.StringIO()
         self.enterContext(redirect_stderr(self.stderr))
 
-    def _wait(self, marker: str, *, becomes_ready: bool = False, quiet: bool = False, compile_diagnostics: bool = True, during_sleep=None, progress_marker: str = "import progress", session_id: str = "a" * 32) -> tuple[dict | ToolInvocationError, mock.Mock]:
+    def _wait(self, marker: str, *, becomes_ready: bool = False, quiet: bool = False, compile_diagnostics: bool = True, during_sleep=None, progress_marker: str = "import progress", session_id: str = "a" * 32, timeout_ms: int = 2000, writes_until: float | None = None, starting_pid: int = 111, host_session: dict | None = None) -> tuple[dict | ToolInvocationError, mock.Mock]:
         clock = [1000.0]
         self.log.write_text(("error CS1061\n" if compile_diagnostics else "") + marker + "\n", encoding="utf-8")
         os.utime(self.log, (clock[0], clock[0]))
@@ -124,14 +125,14 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
             "editor_pid": 222, "bridge_bootstrap_attached": True, "health_status": "healthy",
             "script_compilation_failed": compile_diagnostics, "compiler_error_count": int(compile_diagnostics),
         }
-        starting_state = {"editor_pid": 111, "bridge_generation": 7, "bridge_session_id": session_id,
+        starting_state = {"editor_pid": starting_pid, "bridge_generation": 7, "bridge_session_id": session_id,
                           "editor_log_path": "PRIVATE_PATH_SENTINEL", "authorization": "SECRET_SENTINEL"}
 
         def sleep(seconds: float) -> None:
             if during_sleep is not None:
                 during_sleep()
             clock[0] += seconds
-            if not quiet:
+            if not quiet and (writes_until is None or clock[0] <= writes_until):
                 with self.log.open("a", encoding="utf-8") as handle:
                     handle.write(progress_marker + "\n")
                 os.utime(self.log, (clock[0], clock[0]))
@@ -146,6 +147,7 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
                 ("find_running_unity_editors_for_project", mock.Mock(return_value=[{"pid": 222}])),
                 ("pid_is_alive", mock.Mock(return_value=True)),
                 ("heartbeat_age_seconds", mock.Mock(return_value=1.0)),
+                ("try_read_host_editor_session_state", mock.Mock(return_value=host_session)),
             ):
                 stack.enter_context(mock.patch.object(server_editor_host, name, value))
             server_editor_host.bridge_state_is_ready(None, 10)  # Sync the facade's closed-boundary patches.
@@ -155,7 +157,7 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
                 stack.enter_context(mock.patch.object(server_editor_host, "read_recent_editor_log", return_value=self.log.read_text(encoding="utf-8")))
             try:
                 result = server_editor_host.wait_for_ready(
-                    self.root, timeout_ms=2000, heartbeat_max_age_seconds=10,
+                    self.root, timeout_ms=timeout_ms, heartbeat_max_age_seconds=10,
                     startup_policy="fail_fast_on_interactive_compile_block", editor_log_path=self.log,
                 )
             except ToolInvocationError as exc:
@@ -313,6 +315,62 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
                 self.assertEqual(expected, observation["safe_mode_log_observation"])
                 self.assertEqual("stale_tail_for_live_project_editor", observation["editor_log_observation_scope"])
                 self.assertNotIn("startup_blocker_kind", observation)
+
+    def test_a_quiet_compile_block_without_a_live_bridge_is_the_startup_modal(self) -> None:
+        for session, opened_by_host in ((None, False), ({"opened_by_host": True, "editor_pid": 222}, True)):
+            with self.subTest(opened_by_host=opened_by_host):
+                with mock.patch.object(server_core, "is_windows_like_host", return_value=False):
+                    result, sleep = self._wait("Compilation failed", quiet=True, host_session=session)
+                self.assertIsInstance(result, ToolInvocationError)
+                self.assertEqual("editor_startup_modal_blocked", result.code)
+                sleep.assert_not_called()
+                details = result.details
+                self.assertEqual("waiting_for_bridge_readiness", details["startup_stage"])
+                self.assertEqual("unmeasured", details["compile_state"])
+                self.assertEqual("editor_log_unverified", details["compile_observation_source"])
+                self.assertEqual(1, details["compile_errors_observed_in_log"])
+                self.assertEqual(["error CS1061"], details["compile_error_lines"])
+                self.assertEqual("quit_editor_batch_compile_then_reopen", details["recommended_next_action"])
+                self.assertIn("recover-editor-session", details["recommended_recovery_command"])
+                self.assertIn("--force-compile-probe", details["recommended_recovery_command"])
+                self.assertEqual(["quit_editor", "batch_compile", "reopen_editor"], [step["step"] for step in details["recovery_steps"]])
+                self.assertEqual(opened_by_host, details["opened_by_host"])
+                self.assertEqual(opened_by_host, "restore-editor-state" in details["recovery_steps"][0]["command"])
+                self.assertEqual(opened_by_host, "--force-terminate" in details["recommended_recovery_command"])
+                self.assertGreaterEqual(details["editor_log_idle_seconds"], 20.0)
+
+    def test_a_moving_log_keeps_polling_past_the_compile_block(self) -> None:
+        result, sleep = self._wait("Compilation failed")
+        self.assertIsInstance(result, ToolInvocationError)
+        self.assertNotEqual("editor_startup_modal_blocked", result.code)
+        self.assertEqual("readiness_deadline_reached", result.details["startup_stage"])
+        self.assertEqual(2, sleep.call_count)
+
+    def test_a_live_bridge_state_keeps_polling_even_with_a_quiet_log(self) -> None:
+        result, sleep = self._wait("Compilation failed", quiet=True, starting_pid=222)
+        self.assertIsInstance(result, ToolInvocationError)
+        self.assertNotEqual("editor_startup_modal_blocked", result.code)
+        self.assertEqual(2, sleep.call_count)
+
+    def test_a_bridge_attaching_inside_the_window_wins_over_the_compile_block(self) -> None:
+        state, sleep = self._wait("Compilation failed", becomes_ready=True)
+        self.assertIsInstance(state, dict)
+        self.assertEqual("bridge_attached", state["startup_log_observation"]["resolved_by"])
+        sleep.assert_called_once_with(1.0)
+
+    def test_a_log_that_goes_quiet_late_is_classified_at_the_deadline(self) -> None:
+        result, sleep = self._wait("Compilation failed", timeout_ms=24000, writes_until=1004.0)
+        self.assertIsInstance(result, ToolInvocationError)
+        self.assertEqual("editor_startup_modal_blocked", result.code)
+        self.assertEqual("readiness_deadline_reached", result.details["startup_stage"])
+        self.assertEqual(24, sleep.call_count)
+
+    def test_a_safe_mode_entry_is_not_the_startup_modal(self) -> None:
+        for marker in ("Entered Safe Mode", SAFE_MODE_EXIT_LINE):
+            with self.subTest(marker=marker):
+                result, sleep = self._wait(marker, quiet=True)
+                self.assertNotEqual("editor_startup_modal_blocked", result.code)
+                self.assertEqual(2, sleep.call_count)
 
     def test_log_freshness_still_requires_a_write_during_the_wait(self) -> None:
         text = "error CS1061\nEntered Safe Mode\n"
@@ -699,15 +757,17 @@ class StaleHeartbeatRetryHintTests(unittest.TestCase):
             with self.subTest(age=age, busy_reason=busy_reason):
                 details = self._details(age=age, busy_reason=busy_reason)
 
-                self.assertEqual("editor_state_frozen", details["classification"])
+                self.assertEqual("editor_alive_but_unresponsive", details["classification"])
+                self.assertTrue(details["state_frozen"])
                 self.assertFalse(details["retry_recommended"])
-                self.assertEqual("recover_editor_session", details["recommended_next_action"])
+                self.assertEqual("inspect_editor_log_and_observe", details["recommended_next_action"])
 
     def test_a_dead_pid_is_never_retryable(self) -> None:
         details = self._details(age=183.4, busy_reason="asset_import", alive=False)
 
         self.assertEqual("editor_state_frozen", details["classification"])
         self.assertFalse(details["retry_recommended"])
+        self.assertEqual("recover_editor_session", details["recommended_next_action"])
 
 
 class GuiFallbackQuitAnnotationTests(unittest.TestCase):

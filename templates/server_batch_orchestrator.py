@@ -312,6 +312,7 @@ from server_batch_recovery import (
     maybe_fail_fast_offline_ensure_ready_without_open,
     recover_project_bridge_for_reconciliation,
     run_batch_build_config_compile_matrix_probe,
+    run_editor_open_compile_preflight,
     run_self_json_command,
     run_self_json_command_with_completed,
 )
@@ -2254,6 +2255,56 @@ def _optional_int_arg(arguments: dict[str, Any], name: str, default: int) -> int
     return value
 
 
+def call_unity_ensure_ready_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    validate_declared_argument_types("unity_ensure_ready", TOOLS["unity_ensure_ready"], arguments)
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+    startup_policy = _optional_string_arg(arguments, "startupPolicy") or "fail_fast_on_interactive_compile_block"
+    if startup_policy not in STARTUP_POLICIES:
+        raise JsonRpcError(-32602, f"startupPolicy must be one of: {', '.join(sorted(STARTUP_POLICIES))}.")
+    compile_preflight = _optional_string_arg(arguments, "compilePreflight") or "auto"
+    if compile_preflight not in {"auto", "off"}:
+        raise JsonRpcError(-32602, "compilePreflight must be one of: auto, off.")
+    try:
+        project_root = ensure_project_root(project_root_value)
+    except ToolInvocationError as exc:
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+
+    command = [
+        "ensure-ready",
+        "--project-root",
+        str(project_root),
+        "--timeout-ms",
+        str(max(1000, _optional_int_arg(arguments, "timeoutMs", 120000))),
+        "--startup-policy",
+        startup_policy,
+        "--compile-preflight",
+        compile_preflight,
+    ]
+    for argument, flag in (
+        ("openEditor", "--open-editor"),
+        ("backgroundOpen", "--background-open"),
+        ("includeFullPayload", "--include-full-payload"),
+    ):
+        if _optional_bool_arg(arguments, argument, False):
+            command.append(flag)
+    payload, completed = run_self_json_command_with_completed(command)
+    if completed.returncode == 0 and isinstance(payload, dict):
+        return mcp_json_result(payload)
+    error = dict((payload or {}).get("error") or {})
+    return mcp_json_result(
+        build_tool_error_payload(
+            ToolInvocationError(
+                str(error.get("code") or "ensure_ready_failed"),
+                str(error.get("message") or truncate_text(completed.stderr or completed.stdout or "", 600)),
+                dict(error.get("details") or {}),
+            )
+        ),
+        is_error=True,
+    )
+
+
 def call_xuunity_setup_plan_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     include_test_framework = _optional_string_arg(arguments, "includeTestFramework") or "auto"
     if include_test_framework not in {"auto", "yes", "no"}:
@@ -3003,6 +3054,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             **{tool_name: _device_tool_handler(tool_name) for tool_name in DEVICE_TOOL_HANDLERS},
             "unity_tests_cancel": call_unity_tests_cancel_tool,
             "unity_status_summary": call_unity_status_summary_tool,
+            "unity_ensure_ready": call_unity_ensure_ready_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
             "unity_scenario_result_summary": call_unity_scenario_result_summary_tool,
             "unity_scenario_results_list": call_unity_scenario_results_list_tool,
@@ -3350,6 +3402,7 @@ wrap_globals_with_proxies(globals(), [
     "resolve_operation_default_timeout_ms",
     "restore_host_opened_editor_state",
     "run_batch_build_config_compile_matrix_probe",
+    "run_editor_open_compile_preflight",
     "run_gui_fallback_operation",
     "run_self_json_command_with_completed",
     "summarize_state_for_error",
@@ -3378,6 +3431,7 @@ wrap_globals_with_proxies(globals(), [
     "call_unity_scenario_results_list_tool",
     "call_unity_scenario_result_latest_tool",
     "call_unity_maintenance_prune_tool",
+    "call_unity_ensure_ready_tool",
     "call_unity_license_capabilities_tool",
     "call_unity_project_action_list_tool",
     "call_unity_project_action_invoke_tool",

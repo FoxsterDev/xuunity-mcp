@@ -188,9 +188,15 @@ def build_status_summary(
     if editor_running:
         session = dict(host_editor_session_state or {})
         session_pid = int(session.get("editor_pid") or 0)
-        opened_by_host = bool(session.get("opened_by_host")) and session_pid in (0, editor_pid)
+        opened_by_host = bool(session.get("opened_by_host")) and (
+            session_pid in (0, editor_pid) or bool((discovery_details or {}).get("host_session_live"))
+        )
+        summary["editor_opened_by_host"] = opened_by_host
         if opened_by_host:
             summary["editor_launch_lane"] = "opened_by_host"
+            summary["editor_opened_at_utc"] = str(session.get("opened_at_utc") or "")
+            if session.get("launch_duration_seconds") is not None:
+                summary["editor_launch_duration_seconds"] = session.get("launch_duration_seconds")
         else:
             summary["editor_launch_lane"] = "not_opened_by_host"
             summary["editor_launch_lane_risk"] = "host_default_editor_log_path_may_be_stale"
@@ -293,6 +299,15 @@ def build_status_summary(
             mcp_reachable=bool(payload.get("mcp_reachable", True)),
         )
     )
+    if discovery and not bool(discovery.get("bridge_state_live")):
+        summary["compile_state"] = "unmeasured"
+        summary["compiler_error_count_source"] = "stale_bridge_state" if state else "none"
+        diagnosis = dict(discovery.get("editor_log_diagnosis") or {})
+        observed_count = int(diagnosis.get("compile_error_line_count") or 0)
+        if observed_count > 0:
+            summary["compile_errors_observed_in_log"] = observed_count
+            summary["compile_observation_source"] = "editor_log_unverified"
+            summary["compile_error_lines"] = list(diagnosis.get("compile_error_lines") or [])[:5]
     if bridge_owned_by_non_main_process:
         summary.update(
             {
