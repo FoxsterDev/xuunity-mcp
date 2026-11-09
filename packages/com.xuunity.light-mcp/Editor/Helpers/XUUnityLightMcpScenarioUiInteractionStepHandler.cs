@@ -10,6 +10,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
     static class XUUnityLightMcpScenarioUiInteractionStepHandler
     {
         const string ClickOperation = "unity.ui.click";
+        const string NodeNotFound = "ui_node_not_found";
 
         public static bool ProcessUiReadStep(
             XUUnityLightMcpScenarioStepDefinition step,
@@ -17,6 +18,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             string operation)
         {
             XUUnityLightMcpPlayModeStateOperation.PopulateLivenessEvidence(stepResult);
+            stepResult.optional = step.optional;
             if (XUUnityLightMcpUiSelectorMatcher.IsEmpty(step.selector))
             {
                 return Fail(stepResult, "ui_selector_invalid",
@@ -86,6 +88,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
             if (!payload.met_expectations)
             {
                 var diagnostic = query.errors != null && query.errors.Count > 0 ? query.errors[0] : null;
+                if (step.optional && IsCleanAbsence(query, diagnostic))
+                {
+                    return SkipOptionalAbsent(stepResult, NodeNotFound);
+                }
+
                 stepResult.status = "failed";
                 stepResult.error_code = diagnostic?.code
                     ?? (isExists ? "ui_exists_expectation_failed" : "ui_text_expectation_failed");
@@ -108,6 +115,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             XUUnityLightMcpScenarioStepResult stepResult)
         {
             XUUnityLightMcpPlayModeStateOperation.PopulateLivenessEvidence(stepResult);
+            stepResult.optional = step.optional;
             var interactionId = (step.interactionId ?? "").Trim();
             if (string.IsNullOrEmpty(interactionId))
             {
@@ -204,6 +212,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             stepResult.payload_json = JsonUtility.ToJson(payload);
 
+            if (!click.delivered && step.optional && IsOptionalAbsentRefusal(click.refusal_code))
+            {
+                return SkipOptionalAbsent(stepResult, click.refusal_code);
+            }
+
             if (!payload.met_expectations)
             {
                 stepResult.status = "failed";
@@ -216,6 +229,41 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             stepResult.status = "passed";
             stepResult.outcome = click.no_observable_effect ? "delivered_no_observable_effect" : "interaction_delivered";
+            return true;
+        }
+
+        public static bool IsOptionalAbsentRefusal(string refusalCode)
+        {
+            return string.Equals(refusalCode, NodeNotFound, StringComparison.Ordinal)
+                || string.Equals(refusalCode, "ui_target_not_visible", StringComparison.Ordinal)
+                || string.Equals(refusalCode, "ui_target_occluded", StringComparison.Ordinal);
+        }
+
+        static bool IsCleanAbsence(XUUnityLightMcpUiQueryPayload query, XUUnityLightMcpUiDiagnostic diagnostic)
+        {
+            if (query.exists || query.truncated || query.out_of_scope)
+            {
+                return false;
+            }
+
+            if (query.warnings != null
+                && query.warnings.Exists(item => string.Equals(item?.code, "ui_scope_probe_incomplete", StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            return diagnostic == null
+                ? query.success
+                : string.Equals(diagnostic.code, NodeNotFound, StringComparison.Ordinal);
+        }
+
+        static bool SkipOptionalAbsent(XUUnityLightMcpScenarioStepResult stepResult, string reason)
+        {
+            stepResult.status = XUUnityLightMcpUiRead.SkippedOptionalAbsent;
+            stepResult.outcome = XUUnityLightMcpUiRead.SkippedOptionalAbsent;
+            stepResult.optional_absent_reason = reason ?? "";
+            stepResult.error_code = "";
+            stepResult.error_message = "";
             return true;
         }
 

@@ -10,6 +10,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public const string InteractionStepKind = "ui_click";
         public const string ExistsStepKind = "ui_exists";
         public const string GetTextStepKind = "ui_get_text";
+        public const string SkippedOptionalAbsent = "skipped_optional_absent";
 
         public const string ProofSemanticTree = "semantic_ui_tree";
         public const string ProofSemanticPartial = "semantic_ui_partial";

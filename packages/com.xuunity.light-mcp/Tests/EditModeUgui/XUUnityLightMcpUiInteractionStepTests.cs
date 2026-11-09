@@ -253,6 +253,132 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             Assert.That(payload.query.text, Is.EqualTo("Close"));
         }
 
+        [TestCase("ui_node_not_found")]
+        [TestCase("ui_target_not_visible")]
+        public void OptionalClick_RefusedBeforeDeliveryIsSkippedNotFailed(string expectedReason)
+        {
+            var step = NewStep();
+            step.optional = true;
+            if (expectedReason == "ui_node_not_found")
+            {
+                step.selector = new XUUnityLightMcpUiSelectorArgs { name = "NoSuchButton" };
+            }
+            else
+            {
+                _canvasRoot.transform.Find("CloseButton").gameObject.SetActive(false);
+            }
+
+            var result = Run(step);
+
+            Assert.That(result.status, Is.EqualTo(XUUnityLightMcpUiRead.SkippedOptionalAbsent), result.error_message);
+            Assert.That(result.outcome, Is.EqualTo(XUUnityLightMcpUiRead.SkippedOptionalAbsent));
+            Assert.That(result.optional, Is.True);
+            Assert.That(result.optional_absent_reason, Is.EqualTo(expectedReason));
+            Assert.That(result.error_code, Is.Empty);
+            Assert.That(_clickCount, Is.Zero);
+            var payload = JsonUtility.FromJson<XUUnityLightMcpUiInteractionStepPayload>(result.payload_json);
+            Assert.That(payload.ui_interaction.refusal_code, Is.EqualTo(expectedReason));
+        }
+
+        [Test]
+        public void OptionalClick_OccludedTargetIsSkippedNotFailed()
+        {
+            Assert.That(XUUnityLightMcpScenarioUiInteractionStepHandler.IsOptionalAbsentRefusal("ui_target_occluded"), Is.True);
+            Assert.That(XUUnityLightMcpScenarioUiInteractionStepHandler.IsOptionalAbsentRefusal("ui_selector_search_truncated"), Is.False);
+            Assert.That(XUUnityLightMcpScenarioUiInteractionStepHandler.IsOptionalAbsentRefusal("ui_target_not_interactable"), Is.False);
+            Assert.That(XUUnityLightMcpScenarioUiInteractionStepHandler.IsOptionalAbsentRefusal("ui_target_out_of_scope"), Is.False);
+        }
+
+        [Test]
+        public void OptionalClick_DeliveredWithoutStateChangeStillFails()
+        {
+            var inert = new GameObject("InertButton", typeof(RectTransform), typeof(Image));
+            inert.transform.SetParent(_canvasRoot.transform, false);
+            inert.GetComponent<RectTransform>().sizeDelta = new Vector2(300f, 120f);
+            inert.AddComponent<Button>();
+
+            var step = NewStep();
+            step.optional = true;
+            step.interactionId = "inert";
+            step.selector = new XUUnityLightMcpUiSelectorArgs { name = "InertButton" };
+            var result = Run(step);
+
+            Assert.That(result.status, Is.EqualTo("failed"));
+            Assert.That(result.error_code, Is.EqualTo("ui_interaction_no_state_change"));
+            Assert.That(result.optional, Is.True);
+        }
+
+        [Test]
+        public void OptionalClick_TruncatedSearchStillFails()
+        {
+            var step = NewStep();
+            step.optional = true;
+            step.maxNodes = 1;
+            var result = Run(step);
+
+            Assert.That(result.status, Is.EqualTo("failed"));
+            Assert.That(result.error_code, Is.EqualTo("ui_selector_search_truncated"));
+        }
+
+        [TestCase(XUUnityLightMcpUiRead.ExistsStepKind)]
+        [TestCase(XUUnityLightMcpUiRead.GetTextStepKind)]
+        public void OptionalReadStep_AbsentNodeIsSkippedNotFailed(string kind)
+        {
+            var result = Run(new XUUnityLightMcpScenarioStepDefinition
+            {
+                stepId = "optional-read",
+                kind = kind,
+                optional = true,
+                expectedExists = true,
+                selector = new XUUnityLightMcpUiSelectorArgs { name = "MissingLabel" }
+            });
+
+            Assert.That(result.status, Is.EqualTo(XUUnityLightMcpUiRead.SkippedOptionalAbsent), result.error_message);
+            Assert.That(result.optional_absent_reason, Is.EqualTo("ui_node_not_found"));
+        }
+
+        [Test]
+        public void OptionalGetText_PresentNodeWithWrongTextStillFails()
+        {
+            var result = Run(new XUUnityLightMcpScenarioStepDefinition
+            {
+                stepId = "optional-text",
+                kind = XUUnityLightMcpUiRead.GetTextStepKind,
+                optional = true,
+                expectedText = "Open",
+                selector = new XUUnityLightMcpUiSelectorArgs { name = "Label" }
+            });
+
+            Assert.That(result.status, Is.EqualTo("failed"));
+            Assert.That(result.error_code, Is.EqualTo("ui_text_expectation_failed"));
+        }
+
+        [Test]
+        public void Validator_RefusesOptionalOutsideUiStepsAndOnAbsenceAssertions()
+        {
+            var status = Validate(new XUUnityLightMcpScenarioStepDefinition
+            {
+                stepId = "status",
+                kind = "status",
+                optional = true
+            });
+            Assert.That(Codes(status), Contains.Item("optional_not_supported_for_kind"));
+
+            var absence = Validate(new XUUnityLightMcpScenarioStepDefinition
+            {
+                stepId = "absent",
+                kind = XUUnityLightMcpUiRead.ExistsStepKind,
+                optional = true,
+                expectedExists = false,
+                selector = new XUUnityLightMcpUiSelectorArgs { name = "Label" }
+            });
+            Assert.That(Codes(absence), Contains.Item("optional_absence_assertion"));
+
+            var click = NewStep();
+            click.optional = true;
+            Assert.That(Codes(Validate(click)), Is.Empty);
+        }
+
         static XUUnityLightMcpScenarioStepDefinition NewStep()
         {
             return new XUUnityLightMcpScenarioStepDefinition

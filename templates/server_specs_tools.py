@@ -2134,7 +2134,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "unity_scenario_run_and_wait": {
-        "description": "Start a Unity automation scenario and wait until it reaches a terminal state. Valid kinds and fields are returned by unity_scenario_capabilities, including ui_click, ui_exists, and ui_get_text. By default returns a compact decision envelope; set includeFullPayload=true when asserting raw per-step payload_json, hook_name, or parity fixture fields. Full payload mode omits duplicated run_start.steps unless includeStepPayloads=true.",
+        "description": "Start a Unity automation scenario and wait until it reaches a terminal state. Valid kinds and fields are returned by unity_scenario_capabilities, including ui_click, ui_exists, and ui_get_text. A step marked optional that finds no target reports skipped_optional_absent and does not fail the run. By default returns a compact decision envelope; set includeFullPayload=true when asserting raw per-step payload_json, hook_name, or parity fixture fields. Full payload mode omits duplicated run_start.steps unless includeStepPayloads=true.",
         "inputSchema": {
             "type": "object",
             "properties": {

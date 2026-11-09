@@ -112,6 +112,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 passed_steps = CountSteps(state.steps, "passed"),
                 failed_steps = CountSteps(state.steps, "failed"),
                 skipped_steps = CountSteps(state.steps, "skipped"),
+                skipped_optional_step_count = CountSteps(state.steps, XUUnityLightMcpUiRead.SkippedOptionalAbsent),
                 duration_seconds = CalculateDurationSeconds(state.startedAtUtc, string.IsNullOrWhiteSpace(state.completedAtUtc) ? state.updatedAtUtc : state.completedAtUtc),
             };
 

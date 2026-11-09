@@ -190,6 +190,19 @@ the values describe the editor stand, not a size the tests observe.
 | `playmode_liveness_unproven_editor_unfocused` | `wait_for_playmode_liveness_sample_and_retry` |
 | empty | none |
 
+### Scenario step `status`
+
+| Value | Meaning |
+| --- | --- |
+| `pending` | the run has not reached the step |
+| `passed` | the step met its expectations |
+| `failed` | the step did not meet its expectations; it fails the run |
+| `skipped` | the step did not run because a `dependsOn` or `runIfStepPassed` step did not pass |
+| `skipped_optional_absent` | an `optional` UI step found no target: a `ui_click` refused before delivery as `ui_node_not_found`, `ui_target_not_visible` or `ui_target_occluded`, or a read step whose complete search matched no node; `optional_absent_reason` carries the code and the run is not failed |
+
+The decision verdict counts `required_steps` separately from `optional_steps`;
+an optional step never turns a run `failed` unless it ran and failed.
+
 ### UI interaction outcomes and gaps
 
 | Value | Meaning |

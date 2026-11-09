@@ -213,7 +213,7 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "e4e53fc3e67c0e51ad0bfb38d4b1dca2724e4635316a47466a01b958092c4037",
+    "sha256": "afef46ed76930e473bf5bb4c1d256a1e55b2d323a014c2b2bdbefbcc236cb78d",
     "tool_count": 80,
     "tool_names": [
       "xuunity_setup_plan",
@@ -318,11 +318,6 @@
   },
   "scenario_result_summary": {
     "action": "unity_scenario_result_summary",
-    "mutation_boundary": {
-      "last_applied_mutation": null,
-      "pending_project_actions": [],
-      "automatic_replay_safe": false
-    },
     "active_step": {
       "duration_seconds": 0.5,
       "error_code": "missing_root",
@@ -354,11 +349,33 @@
       "status": "failed",
       "step_id": "assert"
     },
+    "mutation_boundary": {
+      "automatic_replay_safe": false,
+      "last_applied_mutation": null,
+      "pending_project_actions": []
+    },
+    "optional_steps": {
+      "failed": 0,
+      "passed": 0,
+      "pending": 0,
+      "skipped": 0,
+      "skipped_optional_absent": 0,
+      "total": 0
+    },
     "passed_steps": 1,
     "project_root": "ParityProject",
+    "required_steps": {
+      "failed": 1,
+      "passed": 1,
+      "pending": 0,
+      "skipped": 0,
+      "total": 2
+    },
     "result_path": "scenario-result.json",
     "run_id": "run-parity",
     "scenario_name": "scenario_parity",
+    "skipped_optional_step_count": 0,
+    "skipped_optional_steps": [],
     "skipped_steps": 0,
     "started_at_utc": "2026-06-25T10:00:00Z",
     "status": "failed",

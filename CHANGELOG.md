@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Added
+
+- Scenario `optional: true` on `ui_click`, `ui_exists` and `ui_get_text`. A
+  best-effort popup dismissal that found nothing to close used to fail the
+  whole run. Now a click refused before delivery as `ui_node_not_found`,
+  `ui_target_not_visible` or `ui_target_occluded`, or a read step whose
+  complete search matched no node, becomes step status
+  `skipped_optional_absent` and does not fail the run. A delivered click that
+  fails `expectStateChange`, a truncated or out-of-scope search, and every
+  other refusal still fail. Steps that `dependsOn` a skipped optional step
+  are skipped. `optional` on any other step kind, or on `ui_exists` with
+  `expectedExists: false`, is refused at validation. Summaries and the compact
+  decision envelope report `required_steps` and `optional_steps` counts plus
+  `skipped_optional_steps` (step id, kind, refusal reason, interaction id);
+  `unity_scenario_capabilities` lists `step_statuses`.
+
 ## 0.3.87
 
 Release tag: `v0.3.87`

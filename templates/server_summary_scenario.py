@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server_bridge_runtime import build_bridge_stabilization_summary
+from server_specs_scenario import SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT
 from server_ui_fixture import extract_ui_fixture_block, normalize_ui_fixture_evidence
 
 
@@ -121,6 +122,12 @@ def summarize_scenario_step(step: dict[str, Any] | None) -> dict[str, Any] | Non
         "duration_seconds": round(float(step.get("duration_seconds") or 0.0), 3),
     }
 
+    if step.get("optional") is True:
+        summary["optional"] = True
+    optional_absent_reason = str(step.get("optional_absent_reason") or "")
+    if optional_absent_reason:
+        summary["optional_absent_reason"] = optional_absent_reason
+
     error_code = str(step.get("error_code") or "")
     error_message = str(step.get("error_message") or "")
     if error_code:
@@ -154,6 +161,41 @@ def summarize_scenario_step(step: dict[str, Any] | None) -> dict[str, Any] | Non
     if ui_interaction_summary:
         summary["ui_interaction_summary"] = ui_interaction_summary
     return summary
+
+
+def _skipped_optional_step_entry(step: dict[str, Any]) -> dict[str, Any]:
+    entry = {
+        "step_id": str(step.get("stepId") or step.get("step_id") or ""),
+        "kind": str(step.get("kind") or ""),
+        "reason": str(step.get("optional_absent_reason") or ""),
+    }
+    interaction = _parse_step_payload_json(step).get("ui_interaction")
+    if isinstance(interaction, dict) and str(interaction.get("interaction_id") or ""):
+        entry["interaction_id"] = str(interaction.get("interaction_id") or "")
+    return entry
+
+
+def build_scenario_step_counts(steps: list[Any]) -> dict[str, Any]:
+    required = {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "pending": 0}
+    optional = {"total": 0, "passed": 0, "failed": 0, SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT: 0, "skipped": 0, "pending": 0}
+    skipped_optional: list[dict[str, Any]] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        status = str(step.get("status") or "pending")
+        is_optional = step.get("optional") is True or status == SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT
+        bucket = optional if is_optional else required
+        bucket["total"] += 1
+        if status in bucket:
+            bucket[status] += 1
+        if status == SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT:
+            skipped_optional.append(_skipped_optional_step_entry(step))
+    return {
+        "required_steps": required,
+        "optional_steps": optional,
+        "skipped_optional_step_count": len(skipped_optional),
+        "skipped_optional_steps": skipped_optional,
+    }
 
 
 def build_scenario_liveness_summary(steps: list[Any]) -> dict[str, Any]:
@@ -1316,6 +1358,7 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
         "passed_steps": int(normalized.get("passed_steps") or 0),
         "failed_steps": int(normalized.get("failed_steps") or 0),
         "skipped_steps": int(normalized.get("skipped_steps") or 0),
+        **build_scenario_step_counts(step_items),
         "current_step_index": current_step_index,
         "waiting_until_utc": str(normalized.get("waiting_until_utc") or ""),
         "result_path": str(normalized.get("result_path") or ""),
@@ -1592,6 +1635,10 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         "passed_steps",
         "failed_steps",
         "skipped_steps",
+        "required_steps",
+        "optional_steps",
+        "skipped_optional_step_count",
+        "skipped_optional_steps",
         "waited_for_terminal_state",
         "wait_duration_seconds",
         "recovery_attempt_count",
@@ -1642,6 +1689,7 @@ def build_scenario_cleanup_summary(steps: list[Any], cleanup_start_index: Any) -
             "cleanup_passed_count": 0,
             "cleanup_failed_count": 0,
             "cleanup_skipped_count": 0,
+            "cleanup_skipped_optional_count": 0,
             "cleanup_result": "",
             "cleanup_steps": [],
         }
@@ -1655,9 +1703,12 @@ def build_scenario_cleanup_summary(steps: list[Any], cleanup_start_index: Any) -
     passed = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "passed")
     failed = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "failed")
     skipped = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "skipped")
+    skipped_optional = sum(
+        1 for item in cleanup_steps if str(item.get("status") or "") == SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT
+    )
     if failed > 0:
         cleanup_result = "failed"
-    elif cleanup_steps and passed == len(cleanup_steps):
+    elif cleanup_steps and passed + skipped_optional == len(cleanup_steps):
         cleanup_result = "passed"
     elif cleanup_steps:
         cleanup_result = "incomplete"
@@ -1669,6 +1720,7 @@ def build_scenario_cleanup_summary(steps: list[Any], cleanup_start_index: Any) -
         "cleanup_passed_count": passed,
         "cleanup_failed_count": failed,
         "cleanup_skipped_count": skipped,
+        "cleanup_skipped_optional_count": skipped_optional,
         "cleanup_result": cleanup_result,
         "cleanup_steps": cleanup_steps,
     }
