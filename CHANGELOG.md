@@ -16,6 +16,13 @@
   attaches keeps polling. When the wait ends with a weaker code while host
   health holds `startup_modal_dialog_block`, the error points at
   `request-status-summary`.
+- `status_summary` no longer shows `compiler_error_count: 0` beside an Editor.log
+  full of CS errors with nothing to say which is current. Without a live
+  bridge it now adds `compile_state: unmeasured`, `compiler_error_count_source`
+  (`stale_bridge_state` or `none`) and, when the log holds compile errors,
+  `compile_errors_observed_in_log`, `compile_error_lines` and
+  `compile_observation_source: editor_log_unverified`. The log count never
+  goes into `compiler_error_count`, which stays a bridge measurement.
 
 ## 0.3.87
 

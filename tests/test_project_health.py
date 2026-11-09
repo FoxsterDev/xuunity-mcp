@@ -441,5 +441,71 @@ class ProjectHealthTests(unittest.TestCase):
         self.assertEqual({}, diagnosis)
 
 
+class CompileObservationSurfaceTests(unittest.TestCase):
+    def _log(self, text: str) -> Path:
+        handle = tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8")
+        handle.write(text)
+        handle.close()
+        self.addCleanup(Path(handle.name).unlink)
+        return Path(handle.name)
+
+    def _summary(self, *, bridge_state: dict, discovery: dict) -> dict:
+        from server_summary_status import build_status_summary
+
+        return build_status_summary(
+            Path("/tmp/FakeProject"),
+            {},
+            read_best_effort_bridge_state=lambda _: bridge_state,
+            try_read_bridge_state=lambda _: bridge_state,
+            pid_is_alive=lambda _: False,
+            heartbeat_age_seconds=heartbeat_age_seconds,
+            derive_busy_reason=derive_busy_reason,
+            summarize_state_for_error=lambda _: "",
+            discovery_details=discovery,
+            include_full_payload=False,
+        )
+
+    def test_the_diagnosis_counts_distinct_compile_error_lines(self) -> None:
+        log = self._log(
+            "Assets/A.cs(1,1): error CS0246: The type 'Missing' could not be found\n"
+            "Assets/A.cs(1,1): error CS0246: The type 'Missing' could not be found\n"
+            "Assets/B.cs(2,2): error CS1061: no member\n"
+        )
+        diagnosis = build_editor_log_diagnosis(
+            log, startup_policy="fail_fast_on_interactive_compile_block", classify_editor_log=classify_editor_log
+        )
+        self.assertEqual("interactive_compile_block_detected", diagnosis["code"])
+        self.assertEqual(2, diagnosis["compile_error_line_count"])
+        self.assertEqual(2, len(diagnosis["compile_error_lines"]))
+
+    def test_log_compile_errors_never_land_in_the_bridge_error_count(self) -> None:
+        summary = self._summary(
+            bridge_state={"editor_pid": 77, "compiler_error_count": 0, "health_status": "healthy"},
+            discovery={
+                "bridge_state_live": False,
+                "editor_log_diagnosis": {
+                    "code": "interactive_compile_block_detected",
+                    "compile_error_line_count": 3,
+                    "compile_error_lines": ["a error CS0246", "b error CS0246", "c error CS1061"],
+                },
+            },
+        )
+        self.assertEqual(0, summary["compiler_error_count"])
+        self.assertEqual("stale_bridge_state", summary["compiler_error_count_source"])
+        self.assertEqual("unmeasured", summary["compile_state"])
+        self.assertEqual(3, summary["compile_errors_observed_in_log"])
+        self.assertEqual("editor_log_unverified", summary["compile_observation_source"])
+        self.assertEqual(3, len(summary["compile_error_lines"]))
+
+    def test_a_live_bridge_keeps_its_own_compile_fields(self) -> None:
+        summary = self._summary(
+            bridge_state={"editor_pid": 77, "compiler_error_count": 2},
+            discovery={"bridge_state_live": True, "editor_log_diagnosis": {"compile_error_line_count": 5}},
+        )
+        self.assertEqual(2, summary["compiler_error_count"])
+        self.assertNotIn("compile_state", summary)
+        self.assertNotIn("compile_errors_observed_in_log", summary)
+
+
 if __name__ == "__main__":
     unittest.main()

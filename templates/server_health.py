@@ -14,6 +14,16 @@ FRESH_HEARTBEAT_MAX_AGE_SECONDS = 5.0
 STALE_HEARTBEAT_MAX_AGE_SECONDS = 15.0
 ANR_SUSPECTED_HEARTBEAT_MAX_AGE_SECONDS = 30.0
 STARTUP_MODAL_QUIESCENCE_SECONDS = 20.0
+STARTUP_MODAL_FINGERPRINT_LOG_CODES = frozenset(
+    {
+        "interactive_compile_block_detected",
+        "interactive_compile_block_with_safe_mode_dialog",
+        "safe_mode_manual_required",
+    }
+)
+COMPILE_ERROR_LINE_LIMIT = 10
+COMPILE_ERROR_LINE_MAX_CHARS = 300
+COMPILE_ERROR_LINE_PATTERN = re.compile(r"error CS\d{4}")
 # Below this a quiet log is just an idle editor, not the wrong file.
 STALE_LOG_LANE_MIN_AGE_SECONDS = 600.0
 DEFAULT_LOG_TAIL_MAX_CHARS = 40000
@@ -1286,6 +1296,18 @@ def read_editor_log_scope(
     return tail_text, scope
 
 
+def compile_error_lines_from_log(log_text: str) -> tuple[list[str], int]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for line in (log_text or "").splitlines():
+        stripped = line.strip()
+        if not stripped or not COMPILE_ERROR_LINE_PATTERN.search(stripped) or stripped in seen:
+            continue
+        seen.add(stripped)
+        ordered.append(stripped[-COMPILE_ERROR_LINE_MAX_CHARS:])
+    return ordered[-COMPILE_ERROR_LINE_LIMIT:], len(ordered)
+
+
 def _matching_log_lines(log_text: str, patterns: list[str], limit: int = 3) -> list[str]:
     matches: list[str] = []
     for raw_line in log_text.splitlines():
@@ -1414,13 +1436,18 @@ def _build_editor_log_diagnosis_core(
                 "Enter Safe Mode",
             ],
         )
-        return {
+        diagnosis = {
             "code": code,
             "severity": "error",
             "summary": summary,
             "evidence_lines": evidence_lines,
             "scope": log_scope,
         }
+        compile_error_lines, compile_error_line_count = compile_error_lines_from_log(log_text)
+        if compile_error_line_count:
+            diagnosis["compile_error_lines"] = compile_error_lines
+            diagnosis["compile_error_line_count"] = compile_error_line_count
+        return diagnosis
 
     runtime_exception_lines = _matching_log_lines(
         log_text,
@@ -1677,11 +1704,7 @@ def classify_project_health(
             if classification == "anr":
                 classification = "stale"
                 anr_classification = "none"
-        if diagnosis_code in {
-            "interactive_compile_block_detected",
-            "interactive_compile_block_with_safe_mode_dialog",
-            "safe_mode_manual_required",
-        }:
+        if diagnosis_code in STARTUP_MODAL_FINGERPRINT_LOG_CODES:
             # Unity does not log a "Safe Mode" marker while the "Enter Safe Mode?" prompt is
             # displayed, so string matching alone misses a blocking prompt. A live editor with
             # compile errors, no live bridge state, and an idle Editor.log is the reliable

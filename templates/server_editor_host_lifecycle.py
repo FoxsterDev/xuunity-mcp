@@ -54,6 +54,11 @@ from server_hub_licensing import (
 )
 
 from server_licensing_state import guard_editor_licensing_launch, editor_license_evidence
+from server_health import (
+    STARTUP_MODAL_FINGERPRINT_LOG_CODES,
+    STARTUP_MODAL_QUIESCENCE_SECONDS,
+    compile_error_lines_from_log,
+)
 
 ACTIVATION_DELAY_SECONDS = 0.35
 UNITY_EDITOR_ROOTS_ENV = "XUUNITY_UNITY_EDITOR_ROOTS"
@@ -62,17 +67,6 @@ TASKKILL_TIMEOUT_SECONDS = 15.0
 LAUNCH_HELPER_TIMEOUT_SECONDS = 30.0
 TRANSIENT_LICENSING_BLOCKER_GRACE_SECONDS = 5.0
 SAFE_MODE_DIALOG_QUIESCENCE_SECONDS = 20.0
-STARTUP_MODAL_QUIESCENCE_SECONDS = 20.0
-STARTUP_MODAL_FINGERPRINT_LOG_CODES = frozenset(
-    {
-        "interactive_compile_block_detected",
-        "interactive_compile_block_with_safe_mode_dialog",
-        "safe_mode_manual_required",
-    }
-)
-STARTUP_COMPILE_ERROR_LINE_LIMIT = 10
-STARTUP_COMPILE_ERROR_LINE_MAX_CHARS = 300
-COMPILE_ERROR_LINE_PATTERN = re.compile(r"error CS\d{4}")
 STARTUP_BLOCKER_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "licensing_connection_lost",
@@ -1363,18 +1357,6 @@ def _safe_mode_dialog_is_blocking(editor_log_path: Path, readiness_error: ToolIn
         else "editor_log_still_moving_after_safe_mode_markers"
     )
     return blocking
-
-
-def compile_error_lines_from_log(log_text: str) -> tuple[list[str], int]:
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for line in (log_text or "").splitlines():
-        stripped = line.strip()
-        if not stripped or not COMPILE_ERROR_LINE_PATTERN.search(stripped) or stripped in seen:
-            continue
-        seen.add(stripped)
-        ordered.append(stripped[-STARTUP_COMPILE_ERROR_LINE_MAX_CHARS:])
-    return ordered[-STARTUP_COMPILE_ERROR_LINE_LIMIT:], len(ordered)
 
 
 def _startup_modal_block_error(

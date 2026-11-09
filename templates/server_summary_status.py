@@ -293,6 +293,15 @@ def build_status_summary(
             mcp_reachable=bool(payload.get("mcp_reachable", True)),
         )
     )
+    if discovery and not bool(discovery.get("bridge_state_live")):
+        summary["compile_state"] = "unmeasured"
+        summary["compiler_error_count_source"] = "stale_bridge_state" if state else "none"
+        diagnosis = dict(discovery.get("editor_log_diagnosis") or {})
+        observed_count = int(diagnosis.get("compile_error_line_count") or 0)
+        if observed_count > 0:
+            summary["compile_errors_observed_in_log"] = observed_count
+            summary["compile_observation_source"] = "editor_log_unverified"
+            summary["compile_error_lines"] = list(diagnosis.get("compile_error_lines") or [])[:5]
     if bridge_owned_by_non_main_process:
         summary.update(
             {
