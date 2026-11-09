@@ -143,6 +143,13 @@ def build_bridge_stabilization_summary(
     editor_running_effective = bool(
         editor_running if editor_running is not None else derive_editor_running_from_state(effective)
     )
+    recorded_health_status = health_status
+    recorded_listener_state = transport_listener_state
+    if not editor_running_effective:
+        health_status = "editor_not_running"
+        transport_listener_state = "no_live_editor"
+        transport_ready_for_requests = False
+        request_flow_state = "not_ready"
     mcp_reachable_effective = bool(mcp_reachable if mcp_reachable is not None else effective.get("mcp_reachable", True))
 
     blocking_reasons: list[str] = []
@@ -152,7 +159,7 @@ def build_bridge_stabilization_summary(
         blocking_reasons.append("mcp_not_reachable")
     if not runtime_execution_allowed:
         blocking_reasons.append("bridge_owned_by_non_main_process")
-    if health_status != "healthy":
+    if recorded_health_status != "healthy":
         blocking_reasons.append("health_not_healthy")
     if bool(effective.get("domain_reload_in_progress")):
         blocking_reasons.append("domain_reload_in_progress")
@@ -170,7 +177,7 @@ def build_bridge_stabilization_summary(
         blocking_reasons.append("playmode_transition_pending")
     if pending_request_count > 0:
         blocking_reasons.append("pending_request_in_flight")
-    if listener_required and transport_listener_state not in {"", "listening"}:
+    if listener_required and recorded_listener_state not in {"", "listening"}:
         blocking_reasons.append("transport_listener_not_ready")
 
     stabilized = len(blocking_reasons) == 0
@@ -188,6 +195,15 @@ def build_bridge_stabilization_summary(
         "safe_to_retry": stabilized,
         "blocking_reasons": blocking_reasons,
         **writer_identity,
+        **(
+            {}
+            if editor_running_effective
+            else {
+                "recorded_health_status": recorded_health_status,
+                "recorded_transport_listener_state": recorded_listener_state,
+                "liveness_gated": True,
+            }
+        ),
     }
 
 

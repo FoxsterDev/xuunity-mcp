@@ -69,6 +69,8 @@ def _compact_launch(payload: dict[str, Any]) -> dict[str, Any]:
         "editor_pid": _int_or_zero(launch.get("editor_pid")),
         "unity_app": str(launch.get("unity_app") or ""),
         "editor_log_path": str(launch.get("editor_log_path") or ""),
+        "editor_opened_by_this_call": bool(launch.get("editor_opened_by_this_call")),
+        "launch_duration_seconds": launch.get("launch_duration_seconds"),
     }
 
 

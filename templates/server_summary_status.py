@@ -189,8 +189,12 @@ def build_status_summary(
         session = dict(host_editor_session_state or {})
         session_pid = int(session.get("editor_pid") or 0)
         opened_by_host = bool(session.get("opened_by_host")) and session_pid in (0, editor_pid)
+        summary["editor_opened_by_host"] = opened_by_host
         if opened_by_host:
             summary["editor_launch_lane"] = "opened_by_host"
+            summary["editor_opened_at_utc"] = str(session.get("opened_at_utc") or "")
+            if session.get("launch_duration_seconds") is not None:
+                summary["editor_launch_duration_seconds"] = session.get("launch_duration_seconds")
         else:
             summary["editor_launch_lane"] = "not_opened_by_host"
             summary["editor_launch_lane_risk"] = "host_default_editor_log_path_may_be_stale"

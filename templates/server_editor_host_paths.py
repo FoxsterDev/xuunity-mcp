@@ -24,7 +24,7 @@ from server_bridge_runtime import (
     try_read_bridge_state,
     try_read_live_editor_state,
 )
-from server_core import ToolInvocationError, read_json, write_json
+from server_core import ToolInvocationError, parse_utc_timestamp, read_json, write_json
 from server_host_platform import (
     current_host_platform_adapter,
     host_path_to_local_path,
@@ -93,6 +93,12 @@ def update_host_editor_session_pid(project_root: Path, editor_pid: int) -> None:
 
     normalized = dict(state)
     normalized["editor_pid"] = max(0, int(editor_pid or 0))
+    if not normalized.get("bridge_ready_at_utc"):
+        now = time.time()
+        normalized["bridge_ready_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+        opened_at = parse_utc_timestamp(normalized.get("opened_at_utc"))
+        if opened_at is not None:
+            normalized["launch_duration_seconds"] = round(max(0.0, now - opened_at), 3)
     normalized["owned_licensing_children"] = discover_owned_licensing_children(
         baseline_pids=list(normalized.get("licensing_client_pids_before_launch") or []),
         editor_pid=normalized["editor_pid"],

@@ -428,6 +428,7 @@ def cmd_ensure_ready(args):
         "package_import_state_before_ready": package_import_state_before_ready,
     }
     payload["discovery"] = build_project_discovery_report_fn(project_root)
+    launch_started: float | None = None
 
     try:
         maybe_fail_fast_ensure_ready_package_state_fn(
@@ -500,6 +501,7 @@ def cmd_ensure_ready(args):
                             ),
                         },
                     )
+            launch_started = time.monotonic()
             payload["launch"] = open_unity_editor_fn(
                 project_root,
                 log_path,
@@ -575,6 +577,9 @@ def cmd_ensure_ready(args):
     payload["bridge_state"] = state
     if payload.get("launch") and not bool(payload["launch"].get("reused_existing_editor")):
         update_host_editor_session_pid_fn(project_root, int(state.get("editor_pid") or 0))
+        if launch_started is not None:
+            payload["launch"]["editor_opened_by_this_call"] = True
+            payload["launch"]["launch_duration_seconds"] = round(time.monotonic() - launch_started, 3)
     refresh_project_context_fn(project_root)
     payload["discovery_after_ready"] = build_project_discovery_report_fn(project_root)
     payload["package_dependency"] = inspect_package_dependency_alignment_fn(project_root)

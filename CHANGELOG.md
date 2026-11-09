@@ -57,6 +57,21 @@
   `live_editor_not_host_owned` (exit 1) instead of a false `recovered`. Error
   enrichment never pairs `recover_editor_session` with an `observe_only` health
   policy for a live pid. The docs claimed this gate before it existed.
+- A dead editor's state file no longer reads as healthy. `bridge_stabilization`
+  (and the `status_summary` fields built from it) reported `health_status:
+  healthy`, `transport_listener_state: listening`, `request_flow_state: usable`
+  and `transport_ready_for_requests: true` beside `host_health_classification:
+  offline`; `transport_state.listener_state` still said `listening`. Without a
+  live editor they now read `editor_not_running`, `no_live_editor`,
+  `not_ready` and `false`; the file's values stay visible as
+  `recorded_health_status`, `recorded_transport_listener_state` and
+  `transport_state.recorded_listener_state`. `blocking_reasons` are unchanged.
+- An editor the host opened is now visible with its launch time.
+  `status_summary` adds `editor_opened_by_host`, `editor_opened_at_utc` and
+  `editor_launch_duration_seconds`; the host session records
+  `bridge_ready_at_utc` and `launch_duration_seconds` when the bridge first
+  attaches; the compact `ensure-ready` launch block adds
+  `editor_opened_by_this_call` and `launch_duration_seconds`.
 
 ## 0.3.87
 

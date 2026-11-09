@@ -28,7 +28,8 @@
     "bridge_process_class_source": "legacy_state",
     "bridge_session_id": "session-parity",
     "bridge_state_writer_trust_class": "legacy_unclassified",
-    "health_status": "unstable",
+    "health_status": "editor_not_running",
+    "liveness_gated": true,
     "listener_required": true,
     "pending_request_count": 2,
     "request_flow_state": "not_ready",
@@ -36,7 +37,9 @@
     "safe_to_retry": false,
     "stabilized": false,
     "transport": "tcp_loopback",
-    "transport_listener_state": "closed",
+    "recorded_health_status": "unstable",
+    "recorded_transport_listener_state": "closed",
+    "transport_listener_state": "no_live_editor",
     "transport_ready_for_requests": false
   },
   "call_tool_error": {

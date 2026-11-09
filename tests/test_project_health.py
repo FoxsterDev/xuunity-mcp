@@ -2,6 +2,7 @@ import sys
 import tempfile
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
@@ -509,3 +510,70 @@ class CompileObservationSurfaceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeadEditorLivenessGatingTests(unittest.TestCase):
+    STATE = {
+        "editor_pid": 999999, "health_status": "healthy", "transport": "tcp_loopback",
+        "transport_listener_state": "listening", "transport_host": "127.0.0.1", "transport_port": 5000,
+        "heartbeat_utc": "2026-11-09T00:00:00Z", "bridge_process_class": "main_editor",
+    }
+
+    def test_a_dead_editor_state_file_never_reads_healthy_or_listening(self) -> None:
+        from server_bridge_final_status import build_bridge_stabilization_summary
+        from server_discovery import _transport_state
+
+        stabilization = build_bridge_stabilization_summary(self.STATE, editor_running=False)
+        self.assertEqual("editor_not_running", stabilization["health_status"])
+        self.assertEqual("healthy", stabilization["recorded_health_status"])
+        self.assertEqual("no_live_editor", stabilization["transport_listener_state"])
+        self.assertFalse(stabilization["transport_ready_for_requests"])
+        self.assertEqual("not_ready", stabilization["request_flow_state"])
+        self.assertFalse(stabilization["safe_to_retry"])
+
+        transport = _transport_state(
+            bridge_state=self.STATE, active_transport="tcp_loopback", transport_requested="tcp_loopback",
+            transport_metadata={"transport_listener_state": "listening"}, bridge_state_live=False,
+        )
+        self.assertFalse(transport["ready"])
+        self.assertEqual("no_live_editor", transport["listener_state"])
+        self.assertEqual("listening", transport["recorded_listener_state"])
+
+    def test_a_live_editor_keeps_its_recorded_values(self) -> None:
+        from server_bridge_final_status import build_bridge_stabilization_summary
+
+        stabilization = build_bridge_stabilization_summary(self.STATE, editor_running=True)
+        self.assertEqual("healthy", stabilization["health_status"])
+        self.assertEqual("listening", stabilization["transport_listener_state"])
+        self.assertNotIn("liveness_gated", stabilization)
+
+    def test_the_status_summary_names_a_host_opened_editor_and_its_launch_time(self) -> None:
+        from server_summary_status import build_status_summary
+
+        summary = build_status_summary(
+            Path("/tmp/FakeProject"), {},
+            read_best_effort_bridge_state=lambda _: {"editor_pid": 77, "health_status": "healthy"},
+            try_read_bridge_state=lambda _: {},
+            pid_is_alive=lambda _: True,
+            heartbeat_age_seconds=heartbeat_age_seconds,
+            derive_busy_reason=derive_busy_reason,
+            summarize_state_for_error=lambda _: "",
+            include_full_payload=False,
+            host_editor_session_state={"opened_by_host": True, "editor_pid": 77, "opened_at_utc": "2026-11-09T10:00:00Z", "launch_duration_seconds": 41.5},
+        )
+        self.assertTrue(summary["editor_opened_by_host"])
+        self.assertEqual("2026-11-09T10:00:00Z", summary["editor_opened_at_utc"])
+        self.assertEqual(41.5, summary["editor_launch_duration_seconds"])
+
+    def test_the_session_records_bridge_ready_time_and_launch_duration_once(self) -> None:
+        import server_editor_host_paths as paths
+
+        written = []
+        session = {"opened_by_host": True, "editor_pid": 0, "opened_at_utc": "2026-11-09T10:00:00Z"}
+        with unittest.mock.patch.object(paths, "try_read_host_editor_session_state", return_value=session), \
+                unittest.mock.patch.object(paths, "write_host_editor_session_state", side_effect=lambda _, state: written.append(state)), \
+                unittest.mock.patch.object(paths, "discover_owned_licensing_children", return_value=[]), \
+                unittest.mock.patch.object(paths.time, "time", return_value=1794218441.5):
+            paths.update_host_editor_session_pid(Path("/tmp/FakeProject"), 77)
+        self.assertEqual(41.5, written[0]["launch_duration_seconds"])
+        self.assertEqual("2026-11-09T10:00:41Z", written[0]["bridge_ready_at_utc"])
