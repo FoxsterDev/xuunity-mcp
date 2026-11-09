@@ -52,6 +52,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     stepId = step.stepId,
                     kind = NormalizeStepKind(step),
                     status = "pending",
+                    optional = step.optional,
                 });
             }
 

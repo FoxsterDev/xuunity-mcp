@@ -24,7 +24,7 @@ Everything the bridge does per tick runs on the editor main thread: `XUUnityLigh
 ## 3. Ticks Are Throttled and Early-Out
 
 - All periodic work goes through the interval gates in `XUUnityLightMcpBridgeBootstrap.OnUpdate` (heartbeat/pump intervals from bridge config) — never do per-frame work directly on `EditorApplication.update`.
-- The single ungated call is `XUUnityLightMcpEditorQuitScheduler.Tick()`, first in `OnUpdate`: a static-flag early-out, so an armed quit runs on the first update after its response.
+- Two calls are ungated, first in `OnUpdate`, each a static-flag early-out: `XUUnityLightMcpEditorQuitScheduler.Tick()`, so an armed quit runs on the first update after its response, and `XUUnityLightMcpUiClickTreeWatch.Tick()`, so a click with `waitForTreeChangeMs` samples once per Play Mode frame (every 50 ms in Edit Mode) only while a wait is armed.
 - Tick bodies must early-out cheaply when idle (`LifecycleMonitor.Tick`, scenario scheduler). New tick work needs the same shape: field checks first, I/O only when something is actually pending.
 
 ## 4. No `delayCall` on Request Paths

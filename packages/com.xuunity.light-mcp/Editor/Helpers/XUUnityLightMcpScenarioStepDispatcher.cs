@@ -67,7 +67,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 case "project_action":
                     return ProcessProjectActionStep(step, stepResult);
                 case XUUnityLightMcpUiRead.InteractionStepKind:
-                    return XUUnityLightMcpScenarioUiInteractionStepHandler.ProcessUiClickStep(step, stepResult);
+                    return XUUnityLightMcpScenarioUiInteractionStepHandler.ProcessUiClickStep(state, step, stepResult);
                 case XUUnityLightMcpUiRead.ExistsStepKind:
                     return XUUnityLightMcpScenarioUiInteractionStepHandler.ProcessUiReadStep(
                         step,

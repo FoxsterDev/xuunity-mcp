@@ -44,7 +44,8 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual("mutation_applied_unsettled", verdict["trust_class"])
         self.assertEqual("change_environment", verdict["mutation_boundary"]["last_applied_mutation"]["step_id"])
         self.assertEqual("unproven", verdict["applied_mutation_settle_summary"]["settle_completion"])
-        self.assertNotIn("settle_wait_duration_seconds", verdict["steps"][1])
+        self.assertEqual(["refresh"], [step["step_id"] for step in verdict["steps"]])
+        self.assertNotIn("settle_wait_duration_seconds", verdict["steps"][0])
 
     def test_refresh_with_unmeasured_timing_does_not_publish_stale_elapsed(self) -> None:
         for measured in (False, None):
@@ -229,12 +230,14 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual("authoritative", structured["trust_class"])
         self.assertEqual("passed", structured["scenario_status"])
         self.assertTrue(structured["full_payload_available"])
-        self.assertEqual("compact_summary", structured["steps_payload_mode"])
+        self.assertEqual("decision_steps", structured["steps_payload_mode"])
         self.assertTrue(structured["steps_are_compact"])
         self.assertFalse(structured["raw_steps_included"])
         self.assertTrue(structured["raw_steps_available"])
         self.assertEqual(1, structured["raw_step_count"])
-        self.assertEqual(1, structured["compact_step_count"])
+        self.assertEqual(0, structured["compact_step_count"])
+        self.assertEqual(1, structured["omitted_step_count"])
+        self.assertEqual([], structured["steps"])
         self.assertEqual(
             [
                 "request-scenario-result",
@@ -259,10 +262,7 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual(1, structured["bridge_generation_before"])
         self.assertEqual(2, structured["bridge_generation_after"])
         self.assertEqual("host_launchable_not_active", structured["cold_start_reason"])
-        self.assertEqual(
-            [{"step_id": "assert_ui", "kind": "scene_assert", "status": "passed", "outcome": "assertion_passed", "duration_seconds": 0.0}],
-            structured["steps"],
-        )
+        self.assertEqual({"total": 1, "passed": 1, "failed": 0, "skipped": 0, "pending": 0}, structured["required_steps"])
         self.assertNotIn("run_start", structured)
         self.assertNotIn(heavy_payload, json.dumps(structured))
 
@@ -432,7 +432,7 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
         self.assertEqual("failed", structured["verdict"])
         self.assertEqual("authoritative", structured["trust_class"])
         self.assertEqual("product_assertion", structured["failure_class"])
-        self.assertEqual("compact_summary", structured["steps_payload_mode"])
+        self.assertEqual("decision_steps", structured["steps_payload_mode"])
         self.assertFalse(structured["raw_steps_included"])
         self.assertTrue(structured["raw_steps_available"])
         self.assertEqual("scenario_failed", structured["error"]["code"])

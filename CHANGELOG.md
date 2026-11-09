@@ -23,6 +23,29 @@
   `openEditor`, `backgroundOpen`, `compilePreflight`, `startupPolicy`,
   `timeoutMs` and `includeFullPayload`, runs the CLI command, and returns its
   payload or its typed error code and recovery command unchanged.
+- Scenario `optional: true` on `ui_click`, `ui_exists` and `ui_get_text`. A
+  best-effort popup dismissal that found nothing to close used to fail the
+  whole run. Now a click refused before delivery as `ui_node_not_found`,
+  `ui_target_not_visible` or `ui_target_occluded`, or a read step whose
+  complete search matched no node, becomes step status
+  `skipped_optional_absent` and does not fail the run. A delivered click that
+  fails `expectStateChange`, a truncated or out-of-scope search, and every
+  other refusal still fail. Steps that `dependsOn` a skipped optional step
+  are skipped. `optional` on any other step kind, or on `ui_exists` with
+  `expectedExists: false`, is refused at validation. Summaries and the compact
+  decision envelope report `required_steps` and `optional_steps` counts plus
+  `skipped_optional_steps` (step id, kind, refusal reason, interaction id);
+  `unity_scenario_capabilities` lists `step_statuses`.
+- `waitForTreeChangeMs` on `unity_ui_click` and the scenario `ui_click` step
+  (at most 10000 ms). The after-snapshot was taken in the same frame as the
+  click, so a popup that loads a few frames later read as
+  `ui_interaction_no_state_change`, and `expectStateChange: false` was the only
+  workaround. With a window, an unchanged tree is re-snapshotted on later
+  editor frames from the update loop (no sleeping on the main thread) until
+  the signature changes or the window ends. The response carries
+  `tree_change_wait_status`, `tree_change_observed_after_ms` and
+  `tree_change_observed_after_frames`; a second click while one is waiting is
+  refused as `ui_click_wait_in_progress`.
 
 ### Fixed
 
@@ -82,6 +105,38 @@
   `editor_opened_by_this_call` and `launch_duration_seconds`. An editor the
   host opened also reads as host-opened while it is blocked before its bridge
   attaches.
+- A scenario `project_refresh` right after a hook that triggers a recompile
+  (for example a config apply that changes scripting defines) timed out every
+  time. The recompile reloads the editor domain, which drops the refresh
+  settle watcher's in-memory request id, so the step waited for an id that no
+  longer existed while the editor sat idle. Measured on Unity 6000.0.58f2 with
+  the editor unfocused: 4 of 4 runs timed out at the step limit (10 s and
+  60 s) with `lost_final_accounting`; with the fix 3 of 3 pass after about
+  3.5 s of settle. When the domain reloaded after the request and the id is
+  gone, the step now settles on four consecutive idle ticks and reports
+  `completion_basis: editor_idle_after_domain_reload`. Focus was not the
+  cause: the unfocused Edit Mode update loop kept ticking at 5-10 Hz.
+- The scenario decision verdict no longer relabels a failed run as
+  `playmode_throttled` because an earlier step ran throttled in Play Mode. The
+  liveness override applies to a failed run only when the deciding (first
+  failed) step itself ran throttled or unproven, so
+  `mutation_applied_unsettled` survives an Edit Mode refresh timeout that
+  follows a throttled Play Mode step. `playmode_liveness_summary` reports
+  `deciding_step_id` and `applies_to_verdict`. The `unity_playmode_set`
+  description now states that `backgroundExecution: managed` covers Play Mode
+  only.
+
+### Changed
+
+- The compact `unity_scenario_run_and_wait` envelope lists only the decision
+  steps: failed and `skipped_optional_absent` steps, plus the active step of a
+  run that did not finish. Passed steps are counted (`required_steps`,
+  `optional_steps`, `omitted_step_count`) instead of listed, and
+  `cleanup_summary.cleanup_steps` is trimmed the same way. A 20-step passing
+  run drops from about 13 KB to about 2 KB. `steps_payload_mode` is now
+  `decision_steps`; `includeFullPayload=true` (or `unity_scenario_result`)
+  still returns every step.
+
 
 ## 0.3.87
 

@@ -4,12 +4,14 @@ using UnityEngine;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Operations;
 using static XUUnity.LightMcp.Editor.Helpers.XUUnityLightMcpNestedOperationClient;
+using static XUUnity.LightMcp.Editor.Helpers.XUUnityLightMcpScenarioShared;
 
 namespace XUUnity.LightMcp.Editor.Helpers
 {
     static class XUUnityLightMcpScenarioUiInteractionStepHandler
     {
         const string ClickOperation = "unity.ui.click";
+        const string NodeNotFound = "ui_node_not_found";
 
         public static bool ProcessUiReadStep(
             XUUnityLightMcpScenarioStepDefinition step,
@@ -17,6 +19,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             string operation)
         {
             XUUnityLightMcpPlayModeStateOperation.PopulateLivenessEvidence(stepResult);
+            stepResult.optional = step.optional;
             if (XUUnityLightMcpUiSelectorMatcher.IsEmpty(step.selector))
             {
                 return Fail(stepResult, "ui_selector_invalid",
@@ -86,6 +89,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
             if (!payload.met_expectations)
             {
                 var diagnostic = query.errors != null && query.errors.Count > 0 ? query.errors[0] : null;
+                if (step.optional && IsCleanAbsence(query, diagnostic))
+                {
+                    return SkipOptionalAbsent(stepResult, NodeNotFound);
+                }
+
                 stepResult.status = "failed";
                 stepResult.error_code = diagnostic?.code
                     ?? (isExists ? "ui_exists_expectation_failed" : "ui_text_expectation_failed");
@@ -104,10 +112,18 @@ namespace XUUnity.LightMcp.Editor.Helpers
         }
 
         public static bool ProcessUiClickStep(
+            XUUnityLightMcpScenarioRunState state,
             XUUnityLightMcpScenarioStepDefinition step,
             XUUnityLightMcpScenarioStepResult stepResult)
         {
             XUUnityLightMcpPlayModeStateOperation.PopulateLivenessEvidence(stepResult);
+            stepResult.optional = step.optional;
+            if (stepResult.status == "running"
+                && string.Equals(state.pendingNestedOperation, ClickOperation, StringComparison.Ordinal))
+            {
+                return ResumePendingClick(state, step, stepResult);
+            }
+
             var interactionId = (step.interactionId ?? "").Trim();
             if (string.IsNullOrEmpty(interactionId))
             {
@@ -131,14 +147,63 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 includeDontDestroyOnLoad = step.includeDontDestroyOnLoad,
                 maxDepth = step.maxDepth > 0 ? step.maxDepth : XUUnityLightMcpUiRead.DefaultMaxDepth,
                 maxNodes = step.maxNodes > 0 ? step.maxNodes : XUUnityLightMcpUiRead.DefaultMaxNodes,
+                waitForTreeChangeMs = step.waitForTreeChangeMs,
                 selector = step.selector ?? new XUUnityLightMcpUiSelectorArgs()
             };
 
+            var request = BuildNestedRequest(ClickOperation, JsonUtility.ToJson(args), 30000);
             var stopwatch = Stopwatch.StartNew();
-            var response = ExecuteNestedOperation(ClickOperation, JsonUtility.ToJson(args));
+            var response = ExecuteNestedOperation(ClickOperation, request.args_json, request);
             stopwatch.Stop();
             stepResult.duration_seconds = Math.Round(stopwatch.Elapsed.TotalSeconds, 6);
 
+            if (response == null && XUUnityLightMcpUiClickTreeWatch.IsPending)
+            {
+                state.pendingNestedRequestId = request.request_id;
+                state.pendingNestedOperation = ClickOperation;
+                state.pendingNestedStartedAtUtc = request.created_at_utc;
+                stepResult.status = "running";
+                stepResult.outcome = "waiting_for_tree_change";
+                return false;
+            }
+
+            return ApplyClickResponse(step, stepResult, args.selector, interactionId, response);
+        }
+
+        static bool ResumePendingClick(
+            XUUnityLightMcpScenarioRunState state,
+            XUUnityLightMcpScenarioStepDefinition step,
+            XUUnityLightMcpScenarioStepResult stepResult)
+        {
+            if (!TryTakePendingNestedResponse(state.pendingNestedRequestId, out var response))
+            {
+                if (XUUnityLightMcpUiClickTreeWatch.IsPending)
+                {
+                    return false;
+                }
+
+                ClearPendingNestedOperation(state);
+                return Fail(stepResult, "ui_click_wait_response_lost",
+                    $"The deferred '{ClickOperation}' response for waitForTreeChangeMs was not written.");
+            }
+
+            stepResult.duration_seconds = CalculateDurationSeconds(state.pendingNestedStartedAtUtc, response.completed_at_utc ?? "");
+            ClearPendingNestedOperation(state);
+            return ApplyClickResponse(
+                step,
+                stepResult,
+                step.selector ?? new XUUnityLightMcpUiSelectorArgs(),
+                (step.interactionId ?? "").Trim(),
+                response);
+        }
+
+        static bool ApplyClickResponse(
+            XUUnityLightMcpScenarioStepDefinition step,
+            XUUnityLightMcpScenarioStepResult stepResult,
+            XUUnityLightMcpUiSelectorArgs selector,
+            string interactionId,
+            XUUnityLightMcpResponse response)
+        {
             if (response == null)
             {
                 return Fail(stepResult, "null_nested_response", $"Nested operation '{ClickOperation}' returned no response.");
@@ -167,7 +232,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 {
                     interaction_id = interactionId,
                     action = "click",
-                    selector = args.selector,
+                    selector = selector,
                     delivered = click.delivered,
                     delivery_mechanism = click.delivery_mechanism ?? "",
                     target_path = click.target_node != null ? click.target_node.path : "",
@@ -194,7 +259,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     playmode_liveness_remediation = click.playmode_liveness_remediation ?? "",
                     editor_application_focused = click.editor_application_focused,
                     result_trust_class = click.result_trust_class ?? "",
-                    refusal_code = click.refusal_code ?? ""
+                    refusal_code = click.refusal_code ?? "",
+                    wait_for_tree_change_ms = click.wait_for_tree_change_ms,
+                    tree_change_wait_status = click.tree_change_wait_status ?? "",
+                    tree_change_observed_after_ms = click.tree_change_observed_after_ms,
+                    tree_change_observed_after_frames = click.tree_change_observed_after_frames
                 }
             };
 
@@ -203,6 +272,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 && (!expectStateChange || click.state_changed);
 
             stepResult.payload_json = JsonUtility.ToJson(payload);
+
+            if (!click.delivered && step.optional && IsOptionalAbsentRefusal(click.refusal_code))
+            {
+                return SkipOptionalAbsent(stepResult, click.refusal_code);
+            }
 
             if (!payload.met_expectations)
             {
@@ -216,6 +290,41 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             stepResult.status = "passed";
             stepResult.outcome = click.no_observable_effect ? "delivered_no_observable_effect" : "interaction_delivered";
+            return true;
+        }
+
+        public static bool IsOptionalAbsentRefusal(string refusalCode)
+        {
+            return string.Equals(refusalCode, NodeNotFound, StringComparison.Ordinal)
+                || string.Equals(refusalCode, "ui_target_not_visible", StringComparison.Ordinal)
+                || string.Equals(refusalCode, "ui_target_occluded", StringComparison.Ordinal);
+        }
+
+        static bool IsCleanAbsence(XUUnityLightMcpUiQueryPayload query, XUUnityLightMcpUiDiagnostic diagnostic)
+        {
+            if (query.exists || query.truncated || query.out_of_scope)
+            {
+                return false;
+            }
+
+            if (query.warnings != null
+                && query.warnings.Exists(item => string.Equals(item?.code, "ui_scope_probe_incomplete", StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            return diagnostic == null
+                ? query.success
+                : string.Equals(diagnostic.code, NodeNotFound, StringComparison.Ordinal);
+        }
+
+        static bool SkipOptionalAbsent(XUUnityLightMcpScenarioStepResult stepResult, string reason)
+        {
+            stepResult.status = XUUnityLightMcpUiRead.SkippedOptionalAbsent;
+            stepResult.outcome = XUUnityLightMcpUiRead.SkippedOptionalAbsent;
+            stepResult.optional_absent_reason = reason ?? "";
+            stepResult.error_code = "";
+            stepResult.error_message = "";
             return true;
         }
 

@@ -85,9 +85,11 @@ namespace XUUnity.LightMcp.Editor.Core
             public int maxDepth;
             public int maxNodes;
             public bool expectStateChange = true;
+            public int waitForTreeChangeMs;
             public bool expectedExists = true;
             public string expectedText = "";
             public bool approve;
+            public bool optional;
             public XUUnityLightMcpUiSelectorArgs selector = null;
         }
 
@@ -149,6 +151,8 @@ namespace XUUnity.LightMcp.Editor.Core
             public string kind = "";
             public string status = "pending";
             public string outcome = "";
+            public bool optional;
+            public string optional_absent_reason = "";
             public string hook_name = "";
             public string payload_json = "";
             public string terminal_status = "";
@@ -185,6 +189,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public int passed_steps;
             public int failed_steps;
             public int skipped_steps;
+            public int skipped_optional_step_count;
             public int current_step_index = -1;
             public string waiting_until_utc = "";
             public double duration_seconds;

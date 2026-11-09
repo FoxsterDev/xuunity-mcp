@@ -19,6 +19,10 @@ namespace XUUnity.LightMcp.Editor.Helpers
 {
     static class XUUnityLightMcpScenarioRefreshStepHandler
     {
+        internal const string WatcherCompletionBasis = "unity_refresh_settle_watcher";
+        internal const string DomainReloadCompletionBasis = "editor_idle_after_domain_reload";
+        internal const int DomainReloadStableIdleTicks = 4;
+
         public static bool ProcessProjectRefreshStep(XUUnityLightMcpScenarioStepDefinition step, XUUnityLightMcpScenarioStepResult stepResult)
         {
             return ProcessProjectRefreshStep(null, step, stepResult);
@@ -82,19 +86,32 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return true;
             }
 
-            if (IsRefreshRequestSettled(
+            var playModeStable = EditorApplication.isPlaying || !EditorApplication.isPlayingOrWillChangePlaymode;
+            var settledByWatcher = IsRefreshRequestSettled(
                 state.pendingNestedRequestId,
                 XUUnityLightMcpBridgeRuntimeState.RefreshSettleRequestId,
                 XUUnityLightMcpBridgeRuntimeState.RefreshSettlePending,
                 XUUnityLightMcpBridgeRuntimeState.RefreshSettlePhase,
                 EditorApplication.isCompiling,
                 EditorApplication.isUpdating,
-                EditorApplication.isPlaying || !EditorApplication.isPlayingOrWillChangePlaymode))
+                playModeStable);
+            var idleAfterDomainReload = !settledByWatcher && IsIdleAfterDomainReloadLostSettle(
+                state.pendingNestedStartedAtUtc,
+                XUUnityLightMcpBridgeRuntimeState.EditorDomainLoadedUtc,
+                XUUnityLightMcpBridgeRuntimeState.RefreshSettleRequestId,
+                XUUnityLightMcpBridgeRuntimeState.RefreshSettlePending,
+                EditorApplication.isCompiling,
+                EditorApplication.isUpdating,
+                playModeStable);
+            if (settledByWatcher || idleAfterDomainReload)
             {
                 state.pendingNestedStableTickCount++;
-                if (state.pendingNestedStableTickCount >= 2)
+                var requiredTicks = settledByWatcher ? 2 : DomainReloadStableIdleTicks;
+                if (state.pendingNestedStableTickCount >= requiredTicks)
                 {
-                    FinalizeProjectRefreshStep(stepResult);
+                    FinalizeProjectRefreshStep(
+                        stepResult,
+                        settledByWatcher ? WatcherCompletionBasis : DomainReloadCompletionBasis);
                     ClearPendingNestedOperation(state);
                     return true;
                 }
@@ -225,6 +242,25 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return JsonUtility.ToJson(args);
         }
 
+        internal static bool IsIdleAfterDomainReloadLostSettle(
+            string requestStartedAtUtc,
+            string domainLoadedUtc,
+            string observedRequestId,
+            bool settlePending,
+            bool isCompiling,
+            bool isUpdating,
+            bool playModeStable)
+        {
+            return string.IsNullOrWhiteSpace(observedRequestId)
+                && !settlePending
+                && !isCompiling
+                && !isUpdating
+                && playModeStable
+                && TryParseUtc(requestStartedAtUtc, out var startedUtc)
+                && TryParseUtc(domainLoadedUtc, out var loadedUtc)
+                && loadedUtc > startedUtc;
+        }
+
         internal static bool IsRefreshRequestSettled(
             string expectedRequestId,
             string observedRequestId,
@@ -299,6 +335,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         public static void FinalizeProjectRefreshStep(XUUnityLightMcpScenarioStepResult stepResult)
         {
+            FinalizeProjectRefreshStep(stepResult, WatcherCompletionBasis);
+        }
+
+        public static void FinalizeProjectRefreshStep(XUUnityLightMcpScenarioStepResult stepResult, string completionBasis)
+        {
             var payload = string.IsNullOrWhiteSpace(stepResult.payload_json)
                 ? new XUUnityLightMcpProjectRefreshPayload()
                 : JsonUtility.FromJson<XUUnityLightMcpProjectRefreshPayload>(stepResult.payload_json) ?? new XUUnityLightMcpProjectRefreshPayload();
@@ -312,7 +353,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             payload.settled_at_utc = string.IsNullOrWhiteSpace(XUUnityLightMcpBridgeRuntimeState.RefreshSettleCompletedUtc)
                 ? DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
                 : XUUnityLightMcpBridgeRuntimeState.RefreshSettleCompletedUtc;
-            payload.completion_basis = "unity_refresh_settle_watcher";
+            payload.completion_basis = completionBasis;
             payload.editor_is_compiling_after_settle = EditorApplication.isCompiling;
             payload.editor_is_updating_after_settle = EditorApplication.isUpdating;
             payload.playmode_state_after_settle = XUUnityLightMcpPlayModeStateOperation.ResolvePlayModeState();

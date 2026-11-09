@@ -58,6 +58,15 @@ namespace XUUnity.LightMcp.Editor.Ugui
                     "A selector with at least one constraint is required.");
             }
 
+            if (XUUnityLightMcpUiClickTreeWatch.IsPending)
+            {
+                return Refuse(
+                    request,
+                    payload,
+                    "ui_click_wait_in_progress",
+                    "A previous click is still waiting for its UI tree to change (waitForTreeChangeMs); retry after it answers.");
+            }
+
             payload.screen_width_before_context = Screen.width;
             payload.screen_height_before_context = Screen.height;
             if (!XUUnityLightMcpGameViewUtility.TrySynchronizeScreenContext(out payload.coordinate_context_status))
@@ -73,19 +82,8 @@ namespace XUUnity.LightMcp.Editor.Ugui
                     + "the existing preset was preserved. Make the intended Game View visible and retry.");
             }
 
-            var before = XUUnityLightMcpUiTreeBuilder.Build(new XUUnityLightMcpUiTreeOptions
-            {
-                TargetKind = args.targetKind,
-                TargetValue = args.targetValue,
-                SceneName = args.sceneName,
-                IncludeDontDestroyOnLoad = args.includeDontDestroyOnLoad,
-                MaxDepth = args.maxDepth,
-                MaxNodes = args.maxNodes,
-                IncludeInactive = true,
-                IncludeBounds = true,
-                IncludeText = true
-            });
-            payload.before_snapshot = Summarize(before);
+            var before = XUUnityLightMcpUiTreeBuilder.Build(XUUnityLightMcpUiClickTreeWatch.BuildSnapshotOptions(args));
+            payload.before_snapshot = XUUnityLightMcpUiClickTreeWatch.Summarize(before);
             payload.search_target = before.Target;
             CopyRenderEvidence(payload, before.Target);
             payload.search_node_count = before.Nodes.Count;
@@ -285,53 +283,23 @@ namespace XUUnity.LightMcp.Editor.Ugui
             payload.delivered = ExecuteEvents.Execute(handler, pointer, ExecuteEvents.pointerClickHandler);
             payload.delivery_mechanism = "event_system_pointer_click_handler";
 
-            var after = XUUnityLightMcpUiTreeBuilder.Build(new XUUnityLightMcpUiTreeOptions
+            payload.after_snapshot = XUUnityLightMcpUiClickTreeWatch.Snapshot(args);
+            payload.wait_for_tree_change_ms = XUUnityLightMcpUiClickTreeWatch.ClampWaitMs(args.waitForTreeChangeMs);
+            var changedInDeliveryFrame = XUUnityLightMcpUiClickTreeWatch.SignatureChanged(payload);
+            if (payload.wait_for_tree_change_ms > 0)
             {
-                TargetKind = args.targetKind,
-                TargetValue = args.targetValue,
-                SceneName = args.sceneName,
-                IncludeDontDestroyOnLoad = args.includeDontDestroyOnLoad,
-                MaxDepth = args.maxDepth,
-                MaxNodes = args.maxNodes,
-                IncludeInactive = true,
-                IncludeBounds = true,
-                IncludeText = true
-            });
-            payload.after_snapshot = Summarize(after);
-            payload.state_changed = !string.Equals(
-                payload.before_snapshot.signature,
-                payload.after_snapshot.signature,
-                StringComparison.Ordinal);
-            payload.effective = payload.delivered && payload.state_changed;
-            payload.no_observable_effect = payload.delivered && !payload.state_changed;
-
-            payload.success = payload.effective;
-            payload.status = payload.effective
-                ? "effective"
-                : payload.delivered
-                    ? "delivered_no_observable_effect"
-                    : "not_delivered";
-            payload.proof_class = payload.effective
-                ? XUUnityLightMcpUiRead.ProofSemanticTree
-                : XUUnityLightMcpUiRead.ProofSemanticPartial;
-            if (!payload.delivered)
-            {
-                payload.errors.Add(XUUnityLightMcpUiTreeBuilder.Diagnostic(
-                    "ui_click_not_delivered",
-                    "The event system accepted the target but no handler consumed the click."));
-            }
-            else if (payload.no_observable_effect)
-            {
-                payload.warnings.Add(XUUnityLightMcpUiTreeBuilder.Diagnostic(
-                    "ui_click_no_state_change",
-                    "The handler consumed the pointer event, but the UI tree did not change. "
-                    + "The event carries a pointerCurrentRaycast naming "
-                    + $"'{payload.pointer_raycast_target_path}' ({payload.pointer_raycast_evidence}), so a handler that "
-                    + "validates raycast identity was satisfied; the effect may only be visible in logs or non-UI state. "
-                    + "Verify with a UI query, an anchored log assertion, or a project-defined hook that calls the "
-                    + "production API."));
+                if (changedInDeliveryFrame)
+                {
+                    payload.tree_change_wait_status = XUUnityLightMcpUiClickTreeWatch.ChangedInDeliveryFrame;
+                }
+                else if (payload.delivered)
+                {
+                    XUUnityLightMcpUiClickTreeWatch.Arm(request, args, payload);
+                    return null;
+                }
             }
 
+            XUUnityLightMcpUiClickTreeWatch.Finalize(payload);
             return Respond(request, payload);
         }
 
@@ -486,31 +454,6 @@ namespace XUUnity.LightMcp.Editor.Ugui
             payload.render_height = target?.render_height ?? 0;
             payload.render_target_available = target != null && target.render_target_available;
             payload.render_target_differs_from_screen = target != null && target.render_target_differs_from_screen;
-        }
-
-        static XUUnityLightMcpUiClickSnapshotRef Summarize(XUUnityLightMcpUiTreeResult result)
-        {
-            var summary = new XUUnityLightMcpUiClickSnapshotRef
-            {
-                node_count = result.Nodes.Count,
-                truncated = result.Truncated,
-                truncation_reason = result.TruncationReason
-            };
-
-            var builder = new System.Text.StringBuilder();
-            foreach (var node in result.Nodes)
-            {
-                builder.Append(node.path);
-                builder.Append('|');
-                builder.Append(node.active_in_hierarchy ? '1' : '0');
-                builder.Append(node.visible ? '1' : '0');
-                builder.Append(node.interactable ? '1' : '0');
-                builder.Append(node.text);
-                builder.Append(';');
-            }
-
-            summary.signature = XUUnityLightMcpUiClickSnapshotRef.Hash(builder.ToString());
-            return summary;
         }
 
         static XUUnityLightMcpResponse Refuse(

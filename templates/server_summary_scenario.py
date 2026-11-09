@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server_bridge_runtime import build_bridge_stabilization_summary
+from server_specs_scenario import SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT
 from server_ui_fixture import extract_ui_fixture_block, normalize_ui_fixture_evidence
 
 
@@ -73,6 +74,8 @@ SCENARIO_STEP_LIVENESS_FIELDS = (
     "result_trust_class",
 )
 
+SCENARIO_DECISION_STEP_STATUSES = frozenset({"failed", SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT})
+
 SCENARIO_LIVENESS_DECISION_KINDS = frozenset(
     {
         "game_view_screenshot",
@@ -121,6 +124,12 @@ def summarize_scenario_step(step: dict[str, Any] | None) -> dict[str, Any] | Non
         "duration_seconds": round(float(step.get("duration_seconds") or 0.0), 3),
     }
 
+    if step.get("optional") is True:
+        summary["optional"] = True
+    optional_absent_reason = str(step.get("optional_absent_reason") or "")
+    if optional_absent_reason:
+        summary["optional_absent_reason"] = optional_absent_reason
+
     error_code = str(step.get("error_code") or "")
     error_message = str(step.get("error_message") or "")
     if error_code:
@@ -154,6 +163,41 @@ def summarize_scenario_step(step: dict[str, Any] | None) -> dict[str, Any] | Non
     if ui_interaction_summary:
         summary["ui_interaction_summary"] = ui_interaction_summary
     return summary
+
+
+def _skipped_optional_step_entry(step: dict[str, Any]) -> dict[str, Any]:
+    entry = {
+        "step_id": str(step.get("stepId") or step.get("step_id") or ""),
+        "kind": str(step.get("kind") or ""),
+        "reason": str(step.get("optional_absent_reason") or ""),
+    }
+    interaction = _parse_step_payload_json(step).get("ui_interaction")
+    if isinstance(interaction, dict) and str(interaction.get("interaction_id") or ""):
+        entry["interaction_id"] = str(interaction.get("interaction_id") or "")
+    return entry
+
+
+def build_scenario_step_counts(steps: list[Any]) -> dict[str, Any]:
+    required = {"total": 0, "passed": 0, "failed": 0, "skipped": 0, "pending": 0}
+    optional = {"total": 0, "passed": 0, "failed": 0, SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT: 0, "skipped": 0, "pending": 0}
+    skipped_optional: list[dict[str, Any]] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        status = str(step.get("status") or "pending")
+        is_optional = step.get("optional") is True or status == SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT
+        bucket = optional if is_optional else required
+        bucket["total"] += 1
+        if status in bucket:
+            bucket[status] += 1
+        if status == SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT:
+            skipped_optional.append(_skipped_optional_step_entry(step))
+    return {
+        "required_steps": required,
+        "optional_steps": optional,
+        "skipped_optional_step_count": len(skipped_optional),
+        "skipped_optional_steps": skipped_optional,
+    }
 
 
 def build_scenario_liveness_summary(steps: list[Any]) -> dict[str, Any]:
@@ -793,7 +837,7 @@ def _extract_ui_interaction_summary(step: dict[str, Any], payload: dict[str, Any
         return {}
     delivered = bool(block.get("delivered"))
     state_changed = bool(block.get("state_changed"))
-    return {
+    summary = {
         "interaction_id": str(block.get("interaction_id") or ""),
         "delivered": delivered,
         "state_changed": state_changed,
@@ -803,6 +847,14 @@ def _extract_ui_interaction_summary(step: dict[str, Any], payload: dict[str, Any
         "click_status": str(payload.get("click_status") or ""),
         "refusal_code": str(block.get("refusal_code") or ""),
     }
+    wait_ms = int(block.get("wait_for_tree_change_ms") or 0)
+    if wait_ms > 0:
+        summary["wait_for_tree_change_ms"] = wait_ms
+        summary["tree_change_wait_status"] = str(block.get("tree_change_wait_status") or "")
+        if state_changed:
+            summary["tree_change_observed_after_ms"] = block.get("tree_change_observed_after_ms") or 0
+            summary["tree_change_observed_after_frames"] = int(block.get("tree_change_observed_after_frames") or 0)
+    return summary
 
 
 def build_playmode_guard_summary(steps: list[Any]) -> dict[str, Any]:
@@ -1316,6 +1368,7 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
         "passed_steps": int(normalized.get("passed_steps") or 0),
         "failed_steps": int(normalized.get("failed_steps") or 0),
         "skipped_steps": int(normalized.get("skipped_steps") or 0),
+        **build_scenario_step_counts(step_items),
         "current_step_index": current_step_index,
         "waiting_until_utc": str(normalized.get("waiting_until_utc") or ""),
         "result_path": str(normalized.get("result_path") or ""),
@@ -1483,6 +1536,36 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
     return summary
 
 
+def _scope_liveness_to_deciding_step(
+    liveness_summary: dict[str, Any],
+    verdict: str,
+    step_items: list[Any],
+) -> dict[str, Any]:
+    scoped = dict(liveness_summary)
+    if verdict == "passed":
+        scoped["deciding_step_id"] = ""
+        scoped["applies_to_verdict"] = bool(scoped.get("throttled")) or bool(scoped.get("unproven"))
+        return scoped
+
+    _, deciding_step = _first_failed_raw_step(step_items)
+    if deciding_step is None:
+        scoped["deciding_step_id"] = ""
+        scoped["applies_to_verdict"] = bool(scoped.get("throttled")) or bool(scoped.get("unproven"))
+        return scoped
+
+    deciding_step_id = str(deciding_step.get("stepId") or deciding_step.get("step_id") or "")
+    throttled = deciding_step_id in (scoped.get("throttled_step_ids") or [])
+    unproven = deciding_step_id in (scoped.get("unproven_step_ids") or [])
+    scoped["deciding_step_id"] = deciding_step_id
+    scoped["applies_to_verdict"] = throttled or unproven
+    if scoped["applies_to_verdict"]:
+        scoped["throttled"] = throttled
+        scoped["unproven"] = unproven and not throttled
+        scoped["warning"] = str(deciding_step.get("playmode_liveness_warning") or scoped.get("warning") or "")
+        scoped["remediation"] = str(deciding_step.get("playmode_liveness_remediation") or scoped.get("remediation") or "")
+    return scoped
+
+
 def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_statuses: set[str]) -> dict[str, Any]:
     normalized = normalize_scenario_payload(payload, scenario_terminal_statuses)
     steps = normalized.get("steps")
@@ -1510,13 +1593,16 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
             or "exit_playmode_then_rerun_if_fresh_start_required"
         )
     liveness_summary = summary.get("playmode_liveness_summary")
-    if isinstance(liveness_summary, dict) and bool(liveness_summary.get("throttled")):
+    if isinstance(liveness_summary, dict):
+        liveness_summary = _scope_liveness_to_deciding_step(liveness_summary, verdict, step_items)
+    liveness_decides = isinstance(liveness_summary, dict) and bool(liveness_summary.get("applies_to_verdict"))
+    if liveness_decides and bool(liveness_summary.get("throttled")):
         trust_class = "playmode_throttled"
         recommended_next_action = str(
             liveness_summary.get("remediation")
             or "focus_the_unity_editor_or_set_interaction_mode_to_no_throttling"
         )
-    elif isinstance(liveness_summary, dict) and bool(liveness_summary.get("unproven")):
+    elif liveness_decides and bool(liveness_summary.get("unproven")):
         trust_class = "playmode_liveness_unproven"
         recommended_next_action = str(
             liveness_summary.get("remediation")
@@ -1546,6 +1632,20 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
     if run_id:
         full_payload_tool_arguments["runId"] = run_id
 
+    all_compact_steps = list(summary.get("steps") or [])
+    decision_steps = [
+        step
+        for step in all_compact_steps
+        if str(step.get("status") or "") in SCENARIO_DECISION_STEP_STATUSES
+    ]
+    active_step = summary.get("active_step")
+    if (
+        not bool(summary.get("terminal"))
+        and isinstance(active_step, dict)
+        and active_step not in decision_steps
+    ):
+        decision_steps.append(active_step)
+
     envelope: dict[str, Any] = {
         "action": "unity_scenario_run_and_wait",
         "payload_mode": "compact_decision",
@@ -1560,17 +1660,19 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         "scenario_name": str(summary.get("scenario_name") or ""),
         "result_path": str(summary.get("result_path") or ""),
         "first_failure": first_failure,
-        "steps": list(summary.get("steps") or []),
-        "steps_payload_mode": "compact_summary",
+        "steps": decision_steps,
+        "steps_payload_mode": "decision_steps",
         "steps_are_compact": True,
         "raw_steps_included": False,
         "raw_steps_available": bool(step_items),
         "raw_step_count": len(step_items),
-        "compact_step_count": len(summary.get("steps") or []),
+        "compact_step_count": len(decision_steps),
+        "omitted_step_count": max(0, len(all_compact_steps) - len(decision_steps)),
         "full_payload_cli_args": full_payload_cli_args,
         "full_payload_tool": "unity_scenario_result",
         "full_payload_tool_arguments": full_payload_tool_arguments,
         "full_payload_required_for": [
+            "passed_step_list",
             "per_step_payload_json",
             "raw_hook_payloads",
             "hook_name_assertions",
@@ -1592,6 +1694,10 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         "passed_steps",
         "failed_steps",
         "skipped_steps",
+        "required_steps",
+        "optional_steps",
+        "skipped_optional_step_count",
+        "skipped_optional_steps",
         "waited_for_terminal_state",
         "wait_duration_seconds",
         "recovery_attempt_count",
@@ -1624,6 +1730,16 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         if key in summary:
             envelope[key] = summary.get(key)
 
+    cleanup_summary = envelope.get("cleanup_summary")
+    if isinstance(cleanup_summary, dict):
+        compact_cleanup = dict(cleanup_summary)
+        compact_cleanup["cleanup_steps"] = [
+            step
+            for step in cleanup_summary.get("cleanup_steps") or []
+            if isinstance(step, dict) and str(step.get("status") or "") in SCENARIO_DECISION_STEP_STATUSES
+        ]
+        envelope["cleanup_summary"] = compact_cleanup
+
     if isinstance(summary.get("error"), dict):
         envelope["error"] = summary.get("error")
 
@@ -1642,6 +1758,7 @@ def build_scenario_cleanup_summary(steps: list[Any], cleanup_start_index: Any) -
             "cleanup_passed_count": 0,
             "cleanup_failed_count": 0,
             "cleanup_skipped_count": 0,
+            "cleanup_skipped_optional_count": 0,
             "cleanup_result": "",
             "cleanup_steps": [],
         }
@@ -1655,9 +1772,12 @@ def build_scenario_cleanup_summary(steps: list[Any], cleanup_start_index: Any) -
     passed = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "passed")
     failed = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "failed")
     skipped = sum(1 for item in cleanup_steps if str(item.get("status") or "") == "skipped")
+    skipped_optional = sum(
+        1 for item in cleanup_steps if str(item.get("status") or "") == SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT
+    )
     if failed > 0:
         cleanup_result = "failed"
-    elif cleanup_steps and passed == len(cleanup_steps):
+    elif cleanup_steps and passed + skipped_optional == len(cleanup_steps):
         cleanup_result = "passed"
     elif cleanup_steps:
         cleanup_result = "incomplete"
@@ -1669,6 +1789,7 @@ def build_scenario_cleanup_summary(steps: list[Any], cleanup_start_index: Any) -
         "cleanup_passed_count": passed,
         "cleanup_failed_count": failed,
         "cleanup_skipped_count": skipped,
+        "cleanup_skipped_optional_count": skipped_optional,
         "cleanup_result": cleanup_result,
         "cleanup_steps": cleanup_steps,
     }

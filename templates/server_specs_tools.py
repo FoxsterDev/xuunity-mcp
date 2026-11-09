@@ -997,7 +997,8 @@ TOOLS: dict[str, dict[str, Any]] = {
             "is not a raycast filter, so a transparent raycastTarget hit area is clicked and reported as "
             "transparent_hit_area. A node/depth-budget-limited search is ui_selector_search_truncated because "
             "absence or uniqueness is unproven; it reports the searched scope plus retry budget. Records the matched node, "
-            "delivery mechanism, and before/after snapshot signatures. Requires explicit approve=true and "
+            "delivery mechanism, and before/after snapshot signatures; waitForTreeChangeMs re-checks the tree over later "
+            "frames for effects that appear after the click. Requires explicit approve=true and "
             "action='click'. Requires com.unity.ugui."
         ),
         "inputSchema": {
@@ -1036,6 +1037,18 @@ TOOLS: dict[str, dict[str, Any]] = {
                 },
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
+                "waitForTreeChangeMs": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "description": (
+                        "When the UI tree is unchanged in the delivery frame, re-snapshot on later editor frames "
+                        "until the signature changes or this many milliseconds pass. The response reports "
+                        "tree_change_wait_status and, on a change, tree_change_observed_after_ms/_frames. "
+                        "0 keeps the single-frame check."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector", "approve"]
@@ -1858,7 +1871,8 @@ TOOLS: dict[str, dict[str, Any]] = {
             "Mode advancing while the editor is unfocused (the fix for playmode_throttled_editor_unfocused): it "
             "persists background_execution_enabled in the project's bridge config and sets runInBackground only while "
             "Play Mode runs, restoring the project's value on exit. 'project_owned' turns it off. Combine it with any "
-            "action, or use action='configure' to change only the setting."
+            "action, or use action='configure' to change only the setting. It covers Play Mode only: an unfocused "
+            "editor in Edit Mode keeps ticking its update loop, so refresh and compile settle do not need it."
         ),
         "inputSchema": {
             "type": "object",
@@ -1871,7 +1885,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "backgroundExecution": {
                     "type": "string",
                     "enum": ["managed", "project_owned"],
-                    "description": "Optional. managed = Play Mode advances while the editor is unfocused; project_owned = leave runInBackground to the project."
+                    "description": "Optional. managed = Play Mode advances while the editor is unfocused (Play Mode only; Edit Mode is not throttled); project_owned = leave runInBackground to the project."
                 },
                 "includeFullPayload": {
                     "type": "boolean",
@@ -2170,7 +2184,7 @@ TOOLS: dict[str, dict[str, Any]] = {
         },
     },
     "unity_scenario_run_and_wait": {
-        "description": "Start a Unity automation scenario and wait until it reaches a terminal state. Valid kinds and fields are returned by unity_scenario_capabilities, including ui_click, ui_exists, and ui_get_text. By default returns a compact decision envelope; set includeFullPayload=true when asserting raw per-step payload_json, hook_name, or parity fixture fields. Full payload mode omits duplicated run_start.steps unless includeStepPayloads=true.",
+        "description": "Start a Unity automation scenario and wait until it reaches a terminal state. Valid kinds and fields are returned by unity_scenario_capabilities, including ui_click, ui_exists, and ui_get_text. A step marked optional that finds no target reports skipped_optional_absent and does not fail the run. By default returns a compact decision envelope; set includeFullPayload=true when asserting raw per-step payload_json, hook_name, or parity fixture fields. Full payload mode omits duplicated run_start.steps unless includeStepPayloads=true.",
         "inputSchema": {
             "type": "object",
             "properties": {

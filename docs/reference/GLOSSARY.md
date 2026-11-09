@@ -94,7 +94,7 @@ in the same change that emits it.
 | --- | --- | --- |
 | `editor_truth_confirmed` | the editor's point-of-use liveness sampler, mirrored by the host for lifecycle-recovered Play Mode payloads | scenario liveness summary, scenario decision verdict |
 | `playmode_advancing_confirmed` | the same pair | the same |
-| `playmode_throttled` | the same pair, plus the scenario decision verdict | the same |
+| `playmode_throttled` | the same pair, plus the scenario decision verdict; on a failed run only when the deciding (first failed) step itself ran throttled, so an earlier throttled Play Mode step never relabels a later Edit Mode failure | the same |
 | `playmode_liveness_unproven` | the same pair, plus the scenario decision verdict | the same |
 | `authoritative`, `stale_risk` | the scenario decision verdict | scenario decision verdict |
 | `unity_completed_confirmed`, `unity_completed_filter_no_match`, `unity_failed_confirmed`, `unity_unproven`, `request_not_observed`, `wrapper_failed_unity_unproven` | the host's request final status | request final status, wrapper compact output |
@@ -190,6 +190,19 @@ the values describe the editor stand, not a size the tests observe.
 | `playmode_liveness_unproven_editor_unfocused` | `wait_for_playmode_liveness_sample_and_retry` |
 | empty | none |
 
+### Scenario step `status`
+
+| Value | Meaning |
+| --- | --- |
+| `pending` | the run has not reached the step |
+| `passed` | the step met its expectations |
+| `failed` | the step did not meet its expectations; it fails the run |
+| `skipped` | the step did not run because a `dependsOn` or `runIfStepPassed` step did not pass |
+| `skipped_optional_absent` | an `optional` UI step found no target: a `ui_click` refused before delivery as `ui_node_not_found`, `ui_target_not_visible` or `ui_target_occluded`, or a read step whose complete search matched no node; `optional_absent_reason` carries the code and the run is not failed |
+
+The decision verdict counts `required_steps` separately from `optional_steps`;
+an optional step never turns a run `failed` unless it ran and failed.
+
 ### UI interaction outcomes and gaps
 
 | Value | Meaning |
@@ -200,6 +213,20 @@ the values describe the editor stand, not a size the tests observe.
 | `no_state_change` | a gap raised only when the step expected a change |
 | `interaction_delivered` | the scenario step outcome for an effective click |
 | `ui_target_occluded` | refused: a live event-system raycast at the target's centre resolved to a different click handler, so a real pointer would never reach the target |
+| `ui_click_wait_in_progress` | refused: an earlier click is still waiting for its tree change (`waitForTreeChangeMs`) |
+
+### `tree_change_wait_status`
+
+How a click compared the UI tree after delivery. The window is `waitForTreeChangeMs`
+(at most 10000 ms); later samples run on the editor update loop, one per Play Mode
+frame or every 50 ms in Edit Mode, and never block the editor.
+
+| Value | Meaning |
+| --- | --- |
+| `not_requested` | no window; only the delivery frame was compared |
+| `changed_in_delivery_frame` | a window was set, but the tree already changed in the delivery frame |
+| `changed_after_wait` | the tree changed on a later sample; `tree_change_observed_after_ms` and `_frames` say when |
+| `unchanged_after_wait` | no sample inside the window saw a change; the click is `delivered_no_observable_effect` |
 
 ### `pointer_raycast_evidence`
 
@@ -275,6 +302,18 @@ Set when the `Graphic` carrying the click renders nothing (alpha 0 through its c
 | --- | --- |
 | `project_owned` | the bridge does not touch `Application.runInBackground`; the project setting stands |
 | `managed` | the project opted in, the bridge enabled it, and it restores the original value on disable or editor quit |
+
+`managed` applies to Play Mode only. An unfocused editor in Edit Mode keeps
+running `EditorApplication.update` (measured at 5-10 Hz, heartbeat intervals of
+2.0-2.2 s against a 2 s gate), so refresh and compile settle windows do not need
+it.
+
+### Scenario `project_refresh` `completion_basis`
+
+| Value | Meaning |
+| --- | --- |
+| `unity_refresh_settle_watcher` | the bridge's refresh settle watcher reported this step's own request as settled, then two idle scenario ticks followed |
+| `editor_idle_after_domain_reload` | the editor domain reloaded after the refresh was requested (for example a hook changed scripting defines), which drops the watcher's in-memory request; the step then required four consecutive idle ticks (no compile, no import, no pending settle, stable Play Mode state) |
 
 ### `currency_basis`
 

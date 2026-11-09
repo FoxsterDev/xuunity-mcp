@@ -128,6 +128,35 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 }
             }
         }
+        static void ValidateOptional(
+            XUUnityLightMcpScenarioValidatePayload payload,
+            XUUnityLightMcpScenarioStepDefinition step,
+            string kind,
+            string stepId,
+            int index)
+        {
+            if (!step.optional)
+            {
+                return;
+            }
+
+            if (!string.Equals(kind, XUUnityLightMcpUiRead.InteractionStepKind, StringComparison.Ordinal)
+                && !string.Equals(kind, XUUnityLightMcpUiRead.ExistsStepKind, StringComparison.Ordinal)
+                && !string.Equals(kind, XUUnityLightMcpUiRead.GetTextStepKind, StringComparison.Ordinal))
+            {
+                AddIssue(payload, "error", "optional_not_supported_for_kind",
+                    $"optional is supported only on ui_click, ui_exists and ui_get_text, not on {kind}.", stepId, index);
+                return;
+            }
+
+            if (string.Equals(kind, XUUnityLightMcpUiRead.ExistsStepKind, StringComparison.Ordinal) && !step.expectedExists)
+            {
+                AddIssue(payload, "error", "optional_absence_assertion",
+                    "optional skips a step whose node is absent; a ui_exists step with expectedExists=false already passes on absence.",
+                    stepId, index);
+            }
+        }
+
         public static void ValidateStep(XUUnityLightMcpScenarioValidatePayload payload, XUUnityLightMcpScenarioStepDefinition step, string stepId, int index)
         {
             var kind = NormalizeStepKind(step);
@@ -136,6 +165,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 AddIssue(payload, "error", "missing_kind", "Scenario step kind or operation is required.", stepId, index);
                 return;
             }
+
+            ValidateOptional(payload, step, kind, stepId, index);
 
             switch (kind)
             {

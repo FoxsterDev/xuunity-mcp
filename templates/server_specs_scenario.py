@@ -4,6 +4,10 @@ from typing import Any
 
 SCENARIO_TERMINAL_STATUSES = {"passed", "failed"}
 
+SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT = "skipped_optional_absent"
+SCENARIO_STEP_STATUSES = ("pending", "passed", "failed", "skipped", SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT)
+SCENARIO_OPTIONAL_STEP_KINDS = ("ui_click", "ui_exists", "ui_get_text")
+
 SCENARIO_STEP_KINDS = (
     "status",
     "health_probe",
@@ -213,6 +217,17 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
             "default": True,
             "description": "ui_click only. Fail the step when the UI tree signature is unchanged after delivery.",
         },
+        "waitForTreeChangeMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "default": 0,
+            "description": (
+                "ui_click only. When the UI tree is unchanged in the delivery frame, keep re-snapshotting on later "
+                "editor frames until the signature changes or this many milliseconds pass, so a popup that "
+                "appears a few frames after the click counts as a change. 0 keeps the single-frame check."
+            ),
+        },
         "expectedExists": {
             "type": "boolean",
             "default": True,
@@ -226,6 +241,18 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
             "type": "boolean",
             "default": False,
             "description": "ui_click only. Required; delivering a pointer click mutates runtime UI state.",
+        },
+        "optional": {
+            "type": "boolean",
+            "default": False,
+            "description": (
+                "ui_click, ui_exists and ui_get_text only. When the target is absent the step becomes "
+                "skipped_optional_absent instead of failed and does not fail the run: for ui_click a refusal "
+                "before delivery as ui_node_not_found, ui_target_not_visible or ui_target_occluded; for the read "
+                "steps a complete search that matched no node. A delivered click that fails expectStateChange, a "
+                "truncated or out-of-scope search, and every other refusal still fail. Steps that dependOn a "
+                "skipped optional step are skipped."
+            ),
         },
     },
     "anyOf": [{"required": ["kind"]}, {"required": ["operation"]}],

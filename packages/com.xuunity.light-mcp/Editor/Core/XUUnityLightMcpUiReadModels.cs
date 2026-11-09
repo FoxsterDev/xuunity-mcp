@@ -10,6 +10,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public const string InteractionStepKind = "ui_click";
         public const string ExistsStepKind = "ui_exists";
         public const string GetTextStepKind = "ui_get_text";
+        public const string SkippedOptionalAbsent = "skipped_optional_absent";
 
         public const string ProofSemanticTree = "semantic_ui_tree";
         public const string ProofSemanticPartial = "semantic_ui_partial";
@@ -275,6 +276,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool approve;
         public int maxDepth = XUUnityLightMcpUiRead.DefaultMaxDepth;
         public int maxNodes = XUUnityLightMcpUiRead.DefaultMaxNodes;
+        public int waitForTreeChangeMs;
         public XUUnityLightMcpUiSelectorArgs selector = new();
     }
 
@@ -358,6 +360,11 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool render_target_differs_from_screen;
         public XUUnityLightMcpUiClickSnapshotRef before_snapshot = new();
         public XUUnityLightMcpUiClickSnapshotRef after_snapshot = new();
+        public int wait_for_tree_change_ms;
+        public string tree_change_wait_status = "not_requested";
+        public int tree_change_sample_count;
+        public double tree_change_observed_after_ms;
+        public int tree_change_observed_after_frames;
         public List<XUUnityLightMcpUiDiagnostic> warnings = new();
         public List<XUUnityLightMcpUiDiagnostic> errors = new();
         public string validation_evidence = "unity_mcp";
@@ -397,6 +404,10 @@ namespace XUUnity.LightMcp.Editor.Core
         public bool editor_application_focused;
         public string result_trust_class = "";
         public string refusal_code = "";
+        public int wait_for_tree_change_ms;
+        public string tree_change_wait_status = "";
+        public double tree_change_observed_after_ms;
+        public int tree_change_observed_after_frames;
     }
 
     [Serializable]
