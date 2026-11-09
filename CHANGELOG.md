@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.3.88
+
+Release tag: `v0.3.88`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.88
+```
+
+When a script change broke compilation and the editor was then opened, `ensure-ready`
+waited out its whole timeout on Unity's "Enter Safe Mode?" dialog without saying why,
+and a recovery after a frozen heartbeat could close a live editor. Scenarios failed
+whenever a best-effort "close the popup if it is there" click found nothing to close,
+a click that opened a popup a few frames later read as "no effect", and a refresh
+right after a hook that changed scripting defines always timed out. This release
+makes the startup wait, the compile signals and the scenario verdicts say what
+actually happened.
+
 ### Added
 
 - A closed editor is no longer opened on red code. The package now writes the
@@ -128,6 +147,7 @@
 
 ### Changed
 
+- Released `v0.3.88` package metadata, server metadata, package manifests, and Git UPM examples.
 - The compact `unity_scenario_run_and_wait` envelope lists only the decision
   steps: failed and `skipped_optional_absent` steps, plus the active step of a
   run that did not finish. Passed steps are counted (`required_steps`,
@@ -137,6 +157,49 @@
   `decision_steps`; `includeFullPayload=true` (or `unity_scenario_result`)
   still returns every step.
 
+### Validation
+
+- Host Python suite: 1386 tests passed, 14 platform skips.
+- Package self-tests in clean generated projects with the package resolved
+  from local source, macOS, on Unity 2021.3.58f1, 2022.3.62f3, 6000.0.58f2,
+  6000.1.13f1, 6000.2.14f1, 6000.3.23f1, 6000.4.4f1, 6000.5.10f1 and
+  6000.6.0b3: EditMode core 229/229 and PlayMode core 6/6 on every version;
+  on 2021.3.58f1 also TextMeshPro 6/6, uGUI 69/69, PlayMode uGUI 22 passed
+  with 6 skipped. The first 2021.3.58f1 run failed one new uGUI EditMode test
+  because Test Framework 1.1 resumes `yield return null` without a new editor
+  update; the test now waits on editor time, and the rerun passed.
+- Safe Mode wait, live on Unity 6000.0.58f2 with a script that does not
+  compile and the editor closed: with `--compile-preflight off`,
+  `ensure-ready --open-editor` ended as `editor_startup_modal_blocked` after
+  25 s with the CS line (38 s on a larger project, where the earlier build
+  had waited 900 s); with the preflight on, the GUI open was refused after
+  5 s and no editor process started; after the error was removed the editor
+  opened and the bridge was ready. `recover-editor-session` on the editor
+  stuck at the dialog left it running and answered `live_editor_refused`.
+- Scenario refresh after a define-changing hook, live on Unity 6000.0.58f2
+  with the editor unfocused: before the fix 4 of 4 runs timed out
+  (`lost_final_accounting`); after it 3 of 3 settled in about 3.5 s.
+- Optional steps, the click wait and the compact envelope: host tests and
+  package EditMode/PlayMode tests; a 20-step passing run's compact payload
+  measured 1863 bytes.
+
+### Known limitations
+
+- `Unity Package CI` remains waived (no runner Unity license); the local
+  licensed lane above is the package evidence.
+- Live Unity runs were on macOS only. Windows and Linux are covered by host
+  tests and CI, not by a live editor run.
+- The closed-editor compile preflight needs the snapshot written by this
+  package version. The first `ensure-ready` after upgrading a project opens
+  without a preflight; a batch run on red code does not refresh the
+  snapshot, so the next reopen after a green probe may probe once more.
+- An editor that was already blocked by a dialog before `ensure-ready`
+  started is classified by `status_summary`; `ensure-ready` points there
+  instead of raising `editor_startup_modal_blocked` itself.
+- A delivered optional click that fails `expectStateChange` still ends the
+  run as `inconclusive`, as any failed UI interaction did before.
+- The optional steps and the click wait have not yet been run against a
+  real project's scenarios; that check is part of the consumer rollout.
 
 ## 0.3.87
 
