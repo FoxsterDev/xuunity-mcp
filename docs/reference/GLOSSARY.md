@@ -94,7 +94,7 @@ in the same change that emits it.
 | --- | --- | --- |
 | `editor_truth_confirmed` | the editor's point-of-use liveness sampler, mirrored by the host for lifecycle-recovered Play Mode payloads | scenario liveness summary, scenario decision verdict |
 | `playmode_advancing_confirmed` | the same pair | the same |
-| `playmode_throttled` | the same pair, plus the scenario decision verdict | the same |
+| `playmode_throttled` | the same pair, plus the scenario decision verdict; on a failed run only when the deciding (first failed) step itself ran throttled, so an earlier throttled Play Mode step never relabels a later Edit Mode failure | the same |
 | `playmode_liveness_unproven` | the same pair, plus the scenario decision verdict | the same |
 | `authoritative`, `stale_risk` | the scenario decision verdict | scenario decision verdict |
 | `unity_completed_confirmed`, `unity_completed_filter_no_match`, `unity_failed_confirmed`, `unity_unproven`, `request_not_observed`, `wrapper_failed_unity_unproven` | the host's request final status | request final status, wrapper compact output |
@@ -302,6 +302,18 @@ Set when the `Graphic` carrying the click renders nothing (alpha 0 through its c
 | --- | --- |
 | `project_owned` | the bridge does not touch `Application.runInBackground`; the project setting stands |
 | `managed` | the project opted in, the bridge enabled it, and it restores the original value on disable or editor quit |
+
+`managed` applies to Play Mode only. An unfocused editor in Edit Mode keeps
+running `EditorApplication.update` (measured at 5-10 Hz, heartbeat intervals of
+2.0-2.2 s against a 2 s gate), so refresh and compile settle windows do not need
+it.
+
+### Scenario `project_refresh` `completion_basis`
+
+| Value | Meaning |
+| --- | --- |
+| `unity_refresh_settle_watcher` | the bridge's refresh settle watcher reported this step's own request as settled, then two idle scenario ticks followed |
+| `editor_idle_after_domain_reload` | the editor domain reloaded after the refresh was requested (for example a hook changed scripting defines), which drops the watcher's in-memory request; the step then required four consecutive idle ticks (no compile, no import, no pending settle, stable Play Mode state) |
 
 ### `currency_basis`
 

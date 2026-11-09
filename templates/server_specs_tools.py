@@ -1835,7 +1835,8 @@ TOOLS: dict[str, dict[str, Any]] = {
             "Mode advancing while the editor is unfocused (the fix for playmode_throttled_editor_unfocused): it "
             "persists background_execution_enabled in the project's bridge config and sets runInBackground only while "
             "Play Mode runs, restoring the project's value on exit. 'project_owned' turns it off. Combine it with any "
-            "action, or use action='configure' to change only the setting."
+            "action, or use action='configure' to change only the setting. It covers Play Mode only: an unfocused "
+            "editor in Edit Mode keeps ticking its update loop, so refresh and compile settle do not need it."
         ),
         "inputSchema": {
             "type": "object",
@@ -1848,7 +1849,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "backgroundExecution": {
                     "type": "string",
                     "enum": ["managed", "project_owned"],
-                    "description": "Optional. managed = Play Mode advances while the editor is unfocused; project_owned = leave runInBackground to the project."
+                    "description": "Optional. managed = Play Mode advances while the editor is unfocused (Play Mode only; Edit Mode is not throttled); project_owned = leave runInBackground to the project."
                 },
                 "includeFullPayload": {
                     "type": "boolean",

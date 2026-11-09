@@ -88,6 +88,39 @@ namespace XUUnity.LightMcp.Tests.EditMode
                 isCompiling, isUpdating, playModeStable), Is.EqualTo(expected));
         }
 
+        [TestCase("2026-11-09T18:04:02.0000000Z", "2026-11-09T18:04:04.4726410Z", "", false, false, false, true, true)]
+        [TestCase("2026-11-09T18:04:02.0000000Z", "2026-11-09T18:03:01.0000000Z", "", false, false, false, true, false)]
+        [TestCase("2026-11-09T18:04:02.0000000Z", "2026-11-09T18:04:04.4726410Z", "refresh-1", false, false, false, true, false)]
+        [TestCase("2026-11-09T18:04:02.0000000Z", "2026-11-09T18:04:04.4726410Z", "", true, false, false, true, false)]
+        [TestCase("2026-11-09T18:04:02.0000000Z", "2026-11-09T18:04:04.4726410Z", "", false, true, false, true, false)]
+        [TestCase("2026-11-09T18:04:02.0000000Z", "2026-11-09T18:04:04.4726410Z", "", false, false, true, true, false)]
+        [TestCase("2026-11-09T18:04:02.0000000Z", "2026-11-09T18:04:04.4726410Z", "", false, false, false, false, false)]
+        [TestCase("", "2026-11-09T18:04:04.4726410Z", "", false, false, false, true, false)]
+        public void RefreshAcrossDomainReload_SettlesOnlyOnIdleAfterAReloadThatLostTheRequest(
+            string requestStartedAtUtc, string domainLoadedUtc, string observedRequestId, bool settlePending,
+            bool isCompiling, bool isUpdating, bool playModeStable, bool expected)
+        {
+            Assert.That(XUUnityLightMcpScenarioRefreshStepHandler.IsIdleAfterDomainReloadLostSettle(
+                requestStartedAtUtc, domainLoadedUtc, observedRequestId, settlePending,
+                isCompiling, isUpdating, playModeStable), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void RefreshAcrossDomainReload_RecordsItsCompletionBasis()
+        {
+            var result = new XUUnityLightMcpScenarioStepResult
+            {
+                payload_json = JsonUtility.ToJson(new XUUnityLightMcpProjectRefreshPayload { asset_database_refreshed = true })
+            };
+
+            XUUnityLightMcpScenarioRefreshStepHandler.FinalizeProjectRefreshStep(
+                result, XUUnityLightMcpScenarioRefreshStepHandler.DomainReloadCompletionBasis);
+
+            var payload = JsonUtility.FromJson<XUUnityLightMcpProjectRefreshPayload>(result.payload_json);
+            Assert.That(result.status, Is.EqualTo("passed"));
+            Assert.That(payload.completion_basis, Is.EqualTo("editor_idle_after_domain_reload"));
+        }
+
         [TestCase("", "missing_runtime_request_id")]
         [TestCase("refresh-2", "request_id_mismatch")]
         [TestCase("refresh-1", "matching_request_not_confirmed_settled")]

@@ -1536,6 +1536,36 @@ def build_scenario_result_summary(payload: dict[str, Any], scenario_terminal_sta
     return summary
 
 
+def _scope_liveness_to_deciding_step(
+    liveness_summary: dict[str, Any],
+    verdict: str,
+    step_items: list[Any],
+) -> dict[str, Any]:
+    scoped = dict(liveness_summary)
+    if verdict == "passed":
+        scoped["deciding_step_id"] = ""
+        scoped["applies_to_verdict"] = bool(scoped.get("throttled")) or bool(scoped.get("unproven"))
+        return scoped
+
+    _, deciding_step = _first_failed_raw_step(step_items)
+    if deciding_step is None:
+        scoped["deciding_step_id"] = ""
+        scoped["applies_to_verdict"] = bool(scoped.get("throttled")) or bool(scoped.get("unproven"))
+        return scoped
+
+    deciding_step_id = str(deciding_step.get("stepId") or deciding_step.get("step_id") or "")
+    throttled = deciding_step_id in (scoped.get("throttled_step_ids") or [])
+    unproven = deciding_step_id in (scoped.get("unproven_step_ids") or [])
+    scoped["deciding_step_id"] = deciding_step_id
+    scoped["applies_to_verdict"] = throttled or unproven
+    if scoped["applies_to_verdict"]:
+        scoped["throttled"] = throttled
+        scoped["unproven"] = unproven and not throttled
+        scoped["warning"] = str(deciding_step.get("playmode_liveness_warning") or scoped.get("warning") or "")
+        scoped["remediation"] = str(deciding_step.get("playmode_liveness_remediation") or scoped.get("remediation") or "")
+    return scoped
+
+
 def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_statuses: set[str]) -> dict[str, Any]:
     normalized = normalize_scenario_payload(payload, scenario_terminal_statuses)
     steps = normalized.get("steps")
@@ -1563,13 +1593,16 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
             or "exit_playmode_then_rerun_if_fresh_start_required"
         )
     liveness_summary = summary.get("playmode_liveness_summary")
-    if isinstance(liveness_summary, dict) and bool(liveness_summary.get("throttled")):
+    if isinstance(liveness_summary, dict):
+        liveness_summary = _scope_liveness_to_deciding_step(liveness_summary, verdict, step_items)
+    liveness_decides = isinstance(liveness_summary, dict) and bool(liveness_summary.get("applies_to_verdict"))
+    if liveness_decides and bool(liveness_summary.get("throttled")):
         trust_class = "playmode_throttled"
         recommended_next_action = str(
             liveness_summary.get("remediation")
             or "focus_the_unity_editor_or_set_interaction_mode_to_no_throttling"
         )
-    elif isinstance(liveness_summary, dict) and bool(liveness_summary.get("unproven")):
+    elif liveness_decides and bool(liveness_summary.get("unproven")):
         trust_class = "playmode_liveness_unproven"
         recommended_next_action = str(
             liveness_summary.get("remediation")

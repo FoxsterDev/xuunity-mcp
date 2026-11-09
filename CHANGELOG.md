@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Fixed
+
+- A scenario `project_refresh` right after a hook that triggers a recompile
+  (for example a config apply that changes scripting defines) timed out every
+  time. The recompile reloads the editor domain, which drops the refresh
+  settle watcher's in-memory request id, so the step waited for an id that no
+  longer existed while the editor sat idle. Measured on Unity 6000.0.58f2 with
+  the editor unfocused: 4 of 4 runs timed out at the step limit (10 s and
+  60 s) with `lost_final_accounting`; with the fix 3 of 3 pass after about
+  3.5 s of settle. When the domain reloaded after the request and the id is
+  gone, the step now settles on four consecutive idle ticks and reports
+  `completion_basis: editor_idle_after_domain_reload`. Focus was not the
+  cause: the unfocused Edit Mode update loop kept ticking at 5-10 Hz.
+- The scenario decision verdict no longer relabels a failed run as
+  `playmode_throttled` because an earlier step ran throttled in Play Mode. The
+  liveness override applies to a failed run only when the deciding (first
+  failed) step itself ran throttled or unproven, so
+  `mutation_applied_unsettled` survives an Edit Mode refresh timeout that
+  follows a throttled Play Mode step. `playmode_liveness_summary` reports
+  `deciding_step_id` and `applies_to_verdict`. The `unity_playmode_set`
+  description now states that `backgroundExecution: managed` covers Play Mode
+  only.
+
 ### Changed
 
 - The compact `unity_scenario_run_and_wait` envelope lists only the decision
