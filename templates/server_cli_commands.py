@@ -526,10 +526,21 @@ def cmd_ensure_ready(args):
                 "ensure-ready", project_root, "--open-editor"
             )
             details["live_project_editor_pids"] = live_editor_pids
-        raise enrich_tool_invocation_error_with_discovery_fn(
+        enriched = enrich_tool_invocation_error_with_discovery_fn(
             project_root,
             ToolInvocationError(exc.code, exc.message, details),
         )
+        if (
+            enriched.code != "editor_startup_modal_blocked"
+            and str(enriched.details.get("host_health_reason") or "") == "startup_modal_dialog_block"
+        ):
+            enriched.details["stronger_diagnosis_source"] = "status_summary"
+            enriched.details["stronger_diagnosis"] = "startup_modal_dialog_block"
+            enriched.details["recommended_next_action"] = "request-status-summary"
+            enriched.details["recommended_recovery_command"] = render_launcher_cli(
+                "request-status-summary", project_root, "--include-full-payload"
+            )
+        raise enriched
 
     payload["bridge_state"] = state
     if payload.get("launch") and not bool(payload["launch"].get("reused_existing_editor")):

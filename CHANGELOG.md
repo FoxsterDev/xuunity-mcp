@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Fixed
+
+- `ensure-ready` no longer waits out its whole timeout on the "Enter Safe Mode?"
+  startup dialog. Unity logs no marker while the dialog is up, so the wait read
+  the log as an ordinary compile block and ended as
+  `poll_bridge_bootstrap_attached_then_retry`, while `status_summary` already
+  had the right answer. The wait now applies the same fingerprint (live project
+  editor, compile markers written during the wait, no live bridge state,
+  Editor.log idle for 20 s) in the poll loop and at the deadline, and ends as
+  `editor_startup_modal_blocked` with the CS lines, `compile_state: unmeasured`
+  and a quit, batch compile, reopen recovery. A moving log or a bridge that
+  attaches keeps polling. When the wait ends with a weaker code while host
+  health holds `startup_modal_dialog_block`, the error points at
+  `request-status-summary`.
+
 ## 0.3.87
 
 Release tag: `v0.3.87`
