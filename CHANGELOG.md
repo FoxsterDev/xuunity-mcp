@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Changed
+
+- The compact `unity_scenario_run_and_wait` envelope lists only the decision
+  steps: failed and `skipped_optional_absent` steps, plus the active step of a
+  run that did not finish. Passed steps are counted (`required_steps`,
+  `optional_steps`, `omitted_step_count`) instead of listed, and
+  `cleanup_summary.cleanup_steps` is trimmed the same way. A 20-step passing
+  run drops from about 13 KB to about 2 KB. `steps_payload_mode` is now
+  `decision_steps`; `includeFullPayload=true` (or `unity_scenario_result`)
+  still returns every step.
+
 ### Added
 
 - Scenario `optional: true` on `ui_click`, `ui_exists` and `ui_get_text`. A

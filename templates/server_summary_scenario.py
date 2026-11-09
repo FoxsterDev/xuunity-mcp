@@ -74,6 +74,8 @@ SCENARIO_STEP_LIVENESS_FIELDS = (
     "result_trust_class",
 )
 
+SCENARIO_DECISION_STEP_STATUSES = frozenset({"failed", SCENARIO_STEP_STATUS_SKIPPED_OPTIONAL_ABSENT})
+
 SCENARIO_LIVENESS_DECISION_KINDS = frozenset(
     {
         "game_view_screenshot",
@@ -1597,6 +1599,20 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
     if run_id:
         full_payload_tool_arguments["runId"] = run_id
 
+    all_compact_steps = list(summary.get("steps") or [])
+    decision_steps = [
+        step
+        for step in all_compact_steps
+        if str(step.get("status") or "") in SCENARIO_DECISION_STEP_STATUSES
+    ]
+    active_step = summary.get("active_step")
+    if (
+        not bool(summary.get("terminal"))
+        and isinstance(active_step, dict)
+        and active_step not in decision_steps
+    ):
+        decision_steps.append(active_step)
+
     envelope: dict[str, Any] = {
         "action": "unity_scenario_run_and_wait",
         "payload_mode": "compact_decision",
@@ -1611,17 +1627,19 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
         "scenario_name": str(summary.get("scenario_name") or ""),
         "result_path": str(summary.get("result_path") or ""),
         "first_failure": first_failure,
-        "steps": list(summary.get("steps") or []),
-        "steps_payload_mode": "compact_summary",
+        "steps": decision_steps,
+        "steps_payload_mode": "decision_steps",
         "steps_are_compact": True,
         "raw_steps_included": False,
         "raw_steps_available": bool(step_items),
         "raw_step_count": len(step_items),
-        "compact_step_count": len(summary.get("steps") or []),
+        "compact_step_count": len(decision_steps),
+        "omitted_step_count": max(0, len(all_compact_steps) - len(decision_steps)),
         "full_payload_cli_args": full_payload_cli_args,
         "full_payload_tool": "unity_scenario_result",
         "full_payload_tool_arguments": full_payload_tool_arguments,
         "full_payload_required_for": [
+            "passed_step_list",
             "per_step_payload_json",
             "raw_hook_payloads",
             "hook_name_assertions",
@@ -1678,6 +1696,16 @@ def build_scenario_decision_verdict(payload: dict[str, Any], scenario_terminal_s
     ):
         if key in summary:
             envelope[key] = summary.get(key)
+
+    cleanup_summary = envelope.get("cleanup_summary")
+    if isinstance(cleanup_summary, dict):
+        compact_cleanup = dict(cleanup_summary)
+        compact_cleanup["cleanup_steps"] = [
+            step
+            for step in cleanup_summary.get("cleanup_steps") or []
+            if isinstance(step, dict) and str(step.get("status") or "") in SCENARIO_DECISION_STEP_STATUSES
+        ]
+        envelope["cleanup_summary"] = compact_cleanup
 
     if isinstance(summary.get("error"), dict):
         envelope["error"] = summary.get("error")

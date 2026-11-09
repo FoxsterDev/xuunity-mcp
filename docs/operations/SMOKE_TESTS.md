@@ -1332,11 +1332,14 @@ Token-discipline contract:
 Scenario payload contract:
 
 - `request-scenario-run-and-wait` defaults to a compact decision envelope. Its
-  `steps` field is a compact summary, not the raw persisted scenario `steps`.
+  `steps` field holds only the decision steps (failed and
+  `skipped_optional_absent`, plus the active step of a non-terminal run), not
+  the raw persisted scenario `steps`; passed steps are counted, not listed.
 - compact run-and-wait responses expose `payload_mode=compact_decision`,
-  `steps_payload_mode=compact_summary`, `raw_steps_included=false`,
+  `steps_payload_mode=decision_steps`, `raw_steps_included=false`,
   `raw_steps_available`, `raw_step_count`, `compact_step_count`,
-  `full_payload_cli_args`, `full_payload_tool`, and
+  `omitted_step_count`, `required_steps`, `optional_steps`,
+  `skipped_optional_steps`, `full_payload_cli_args`, `full_payload_tool`, and
   `full_payload_tool_arguments`.
 - smoke helpers that assert `payload_json`, `hook_name`, exact raw step fields,
   or scenario parity fixtures must pass `--include-full-payload`.
