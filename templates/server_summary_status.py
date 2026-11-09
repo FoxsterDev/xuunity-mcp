@@ -188,7 +188,9 @@ def build_status_summary(
     if editor_running:
         session = dict(host_editor_session_state or {})
         session_pid = int(session.get("editor_pid") or 0)
-        opened_by_host = bool(session.get("opened_by_host")) and session_pid in (0, editor_pid)
+        opened_by_host = bool(session.get("opened_by_host")) and (
+            session_pid in (0, editor_pid) or bool((discovery_details or {}).get("host_session_live"))
+        )
         summary["editor_opened_by_host"] = opened_by_host
         if opened_by_host:
             summary["editor_launch_lane"] = "opened_by_host"

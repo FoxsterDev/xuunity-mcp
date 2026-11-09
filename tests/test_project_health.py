@@ -577,3 +577,20 @@ class DeadEditorLivenessGatingTests(unittest.TestCase):
             paths.update_host_editor_session_pid(Path("/tmp/FakeProject"), 77)
         self.assertEqual(41.5, written[0]["launch_duration_seconds"])
         self.assertEqual("2026-11-09T10:00:41Z", written[0]["bridge_ready_at_utc"])
+
+    def test_a_live_host_session_counts_even_when_the_bridge_state_is_from_an_older_editor(self) -> None:
+        from server_summary_status import build_status_summary
+
+        summary = build_status_summary(
+            Path("/tmp/FakeProject"), {"editor_running": True},
+            read_best_effort_bridge_state=lambda _: {"editor_pid": 11, "health_status": "healthy"},
+            try_read_bridge_state=lambda _: {},
+            pid_is_alive=lambda pid: True,
+            heartbeat_age_seconds=heartbeat_age_seconds,
+            derive_busy_reason=derive_busy_reason,
+            summarize_state_for_error=lambda _: "",
+            discovery_details={"host_session_live": True, "bridge_state_live": False},
+            include_full_payload=False,
+            host_editor_session_state={"opened_by_host": True, "editor_pid": 22, "opened_at_utc": "2026-11-09T10:00:00Z"},
+        )
+        self.assertTrue(summary["editor_opened_by_host"])

@@ -79,7 +79,9 @@
   `editor_launch_duration_seconds`; the host session records
   `bridge_ready_at_utc` and `launch_duration_seconds` when the bridge first
   attaches; the compact `ensure-ready` launch block adds
-  `editor_opened_by_this_call` and `launch_duration_seconds`.
+  `editor_opened_by_this_call` and `launch_duration_seconds`. An editor the
+  host opened also reads as host-opened while it is blocked before its bridge
+  attaches.
 
 ## 0.3.87
 
