@@ -298,5 +298,51 @@ class RecoverEditorSessionPreflightTests(unittest.TestCase):
         self.assertTrue(payload["_reopen_attempted"])
 
 
+
+class EnsureReadyMcpToolTests(unittest.TestCase):
+    def call(self, arguments: dict, *, returncode: int, payload: dict | None):
+        import server_batch_orchestrator as orchestrator
+
+        runner = mock.Mock(return_value=(payload, mock.Mock(returncode=returncode, stderr="", stdout="")))
+        with mock.patch.object(orchestrator, "run_self_json_command_with_completed", runner), \
+                mock.patch.object(orchestrator, "ensure_project_root", return_value=Path("/tmp/FakeProject")):
+            result = orchestrator.call_tool("unity_ensure_ready", arguments)
+        return result, runner.call_args.args[0] if runner.called else None
+
+    def test_the_tool_forwards_the_cli_flags(self) -> None:
+        result, command = self.call(
+            {"projectRoot": "/tmp/FakeProject", "openEditor": True, "compilePreflight": "off", "timeoutMs": 60000},
+            returncode=0, payload={"verdict": "ready", "succeeded": True},
+        )
+        self.assertFalse(result["isError"])
+        self.assertEqual("ready", result["structuredContent"]["verdict"])
+        self.assertEqual("ensure-ready", command[0])
+        self.assertIn("--open-editor", command)
+        self.assertEqual("off", command[command.index("--compile-preflight") + 1])
+        self.assertEqual("60000", command[command.index("--timeout-ms") + 1])
+        self.assertNotIn("--include-full-payload", command)
+
+    def test_typed_exits_keep_their_code_and_recovery(self) -> None:
+        for code in ("editor_startup_modal_blocked", "editor_open_refused_compile_red", "launch_blocked_probable_modal"):
+            with self.subTest(code=code):
+                error = {"error": {"code": code, "message": "m", "details": {"recommended_next_action": "x", "recommended_recovery_command": "launcher recover"}}}
+                result, _ = self.call({"projectRoot": "/tmp/FakeProject", "openEditor": True}, returncode=1, payload=error)
+                self.assertTrue(result["isError"])
+                self.assertEqual(code, result["structuredContent"]["error"]["code"])
+                self.assertEqual("launcher recover", result["structuredContent"]["error"]["details"]["recommended_recovery_command"])
+
+    def test_a_crash_without_json_still_returns_a_typed_error(self) -> None:
+        result, _ = self.call({"projectRoot": "/tmp/FakeProject"}, returncode=2, payload=None)
+        self.assertTrue(result["isError"])
+        self.assertEqual("ensure_ready_failed", result["structuredContent"]["error"]["code"])
+
+    def test_bad_arguments_are_refused_before_anything_runs(self) -> None:
+        from server_mcp_protocol import JsonRpcError
+
+        for arguments in ({"projectRoot": "/tmp/FakeProject", "compilePreflight": "sometimes"}, {"projectRoot": "/tmp/FakeProject", "openEditor": "yes"}):
+            with self.subTest(arguments=arguments), self.assertRaises(JsonRpcError):
+                self.call(arguments, returncode=0, payload={})
+
+
 if __name__ == "__main__":
     unittest.main()

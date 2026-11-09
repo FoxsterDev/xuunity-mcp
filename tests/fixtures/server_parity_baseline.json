@@ -216,8 +216,8 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "e4e53fc3e67c0e51ad0bfb38d4b1dca2724e4635316a47466a01b958092c4037",
-    "tool_count": 80,
+    "sha256": "f5802724064c121f941e461c911033432ba5eb4dc0bb09a3a15d48278e0c5720",
+    "tool_count": 81,
     "tool_names": [
       "xuunity_setup_plan",
       "xuunity_setup_apply",
@@ -231,6 +231,7 @@
       "unity_build_target_get",
       "unity_build_target_switch",
       "unity_status_summary",
+      "unity_ensure_ready",
       "unity_request_final_status",
       "unity_project_refresh",
       "unity_project_action_list",

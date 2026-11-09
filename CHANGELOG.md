@@ -16,6 +16,11 @@
   `editor_open_refused_compile_red` / `reopen_blocked`. A touch without a
   content change, a missing snapshot or an inconclusive probe opens as before.
   `--compile-preflight off` skips the check.
+- `unity_ensure_ready` brings `ensure-ready` to the MCP surface. An agent no
+  longer has to leave the MCP to open or wait for an editor: the tool takes
+  `openEditor`, `backgroundOpen`, `compilePreflight`, `startupPolicy`,
+  `timeoutMs` and `includeFullPayload`, runs the CLI command, and returns its
+  payload or its typed error code and recovery command unchanged.
 
 ### Fixed
 
