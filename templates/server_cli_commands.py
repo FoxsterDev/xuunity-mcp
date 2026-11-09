@@ -547,6 +547,7 @@ def cmd_ensure_ready(args):
         )
         if (
             args.open_editor
+            and exc.code != "editor_startup_modal_blocked"
             and import_state in {"declared_not_resolved", "resolved_not_cached"}
             and live_editor_pids
             and not bridge_state_present

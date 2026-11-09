@@ -2606,6 +2606,35 @@ actions:
                 self.assertEqual(expect_hint, details.get("stronger_diagnosis_source") == "status_summary")
                 self.assertEqual(expect_hint, "request-status-summary" in str(details.get("recommended_recovery_command") or ""))
 
+    def test_a_startup_modal_is_not_rewritten_as_an_unimported_package(self) -> None:
+        args = argparse.Namespace(
+            project_root="/tmp/FakeProject", open_editor=True, unity_app=None, editor_log_path=None,
+            background_open=False, timeout_ms=120000, heartbeat_max_age_seconds=10,
+            startup_policy="fail_fast_on_interactive_compile_block", compile_preflight="off",
+        )
+        modal = server.ToolInvocationError("editor_startup_modal_blocked", "modal", {
+            "recommended_next_action": "quit_editor_batch_compile_then_reopen",
+            "recommended_recovery_command": "launcher recover-editor-session --force-terminate",
+        })
+        with ExitStack() as stack:
+            for name, value in (
+                ("ensure_project_root", mock.Mock(return_value=Path("/tmp/FakeProject"))),
+                ("resolve_editor_log_path", mock.Mock(return_value=Path("/tmp/editor.log"))),
+                ("build_project_discovery_report", mock.Mock(return_value={"detected_editor_pids": [2468], "detected_editor_count": 1})),
+                ("current_project_context_bridge_state", mock.Mock(return_value={})),
+                ("inspect_light_mcp_import_state", mock.Mock(return_value={"import_state": "resolved_not_cached", "bridge_state_present": False})),
+                ("detect_unity_app_path_for_project", mock.Mock(return_value=Path("/Applications/Unity.app"))),
+                ("open_unity_editor", mock.Mock(return_value={"reused_existing_editor": False, "editor_pid": 2468})),
+                ("enrich_tool_invocation_error_with_discovery", mock.Mock(side_effect=lambda _, exc: exc)),
+                ("wait_for_ready", mock.Mock(side_effect=modal)),
+            ):
+                stack.enter_context(mock.patch.object(server, name, value))
+            with self.assertRaises(server.ToolInvocationError) as ctx:
+                server.cmd_ensure_ready(args)
+        self.assertEqual("editor_startup_modal_blocked", ctx.exception.code)
+        self.assertEqual("quit_editor_batch_compile_then_reopen", ctx.exception.details["recommended_next_action"])
+        self.assertNotIn("package_import_diagnosis", ctx.exception.details)
+
     def test_ensure_ready_fails_fast_when_package_not_declared(self) -> None:
         args = argparse.Namespace(
             project_root="/tmp/FakeProject",

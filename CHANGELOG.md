@@ -37,7 +37,8 @@
   and a quit, batch compile, reopen recovery. A moving log or a bridge that
   attaches keeps polling. When the wait ends with a weaker code while host
   health holds `startup_modal_dialog_block`, the error points at
-  `request-status-summary`.
+  `request-status-summary`. A local `file:` package no longer
+  replaces that recovery with a package re-resolve.
 - `status_summary` no longer shows `compiler_error_count: 0` beside an Editor.log
   full of CS errors with nothing to say which is current. Without a live
   bridge it now adds `compile_state: unmeasured`, `compiler_error_count_source`
