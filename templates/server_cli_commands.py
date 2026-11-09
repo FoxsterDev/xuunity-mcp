@@ -48,6 +48,7 @@ from server_batch_orchestrator import (
     refresh_project_context,
     request_editor_quit,
     run_batch_build_config_compile_matrix_probe,
+    run_editor_open_compile_preflight,
     run_self_json_command,
     run_self_json_command_with_completed,
     DISCOVERY_STATUS_FALLBACK_ERROR_CODES,
@@ -470,6 +471,35 @@ def cmd_ensure_ready(args):
             }
         elif args.open_editor:
             unity_app = detect_unity_app_path_for_project_fn(project_root, args.unity_app)
+            if int(payload["discovery"].get("detected_editor_count") or 0) == 0:
+                preflight = _compat_dep("run_editor_open_compile_preflight")(
+                    project_root,
+                    timeout_ms=args.timeout_ms,
+                    mode=str(getattr(args, "compile_preflight", "auto") or "auto"),
+                )
+                payload["compile_preflight"] = preflight
+                if preflight.get("verdict") == "red":
+                    raise ToolInvocationError(
+                        "editor_open_refused_compile_red",
+                        (
+                            "Compile inputs changed while the editor was closed and the batch compile is red, so "
+                            "the GUI editor was not opened: it would stop on the 'Enter Safe Mode?' dialog. Fix "
+                            "the compile errors, then rerun ensure-ready --open-editor."
+                        ),
+                        {
+                            "fail_fast_reason": "ensure_ready_compile_red_before_gui_open",
+                            "reopen_blocked": True,
+                            "reopen_block_reason": "compile_red_before_gui_open",
+                            "compile_state": "batch_compile_red",
+                            "compile_errors_observed": preflight.get("compile_errors_observed", 0),
+                            "compile_error_lines": preflight.get("compile_error_lines", []),
+                            "compile_preflight": preflight,
+                            "recommended_next_action": "fix_compile_errors_before_gui_reopen",
+                            "recommended_recovery_command": render_launcher_cli(
+                                "ensure-ready", project_root, "--open-editor"
+                            ),
+                        },
+                    )
             payload["launch"] = open_unity_editor_fn(
                 project_root,
                 log_path,

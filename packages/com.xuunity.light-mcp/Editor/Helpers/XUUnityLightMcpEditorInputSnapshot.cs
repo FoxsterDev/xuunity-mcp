@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using UnityEditor;
@@ -25,6 +26,22 @@ namespace XUUnity.LightMcp.Editor.Helpers
         public bool ContentChanged => Ready && changed_count > 0;
     }
 
+    [Serializable]
+    internal sealed class XUUnityLightMcpPersistedEditorInputSnapshot
+    {
+        public int schema_version = 1;
+        public string trigger = "";
+        public string basis_utc = "";
+        public string captured_utc = "";
+        public int editor_pid;
+        public string compile_outcome = XUUnityLightMcpEditorInputSnapshot.CompileOutcomeUnknown;
+        public int compile_error_count;
+        public int input_count;
+        public List<string> paths = new();
+        public List<string> hashes = new();
+        public List<string> dirty_at_capture = new();
+    }
+
     [InitializeOnLoad]
     internal static class XUUnityLightMcpEditorInputSnapshot
     {
@@ -32,7 +49,14 @@ namespace XUUnity.LightMcp.Editor.Helpers
         internal const string StatePending = "pending";
         internal const string StateFailed = "failed";
         internal const string StateUnavailable = "unavailable";
+        internal const string TriggerDomainLoad = "domain_load";
+        internal const string TriggerCompilationFinished = "compilation_finished";
+        internal const string CompileOutcomeSucceeded = "succeeded";
+        internal const string CompileOutcomeFailed = "failed";
+        internal const string CompileOutcomeUnknown = "unknown";
         const string CompileStartedSessionKey = "XUUnityLightMcp.EditorInputSnapshot.CompileStartedUtc";
+        const string CompileOutcomeSessionKey = "XUUnityLightMcp.EditorInputSnapshot.LastCompileOutcome";
+        const string PersistedFileName = "editor_input_snapshot.json";
         const int ChangedPathLimit = 8;
         const int PendingWaitMilliseconds = 3000;
 
@@ -45,8 +69,12 @@ namespace XUUnity.LightMcp.Editor.Helpers
         };
 
         static readonly object Gate = new();
+        static readonly object PersistGate = new();
         static Snapshot Current;
         static Task<Snapshot> PendingBuild;
+        static int BuildSequence;
+        static int PersistedSequence;
+        static int CompileErrorCount;
 
         internal sealed class Snapshot
         {
@@ -57,16 +85,27 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static XUUnityLightMcpEditorInputSnapshot()
         {
-            if (XUUnityLightMcpBridgeProcessIdentity.ResolveCurrentProcessClass()
-                == XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass)
+            if (!ShouldCapture(XUUnityLightMcpBridgeProcessIdentity.ResolveCurrentProcessClass()))
             {
                 return;
             }
 
             var basisUtc = ResolveDomainBasisUtc(SessionState.GetString(CompileStartedSessionKey, ""), DateTime.UtcNow);
-            StartBuild(XUUnityLightMcpFileIpcPaths.ProjectRootPath, basisUtc);
+            var outcome = SessionState.GetString(CompileOutcomeSessionKey, CompileOutcomeUnknown);
+            StartBuild(XUUnityLightMcpFileIpcPaths.ProjectRootPath, basisUtc, TriggerDomainLoad, outcome, 0);
             CompilationPipeline.compilationStarted += OnCompilationStarted;
+            CompilationPipeline.assemblyCompilationFinished += OnAssemblyCompilationFinished;
             CompilationPipeline.compilationFinished += OnCompilationFinished;
+        }
+
+        internal static bool ShouldCapture(string processClass)
+        {
+            return processClass != XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass;
+        }
+
+        internal static string PersistedSnapshotPath(string projectRoot)
+        {
+            return Path.Combine(projectRoot, "Library", "XUUnityLightMcp", "state", PersistedFileName);
         }
 
         internal static DateTime ResolveDomainBasisUtc(string compileStartedUtc, DateTime domainLoadedUtc)
@@ -86,37 +125,134 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
         static void OnCompilationStarted(object context)
         {
+            CompileErrorCount = 0;
             SessionState.SetString(CompileStartedSessionKey, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        }
+
+        static void OnAssemblyCompilationFinished(string assemblyName, CompilerMessage[] messages)
+        {
+            if (messages == null)
+            {
+                return;
+            }
+
+            foreach (var message in messages)
+            {
+                if (message.type == CompilerMessageType.Error)
+                {
+                    CompileErrorCount++;
+                }
+            }
         }
 
         static void OnCompilationFinished(object context)
         {
+            var outcome = CompileErrorCount > 0 ? CompileOutcomeFailed : CompileOutcomeSucceeded;
+            SessionState.SetString(CompileOutcomeSessionKey, outcome);
             var basisUtc = ResolveDomainBasisUtc(SessionState.GetString(CompileStartedSessionKey, ""), DateTime.UtcNow);
-            StartBuild(XUUnityLightMcpFileIpcPaths.ProjectRootPath, basisUtc);
+            StartBuild(XUUnityLightMcpFileIpcPaths.ProjectRootPath, basisUtc, TriggerCompilationFinished, outcome, CompileErrorCount);
         }
 
-        static void StartBuild(string projectRoot, DateTime basisUtc)
+        static void StartBuild(string projectRoot, DateTime basisUtc, string trigger, string outcome, int errorCount)
         {
             if (string.IsNullOrEmpty(projectRoot))
             {
                 return;
             }
 
+            var editorPid = ResolveEditorPid();
             lock (Gate)
             {
-                PendingBuild = Task.Run(() => Build(projectRoot, basisUtc));
+                var sequence = ++BuildSequence;
+                PendingBuild = Task.Run(() => Build(projectRoot, basisUtc, trigger, outcome, errorCount, editorPid, sequence));
             }
         }
 
-        static Snapshot Build(string projectRoot, DateTime basisUtc)
+        static int ResolveEditorPid()
+        {
+            try
+            {
+                using var process = Process.GetCurrentProcess();
+                return process.Id;
+            }
+            catch (Exception)
+            {
+                return 0;
+            }
+        }
+
+        static Snapshot Build(
+            string projectRoot,
+            DateTime basisUtc,
+            string trigger,
+            string outcome,
+            int errorCount,
+            int editorPid,
+            int sequence)
         {
             var snapshot = CaptureSnapshot(projectRoot, basisUtc);
             lock (Gate)
             {
-                Current = snapshot;
+                if (sequence == BuildSequence)
+                {
+                    Current = snapshot;
+                }
+            }
+
+            lock (PersistGate)
+            {
+                if (sequence > PersistedSequence
+                    && TryPersist(PersistedSnapshotPath(projectRoot), ToPersisted(snapshot, trigger, outcome, errorCount, editorPid)))
+                {
+                    PersistedSequence = sequence;
+                }
             }
 
             return snapshot;
+        }
+
+        internal static XUUnityLightMcpPersistedEditorInputSnapshot ToPersisted(
+            Snapshot snapshot,
+            string trigger,
+            string outcome,
+            int errorCount,
+            int editorPid)
+        {
+            var persisted = new XUUnityLightMcpPersistedEditorInputSnapshot
+            {
+                trigger = trigger ?? "",
+                basis_utc = snapshot.BasisUtc.ToString("O", CultureInfo.InvariantCulture),
+                captured_utc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                editor_pid = editorPid,
+                compile_outcome = string.IsNullOrEmpty(outcome) ? CompileOutcomeUnknown : outcome,
+                compile_error_count = errorCount,
+                input_count = snapshot.Hashes.Count,
+            };
+            var paths = new List<string>(snapshot.Hashes.Keys);
+            paths.Sort(StringComparer.Ordinal);
+            foreach (var path in paths)
+            {
+                persisted.paths.Add(path);
+                persisted.hashes.Add(snapshot.Hashes[path]);
+            }
+
+            var dirty = new List<string>(snapshot.DirtyAtCapture);
+            dirty.Sort(StringComparer.Ordinal);
+            persisted.dirty_at_capture.AddRange(dirty);
+            return persisted;
+        }
+
+        internal static bool TryPersist(string path, XUUnityLightMcpPersistedEditorInputSnapshot persisted)
+        {
+            try
+            {
+                XUUnityLightMcpAtomicFileWriter.WriteAllText(path, UnityEngine.JsonUtility.ToJson(persisted));
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         internal static Snapshot CaptureSnapshot(string projectRoot, DateTime basisUtc)

@@ -138,6 +138,7 @@ from server_batch_orchestrator import (
     wait_for_ready,
     resolve_operation_default_timeout_ms,
     run_batch_build_config_compile_matrix_probe,
+    run_editor_open_compile_preflight,
     run_self_json_command_with_completed,
     build_status_summary,
     enrich_error_details_with_discovery,

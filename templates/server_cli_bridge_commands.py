@@ -99,6 +99,23 @@ def cmd_recover_editor_session(args):
             payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
             print_json(payload)
             raise SystemExit(1)
+    elif not detected_editor_pids:
+        preflight = run_editor_open_compile_preflight(
+            project_root,
+            timeout_ms=args.timeout_ms,
+            mode=str(getattr(args, "compile_preflight", "auto") or "auto"),
+        )
+        payload["compile_preflight"] = preflight
+        payload["compile_probe_attempted"] = bool(preflight.get("run_compile_probe"))
+        if preflight.get("verdict") == "red":
+            payload["recovery_classification"] = "compile_red_confirmed"
+            payload["recovery_recommended_next_action"] = "fix_compile_errors_before_gui_reopen"
+            payload["recommended_recovery_command"] = render_launcher_cli("project-discovery-report", project_root)
+            payload["reopen_blocked"] = True
+            payload["reopen_block_reason"] = "compile_red_before_gui_open"
+            payload["discovery_after_recovery"] = build_project_discovery_report(project_root)
+            print_json(payload)
+            raise SystemExit(1)
 
     if args.open_editor:
         ensure_payload, ensure_completed = run_self_json_command_with_completed(

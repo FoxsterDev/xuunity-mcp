@@ -1041,6 +1041,10 @@ Unity logs nothing while the "Enter Safe Mode?" prompt is up, so a live editor
 with compile errors in the log, no live bridge and a log idle for 20 s ends the
 wait as `editor_startup_modal_blocked`, with the CS lines and a quit, batch
 compile, reopen recovery command, instead of running to the timeout.
+With the editor closed, `ensure-ready --open-editor` first compares the
+compile inputs with the snapshot the package wrote after its last compile; if
+content changed it runs a batch compile and refuses to open the GUI editor on
+red (`editor_open_refused_compile_red`). Pass `--compile-preflight off` to skip.
 `unity_asset_snapshot` reads the serialized fields of a ScriptableObject or
 any other main asset as depth-limited path/type/value rows, so a configuration
 question is answered without Play Mode or asset YAML.

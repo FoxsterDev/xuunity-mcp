@@ -24,6 +24,8 @@ from server_bridge_runtime import (
     try_read_live_editor_state,
 )
 from server_core import ToolInvocationError
+from server_editor_input_snapshot import editor_open_compile_preflight_decision
+from server_health import compile_error_lines_from_log
 from server_editor_host import (
     activate_unity_editor,
     bridge_state_is_ready,
@@ -395,6 +397,67 @@ def run_batch_build_config_compile_matrix_probe(
         payload["succeeded"] = completed.returncode == 0
 
     return payload
+
+
+def compile_probe_red_evidence(compile_probe: dict[str, Any]) -> dict[str, Any]:
+    text = ""
+    log_path = str(compile_probe.get("log_path") or "")
+    if log_path:
+        try:
+            text = Path(log_path).read_text(encoding="utf-8", errors="ignore")[-2000000:]
+        except OSError:
+            text = ""
+    if not text:
+        text = "\n".join(str(compile_probe.get(key) or "") for key in ("batch_probe_stdout", "batch_probe_stderr"))
+    lines, count = compile_error_lines_from_log(text)
+    return {"compile_errors_observed": count, "compile_error_lines": lines}
+
+
+def run_editor_open_compile_preflight(project_root: Path, *, timeout_ms: int, mode: str = "auto") -> dict[str, Any]:
+    if mode == "off":
+        return {"mode": "off", "run_compile_probe": False, "verdict": "skipped", "reason": "compile_preflight_off"}
+    decision = editor_open_compile_preflight_decision(project_root)
+    comparison = dict(decision.get("input_comparison") or {})
+    preflight: dict[str, Any] = {
+        "mode": mode,
+        "run_compile_probe": bool(decision.get("run_compile_probe")),
+        "reason": str(decision.get("reason") or ""),
+        "input_comparison": {
+            key: comparison.get(key)
+            for key in (
+                "state",
+                "changed_count",
+                "changed_paths",
+                "input_count",
+                "basis_utc",
+                "snapshot_trigger",
+                "snapshot_compile_outcome",
+            )
+            if key in comparison
+        },
+        "verdict": "not_needed",
+    }
+    if not preflight["run_compile_probe"]:
+        return preflight
+    probe = run_batch_build_config_compile_matrix_probe(project_root, timeout_ms=timeout_ms)
+    preflight["compile_probe"] = {
+        key: probe.get(key)
+        for key in ("succeeded", "batch_exit_code", "log_path", "result_file", "summary_file")
+        if key in probe
+    }
+    if bool(probe.get("succeeded")):
+        preflight["verdict"] = "green"
+        return preflight
+    classification, _, _ = classify_compile_probe_failure(probe)
+    evidence = compile_probe_red_evidence(probe)
+    preflight.update(evidence)
+    if classification == "compile_probe_blocked_by_live_editor":
+        preflight["verdict"] = "blocked_by_live_editor"
+    elif evidence["compile_errors_observed"] > 0:
+        preflight["verdict"] = "red"
+    else:
+        preflight["verdict"] = "inconclusive"
+    return preflight
 
 
 def classify_compile_probe_failure(compile_probe: dict[str, Any]) -> tuple[str, str, str]:

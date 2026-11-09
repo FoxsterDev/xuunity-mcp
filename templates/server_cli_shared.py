@@ -66,6 +66,7 @@ from server_batch_orchestrator import (
     refresh_project_context,
     request_editor_quit,
     run_batch_build_config_compile_matrix_probe,
+    run_editor_open_compile_preflight,
     run_self_json_command,
     run_self_json_command_with_completed,
     DISCOVERY_STATUS_FALLBACK_ERROR_CODES,

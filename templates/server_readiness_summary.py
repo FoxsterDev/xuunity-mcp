@@ -167,6 +167,14 @@ def build_ensure_ready_summary(
     if launch:
         summary["launch"] = launch
 
+    compile_preflight = payload.get("compile_preflight")
+    if isinstance(compile_preflight, dict) and compile_preflight:
+        summary["compile_preflight"] = {
+            key: compile_preflight.get(key)
+            for key in ("verdict", "reason", "run_compile_probe", "compile_errors_observed")
+            if key in compile_preflight
+        }
+
     startup_log_observation = bridge_state.get("startup_log_observation")
     if isinstance(startup_log_observation, dict) and startup_log_observation:
         summary["startup_log_observation"] = dict(startup_log_observation)

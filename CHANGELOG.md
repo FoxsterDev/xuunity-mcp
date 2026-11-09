@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added
+
+- A closed editor is no longer opened on red code. The package now writes the
+  RG-42 compile-input snapshot (content hashes of every `.cs`, `.asmdef`,
+  `.asmref` and `.rsp` under Assets, embedded and local packages, plus the
+  last compile outcome) to `Library/XUUnityLightMcp/state/editor_input_snapshot.json`
+  at domain load and after each compile; an import worker writes nothing.
+  `ensure-ready --open-editor` and `recover-editor-session` compare the
+  inputs with that file while the editor is closed. When content changed, or
+  the last recorded compile failed, they run the existing batch compile probe
+  first; a red probe (CS lines in the batch log) refuses the GUI open with
+  `editor_open_refused_compile_red` / `reopen_blocked`. A touch without a
+  content change, a missing snapshot or an inconclusive probe opens as before.
+  `--compile-preflight off` skips the check.
+
 ### Fixed
 
 - `ensure-ready` no longer waits out its whole timeout on the "Enter Safe Mode?"

@@ -312,6 +312,7 @@ from server_batch_recovery import (
     maybe_fail_fast_offline_ensure_ready_without_open,
     recover_project_bridge_for_reconciliation,
     run_batch_build_config_compile_matrix_probe,
+    run_editor_open_compile_preflight,
     run_self_json_command,
     run_self_json_command_with_completed,
 )
@@ -3350,6 +3351,7 @@ wrap_globals_with_proxies(globals(), [
     "resolve_operation_default_timeout_ms",
     "restore_host_opened_editor_state",
     "run_batch_build_config_compile_matrix_probe",
+    "run_editor_open_compile_preflight",
     "run_gui_fallback_operation",
     "run_self_json_command_with_completed",
     "summarize_state_for_error",

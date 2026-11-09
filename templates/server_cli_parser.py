@@ -711,6 +711,12 @@ def build_parser() -> argparse.ArgumentParser:
     ensure_ready_cmd.add_argument("--heartbeat-max-age-seconds", type=int, default=10)
     ensure_ready_cmd.add_argument("--include-full-payload", action="store_true")
     ensure_ready_cmd.add_argument(
+        "--compile-preflight",
+        default="auto",
+        choices=["auto", "off"],
+        help="With --open-editor and a closed editor: batch-compile first when compile inputs changed since the last recorded compile, and refuse the GUI open on red.",
+    )
+    ensure_ready_cmd.add_argument(
         "--startup-policy",
         default="fail_fast_on_interactive_compile_block",
         choices=sorted(STARTUP_POLICIES),
@@ -735,6 +741,12 @@ def build_parser() -> argparse.ArgumentParser:
     recover_editor_cmd.add_argument("--close-timeout-ms", type=int, default=45000)
     recover_editor_cmd.add_argument("--open-editor", action="store_true")
     recover_editor_cmd.add_argument("--force-compile-probe", action="store_true")
+    recover_editor_cmd.add_argument(
+        "--compile-preflight",
+        default="auto",
+        choices=["auto", "off"],
+        help="Run the batch compile probe when compile inputs changed since the last recorded compile.",
+    )
     recover_editor_cmd.add_argument("--heartbeat-max-age-seconds", type=int, default=10)
     recover_editor_cmd.add_argument(
         "--startup-policy",
