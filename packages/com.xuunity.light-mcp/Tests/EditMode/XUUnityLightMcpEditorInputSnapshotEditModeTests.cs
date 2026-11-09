@@ -216,7 +216,7 @@ namespace XUUnity.LightMcp.Tests.EditMode
 
             Assert.That(File.Exists(path), Is.True, path);
             var read = JsonUtility.FromJson<XUUnityLightMcpPersistedEditorInputSnapshot>(File.ReadAllText(path));
-            Assert.That(read.trigger, Is.AnyOf("domain_load", "compilation_finished"));
+            Assert.That(new[] { "domain_load", "compilation_finished" }, Does.Contain(read.trigger));
             Assert.That(read.editor_pid, Is.EqualTo(System.Diagnostics.Process.GetCurrentProcess().Id));
             Assert.That(read.paths.Count, Is.EqualTo(read.hashes.Count));
             Assert.That(read.paths.Count, Is.EqualTo(read.input_count));
