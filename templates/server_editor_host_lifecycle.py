@@ -35,6 +35,7 @@ from server_core import (
     write_json,
 )
 from server_host_platform import (
+    host_standalone_build_target,
     current_host_platform_adapter,
     host_path_to_local_path,
     is_wsl,
@@ -1417,7 +1418,9 @@ def _startup_modal_block_error(
                 {"step": "quit_editor", "command": quit_step},
                 {
                     "step": "batch_compile",
-                    "command": render_launcher_cli("batch-build-config-compile-matrix", project_root),
+                    "command": render_launcher_cli(
+                        "batch-compile", project_root, "--target", host_standalone_build_target()
+                    ),
                 },
                 {"step": "reopen_editor", "command": render_launcher_cli("ensure-ready", project_root, "--open-editor")},
             ],

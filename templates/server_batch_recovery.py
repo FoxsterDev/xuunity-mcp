@@ -24,6 +24,7 @@ from server_bridge_runtime import (
     try_read_live_editor_state,
 )
 from server_core import ToolInvocationError
+from server_host_platform import host_standalone_build_target
 from server_editor_input_snapshot import editor_open_compile_preflight_decision
 from server_health import compile_error_lines_from_log
 from server_editor_host import (
@@ -350,6 +351,7 @@ def run_batch_build_config_compile_matrix_probe(
     project_root: Path,
     *,
     timeout_ms: int,
+    fallback_target: str = "",
 ) -> dict[str, Any]:
     command = [
         *(ProcessLauncher.get_self_invocation_base_command()),
@@ -357,6 +359,16 @@ def run_batch_build_config_compile_matrix_probe(
         "--project-root",
         str(project_root),
     ]
+    if fallback_target:
+        command = [
+            *(ProcessLauncher.get_self_invocation_base_command()),
+            "batch-compile",
+            "--project-root",
+            str(project_root),
+            "--target",
+            fallback_target,
+        ]
+    command.extend(["--no-progress-stdout", "--batch-fallback-mode", "off"])
     completed = subprocess.run(
         command,
         check=False,
@@ -369,7 +381,7 @@ def run_batch_build_config_compile_matrix_probe(
     stdout = str(completed.stdout or "").strip()
     stderr = str(completed.stderr or "").strip()
     payload: dict[str, Any] = {
-        "action": "batch_build_config_compile_matrix_probe",
+        "action": "batch_compile_probe" if fallback_target else "batch_build_config_compile_matrix_probe",
         "command": command,
         "batch_exit_code": completed.returncode,
         "timeout_ms": timeout_ms,
@@ -379,7 +391,20 @@ def run_batch_build_config_compile_matrix_probe(
         try:
             payload["batch_probe"] = json.loads(stdout)
         except json.JSONDecodeError:
-            payload["batch_probe_stdout"] = truncate_text(stdout, 1200)
+            last_object: dict[str, Any] = {}
+            for line in stdout.splitlines():
+                try:
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    last_object = parsed
+                    if parsed.get("log_path"):
+                        payload["log_path"] = str(parsed["log_path"])
+            if last_object:
+                payload["batch_probe"] = last_object
+            else:
+                payload["batch_probe_stdout"] = truncate_text(stdout, 1200)
     if stderr:
         payload["batch_probe_stderr"] = truncate_text(stderr, 1200)
 
@@ -388,7 +413,9 @@ def run_batch_build_config_compile_matrix_probe(
         payload["succeeded"] = bool(batch_probe.get("succeeded"))
         payload["summary_file"] = str(batch_probe.get("summary_file") or "")
         payload["result_file"] = str(batch_probe.get("result_file") or "")
-        payload["log_path"] = str(batch_probe.get("log_path") or "")
+        payload["log_path"] = str(
+            batch_probe.get("log_path") or batch_probe.get("raw_log_path") or payload.get("log_path") or ""
+        )
         result_summary = batch_probe.get("result_summary")
         if isinstance(result_summary, dict):
             payload["compile_gate_summary"] = result_summary
@@ -402,13 +429,26 @@ def run_batch_build_config_compile_matrix_probe(
 def compile_probe_red_evidence(compile_probe: dict[str, Any]) -> dict[str, Any]:
     text = ""
     log_path = str(compile_probe.get("log_path") or "")
+    summary: dict[str, Any] = {}
+    summary_file = str(compile_probe.get("summary_file") or "")
+    if summary_file:
+        try:
+            loaded = json.loads(Path(summary_file).read_text(encoding="utf-8"))
+            summary = loaded if isinstance(loaded, dict) else {}
+        except (OSError, ValueError):
+            summary = {}
+    log_path = log_path or str(summary.get("raw_log_path") or summary.get("log_path") or "")
     if log_path:
         try:
             text = Path(log_path).read_text(encoding="utf-8", errors="ignore")[-2000000:]
         except OSError:
             text = ""
     if not text:
-        text = "\n".join(str(compile_probe.get(key) or "") for key in ("batch_probe_stdout", "batch_probe_stderr"))
+        batch_probe = dict(compile_probe.get("batch_probe") or {})
+        text = "\n".join(
+            [str(batch_probe.get("log_excerpt_hint") or summary.get("log_excerpt_hint") or "")]
+            + [str(compile_probe.get(key) or "") for key in ("batch_probe_stdout", "batch_probe_stderr")]
+        )
     lines, count = compile_error_lines_from_log(text)
     return {"compile_errors_observed": count, "compile_error_lines": lines}
 
@@ -440,6 +480,15 @@ def run_editor_open_compile_preflight(project_root: Path, *, timeout_ms: int, mo
     if not preflight["run_compile_probe"]:
         return preflight
     probe = run_batch_build_config_compile_matrix_probe(project_root, timeout_ms=timeout_ms)
+    probe_error_code = str(dict(dict(probe.get("batch_probe") or {}).get("error") or {}).get("code") or "")
+    if not bool(probe.get("succeeded")) and probe_error_code.startswith("build_config_"):
+        preflight["compile_probe_fallback_reason"] = probe_error_code
+        probe = run_batch_build_config_compile_matrix_probe(
+            project_root, timeout_ms=timeout_ms, fallback_target=host_standalone_build_target()
+        )
+        preflight["compile_probe_lane"] = "batch_compile_host_standalone"
+    else:
+        preflight["compile_probe_lane"] = "batch_build_config_compile_matrix"
     preflight["compile_probe"] = {
         key: probe.get(key)
         for key in ("succeeded", "batch_exit_code", "log_path", "result_file", "summary_file")

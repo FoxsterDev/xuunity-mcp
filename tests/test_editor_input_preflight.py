@@ -180,6 +180,20 @@ class PreflightVerdictTests(SnapshotFixture):
         green, _ = self.run_preflight(self.probe(succeeded=True))
         self.assertEqual("green", green["verdict"])
 
+    def test_a_project_without_a_build_config_falls_back_to_a_host_standalone_batch_compile(self) -> None:
+        self.persist()
+        write(self.root / "Assets/Scripts/Board.cs", "class Board { Missing m; }", COMPILED_EPOCH + 600)
+        missing = {"succeeded": False, "batch_probe": {"error": {"code": "build_config_asset_not_found"}}}
+        red = self.probe(succeeded=False, log_text="Assets/Scripts/Board.cs(1,15): error CS0246: missing\n")
+        probe = mock.Mock(side_effect=[missing, red])
+        with mock.patch.object(server_batch_recovery, "run_batch_build_config_compile_matrix_probe", probe), \
+                mock.patch.object(server_batch_recovery, "host_standalone_build_target", return_value="StandaloneOSX"):
+            preflight = server_batch_recovery.run_editor_open_compile_preflight(self.root, timeout_ms=1000)
+        self.assertEqual("red", preflight["verdict"])
+        self.assertEqual("build_config_asset_not_found", preflight["compile_probe_fallback_reason"])
+        self.assertEqual("batch_compile_host_standalone", preflight["compile_probe_lane"])
+        self.assertEqual("StandaloneOSX", probe.call_args_list[1].kwargs["fallback_target"])
+
     def test_off_and_unchanged_inputs_never_spawn_the_probe(self) -> None:
         self.persist()
         off, probe = self.run_preflight(self.probe(succeeded=False), mode="off")

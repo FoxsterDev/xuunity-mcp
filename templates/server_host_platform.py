@@ -10,7 +10,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from server_core import hidden_window_subprocess_kwargs
+from server_core import hidden_window_subprocess_kwargs, is_windows_like_host
 
 
 WSL_PROC_ROOT = Path("/proc")
@@ -517,6 +517,12 @@ def host_platform_kind() -> str:
     if os.name == "nt":
         return "windows"
     return "linux"
+
+
+def host_standalone_build_target() -> str:
+    if is_windows_like_host() or is_wsl():
+        return "StandaloneWindows64"
+    return "StandaloneOSX" if host_platform_kind() == "macos" else "StandaloneLinux64"
 
 
 def current_host_platform_adapter() -> HostPlatformAdapter:
