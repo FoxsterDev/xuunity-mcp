@@ -82,6 +82,45 @@ class DiagnosticFreshnessTests(unittest.TestCase):
             self.assertEqual("stale", gate.compiler_diagnostics_trust_from_state(state, root)["compiler_diagnostics_trust_class"])
             self.assertTrue(gate.fail_if_compile_broken_for_operation(root, "unity.tests.run_editmode", state))
 
+    def test_a_fix_in_any_compile_input_makes_the_diagnostics_stale(self):
+        cases = (
+            ("Assets/Component.cs", "source_tree_changed"),
+            ("Assets/New/Added.cs", "source_tree_changed"),
+            ("Assets/Game.asmdef", "source_tree_changed"),
+            ("Packages/com.example.core/Runtime/Core.cs", "source_tree_changed"),
+        )
+        for relative, reason in cases:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                state = red_state(root)
+                package = root / "Packages" / "com.example.core"
+                package.mkdir(parents=True)
+                (package / "package.json").write_text("{}", encoding="utf-8")
+                os.utime(package / "package.json", (1700000000, 1700000000))
+                self.assertEqual("confirmed", gate.compiler_diagnostics_trust_from_state(state, root)["compiler_diagnostics_trust_class"])
+                changed = root / relative
+                changed.parent.mkdir(parents=True, exist_ok=True)
+                changed.write_text("fixed", encoding="utf-8")
+                os.utime(changed, (1800000000, 1800000000))
+                trust = gate.compiler_diagnostics_trust_from_state(state, root)
+                self.assertEqual("stale", trust["compiler_diagnostics_trust_class"])
+                self.assertEqual(reason, trust["compiler_diagnostics_stale_reason"])
+                self.assertEqual(relative, trust["compiler_diagnostics_newer_input"])
+                self.assertTrue(gate.fail_if_compile_broken_for_operation(root, "unity.tests.run_editmode", state))
+
+    def test_non_input_and_ignored_files_keep_a_fresh_error_confirmed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = red_state(root)
+            for relative in ("Assets/Art/icon.png", "Assets/Samples~/Old.cs", "Assets/.hidden/Tmp.cs"):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x", encoding="utf-8")
+                os.utime(path, (1800000000, 1800000000))
+            self.assertEqual("confirmed", gate.compiler_diagnostics_trust_from_state(state, root)["compiler_diagnostics_trust_class"])
+            with self.assertRaises(ToolInvocationError):
+                gate.fail_if_compile_broken_for_operation(root, "unity.tests.run_editmode", state)
+
     def test_prior_generation_and_undated_legacy_diagnostics_require_refresh(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

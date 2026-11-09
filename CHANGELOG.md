@@ -38,6 +38,14 @@
   `compile_errors_observed_in_log`, `compile_error_lines` and
   `compile_observation_source: editor_log_unverified`. The log count never
   goes into `compiler_error_count`, which stays a bridge measurement.
+- The compile gate no longer refuses a request after a cross-file fix. It
+  judged fresh diagnostics only by the files the errors named, so fixing the
+  other file (the usual fix for CS1061 or CS0246), adding a file or editing an
+  `.asmdef` still read `compile_broken`. It now also scans every compile input
+  with the same enumerator as the input snapshot (Assets, embedded and local
+  packages; `.cs`, `.asmdef`, `.asmref`, `.rsp`); a newer input marks the
+  diagnostics `stale` (`source_tree_changed`, `compiler_diagnostics_newer_input`)
+  and the existing single refresh decides. Only the red path pays the scan.
 
 ## 0.3.87
 
