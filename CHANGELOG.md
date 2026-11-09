@@ -17,6 +17,16 @@
   decision envelope report `required_steps` and `optional_steps` counts plus
   `skipped_optional_steps` (step id, kind, refusal reason, interaction id);
   `unity_scenario_capabilities` lists `step_statuses`.
+- `waitForTreeChangeMs` on `unity_ui_click` and the scenario `ui_click` step
+  (at most 10000 ms). The after-snapshot was taken in the same frame as the
+  click, so a popup that loads a few frames later read as
+  `ui_interaction_no_state_change`, and `expectStateChange: false` was the only
+  workaround. With a window, an unchanged tree is re-snapshotted on later
+  editor frames from the update loop (no sleeping on the main thread) until
+  the signature changes or the window ends. The response carries
+  `tree_change_wait_status`, `tree_change_observed_after_ms` and
+  `tree_change_observed_after_frames`; a second click while one is waiting is
+  refused as `ui_click_wait_in_progress`.
 
 ## 0.3.87
 

@@ -4,6 +4,7 @@ using UnityEngine;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Operations;
 using static XUUnity.LightMcp.Editor.Helpers.XUUnityLightMcpNestedOperationClient;
+using static XUUnity.LightMcp.Editor.Helpers.XUUnityLightMcpScenarioShared;
 
 namespace XUUnity.LightMcp.Editor.Helpers
 {
@@ -111,11 +112,18 @@ namespace XUUnity.LightMcp.Editor.Helpers
         }
 
         public static bool ProcessUiClickStep(
+            XUUnityLightMcpScenarioRunState state,
             XUUnityLightMcpScenarioStepDefinition step,
             XUUnityLightMcpScenarioStepResult stepResult)
         {
             XUUnityLightMcpPlayModeStateOperation.PopulateLivenessEvidence(stepResult);
             stepResult.optional = step.optional;
+            if (stepResult.status == "running"
+                && string.Equals(state.pendingNestedOperation, ClickOperation, StringComparison.Ordinal))
+            {
+                return ResumePendingClick(state, step, stepResult);
+            }
+
             var interactionId = (step.interactionId ?? "").Trim();
             if (string.IsNullOrEmpty(interactionId))
             {
@@ -139,14 +147,63 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 includeDontDestroyOnLoad = step.includeDontDestroyOnLoad,
                 maxDepth = step.maxDepth > 0 ? step.maxDepth : XUUnityLightMcpUiRead.DefaultMaxDepth,
                 maxNodes = step.maxNodes > 0 ? step.maxNodes : XUUnityLightMcpUiRead.DefaultMaxNodes,
+                waitForTreeChangeMs = step.waitForTreeChangeMs,
                 selector = step.selector ?? new XUUnityLightMcpUiSelectorArgs()
             };
 
+            var request = BuildNestedRequest(ClickOperation, JsonUtility.ToJson(args), 30000);
             var stopwatch = Stopwatch.StartNew();
-            var response = ExecuteNestedOperation(ClickOperation, JsonUtility.ToJson(args));
+            var response = ExecuteNestedOperation(ClickOperation, request.args_json, request);
             stopwatch.Stop();
             stepResult.duration_seconds = Math.Round(stopwatch.Elapsed.TotalSeconds, 6);
 
+            if (response == null && XUUnityLightMcpUiClickTreeWatch.IsPending)
+            {
+                state.pendingNestedRequestId = request.request_id;
+                state.pendingNestedOperation = ClickOperation;
+                state.pendingNestedStartedAtUtc = request.created_at_utc;
+                stepResult.status = "running";
+                stepResult.outcome = "waiting_for_tree_change";
+                return false;
+            }
+
+            return ApplyClickResponse(step, stepResult, args.selector, interactionId, response);
+        }
+
+        static bool ResumePendingClick(
+            XUUnityLightMcpScenarioRunState state,
+            XUUnityLightMcpScenarioStepDefinition step,
+            XUUnityLightMcpScenarioStepResult stepResult)
+        {
+            if (!TryTakePendingNestedResponse(state.pendingNestedRequestId, out var response))
+            {
+                if (XUUnityLightMcpUiClickTreeWatch.IsPending)
+                {
+                    return false;
+                }
+
+                ClearPendingNestedOperation(state);
+                return Fail(stepResult, "ui_click_wait_response_lost",
+                    $"The deferred '{ClickOperation}' response for waitForTreeChangeMs was not written.");
+            }
+
+            stepResult.duration_seconds = CalculateDurationSeconds(state.pendingNestedStartedAtUtc, response.completed_at_utc ?? "");
+            ClearPendingNestedOperation(state);
+            return ApplyClickResponse(
+                step,
+                stepResult,
+                step.selector ?? new XUUnityLightMcpUiSelectorArgs(),
+                (step.interactionId ?? "").Trim(),
+                response);
+        }
+
+        static bool ApplyClickResponse(
+            XUUnityLightMcpScenarioStepDefinition step,
+            XUUnityLightMcpScenarioStepResult stepResult,
+            XUUnityLightMcpUiSelectorArgs selector,
+            string interactionId,
+            XUUnityLightMcpResponse response)
+        {
             if (response == null)
             {
                 return Fail(stepResult, "null_nested_response", $"Nested operation '{ClickOperation}' returned no response.");
@@ -175,7 +232,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 {
                     interaction_id = interactionId,
                     action = "click",
-                    selector = args.selector,
+                    selector = selector,
                     delivered = click.delivered,
                     delivery_mechanism = click.delivery_mechanism ?? "",
                     target_path = click.target_node != null ? click.target_node.path : "",
@@ -202,7 +259,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     playmode_liveness_remediation = click.playmode_liveness_remediation ?? "",
                     editor_application_focused = click.editor_application_focused,
                     result_trust_class = click.result_trust_class ?? "",
-                    refusal_code = click.refusal_code ?? ""
+                    refusal_code = click.refusal_code ?? "",
+                    wait_for_tree_change_ms = click.wait_for_tree_change_ms,
+                    tree_change_wait_status = click.tree_change_wait_status ?? "",
+                    tree_change_observed_after_ms = click.tree_change_observed_after_ms,
+                    tree_change_observed_after_frames = click.tree_change_observed_after_frames
                 }
             };
 

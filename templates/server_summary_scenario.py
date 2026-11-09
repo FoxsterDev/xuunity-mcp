@@ -835,7 +835,7 @@ def _extract_ui_interaction_summary(step: dict[str, Any], payload: dict[str, Any
         return {}
     delivered = bool(block.get("delivered"))
     state_changed = bool(block.get("state_changed"))
-    return {
+    summary = {
         "interaction_id": str(block.get("interaction_id") or ""),
         "delivered": delivered,
         "state_changed": state_changed,
@@ -845,6 +845,14 @@ def _extract_ui_interaction_summary(step: dict[str, Any], payload: dict[str, Any
         "click_status": str(payload.get("click_status") or ""),
         "refusal_code": str(block.get("refusal_code") or ""),
     }
+    wait_ms = int(block.get("wait_for_tree_change_ms") or 0)
+    if wait_ms > 0:
+        summary["wait_for_tree_change_ms"] = wait_ms
+        summary["tree_change_wait_status"] = str(block.get("tree_change_wait_status") or "")
+        if state_changed:
+            summary["tree_change_observed_after_ms"] = block.get("tree_change_observed_after_ms") or 0
+            summary["tree_change_observed_after_frames"] = int(block.get("tree_change_observed_after_frames") or 0)
+    return summary
 
 
 def build_playmode_guard_summary(steps: list[Any]) -> dict[str, Any]:

@@ -85,6 +85,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public int maxDepth;
             public int maxNodes;
             public bool expectStateChange = true;
+            public int waitForTreeChangeMs;
             public bool expectedExists = true;
             public string expectedText = "";
             public bool approve;

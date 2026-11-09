@@ -961,7 +961,8 @@ TOOLS: dict[str, dict[str, Any]] = {
             "is not a raycast filter, so a transparent raycastTarget hit area is clicked and reported as "
             "transparent_hit_area. A node/depth-budget-limited search is ui_selector_search_truncated because "
             "absence or uniqueness is unproven; it reports the searched scope plus retry budget. Records the matched node, "
-            "delivery mechanism, and before/after snapshot signatures. Requires explicit approve=true and "
+            "delivery mechanism, and before/after snapshot signatures; waitForTreeChangeMs re-checks the tree over later "
+            "frames for effects that appear after the click. Requires explicit approve=true and "
             "action='click'. Requires com.unity.ugui."
         ),
         "inputSchema": {
@@ -1000,6 +1001,18 @@ TOOLS: dict[str, dict[str, Any]] = {
                 },
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
+                "waitForTreeChangeMs": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "description": (
+                        "When the UI tree is unchanged in the delivery frame, re-snapshot on later editor frames "
+                        "until the signature changes or this many milliseconds pass. The response reports "
+                        "tree_change_wait_status and, on a change, tree_change_observed_after_ms/_frames. "
+                        "0 keeps the single-frame check."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector", "approve"]

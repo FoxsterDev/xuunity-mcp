@@ -213,6 +213,20 @@ an optional step never turns a run `failed` unless it ran and failed.
 | `no_state_change` | a gap raised only when the step expected a change |
 | `interaction_delivered` | the scenario step outcome for an effective click |
 | `ui_target_occluded` | refused: a live event-system raycast at the target's centre resolved to a different click handler, so a real pointer would never reach the target |
+| `ui_click_wait_in_progress` | refused: an earlier click is still waiting for its tree change (`waitForTreeChangeMs`) |
+
+### `tree_change_wait_status`
+
+How a click compared the UI tree after delivery. The window is `waitForTreeChangeMs`
+(at most 10000 ms); later samples run on the editor update loop, one per Play Mode
+frame or every 50 ms in Edit Mode, and never block the editor.
+
+| Value | Meaning |
+| --- | --- |
+| `not_requested` | no window; only the delivery frame was compared |
+| `changed_in_delivery_frame` | a window was set, but the tree already changed in the delivery frame |
+| `changed_after_wait` | the tree changed on a later sample; `tree_change_observed_after_ms` and `_frames` say when |
+| `unchanged_after_wait` | no sample inside the window saw a change; the click is `delivered_no_observable_effect` |
 
 ### `pointer_raycast_evidence`
 

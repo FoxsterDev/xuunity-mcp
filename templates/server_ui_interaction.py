@@ -76,6 +76,7 @@ def ui_interaction_contract() -> dict[str, Any]:
             "click_status": "the direct-tool status the step recorded: effective, delivered_no_observable_effect, or not_delivered",
             "playmode_state": "edit, playing, or paused at delivery time",
             "refusal_code": "set when the operation refused before delivery",
+            "tree_change_wait_status": "not_requested, changed_in_delivery_frame, changed_after_wait or unchanged_after_wait when the step set waitForTreeChangeMs",
         },
         "rules": [
             "Edit-mode delivery never proves a runtime user path; run the step inside a Play-mode scenario.",

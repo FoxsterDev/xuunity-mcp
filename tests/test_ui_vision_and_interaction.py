@@ -972,7 +972,10 @@ class CrossLanguageContractTests(unittest.TestCase):
         self.assertNotIn("CurrentPlayModeState()", text)
 
     def test_the_click_operation_ranks_observable_effect_above_delivery(self) -> None:
-        text = self.read("Ugui/XUUnityLightMcpUiClickOperation.cs")
+        operation = self.read("Ugui/XUUnityLightMcpUiClickOperation.cs")
+        self.assertIn("XUUnityLightMcpUiClickTreeWatch.Finalize(payload);", operation)
+        self.assertNotIn("payload.success = payload.delivered;", operation)
+        text = self.read("Helpers/XUUnityLightMcpUiClickTreeWatch.cs")
 
         self.assertIn("payload.effective = payload.delivered && payload.state_changed", text)
         self.assertIn('"delivered_no_observable_effect"', text)

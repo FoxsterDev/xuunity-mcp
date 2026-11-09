@@ -217,6 +217,17 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
             "default": True,
             "description": "ui_click only. Fail the step when the UI tree signature is unchanged after delivery.",
         },
+        "waitForTreeChangeMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "default": 0,
+            "description": (
+                "ui_click only. When the UI tree is unchanged in the delivery frame, keep re-snapshotting on later "
+                "editor frames until the signature changes or this many milliseconds pass, so a popup that "
+                "appears a few frames after the click counts as a change. 0 keeps the single-frame check."
+            ),
+        },
         "expectedExists": {
             "type": "boolean",
             "default": True,
