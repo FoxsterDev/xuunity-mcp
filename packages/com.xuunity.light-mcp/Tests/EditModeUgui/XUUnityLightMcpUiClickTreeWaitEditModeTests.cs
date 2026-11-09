@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
@@ -17,7 +18,7 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
     [Category("XUUnity.MCP.UiInteraction")]
     public sealed class XUUnityLightMcpUiClickTreeWaitEditModeTests
     {
-        const int MaxTestFrames = 400;
+        const double MaxWaitSeconds = 6d;
 
         GameObject _canvasRoot;
         GameObject _popup;
@@ -73,11 +74,13 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             Assert.That(_clicked, Is.True);
             Assert.That(XUUnityLightMcpUiClickTreeWatch.IsPending, Is.True);
 
-            var frames = 0;
+            // Older Test Framework versions resume an Edit Mode yield without a new editor update, so the bound is real time.
+            var deadline = EditorApplication.timeSinceStartup + MaxWaitSeconds;
+            var iterations = 0;
             while (!File.Exists(OutboxPath(_requestId)))
             {
-                Assert.That(++frames, Is.LessThan(MaxTestFrames), "the deferred click never answered");
-                if (frames == 3)
+                Assert.That(EditorApplication.timeSinceStartup, Is.LessThan(deadline), "the deferred click never answered");
+                if (++iterations == 3)
                 {
                     _popup.SetActive(true);
                 }
