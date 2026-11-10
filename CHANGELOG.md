@@ -50,6 +50,11 @@
   a server block in the project's parent directories (scope `ancestor_project`),
   and a client counts as wired when any of its targets is compatible; an
   existing incompatible block still blocks (RG-18).
+- A scenario whose first failure is a required UI step that found no node after
+  a complete search is now a clean `failed` with `failure_class: precondition`
+  and an authoritative trust class, not `inconclusive` / `unity_unproven`. A
+  `ui_click` refused as `ui_target_occluded` is `blocking_popup`. A truncated or
+  out-of-scope search still reads as unproven (RG-53).
 
 ## 0.3.88
 
