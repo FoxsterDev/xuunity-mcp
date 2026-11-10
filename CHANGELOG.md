@@ -40,6 +40,14 @@
   - A batch-mode Unity process that attached the bridge writes
     `health_status: process_exited` when it quits, instead of leaving a
     `healthy` state file behind a dead pid.
+- A raw `-batchmode -runTests` run is no longer invisible (RG-21). The package
+  registers its own test callbacks in such a process and writes
+  `Library/XUUnityLightMcp/state/cli_test_progress.json` (run phase, totals,
+  last started and finished test, progress time, domain reloads survived).
+  `unity_status_summary` reports it as `cli_test_progress` with `status`
+  `running`, `running_without_progress` (quiet for 5 minutes) or
+  `process_exited_before_completion`. `AI_INTEGRATION.md` no longer offers raw
+  batch PlayMode as the fallback and names the `WaitForEndOfFrame` hang.
 
 ## 0.3.88
 
