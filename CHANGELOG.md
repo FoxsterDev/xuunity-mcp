@@ -20,7 +20,10 @@
   (with `attachment_pending_basis`) when the host-opened editor predates the
   manifest change, adding the focus or Assets > Refresh hint.
 - The recovered Play Mode completion's no-duplicate check is a named predicate
-  with an EditMode test (RG-04 F-6).
+  with an EditMode test (RG-04 F-6). An end-to-end EditMode test drives
+  `TryWritePendingCompletedResponse` under a thread-local project root override
+  (`ProjectRootPathOverrideForCurrentThread`), so it never touches the live
+  active-test-run file, and checks one `request_completed` per request.
 
 ## 0.3.89
 

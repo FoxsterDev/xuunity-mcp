@@ -5,9 +5,19 @@ namespace XUUnity.LightMcp.Editor.Core
 {
     internal static class XUUnityLightMcpFileIpcPaths
     {
+        [System.ThreadStatic] static string projectRootPathOverrideForCurrentThread;
+
+        internal static string ProjectRootPathOverrideForCurrentThread
+        {
+            get => projectRootPathOverrideForCurrentThread;
+            set => projectRootPathOverrideForCurrentThread = value;
+        }
+
         public static string ProjectRootPath =>
-            Directory.GetParent(Application.dataPath)?.FullName
-            ?? throw new DirectoryNotFoundException("Unable to resolve Unity project root from Application.dataPath.");
+            !string.IsNullOrEmpty(projectRootPathOverrideForCurrentThread)
+                ? projectRootPathOverrideForCurrentThread
+                : Directory.GetParent(Application.dataPath)?.FullName
+                  ?? throw new DirectoryNotFoundException("Unable to resolve Unity project root from Application.dataPath.");
 
         public static string RootPath => Path.Combine(ProjectRootPath, "Library", "XUUnityLightMcp");
         public static string ConfigDirectory => Path.Combine(RootPath, "config");
