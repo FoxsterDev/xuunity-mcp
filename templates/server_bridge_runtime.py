@@ -113,6 +113,7 @@ def build_request_final_status(
     poll_timeout_ms: int = 0,
     poll_interval_ms: int = 200,
     return_reclassified_terminal_immediately: bool = True,
+    reconcile_orphaned_outbox: bool = False,
 ) -> dict[str, Any]:
     original_reader = _final_status.read_request_journal_events
     _final_status.read_request_journal_events = read_request_journal_events
@@ -126,6 +127,7 @@ def build_request_final_status(
             poll_timeout_ms=poll_timeout_ms,
             poll_interval_ms=poll_interval_ms,
             return_reclassified_terminal_immediately=return_reclassified_terminal_immediately,
+            reconcile_orphaned_outbox=reconcile_orphaned_outbox,
         )
     finally:
         _final_status.read_request_journal_events = original_reader

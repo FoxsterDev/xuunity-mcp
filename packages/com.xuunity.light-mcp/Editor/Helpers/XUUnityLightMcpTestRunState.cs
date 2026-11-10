@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using XUUnity.LightMcp.Editor.Bridge;
@@ -127,6 +128,30 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return !string.IsNullOrWhiteSpace(state.request_id)
                        && !string.Equals(state.response_handoff_state, "written", StringComparison.Ordinal);
             }
+        }
+
+        public static bool WillResumeAfterDomainReload(string requestId, string operation)
+        {
+            if (string.IsNullOrWhiteSpace(requestId)
+                || !string.Equals(operation, PlayModeTestsOperationName, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            lock (Gate)
+            {
+                return TryLoadLocked(out var state) && IsResumablePlayModeRun(state, requestId);
+            }
+        }
+
+        internal static bool IsResumablePlayModeRun(XUUnityLightMcpPersistedTestRunState state, string requestId)
+        {
+            return state != null
+                   && !string.IsNullOrWhiteSpace(requestId)
+                   && string.Equals(state.request_id, requestId, StringComparison.Ordinal)
+                   && string.Equals(state.operation, PlayModeTestsOperationName, StringComparison.Ordinal)
+                   && string.Equals(state.response_handoff_state, "pending", StringComparison.Ordinal)
+                   && string.IsNullOrWhiteSpace(state.completed_at_utc);
         }
 
         public static bool TryLoadActive(out XUUnityLightMcpPersistedTestRunState state)
@@ -279,6 +304,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 state.run_phase = string.Equals(state.run_phase, "timed_out", StringComparison.Ordinal)
                     ? "settled_after_timeout"
                     : "completed";
+                if (string.IsNullOrWhiteSpace(state.timeout_classification)
+                    && ExceededRuntimeBudget(state.started_at_utc, state.completed_at_utc, state.runtime_timeout_ms))
+                {
+                    state.timeout_classification = CompletedAfterRuntimeBudget;
+                }
                 state.completion_basis = completionBasis ?? "";
                 state.playmode_state_after_test_callbacks = playmodeStateAfterSettle ?? "";
                 state.playmode_state_after_host_settle = "";
@@ -789,6 +819,20 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             return IsRecoveryDeadlineExpiredLocked(state);
+        }
+
+        internal const string CompletedAfterRuntimeBudget = "completed_after_runtime_budget";
+
+        internal static bool ExceededRuntimeBudget(string startedAtUtc, string completedAtUtc, int runtimeTimeoutMs)
+        {
+            if (runtimeTimeoutMs <= 0
+                || !DateTime.TryParse(startedAtUtc, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var started)
+                || !DateTime.TryParse(completedAtUtc, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var completed))
+            {
+                return false;
+            }
+
+            return (completed - started).TotalMilliseconds > runtimeTimeoutMs;
         }
 
         static bool IsRecoveryDeadlineExpiredLocked(XUUnityLightMcpPersistedTestRunState state)

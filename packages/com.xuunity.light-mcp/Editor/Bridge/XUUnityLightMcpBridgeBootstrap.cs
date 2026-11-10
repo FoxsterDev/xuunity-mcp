@@ -96,6 +96,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
             XUUnityLightMcpBackgroundExecution.ApplyIfConfigured();
             EditorApplication.quitting -= XUUnityLightMcpBackgroundExecution.Restore;
             EditorApplication.quitting += XUUnityLightMcpBackgroundExecution.Restore;
+            if (processClass == XUUnityLightMcpBridgeProcessIdentity.BatchProcessClass)
+            {
+                EditorApplication.quitting -= WriteBatchProcessExited;
+                EditorApplication.quitting += WriteBatchProcessExited;
+            }
             XUUnityLightMcpBridgeRuntimeState.InitializeBridgeSession();
             XUUnityLightMcpBridgeTransportRuntime.Initialize(config);
             XUUnityLightMcpLifecycleMonitor.InitializeIfNeeded();
@@ -114,6 +119,17 @@ namespace XUUnity.LightMcp.Editor.Bridge
             XUUnityLightMcpEditorQuitScheduler.RestoreFromSessionState();
             EditorApplication.update -= OnUpdate;
             EditorApplication.update += OnUpdate;
+        }
+
+        static void WriteBatchProcessExited()
+        {
+            try
+            {
+                XUUnityLightMcpBridgeStateWriter.WriteProcessExited();
+            }
+            catch
+            {
+            }
         }
 
         static void OnUpdate()

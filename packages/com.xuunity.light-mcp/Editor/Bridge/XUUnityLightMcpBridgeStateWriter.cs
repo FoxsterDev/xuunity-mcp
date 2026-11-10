@@ -20,7 +20,14 @@ namespace XUUnity.LightMcp.Editor.Bridge
             return process.Id;
         }
 
-        public static void WriteHeartbeat(string lastError = "")
+        internal const string ProcessExitedHealthStatus = "process_exited";
+
+        public static void WriteProcessExited()
+        {
+            WriteHeartbeat("batch process exited", ProcessExitedHealthStatus);
+        }
+
+        public static void WriteHeartbeat(string lastError = "", string healthStatusOverride = "")
         {
             if (BridgeProcessClass == XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass)
             {
@@ -145,6 +152,13 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 disabled_operation_count = report.disabled_operations?.Count ?? 0,
                 capabilities_report_path = XUUnityLightMcpFileIpcPaths.CapabilitiesReportPath
             };
+
+            if (!string.IsNullOrEmpty(healthStatusOverride))
+            {
+                state.health_status = healthStatusOverride;
+                state.runtime_execution_allowed = false;
+                state.pending_request_count = 0;
+            }
 
             XUUnityLightMcpAtomicFileWriter.WriteAllText(XUUnityLightMcpFileIpcPaths.BridgeStatePath, JsonUtility.ToJson(state, true));
         }

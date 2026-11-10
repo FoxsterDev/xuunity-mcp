@@ -227,9 +227,12 @@ def classify_result_trust_class(
         "cancellation_requested_in_flight",
     }:
         return "wrapper_failed_unity_unproven"
+    if operation_outcome == "resumes_after_domain_reload":
+        return "unity_unproven"
     if operation_outcome in {
         "cancelled_before_unity_start",
         "submitted_no_unity_journal_confirmation",
+        "refused_before_submission",
     }:
         return "request_not_observed"
     if request_completed:
@@ -432,6 +435,7 @@ def build_request_final_status(
     poll_timeout_ms: int = 0,
     poll_interval_ms: int = 200,
     return_reclassified_terminal_immediately: bool = True,
+    reconcile_orphaned_outbox: bool = False,
 ) -> dict[str, Any]:
     deadline = time.time() + max(0.0, poll_timeout_ms / 1000.0)
 
@@ -460,6 +464,8 @@ def build_request_final_status(
             if str(event.get("event_type") or "") in {"request_reclassified", "request_abandoned"}
         ]
         reclassified_event = reclassified_events[-1] if reclassified_events else None
+        refused_events = [event for event in events if str(event.get("event_type") or "") == "request_refused"]
+        refused_event = refused_events[-1] if refused_events else None
         delivery_events = [
             event
             for event in events
@@ -483,8 +489,11 @@ def build_request_final_status(
         cancellation_requested = cancellation_event_type == "request_cancel_requested"
         request_cancelled = cancellation_event_type == "request_cancelled"
         reclassified = reclassified_event is not None
+        resumes_after_domain_reload = abandoned_event_resumes_after_reload(reclassified_event, operation)
         reclassification_retryable = (
-            bool((reclassified_event or {}).get("retryable")) if reclassified else False
+            bool((reclassified_event or {}).get("retryable")) and not resumes_after_domain_reload
+            if reclassified
+            else False
         )
         retryable = reclassification_retryable and not request_completed
         request_observed_in_unity_journal = request_started or request_completed
@@ -534,7 +543,11 @@ def build_request_final_status(
         )
 
         reclassified_event_type = str((reclassified_event or {}).get("event_type") or "")
-        reclassified_status = str((reclassified_event or {}).get("reclassified_status") or "")
+        reclassified_status = (
+            "resumes_after_domain_reload"
+            if resumes_after_domain_reload
+            else str((reclassified_event or {}).get("reclassified_status") or "")
+        )
         reclassified_reason = str((reclassified_event or {}).get("reason") or "")
 
         if request_completed:
@@ -561,6 +574,8 @@ def build_request_final_status(
             operation_outcome = "completed_ok"
         elif request_completed:
             operation_outcome = "completed_failed"
+        elif refused_event is not None and not request_submitted:
+            operation_outcome = "refused_before_submission"
         elif reclassified_event_type == "request_abandoned" and reclassified_status:
             operation_outcome = reclassified_status
         elif reclassified_event_type == "request_reclassified" and reclassified_status:
@@ -580,6 +595,10 @@ def build_request_final_status(
             recommended_next_action = "none"
         elif operation_outcome == "completed_failed":
             recommended_next_action = "inspect_request_journal"
+        elif operation_outcome == "refused_before_submission":
+            recommended_next_action = str((refused_event or {}).get("recommended_next_action") or "retry_request")
+        elif operation_outcome == "resumes_after_domain_reload":
+            recommended_next_action = "wait_for_final_status"
         elif operation_outcome in {"retryable_after_lifecycle_reset", "abandoned_after_lifecycle_reset"}:
             recommended_next_action = (
                 "retry_request" if stabilization["safe_to_retry"] else "wait_for_bridge_stabilization"
@@ -658,6 +677,9 @@ def build_request_final_status(
             "reclassified_event_type": reclassified_event_type,
             "reclassified_status": reclassified_status,
             "reclassified_reason": reclassified_reason,
+            "resumes_after_domain_reload": resumes_after_domain_reload,
+            "refused_before_submission": operation_outcome == "refused_before_submission",
+            "refusal_code": str((refused_event or {}).get("code") or ""),
             "reclassification_retryable": reclassification_retryable,
             "retryable": retryable,
             "recommended_next_action": recommended_next_action,
@@ -725,6 +747,18 @@ def build_request_final_status(
 
         if request_completed or recovery_gap_detected or reclassified_terminal or time.time() >= deadline:
             response_payload = peek_response_payload(project_root, request_id)
+            orphan_reconciliation = {} if not reconcile_orphaned_outbox else reconcile_orphaned_outbox_response(
+                project_root,
+                request_id,
+                str(summary.get("operation") or operation or ""),
+                events=events,
+                request_completed=request_completed,
+                delivery_deadline_elapsed=delivery_deadline_elapsed,
+                host_delivery_observed=host_delivery_observed,
+                state=active_state,
+            )
+            if orphan_reconciliation:
+                summary["orphaned_outbox_response"] = orphan_reconciliation
             effective_operation = str(summary.get("operation") or operation or "")
             if is_test_operation(effective_operation):
                 persisted_test_result = read_persisted_test_result(project_root, request_id)
@@ -767,6 +801,84 @@ def build_request_final_status(
             )
 
         time.sleep(max(0.05, poll_interval_ms / 1000.0))
+
+
+PLAYMODE_TEST_OPERATION = "unity.tests.run_playmode"
+HOST_WAITER_TERMINAL_EVENT_TYPES = frozenset({"request_reclassified", "request_delivery_unproven"})
+ORPHANED_OUTBOX_SETTLE_SECONDS = 10.0
+
+
+def abandoned_event_resumes_after_reload(event: dict[str, Any] | None, operation: str = "") -> bool:
+    """A Play Mode test run abandoned by the Play-entry reload resumes in the new domain; older packages still mark it retryable."""
+
+    if not isinstance(event, dict) or str(event.get("event_type") or "") != "request_abandoned":
+        return False
+    if str(event.get("reclassified_status") or "") == "resumes_after_domain_reload" or bool(
+        event.get("resumes_after_domain_reload")
+    ):
+        return True
+    return (
+        str(event.get("operation") or operation or "") == PLAYMODE_TEST_OPERATION
+        and str(event.get("reason") or "") == "domain_reload_before_request_completion"
+    )
+
+
+def reconcile_orphaned_outbox_response(
+    project_root: Path,
+    request_id: str,
+    operation: str,
+    *,
+    events: list[dict[str, Any]],
+    request_completed: bool,
+    delivery_deadline_elapsed: bool,
+    host_delivery_observed: bool,
+    state: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Consume a completed response that no host call is still waiting for, so it stops reading as a stale artifact."""
+
+    if not request_id or not request_completed or host_delivery_observed:
+        return {}
+    path = response_path(project_root, request_id)
+    if not path.is_file():
+        return {}
+    waiter_gave_up = any(
+        str(event.get("event_type") or "") in HOST_WAITER_TERMINAL_EVENT_TYPES
+        and str(event.get("event_source") or "") == "host_wrapper"
+        for event in events
+    )
+    if not waiter_gave_up:
+        try:
+            settled = time.time() - path.stat().st_mtime >= ORPHANED_OUTBOX_SETTLE_SECONDS
+        except OSError:
+            return {}
+        if not (delivery_deadline_elapsed and settled):
+            return {}
+    response = try_take_recovered_response(project_root, request_id)
+    if response is None:
+        return {}
+    basis = "host_waiter_reclassified" if waiter_gave_up else "delivery_deadline_elapsed"
+    try:
+        journal_path = write_host_request_journal_event(
+            project_root,
+            "request_outbox_reconciled",
+            {
+                "request_id": request_id,
+                "operation": operation,
+                "reason": "orphaned_outbox_response_consumed_by_final_status",
+                "reconciliation_basis": basis,
+                "response_status": str(response.get("status") or ""),
+                "bridge_generation": int((state or {}).get("bridge_generation") or 0),
+                "bridge_session_id": str((state or {}).get("bridge_session_id") or ""),
+            },
+        )
+    except OSError:
+        journal_path = None
+    return {
+        "consumed": True,
+        "basis": basis,
+        "response_status": str(response.get("status") or ""),
+        "journal_event_path": str(journal_path or ""),
+    }
 
 
 def try_take_recovered_response(project_root: Path, request_id: str) -> dict[str, Any] | None:
@@ -873,6 +985,26 @@ def _runtime_deadline_expired(test_result: dict[str, Any] | None) -> bool:
     if baseline_unix <= 0:
         return False
     return time.time() >= baseline_unix + (runtime_timeout_ms / 1000.0)
+
+
+COMPLETED_AFTER_RUNTIME_BUDGET = "completed_after_runtime_budget"
+
+
+def completed_runtime_budget_overrun_seconds(test_result: dict[str, Any] | None) -> float | None:
+    """How far a completed run overran its runtime budget; the budget is reported, not enforced, so a late pass stays a pass."""
+
+    if not isinstance(test_result, dict):
+        return None
+    try:
+        budget_ms = int(test_result.get("runtime_timeout_ms") or 0)
+    except (TypeError, ValueError):
+        return None
+    started = parse_journal_utc_timestamp(test_result.get("started_at_utc"))
+    completed = parse_journal_utc_timestamp(test_result.get("completed_at_utc"))
+    if budget_ms <= 0 or started <= 0 or completed <= 0:
+        return None
+    overrun = (completed - started) - budget_ms / 1000.0
+    return round(overrun, 3) if overrun > 0 else None
 
 
 def _derive_timeout_classification(test_result: dict[str, Any] | None) -> str:
@@ -1027,6 +1159,9 @@ def build_test_verdict_summary(
     )
     if not source_completed and not timeout_classification:
         timeout_classification = _derive_timeout_classification(source_payload)
+    runtime_budget_overrun_seconds = completed_runtime_budget_overrun_seconds(source_payload)
+    if source_completed and not timeout_classification and runtime_budget_overrun_seconds is not None:
+        timeout_classification = COMPLETED_AFTER_RUNTIME_BUDGET
     runtime_timeout_observed = (
         not source_completed
         and (
@@ -1055,6 +1190,8 @@ def build_test_verdict_summary(
     elif source_payload is not None and run_phase == "abandoned":
         test_verdict = "unity_unproven"
     elif source_payload is not None:
+        test_verdict = "in_progress"
+    elif operation_outcome == "resumes_after_domain_reload":
         test_verdict = "in_progress"
     elif request_completed and completion_status == "ok":
         test_verdict = "unity_unproven"
@@ -1151,6 +1288,8 @@ def build_test_verdict_summary(
         "last_progress_at_utc": str((source_payload or {}).get("last_progress_at_utc") or ""),
         "runtime_timeout_observed": runtime_timeout_observed or test_verdict == "runtime_timeout",
         "timeout_classification": timeout_classification,
+        "runtime_budget_exceeded": runtime_budget_overrun_seconds is not None,
+        "runtime_budget_overrun_seconds": runtime_budget_overrun_seconds,
         "runtime_timeout_ms": max(0, runtime_timeout_ms),
         "elapsed_runtime_seconds": elapsed_runtime_seconds,
         "lifecycle_churn_observed": bool((source_payload or {}).get("lifecycle_churn_observed")) or bridge_changed_since_submission,

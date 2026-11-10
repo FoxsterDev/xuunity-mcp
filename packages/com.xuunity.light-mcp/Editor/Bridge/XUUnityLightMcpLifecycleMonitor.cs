@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEditor.PackageManager;
 using UnityEngine;
+using XUUnity.LightMcp.Editor.Helpers;
 
 namespace XUUnity.LightMcp.Editor.Bridge
 {
@@ -79,10 +80,12 @@ namespace XUUnity.LightMcp.Editor.Bridge
         {
             if (XUUnityLightMcpBridgeRuntimeState.TryGetActiveRequestSnapshot(out var snapshot))
             {
+                var resumes = XUUnityLightMcpTestRunState.WillResumeAfterDomainReload(snapshot.request_id, snapshot.operation);
                 XUUnityLightMcpRequestJournal.WriteRequestAbandoned(
                     snapshot,
-                    "domain_reload_before_request_completion",
-                    true);
+                    resumes ? "domain_reload_test_run_resumes" : "domain_reload_before_request_completion",
+                    !resumes,
+                    resumes);
             }
 
             XUUnityLightMcpBridgeTransportRuntime.Shutdown();

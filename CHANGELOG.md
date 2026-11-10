@@ -15,6 +15,31 @@
   state written by a non-main process gets a bounded wait (10 s) for the main
   editor to take it back; if it does not, the refusal says
   `request_submitted: false`, `retryable: true` and how long it waited (RG-15).
+- The request journal tells the truth through reloads and exits (RG-19):
+  - A Play Mode test run that the Play-entry domain reload interrupts, and that
+    resumes in the new domain, is journaled as `request_abandoned` with
+    `resumes_after_domain_reload` and `retryable: false`. `request-final-status`
+    reports `resumes_after_domain_reload` / `wait_for_final_status` for it, also
+    for events written by older packages, so it no longer invites replaying a
+    long suite.
+  - `request_reclassified` reads the bridge identity when it is written and
+    claims `bridge_generation_changed_before_response` only when the generation
+    or session actually changed; otherwise the reason names the trigger
+    (`transport_restarting_before_response`).
+  - Host progress events carry the request id the transport then submits, a
+    request refused before submission journals `request_refused` under the
+    same id (final status `refused_before_submission`), and host events carry
+    `host_event_sequence` so same-millisecond events read in causal order.
+  - A test run that completes after its runtime budget reports
+    `timeout_classification: completed_after_runtime_budget` with
+    `runtime_budget_overrun_seconds`; the verdict stays the run's own.
+  - `request-final-status` consumes a completed outbox response that no host
+    call is waiting for any more and journals `request_outbox_reconciled`, so a
+    recovered run no longer leaves `stale_request_artifacts_present`. Internal
+    recovery never consumes it.
+  - A batch-mode Unity process that attached the bridge writes
+    `health_status: process_exited` when it quits, instead of leaving a
+    `healthy` state file behind a dead pid.
 
 ## 0.3.88
 

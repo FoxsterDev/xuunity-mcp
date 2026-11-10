@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import itertools
 import os
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -17,6 +19,8 @@ HOST_CLIENT_SESSION_STARTED_UNIX = time.time()
 _CONFIGURED_CLIENT_SESSION_ID = str(os.environ.get("XUUNITY_CLIENT_SESSION_ID") or "").strip()
 HOST_CLIENT_SESSION_ID = _CONFIGURED_CLIENT_SESSION_ID or uuid.uuid4().hex
 os.environ["XUUNITY_CLIENT_SESSION_ID"] = HOST_CLIENT_SESSION_ID
+_HOST_EVENT_SEQUENCE = itertools.count(1)
+_HOST_EVENT_SEQUENCE_LOCK = threading.Lock()
 _CONFIGURED_CLIENT_KIND = str(os.environ.get("XUUNITY_CLIENT_KIND") or "").strip().lower()
 _HOST_CLIENT_KIND = _CONFIGURED_CLIENT_KIND or HOST_CLIENT_KIND_MCP_SERVER
 
@@ -132,14 +136,21 @@ def emit_operation_progress_phase(
         pass
 
 
-def record_request_refused_event(project_root: Path, operation: str, error: Any, state: dict[str, Any] | None) -> Path:
+def record_request_refused_event(
+    project_root: Path,
+    operation: str,
+    error: Any,
+    state: dict[str, Any] | None,
+    *,
+    request_id: str = "",
+) -> Path:
     from server_recovery_commands import recommended_recovery_command_for_project
 
     details = dict(error.details or {})
     next_action = str(details.get("recommended_next_action") or "")
     effective = state or {}
     return write_host_request_journal_event(project_root, "request_refused", {
-        "request_id": "",
+        "request_id": request_id,
         "request_submitted": False,
         "operation": operation,
         "code": error.code,
@@ -303,8 +314,19 @@ def write_host_request_journal_event(
         data.setdefault("client_kind", current_client_kind())
     data.setdefault("event_at_utc", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     data.setdefault("project_root", str(project_root))
+    with _HOST_EVENT_SEQUENCE_LOCK:
+        data.setdefault("host_event_sequence", next(_HOST_EVENT_SEQUENCE))
     write_json(path, data)
     return path
+
+
+def journal_event_sort_key(event: dict[str, Any]) -> tuple[float, str, int, str]:
+    event_id = str(event.get("event_id") or "")
+    try:
+        sequence = int(event.get("host_event_sequence") or 0)
+    except (TypeError, ValueError):
+        sequence = 0
+    return (parse_journal_utc_timestamp(event.get("event_at_utc")), event_id.split("_", 1)[0], sequence, event_id)
 
 
 def summarize_request_attribution(project_root: Path) -> dict[str, Any]:
@@ -398,10 +420,5 @@ def read_request_journal_events_by_request(
         matched[request_id].append(event)
 
     for events in matched.values():
-        events.sort(
-            key=lambda item: (
-                parse_journal_utc_timestamp(item.get("event_at_utc")),
-                str(item.get("event_id") or ""),
-            )
-        )
+        events.sort(key=journal_event_sort_key)
     return matched

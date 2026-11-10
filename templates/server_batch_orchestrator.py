@@ -5,6 +5,7 @@ import sys
 import json
 import time
 import subprocess
+import uuid
 from server_host_call_timing import measure_host_stage, timed_host_call
 from server_core import bridge_enable_recovery_command
 
@@ -1262,12 +1263,14 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
 
             dispatch_started = False
             pre_idle_state = pre_request_state
+            planned_request_id = str(uuid.uuid4())
             try:
                 if policy["activate_unity"]:
                     report_operation_progress_phase(
                         project_root=project_root,
                         operation=operation,
                         phase="activation",
+                        request_id=planned_request_id,
                         state=pre_request_state,
                     )
                     lifecycle["activation_requested"] = True
@@ -1314,6 +1317,7 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                         project_root=project_root,
                         operation=operation,
                         phase="wait_for_idle_before",
+                        request_id=planned_request_id,
                         state=pre_idle_state,
                     )
                     lifecycle["idle_wait_before"] = timed_host_call(
@@ -1331,12 +1335,14 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                         project_root=project_root,
                         operation=operation,
                         phase="dispatching",
+                        request_id=planned_request_id,
                         state=dispatch_state,
                     )
                     report_operation_progress_phase(
                         project_root=project_root,
                         operation=operation,
                         phase="waiting_for_response",
+                        request_id=planned_request_id,
                         state=dispatch_state,
                     )
                 dispatch_started = True
@@ -1347,6 +1353,7 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                     args,
                     timeout_ms,
                     post_reset_recovery_cap_ms=int(policy.get("post_reset_recovery_cap_ms") or 0),
+                    request_id=planned_request_id,
                 )
                 lifecycle["transport"] = transport_metadata
                 post_reset_recovery = response.pop(POST_RESET_RECOVERY_RESPONSE_KEY, None)
@@ -1493,7 +1500,7 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
             except ToolInvocationError as exc:
                 if not dispatch_started:
                     try:
-                        record_request_refused_event(project_root, operation, exc, pre_idle_state)
+                        record_request_refused_event(project_root, operation, exc, pre_idle_state, request_id=planned_request_id)
                     except (OSError, ValueError) as journal_error:
                         exc.details = {**(exc.details or {}), "refusal_journal_error": str(journal_error)}
                 if (

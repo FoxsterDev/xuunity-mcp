@@ -436,6 +436,7 @@ def build_request_final_status_from_context_data(
             current_state=current_project_context_bridge_state(project_root),
             read_current_state=current_project_context_bridge_state,
             poll_timeout_ms=poll_timeout_ms,
+            reconcile_orphaned_outbox=True,
         ),
         discovery=discovery,
     )
