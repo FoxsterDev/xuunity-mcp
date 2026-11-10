@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Fixed
+
+- `license-capabilities --unity-app <path to the Unity executable>` no longer
+  refuses with `licensing_busy` when no editor is open. The process scan
+  matched `Unity.app/Contents/MacOS/Unity`, `Unity.exe` or `/Unity` anywhere in
+  a command line, so the probe's own Python process, whose arguments carry that
+  path, counted as a live editor. A process is now an editor, worker or Hub
+  launcher only when its executable (the leading path of the command line) is
+  one; a path in an argument, or a shell wrapper such as `zsh -c <Unity path>`,
+  no longer matches.
+
 ## 0.3.88
 
 Release tag: `v0.3.88`

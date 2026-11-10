@@ -48,11 +48,28 @@ from test_mcp_stdio_e2e import (
 )
 
 SIMULATOR_PATH = TESTS_DIR / "bridge_ipc_simulator.py"
-SIMULATED_UNITY_EXECUTABLE = (
-    r"C:\Program Files\Unity\Hub\Editor\2021.3.58f1\Editor\Unity.exe"
+SIMULATED_UNITY_EXECUTABLE_RELATIVE = (
+    Path("Unity", "Hub", "Editor", "2021.3.58f1", "Editor", "Unity.exe")
     if os.name == "nt"
-    else "/Applications/Unity/Hub/Editor/2021.3.58f1/Unity.app/Contents/MacOS/Unity"
+    else Path("Unity", "Hub", "Editor", "2021.3.58f1", "Unity.app", "Contents", "MacOS", "Unity")
 )
+
+
+def simulator_argv_and_executable(project_root: Path, tail: list[str]) -> tuple[list[str], str | None]:
+    # Host discovery trusts a bridge-state writer only when the process executable is a Unity
+    # editor, so the simulator runs with a Unity-shaped argv[0].
+    unity_path = project_root.parent / "simulated-editor" / SIMULATED_UNITY_EXECUTABLE_RELATIVE
+    argv = [str(unity_path), str(SIMULATOR_PATH), *tail]
+    if os.name == "nt":
+        return argv, sys.executable
+    # A macOS framework python3 re-execs its app binary and drops argv[0]; run that binary directly.
+    framework_binary = Path(sys.base_prefix, "Resources", "Python.app", "Contents", "MacOS", "Python")
+    if sys.platform == "darwin" and framework_binary.is_file():
+        return argv, str(framework_binary)
+    unity_path.parent.mkdir(parents=True, exist_ok=True)
+    if not unity_path.exists():
+        unity_path.symlink_to(sys.executable)
+    return argv, None
 
 
 def start_simulator(
@@ -61,20 +78,13 @@ def start_simulator(
     *,
     mode: str = "simulate",
 ) -> subprocess.Popen:
+    argv, executable = simulator_argv_and_executable(
+        project_root,
+        [mode, str(project_root), str(deadline_seconds), "-projectPath", str(project_root)],
+    )
     return subprocess.Popen(
-        [
-            sys.executable,
-            str(SIMULATOR_PATH),
-            mode,
-            str(project_root),
-            str(deadline_seconds),
-            # The separate Python process intentionally advertises the same
-            # executable and -projectPath shape that production discovery
-            # requires before trusting a bridge-state writer.
-            SIMULATED_UNITY_EXECUTABLE,
-            "-projectPath",
-            str(project_root),
-        ],
+        argv,
+        executable=executable,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
