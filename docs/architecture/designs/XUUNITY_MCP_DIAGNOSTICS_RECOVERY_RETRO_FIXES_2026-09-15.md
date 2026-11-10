@@ -182,4 +182,8 @@ The same review's remaining items: the pending-response recovery path now journa
 `request_completed` (F-6); the host compares a capability report's
 `probe_bridge_generation` with the live bridge (`capability_report_generation_behind`);
 and setup computes editor attachment from bridge liveness with a reachable next
-command, `ensure-ready --open-editor` (F-8).
+command, `ensure-ready --open-editor` (F-8). The readiness timeout for a live but
+unattached editor no longer says "do not restart": it uses setup's restart
+criterion (poll first, restart only once import has settled without attachment)
+and sets `attachment_pending_predates_install` when the host-opened editor
+predates the manifest change.

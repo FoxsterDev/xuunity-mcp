@@ -10,6 +10,12 @@
   health views report `process_exited` for a dead batch writer and
   `editor_not_running` for any other dead writer, with the file's value kept as
   `recorded_health_status`.
+- The `editor_not_ready_bridge_not_attached` readiness timeout no longer
+  contradicts setup's guidance (RG-04, F-8 item 4). It says to poll first and to
+  restart only once import has settled without attachment, carries the same
+  `restart_criterion` as setup, and sets `attachment_pending_predates_install`
+  (with `attachment_pending_basis`) when the host-opened editor predates the
+  manifest change, adding the focus or Assets > Refresh hint.
 
 ## 0.3.89
 
