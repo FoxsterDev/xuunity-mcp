@@ -48,6 +48,20 @@
   `running`, `running_without_progress` (quiet for 5 minutes) or
   `process_exited_before_completion`. `AI_INTEGRATION.md` no longer offers raw
   batch PlayMode as the fallback and names the `WaitForEndOfFrame` hang.
+- A player build is reported as a build, not as a hung editor (RG-40). The
+  package writes `busy_reason: build_player` (with the target in
+  `busy_reason_detail`) to the bridge state before the synchronous build
+  blocks the main thread, for `unity.build_player` and for any build a project
+  hook starts (`IPreprocessBuildWithReport`), and clears it after. On the host
+  a live pid with a stale heartbeat during a build stays
+  `editor_alive_but_unresponsive` (the v0.3.88 rule) with
+  `editor_busy_in_build: true`, `unresponsive_cause: build_player_in_progress`
+  and `wait_for_build_player_to_finish`; host health no longer escalates a
+  build to `anr` with a `graceful_terminate` policy. `unity_scenario_result`
+  answers a transport miss (`transport_response_missing`, `editor_idle_timeout`
+  and the other reload codes) from the persisted scenario result, marked
+  `scenario_result_source: persisted_result_file` with the miss code and the
+  editor's busy reason.
 
 ## 0.3.88
 

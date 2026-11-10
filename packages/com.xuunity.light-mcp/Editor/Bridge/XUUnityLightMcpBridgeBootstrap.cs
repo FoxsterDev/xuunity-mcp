@@ -136,6 +136,7 @@ namespace XUUnity.LightMcp.Editor.Bridge
         {
             XUUnityLightMcpEditorQuitScheduler.Tick();
             XUUnityLightMcpUiClickTreeWatch.Tick();
+            XUUnityLightMcpBuildPlayerRuntime.Tick();
             var now = EditorApplication.timeSinceStartup;
 
             if (now - _lastHeartbeatAt >= _heartbeatIntervalSeconds)

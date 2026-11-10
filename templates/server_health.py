@@ -1682,6 +1682,14 @@ def classify_project_health(
                 termination_policy = "graceful_terminate"
                 anr_classification = "anr"
 
+    if busy_reason == "build_player" and classification in {"stale", "anr_suspected", "anr"}:
+        # A synchronous player build blocks the heartbeat writer; it is busy, not hung, and never a termination case.
+        classification = "stale"
+        reason = "build_player_in_progress"
+        recommended_next_action = "wait_for_build_player_to_finish"
+        termination_policy = "observe_only"
+        anr_classification = "none"
+
     startup_modal_block = False
     if editor_log_diagnosis and classification in {"stale", "anr_suspected", "anr"}:
         diagnosis_code = str(editor_log_diagnosis.get("code") or "")

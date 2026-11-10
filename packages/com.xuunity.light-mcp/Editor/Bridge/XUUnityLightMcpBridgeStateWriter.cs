@@ -181,6 +181,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         static string ResolveBusyReason()
         {
+            if (XUUnityLightMcpBuildPlayerRuntime.InProgress)
+            {
+                return XUUnityLightMcpBuildPlayerRuntime.BusyReason;
+            }
+
             if (XUUnityLightMcpBridgeRuntimeState.DomainReloadInProgress)
             {
                 return "domain_reload";
@@ -246,6 +251,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         static string ResolveBusyReasonDetail()
         {
+            if (XUUnityLightMcpBuildPlayerRuntime.InProgress)
+            {
+                return $"target:{XUUnityLightMcpBuildPlayerRuntime.Target}:started:{XUUnityLightMcpBuildPlayerRuntime.StartedUtc}";
+            }
+
             if (XUUnityLightMcpBridgeRuntimeState.DomainReloadInProgress)
             {
                 return "AssemblyReloadEvents.beforeAssemblyReload";

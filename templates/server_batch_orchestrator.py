@@ -2122,6 +2122,60 @@ def call_unity_request_final_status_tool(arguments: dict[str, Any]) -> dict[str,
     )
 
 
+SCENARIO_RESULT_PERSISTED_FALLBACK_ERROR_CODES = DISCOVERY_STATUS_FALLBACK_ERROR_CODES.union(
+    SCENARIO_RECOVERY_ERROR_CODES, {"editor_idle_timeout"}
+)
+
+
+def call_unity_scenario_result_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Read a scenario result; when the editor cannot answer (a synchronous build, a reload), serve the persisted result."""
+
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+    project_root = ensure_project_root(project_root_value)
+    timeout_ms = resolve_operation_timeout_ms(project_root, "unity.scenario.result", arguments.get("timeoutMs"), 5000)
+    bridge_args: dict[str, Any] = {}
+    for key in ("runId", "scenarioName"):
+        value = arguments.get(key)
+        if value is not None and not isinstance(value, str):
+            raise JsonRpcError(-32602, f"{key} must be a string when provided.")
+        if isinstance(value, str) and value.strip():
+            bridge_args[key] = value.strip()
+
+    try:
+        response = invoke_bridge(str(project_root), "unity.scenario.result", bridge_args, timeout_ms)
+    except ToolInvocationError as exc:
+        if exc.code in SCENARIO_RESULT_PERSISTED_FALLBACK_ERROR_CODES:
+            reconciliation = reconcile_persisted_scenario_result(
+                project_root, bridge_args.get("runId", ""), bridge_args.get("scenarioName", "")
+            )
+            if bool(reconciliation.get("lookup_found")):
+                state = try_read_bridge_state(project_root) or {}
+                busy_reason = derive_busy_reason(state) if state else ""
+                payload = normalize_scenario_payload(dict(reconciliation.get("payload") or {}), SCENARIO_TERMINAL_STATUSES)
+                terminal = bool(reconciliation.get("terminal_result_found"))
+                payload.update(
+                    {
+                        "scenario_result_source": "persisted_result_file",
+                        "scenario_result_lookup_strategy": str(reconciliation.get("lookup_strategy") or ""),
+                        "transport_miss_code": exc.code,
+                        "transport_miss_message": truncate_text(exc.message, 240),
+                        "editor_busy_reason": busy_reason,
+                        "editor_busy_in_build": busy_reason == "build_player",
+                        "persisted_result_terminal": terminal,
+                    }
+                )
+                if not terminal:
+                    payload["recommended_next_action"] = (
+                        "wait_for_build_player_to_finish" if busy_reason == "build_player" else "poll_scenario_result_again"
+                    )
+                return mcp_json_result(payload, is_error=False)
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+
+    return bridge_response_to_tool_result(response, include_full_payload=False)
+
+
 def call_unity_scenario_result_summary_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     project_root_value = arguments.get("projectRoot")
     if not isinstance(project_root_value, str) or not project_root_value.strip():
@@ -3102,6 +3156,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_status_summary": call_unity_status_summary_tool,
             "unity_ensure_ready": call_unity_ensure_ready_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
+            "unity_scenario_result": call_unity_scenario_result_tool,
             "unity_scenario_result_summary": call_unity_scenario_result_summary_tool,
             "unity_scenario_results_list": call_unity_scenario_results_list_tool,
             "unity_scenario_result_latest": call_unity_scenario_result_latest_tool,

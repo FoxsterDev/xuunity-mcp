@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using XUUnity.LightMcp.Editor.Bridge;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Helpers;
 
@@ -38,6 +39,34 @@ namespace XUUnity.LightMcp.Tests.EditMode
             Assert.That(XUUnityLightMcpTestRunState.IsResumablePlayModeRun(PendingPlayModeRun("r1"), "r2"), Is.False);
             Assert.That(XUUnityLightMcpTestRunState.IsResumablePlayModeRun(editMode, "r1"), Is.False);
             Assert.That(XUUnityLightMcpTestRunState.IsResumablePlayModeRun(null, "r1"), Is.False);
+        }
+
+        [Test]
+        public void BuildPlayerMark_IsBusyUntilCompleted()
+        {
+            Assume.That(XUUnityLightMcpBuildPlayerRuntime.InProgress, Is.False);
+            XUUnityLightMcpBuildPlayerRuntime.MarkStarted("Android");
+            try
+            {
+                Assert.That(XUUnityLightMcpBuildPlayerRuntime.InProgress, Is.True);
+                Assert.That(XUUnityLightMcpBuildPlayerRuntime.Target, Is.EqualTo("Android"));
+                Assert.That(XUUnityLightMcpBuildPlayerRuntime.BusyReason, Is.EqualTo("build_player"));
+            }
+            finally
+            {
+                XUUnityLightMcpBuildPlayerRuntime.MarkCompleted();
+            }
+
+            Assert.That(XUUnityLightMcpBuildPlayerRuntime.InProgress, Is.False);
+        }
+
+        [Test]
+        public void BuildPlayerMark_ClearsOnTheFirstTickAfterAnAbortedBuild()
+        {
+            Assume.That(XUUnityLightMcpBuildPlayerRuntime.InProgress, Is.False);
+            XUUnityLightMcpBuildPlayerRuntime.MarkStarted("iOS");
+            XUUnityLightMcpBuildPlayerRuntime.Tick();
+            Assert.That(XUUnityLightMcpBuildPlayerRuntime.InProgress, Is.False);
         }
 
         [Test]

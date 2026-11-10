@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using XUUnity.LightMcp.Editor.Bridge;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Helpers;
 
@@ -194,10 +195,12 @@ namespace XUUnity.LightMcp.Editor.Operations
                         EditorUserBuildSettings.exportAsGoogleAndroidProject = shouldExportAndroidProject;
                     }
 
+                    XUUnityLightMcpBuildPlayerRuntime.MarkStarted(target.ToString());
                     report = BuildPipeline.BuildPlayer(buildPlayerOptions);
                 }
                 finally
                 {
+                    XUUnityLightMcpBuildPlayerRuntime.MarkCompleted();
                     if (target == BuildTarget.Android)
                     {
                         EditorUserBuildSettings.exportAsGoogleAndroidProject = previousExportAsGoogleAndroidProject;
