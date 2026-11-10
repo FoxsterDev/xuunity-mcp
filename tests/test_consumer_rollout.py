@@ -636,6 +636,58 @@ class ConsumerEvidenceTests(unittest.TestCase):
             self.assertEqual(1, summary["exited"])
             self.assertEqual("exited", ledger["compiler_servers"][0]["status"])
 
+    def test_expected_churn_allowlist_reports_but_does_not_stop(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            follower = create_consumer(root, "Follower")
+            ledger = make_ledger(root, [canary, follower], canary)
+            rollout.add_expected_churn(
+                ledger,
+                ["Assets/Settings/GeneratedEffectSettings.asset", "Follower/ProjectSettings/ProjectSettings.asset", ""],
+                "plan",
+            )
+            with self.assertRaises(rollout.RolloutError):
+                rollout.add_expected_churn(ledger, ["**"], "plan")
+            git_root = Path(ledger["preflight"]["workspace_baselines"][0]["root"])
+            result = rollout.workspace_side_effects(
+                ledger,
+                workspace_snapshot_fn=lambda _root: {
+                    "available": True,
+                    "root": str(git_root),
+                    "dirty_paths": [
+                        "Canary/Assets/Settings/GeneratedEffectSettings.asset",
+                        "Follower/ProjectSettings/ProjectSettings.asset",
+                        "Canary/ProjectSettings/ProjectSettings.asset",
+                    ],
+                    "error_code": "",
+                },
+            )
+
+            self.assertEqual([f"{git_root}:Canary/ProjectSettings/ProjectSettings.asset"], result["new_unowned_dirty_paths"])
+            self.assertEqual(
+                {
+                    "Canary/Assets/Settings/GeneratedEffectSettings.asset": "Assets/Settings/GeneratedEffectSettings.asset",
+                    "Follower/ProjectSettings/ProjectSettings.asset": "Follower/ProjectSettings/ProjectSettings.asset",
+                },
+                {row["path"]: row["pattern"] for row in result["workspaces"][0]["expected_churn_paths"]},
+            )
+            self.assertEqual(2, len(ledger["expected_churn"]))
+
+    def test_expected_churn_is_accepted_by_plan_and_resume_arguments(self) -> None:
+        plan = rollout.parse_args(
+            [
+                "plan", "--search-root", "/w", "--expected-project-root", "/w/A", "--canary-project-root", "/w/A",
+                "--release-tag", RELEASE_TAG, "--release-commit", RELEASE_COMMIT, "--unity-app", "/u",
+                "--run-dir", "/r", "--expected-churn", "Assets/A.asset", "--expected-churn", "Assets/B.asset",
+            ]
+        )
+        self.assertEqual(["Assets/A.asset", "Assets/B.asset"], plan.expected_churn)
+        resume = rollout.parse_args(
+            ["resume-project", "--ledger", "/l", "--project-id", "A", "--confirm-release-tag", RELEASE_TAG, "--expected-churn", "x"]
+        )
+        self.assertEqual(["x"], resume.expected_churn)
+
     def test_worker_packet_is_exact_and_denies_diagnosis_release_and_kill(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -13,6 +13,7 @@ inspect the frozen inventory, preflight evidence, or worker task packet.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
@@ -1161,6 +1162,51 @@ def path_is_under_prefix(path: str, prefix: str) -> bool:
     return normalized == prefix.rstrip("/") or normalized.startswith(prefix)
 
 
+def expected_churn_entries(patterns: list[str], source: str) -> list[dict[str, Any]]:
+    entries = []
+    for pattern in patterns:
+        text = str(pattern or "").strip().replace("\\", "/").lstrip("/")
+        if not text:
+            continue
+        if text in {"*", "**", "**/*"}:
+            raise RolloutError("An expected-churn pattern must name files, not the whole workspace.")
+        entries.append({"pattern": text, "source": source, "added_at_utc": utc_now()})
+    return entries
+
+
+def add_expected_churn(ledger: dict[str, Any], patterns: list[str], source: str) -> None:
+    current = ledger.setdefault("expected_churn", [])
+    known = {str(row.get("pattern") or "") for row in current}
+    for entry in expected_churn_entries(patterns, source):
+        if entry["pattern"] not in known:
+            current.append(entry)
+            known.add(entry["pattern"])
+
+
+def project_relative_candidates(ledger: dict[str, Any], git_root: Path, path: str) -> list[str]:
+    candidates = [path]
+    for project in ledger.get("projects") or []:
+        try:
+            project_prefix = Path(project["project_root"]).resolve().relative_to(git_root.resolve()).as_posix()
+        except (KeyError, OSError, ValueError):
+            continue
+        if project_prefix in {"", "."}:
+            continue
+        if path.startswith(project_prefix + "/"):
+            candidates.append(path[len(project_prefix) + 1 :])
+    return candidates
+
+
+def matching_expected_churn(ledger: dict[str, Any], git_root: Path, path: str) -> str:
+    patterns = [str(row.get("pattern") or "") for row in ledger.get("expected_churn") or []]
+    normalized = path.replace("\\", "/").strip('"')
+    for candidate in project_relative_candidates(ledger, git_root, normalized):
+        for pattern in patterns:
+            if pattern and fnmatch.fnmatchcase(candidate, pattern):
+                return pattern
+    return ""
+
+
 def workspace_side_effects(
     ledger: dict[str, Any],
     *,
@@ -1178,6 +1224,12 @@ def workspace_side_effects(
         new_paths = sorted(current_paths - baseline_paths - allowed_paths) if current.get("available") else []
         own_run_dir_paths = [path for path in new_paths if path_is_under_prefix(path, run_dir_prefix)]
         new_paths = [path for path in new_paths if path not in own_run_dir_paths]
+        expected_churn = []
+        for path in list(new_paths):
+            pattern = matching_expected_churn(ledger, git_root, path)
+            if pattern:
+                expected_churn.append({"path": path, "pattern": pattern})
+                new_paths.remove(path)
         if new_paths:
             all_new_paths.extend(f"{git_root}:{path}" for path in new_paths)
         rows.append(
@@ -1189,6 +1241,7 @@ def workspace_side_effects(
                 "allowed_owned_package_paths": sorted(allowed_paths),
                 "own_run_dir": run_dir_prefix,
                 "own_run_dir_path_count": len(own_run_dir_paths),
+                "expected_churn_paths": expected_churn,
                 "new_unowned_dirty_paths": new_paths,
                 "error_code": str(current.get("error_code") or ""),
             }
@@ -1762,6 +1815,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     plan_parser.add_argument("--worker-timeout-seconds", type=int, default=DEFAULT_WORKER_TIMEOUT_SECONDS)
     plan_parser.add_argument("--overall-deadline-seconds", type=int, default=DEFAULT_OVERALL_DEADLINE_SECONDS)
     plan_parser.add_argument("--license-timeout-seconds", type=int, default=DEFAULT_LICENSE_TIMEOUT_SECONDS)
+    plan_parser.add_argument(
+        "--expected-churn",
+        action="append",
+        default=[],
+        help="Glob of a file a batch import rewrites deterministically, relative to the git root or a project root. Repeatable.",
+    )
     plan_parser.add_argument("--output", choices=("compact", "full"), default="compact")
 
     execute_parser = subparsers.add_parser("execute", help="Run canary, fan-out, and serial validation.")
@@ -1780,6 +1839,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     resume_parser.add_argument("--ledger", required=True)
     resume_parser.add_argument("--project-id", required=True)
     resume_parser.add_argument("--confirm-release-tag", required=True)
+    resume_parser.add_argument("--expected-churn", action="append", default=[])
     resume_parser.add_argument("--output", choices=("compact", "full"), default="compact")
 
     compiler_parser = subparsers.add_parser(
@@ -1826,6 +1886,9 @@ def main(argv: list[str]) -> int:
                 worker_timeout_seconds=max(1, args.worker_timeout_seconds),
                 overall_deadline_seconds=max(1, args.overall_deadline_seconds),
             )
+            if args.expected_churn:
+                add_expected_churn(ledger, args.expected_churn, "plan")
+                write_ledger(ledger)
             emit_ledger(ledger, args.output)
             return 0 if ledger["status"] == "planned" else 2
 
@@ -1847,6 +1910,8 @@ def main(argv: list[str]) -> int:
             emit_ledger(ledger, args.output)
             return 0 if summary["left_open"] == 0 else 2
         if args.command == "resume-project":
+            if args.expected_churn:
+                add_expected_churn(ledger, args.expected_churn, "resume-project")
             ledger = authorize_resume(
                 ledger,
                 project_id=args.project_id,

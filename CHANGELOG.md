@@ -25,6 +25,10 @@
   leave behind and closes them when the run completes, after re-checking the
   command and install; `close-compiler-servers` does the same after a stopped
   run, and a live editor leaves them open (RG-25).
+- `run_consumer_rollout.py plan|resume-project --expected-churn <glob>`
+  declares files a batch import rewrites deterministically; matching new dirty
+  paths are reported as `expected_churn_paths` instead of stopping the run, so
+  known churn no longer needs a manual ledger edit (RG-26).
 
 ## 0.3.88
 

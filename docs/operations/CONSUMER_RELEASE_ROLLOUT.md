@@ -50,6 +50,14 @@ python3 scripts/testing/run_consumer_rollout.py plan \
   --run-dir /path/to/private-rollout-evidence
 ```
 
+Some projects rewrite a file on every batch import, for example a generated
+settings asset or a scripting-define list. Declare each such file with a
+repeatable `--expected-churn <glob>`, relative to the git root or to a project
+root. A matching new dirty path is reported under `expected_churn_paths` and
+does not stop the run; any other new path still does. Keep the globs to single
+files. `resume-project` accepts the same option for churn found mid-run, so the
+ledger never needs a manual edit.
+
 `--unity-app` accepts the Unity application/install path understood by the
 normal XUUnity host discovery. Every included project must declare the same
 exact Unity editor version in `ProjectSettings/ProjectVersion.txt`.
