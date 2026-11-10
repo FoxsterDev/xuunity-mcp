@@ -12,6 +12,11 @@
   launcher only when its executable (the leading path of the command line) is
   one; a path in an argument, or a shell wrapper such as `zsh -c <Unity path>`,
   no longer matches.
+- The consumer rollout helper's global Unity process scan uses the same
+  executable rule, so an operator shell wrapper or a helper whose arguments
+  name the Unity binary no longer blocks the preflight with
+  `global_unity_process_conflict` (RG-24). Licensing clients are also matched
+  by executable.
 
 ## 0.3.88
 

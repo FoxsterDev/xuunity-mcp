@@ -46,6 +46,7 @@ from server_editor_host import (  # noqa: E402
 from server_editor_host_discovery import list_process_commands_report  # noqa: E402
 from server_editor_host_processes import (  # noqa: E402
     classify_unity_process_role,
+    unity_command_executable,
     unity_command_targets_project,
 )
 from server_license import build_license_capabilities  # noqa: E402
@@ -602,8 +603,8 @@ def relevant_unity_processes(report: dict[str, Any]) -> list[dict[str, Any]]:
             role = classify_unity_process_role(command)
         except (IndexError, TypeError, ValueError, SystemError):
             continue
-        lower = command.lower()
-        if role or "unity licensing client" in lower or "unitylicensingclient" in lower:
+        executable = unity_command_executable(command).lower()
+        if role or "unity licensing client" in executable or "unitylicensingclient" in executable:
             rows.append(
                 {
                     "pid": pid,

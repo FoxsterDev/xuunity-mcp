@@ -275,6 +275,23 @@ class ConsumerPreflightTests(unittest.TestCase):
             self.assertIn("global_unity_process_conflict", {row["code"] for row in preflight["blockers"]})
             license_probe.assert_not_called()
 
+    def test_preflight_ignores_unity_paths_in_arguments_of_other_processes(self) -> None:
+        unity = "/Applications/Unity/Unity.app/Contents/MacOS/Unity"
+        report = {
+            "available": True,
+            "commands": [
+                (8201, f"/bin/zsh -c {unity} -batchmode -projectPath /private/other-project"),
+                (8202, f"/usr/bin/python3 run_consumer_rollout.py plan --unity-app {unity}"),
+                (8203, "/usr/bin/python3 helper.py --label '/opt/Unity Licensing Client/UnityLicensingClient'"),
+                (8204, f"{unity} -projectPath /private/other-project"),
+                (8205, "/Applications/Unity Hub.app/Contents/Frameworks/UnityLicensingClient_V1.app/Contents/MacOS/Unity.Licensing.Client"),
+            ],
+        }
+        rows = rollout.relevant_unity_processes(report)
+        self.assertEqual({8204: "main_editor"}, {row["pid"]: row["role"] for row in rows if row["role"] != "launcher"})
+        report["commands"] = report["commands"][:3]
+        self.assertEqual([], rollout.relevant_unity_processes(report))
+
     def test_preflight_proves_writes_visibility_and_batch_license(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
