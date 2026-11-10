@@ -20,6 +20,17 @@
   the artifact contract there and the pixels only when a device is present, as
   the other render tests do.
 
+### Added
+
+- `unity_prefab_snapshot` with `includeFullPayload: true` returns
+  `component_type_full_names`: one row per node (`node_id`, `path`) with the
+  namespace-qualified type of each entry of that node's `components`, in the
+  same order, so two components that share a short name can be told apart
+  before a `componentType` edit (RG-48). The rows sit beside `nodes`, not in
+  them: Unity's JSON writer cannot omit an empty per-node field, and the node
+  type is shared with scene snapshots and UI queries. The default snapshot is
+  byte-for-byte unchanged.
+
 ## 0.3.89
 
 Release tag: `v0.3.89`

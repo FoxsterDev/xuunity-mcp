@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Helpers;
@@ -15,15 +16,14 @@ namespace XUUnity.LightMcp.Editor.Operations
                 ? new XUUnityLightMcpPrefabArgs()
                 : JsonUtility.FromJson<XUUnityLightMcpPrefabArgs>(request.args_json) ?? new XUUnityLightMcpPrefabArgs();
 
-            var payload = new XUUnityLightMcpUiTreePayload
-            {
-                operation = OperationName,
-                project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath,
-                generated_at_utc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                max_depth = Math.Max(1, args.maxDepth),
-                max_nodes = Math.Max(1, args.maxNodes),
-                component_detail_backends = XUUnityLightMcpUiComponentReaderRegistry.BackendIds()
-            };
+            var fullPayload = args.includeFullPayload ? new XUUnityLightMcpPrefabSnapshotFullPayload() : null;
+            var payload = fullPayload ?? new XUUnityLightMcpUiTreePayload();
+            payload.operation = OperationName;
+            payload.project_root = XUUnityLightMcpFileIpcPaths.ProjectRootPath;
+            payload.generated_at_utc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+            payload.max_depth = Math.Max(1, args.maxDepth);
+            payload.max_nodes = Math.Max(1, args.maxNodes);
+            payload.component_detail_backends = XUUnityLightMcpUiComponentReaderRegistry.BackendIds();
             payload.target.kind = XUUnityLightMcpUiRead.TargetPrefabAsset;
             payload.target.requested_value = args.prefabPath ?? "";
 
@@ -69,6 +69,11 @@ namespace XUUnity.LightMcp.Editor.Operations
 
             payload.nodes = result.Nodes;
             payload.root_paths = result.RootPaths;
+            if (fullPayload != null)
+            {
+                fullPayload.component_type_full_names = ComponentTypeFullNames(result);
+            }
+
             payload.node_count = result.Nodes.Count;
             payload.truncated = result.Truncated;
             payload.truncation_reason = result.TruncationReason;
@@ -104,6 +109,28 @@ namespace XUUnity.LightMcp.Editor.Operations
             }
 
             return Respond(request, payload);
+        }
+
+        static List<XUUnityLightMcpUiNodeComponentTypes> ComponentTypeFullNames(XUUnityLightMcpUiTreeResult result)
+        {
+            var rows = new List<XUUnityLightMcpUiNodeComponentTypes>(result.Nodes.Count);
+            for (var index = 0; index < result.Nodes.Count; index++)
+            {
+                var node = result.Nodes[index];
+                var row = new XUUnityLightMcpUiNodeComponentTypes { node_id = node.node_id, path = node.path };
+                var transform = index < result.NodeTransforms.Count ? result.NodeTransforms[index] : null;
+                if (transform != null)
+                {
+                    foreach (var component in transform.gameObject.GetComponents<Component>())
+                    {
+                        row.full_names.Add(component == null ? "<missing script>" : component.GetType().FullName);
+                    }
+                }
+
+                rows.Add(row);
+            }
+
+            return rows;
         }
 
         static XUUnityLightMcpResponse Respond(XUUnityLightMcpRequest request, XUUnityLightMcpUiTreePayload payload)

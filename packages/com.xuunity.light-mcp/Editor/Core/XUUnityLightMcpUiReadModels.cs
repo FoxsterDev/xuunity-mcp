@@ -183,7 +183,7 @@ namespace XUUnity.LightMcp.Editor.Core
     }
 
     [Serializable]
-    internal sealed class XUUnityLightMcpUiTreePayload : XUUnityLightMcpPlayModeLivenessEvidence
+    internal class XUUnityLightMcpUiTreePayload : XUUnityLightMcpPlayModeLivenessEvidence
     {
         public string schema_version = XUUnityLightMcpUiRead.SchemaVersion;
         public string backend_id = "xuunity.light_unity_mcp";
@@ -251,6 +251,20 @@ namespace XUUnity.LightMcp.Editor.Core
     }
 
     [Serializable]
+    internal sealed class XUUnityLightMcpUiNodeComponentTypes
+    {
+        public string node_id = "";
+        public string path = "";
+        public List<string> full_names = new();
+    }
+
+    [Serializable]
+    internal sealed class XUUnityLightMcpPrefabSnapshotFullPayload : XUUnityLightMcpUiTreePayload
+    {
+        public List<XUUnityLightMcpUiNodeComponentTypes> component_type_full_names = new();
+    }
+
+    [Serializable]
     internal sealed class XUUnityLightMcpPrefabArgs
     {
         public string prefabPath = "";
@@ -263,6 +277,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public string unassignedReferenceScope = XUUnityLightMcpUiRead.DefaultUnassignedReferenceScope;
         public bool writeSnapshot = true;
         public string snapshotOutputPath = "";
+        public bool includeFullPayload;
     }
 
     [Serializable]
