@@ -14,6 +14,11 @@
   compiled and its tests silently did not run. The matrix adds the `ugui` lane
   packages to each created project through the new
   `scaffold_unity_ci_project.py --add-ugui-to-existing`; `--no-ugui` skips it.
+- The package self-test `Render_AcceptsAnIntentionallyBlankPrefabAsAnArtifact`
+  no longer fails under `-nographics`. Without a graphics device the capture is
+  not transparent, so the test checked pixels it could not get; it now checks
+  the artifact contract there and the pixels only when a device is present, as
+  the other render tests do.
 
 ## 0.3.89
 
