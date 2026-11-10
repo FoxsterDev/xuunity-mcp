@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- A bridge state left by a batch process that died without quitting (SIGKILL,
+  crash) no longer reads as a live non-main owner (RG-19 residual). Discovery
+  sets `bridge_state_writer_exited` and treats the file as stale state, so a
+  live main editor is routed normally and an empty project reads
+  `stale_bridge_state` instead of `bridge_owned_by_non_main_process`. The
+  health views report `process_exited` for a dead batch writer and
+  `editor_not_running` for any other dead writer, with the file's value kept as
+  `recorded_health_status`.
+
 ## 0.3.89
 
 Release tag: `v0.3.89`

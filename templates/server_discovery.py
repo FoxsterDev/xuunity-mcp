@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from server_bridge_state import inspect_bridge_state_writer_identity
+from server_bridge_state import effective_bridge_health_status, inspect_bridge_state_writer_identity
 from server_core import render_launcher_cli
 
 TRANSPORT_METADATA_KEYS = (
@@ -151,7 +151,7 @@ def _state_groups(
             "bridge_health_status": (
                 "bridge_owned_by_non_main_process"
                 if bool(discovery.get("bridge_owned_by_non_main_process"))
-                else str(bridge_state.get("health_status") or "")
+                else str(discovery.get("bridge_health_status_effective") or bridge_state.get("health_status") or "")
             ),
             "bridge_health_status_recorded": str(bridge_state.get("health_status") or ""),
             "host_health_classification": str(discovery.get("host_health_classification") or ""),
@@ -513,8 +513,9 @@ def discover_project_context_state(
     host_session_pid_alive = pid_is_alive(host_session_pid) if host_session_pid > 0 else False
 
     writer_identity = inspect_bridge_state_writer_identity(bridge_state)
+    bridge_state_writer_exited = bool(bridge_state) and bridge_pid > 0 and not bridge_pid_alive
     bridge_owned_by_non_main_process = bool(bridge_state) and (
-        not bool(writer_identity.get("runtime_execution_allowed"))
+        (not bool(writer_identity.get("runtime_execution_allowed")) and not bridge_state_writer_exited)
         or bridge_pid in detected_worker_pid_set
         or (
             bool(process_visibility.get("process_visibility_available", True))
@@ -628,6 +629,10 @@ def discover_project_context_state(
         "host_session_live": host_session_live,
         "bridge_enabled": bridge_currently_enabled,
         "bridge_owned_by_non_main_process": bridge_owned_by_non_main_process,
+        "bridge_state_writer_exited": bridge_state_writer_exited,
+        "bridge_health_status_effective": effective_bridge_health_status(
+            bridge_state, pid_alive=bridge_pid_alive
+        ),
         "bridge_process_class": str(writer_identity.get("bridge_process_class") or ""),
         "bridge_process_class_source": str(writer_identity.get("bridge_process_class_source") or ""),
         "bridge_state_writer_trust_class": str(writer_identity.get("bridge_state_writer_trust_class") or ""),
