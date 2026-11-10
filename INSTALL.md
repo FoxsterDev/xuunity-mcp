@@ -85,16 +85,21 @@ Prefer this default behavior:
     (`opened_by_host: true`), run `restore-editor-state` and then
     `verify-editor-closed` before the final report
 
-Before running the helper, verify which Python it will use:
+Every launcher picks its interpreter in the same order: `PYTHON` when it is
+set, then the launcher's own `.venv`, then `python3` / `python` / `py -3` on
+`PATH`. GUI clients do not inherit the shell `PATH`, so the first `python3`
+they find can be an old system Python. When the chosen interpreter is older
+than `3.10`, the Python entrypoint re-runs itself with the first supported one
+it finds: the launcher's `.venv`, the neutral install's `.venv` (the one the
+installer creates), then `python3.15` … `python3.10`, `python3`, `python` on
+`PATH`. It prints one `xuunity launcher: ... re-running with ...` line to stderr,
+or lists every interpreter it tried. The Windows `.cmd` and `.ps1` launchers
+probe each candidate the same way and skip the Microsoft Store stub. An
+explicit `PYTHON` that is too old is an error, never silently replaced.
 
-```bash
-command -v python3
-python3 --version
-```
-
-If the selected interpreter is older than `3.10`, set `PYTHON` explicitly
-before `run_installed_or_refresh_xuunity_mcp.sh`, `run.sh`, or
-`xuunity_light_unity_mcp.sh`.
+A wrapper command run from a Claude Code or Codex terminal refreshes the neutral
+install when the client tool directory holds the installer's delegate stubs, so
+the stubs keep pointing at the neutral install and its venv.
 
 `setup-plan` is the only setup wizard command intended for pre-approval
 inspection. It must not clone, run the installer, refresh installed helper

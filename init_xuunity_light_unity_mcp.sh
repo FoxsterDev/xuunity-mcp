@@ -210,19 +210,20 @@ resolve_python_bin() {
     printf '%s\n' "$PYTHON"
     return 0
   fi
-  if command -v python3 >/dev/null 2>&1; then
-    command -v python3
-    return 0
-  fi
-  if command -v python >/dev/null 2>&1; then
-    command -v python
-    return 0
-  fi
-  if command -v py >/dev/null 2>&1; then
+  local candidate
+  for candidate in python3.15 python3.14 python3.13 python3.12 python3.11 python3.10 python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1 && \
+      "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] >= (3, 10) else 2)' >/dev/null 2>&1; then
+      command -v "$candidate"
+      return 0
+    fi
+  done
+  if command -v py >/dev/null 2>&1 && \
+    py -3 -c 'import sys; raise SystemExit(0 if sys.version_info[:2] >= (3, 10) else 2)' >/dev/null 2>&1; then
     command -v py
     return 0
   fi
-  echo "Python 3 was not found. Install Python 3 or set PYTHON to its executable path." >&2
+  echo "Python 3.10 or newer was not found on PATH. Install it or set PYTHON to its executable path." >&2
   exit 1
 }
 

@@ -330,8 +330,20 @@ def publish_launcher_env(script_dir: Path) -> None:
         os.environ.pop("XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_PATH", None)
 
 
-def main(argv: list[str]) -> int:
+def ensure_supported_python_or_reexec(argv: list[str]) -> None:
+    script_dir = Path(__file__).resolve().parent
+    for module_dir in (script_dir, script_dir / "templates"):
+        if (module_dir / "server_python_gate.py").is_file():
+            sys.path.insert(0, str(module_dir))
+            from server_python_gate import ensure_supported_python
+
+            ensure_supported_python(__file__, argv, [script_dir])
+            return
     require_supported_python()
+
+
+def main(argv: list[str]) -> int:
+    ensure_supported_python_or_reexec(argv)
     reconfigure_stdio_utf8()
     os.environ.setdefault("PYTHONUTF8", "1")
     script_dir = Path(__file__).resolve().parent

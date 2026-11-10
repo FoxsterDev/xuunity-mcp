@@ -29,6 +29,18 @@
   declares files a batch import rewrites deterministically; matching new dirty
   paths are reported as `expected_churn_paths` instead of stopping the run, so
   known churn no longer needs a manual ledger edit (RG-26).
+- A GUI-spawned MCP client whose `PATH` puts an old system `python3` first
+  no longer fails with `CONNECTION_CLOSED` while a supported venv exists. The
+  shell launchers stay thin; every Python entrypoint (`server.py`,
+  `server_launcher.py`, the refresh launcher) now re-runs itself with the first
+  Python 3.10+ it finds: the launcher's `.venv`, the neutral install's `.venv`,
+  then `python3.15` … `python3.10`, `python3`, `python` on `PATH`. An explicit
+  `PYTHON` that is too old is still an error. The `.cmd` and `.ps1` launchers
+  probe every candidate, know the neutral venv, and skip the Store stub; the
+  installer probes versions too. `templates/run.sh` now honours `PYTHON` before
+  its `.venv`, like every other flavour. A wrapper command run from a Claude
+  Code or Codex context refreshes the neutral install instead of overwriting the
+  installer's delegate stubs with a venv-less copy (RG-02, F-1).
 
 ## 0.3.88
 
