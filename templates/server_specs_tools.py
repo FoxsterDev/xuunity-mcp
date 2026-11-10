@@ -951,6 +951,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "items": {"type": "string"},
                     "description": "Extra component types this transaction may add or remove, on top of the built-in layout allowlist."
                 },
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "A refusal before any change (operation limit, missing prefab, drifted hash) returns only its status, errors and next action; true adds the timing, artifact and validation blocks."
+                },
                 "timeoutMs": {"type": "integer", "default": 60000, "minimum": 1000}
             },
             "required": ["projectRoot", "prefabPath", "operations"]
@@ -983,6 +988,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "previewOnly": {"type": "boolean", "default": True},
                 "approve": {"type": "boolean", "default": False},
                 "overwrite": {"type": "boolean", "default": False},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "A refusal before any change (operation limit, missing prefab, drifted hash) returns only its status, errors and next action; true adds the timing, artifact and validation blocks."
+                },
                 "timeoutMs": {"type": "integer", "default": 60000, "minimum": 1000}
             },
             "required": ["projectRoot", "prefabPath"]
@@ -1148,6 +1158,15 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
                 "maxMatches": {"type": "integer", "default": 20, "minimum": 1},
                 "includeInactive": {"type": "boolean", "default": False},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Matched nodes come back compact by default: path, name, type, scene, components, "
+                        "activity, visibility, interactability, pointer status, bounds and text, with "
+                        "default-valued and render-detail fields left out. true returns every node field."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector"]
@@ -1194,6 +1213,15 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "includeInactive": {"type": "boolean", "default": False},
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Matched nodes come back compact by default: path, name, type, scene, components, "
+                        "activity, visibility, interactability, pointer status, bounds and text, with "
+                        "default-valued and render-detail fields left out. true returns every node field."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector"]
@@ -1242,6 +1270,15 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "includeInactive": {"type": "boolean", "default": False},
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Matched nodes come back compact by default: path, name, type, scene, components, "
+                        "activity, visibility, interactability, pointer status, bounds and text, with "
+                        "default-valued and render-detail fields left out. true returns every node field."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector"]

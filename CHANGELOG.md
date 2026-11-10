@@ -99,6 +99,18 @@
   the code, message, recommended next action and recovery command, the stale
   artifact count and classifications, and the editor-log classification;
   `includeFullPayload: true` returns every detail as before (QPF-MCP-05, RG-51).
+- `unity_ui_query`, `unity_ui_exists` and `unity_ui_get_text` return compact
+  matched nodes by default. A node carried about 40 fields (1.3 KB); it now
+  carries path, name, type, scene, components, activity, visibility, pointer
+  status, bounds and text, plus interactability, alpha below 1, clipping and
+  descendant visibility only when they say something. Ten matches went from
+  12.6 KB to 4.0 KB; `includeFullPayload: true` returns every field.
+- A `unity_prefab_mutate` or `unity_prefab_create` refusal before any change
+  (operation limit, missing prefab, drifted hash) returns only its status,
+  errors, requested operation count and next action: 570 bytes instead of
+  about 5 KB of timing, artifact and empty validation blocks. Measured live, the
+  refusal never echoed the plan (65 and 96 operations gave the same size)
+  (RG-51).
 
 ## 0.3.88
 
