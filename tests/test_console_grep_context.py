@@ -101,6 +101,21 @@ class ConsoleGrepContextTests(unittest.TestCase):
                     {"projectRoot": str(self.root), "pattern": "x", "source": "console", "afterLines": 1}
                 )
 
+    def test_mcp_console_tools_report_an_explicit_log_path_like_the_cli(self) -> None:
+        with mock.patch.object(server_batch_orchestrator, "ensure_project_root", return_value=self.root):
+            grep = server_batch_orchestrator.call_unity_console_grep_tool(
+                {"projectRoot": str(self.root), "pattern": "SpinResult", "editorLogPath": str(self.log)}
+            )
+            tail = server_batch_orchestrator.call_unity_console_tail_tool(
+                {"projectRoot": str(self.root), "editorLogPath": str(self.log)}
+            )
+            default = server_batch_orchestrator.call_unity_console_grep_tool(
+                {"projectRoot": str(self.root), "pattern": "SpinResult"}
+            )
+        for result, expected in ((grep, True), (tail, True), (default, False)):
+            payload = json.loads(result["content"][0]["text"])
+            self.assertIs(expected, payload["log_lane"]["explicit_path_requested"])
+
 
 class ConsoleGrepStackFrameTests(unittest.TestCase):
     FRAMES = [

@@ -87,6 +87,10 @@
   true` they are kept and `stack_frame_hint` appears when they are most of the
   matches. `messagesOnly: true` (and `--messages-only`) returns each item as its
   message plus line and context, or type for the console source (RG-20).
+- `unity_console_grep` and `unity_console_tail` with an `editorLogPath` now
+  report `log_lane.explicit_path_requested: true`, as the CLI does, and resolve
+  the default log from the live bridge state the same way, so an explicitly
+  chosen log is no longer classified like a guessed default (RG-22b).
 
 ## 0.3.88
 

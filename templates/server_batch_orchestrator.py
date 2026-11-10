@@ -1864,10 +1864,10 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         editor_log_path = arguments.get("editorLogPath")
         if editor_log_path is not None and not isinstance(editor_log_path, str):
             raise JsonRpcError(-32602, "editorLogPath must be a string when provided.")
-        log_path = resolve_editor_log_path(project_root, editor_log_path)
         anchor_bridge_state, anchor_host_session_state, anchor_state_is_live = editor_log_anchor_state(
             project_root, since
         )
+        log_path = resolve_editor_log_path(project_root, editor_log_path, bridge_state=anchor_bridge_state)
         anchor_journal_events = editor_log_anchor_journal(project_root, since, since_request_id)
         try:
             payload = grep_editor_log_payload(
@@ -1887,6 +1887,7 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 journal_events=anchor_journal_events,
                 since_request_id=since_request_id,
                 bridge_state_is_live=anchor_state_is_live,
+                explicit_path_requested=bool(editor_log_path),
                 before_lines=before_lines,
                 after_lines=after_lines,
                 max_payload_bytes=max_payload_bytes,
@@ -1959,10 +1960,10 @@ def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         editor_log_path = arguments.get("editorLogPath")
         if editor_log_path is not None and not isinstance(editor_log_path, str):
             raise JsonRpcError(-32602, "editorLogPath must be a string when provided.")
-        log_path = resolve_editor_log_path(project_root, editor_log_path)
         anchor_bridge_state, anchor_host_session_state, anchor_state_is_live = editor_log_anchor_state(
             project_root, since
         )
+        log_path = resolve_editor_log_path(project_root, editor_log_path, bridge_state=anchor_bridge_state)
         anchor_journal_events = editor_log_anchor_journal(project_root, since, since_request_id)
         return mcp_json_result(
             tail_editor_log_payload(
@@ -1976,6 +1977,7 @@ def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 since_request_id=since_request_id,
                 bridge_state_is_live=anchor_state_is_live,
                 max_payload_bytes=max_payload_bytes,
+                explicit_path_requested=bool(editor_log_path),
             )
         )
 
