@@ -89,6 +89,14 @@
     `ensure-ready --open-editor`, the manual fallback and the restart
     criterion, shown before the approval sentence in the review summary and in
     the README review template.
+- Batch runs end with one comparable terminal record on every path (RG-08
+  residual). A GUI-fallback run that fails (for example `editor_idle_timeout`
+  while the editor imports) now also writes the terminal record as the last
+  NDJSON progress line, with `phase: gui_fallback`; the record carries
+  `error_code`, `retry_recommended` and `retry_reason`. The GUI lane's
+  `result.status` (and a GUI matrix's top-level `status`) now fill the same
+  `compile` / `matrix` sections as the batch lane's `compile.status`, so
+  `compile_status` in the record no longer comes back empty on the GUI lane.
 
 ## 0.3.88
 

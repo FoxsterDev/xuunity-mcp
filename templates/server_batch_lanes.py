@@ -761,8 +761,13 @@ def run_batch_operation_data(
             truncate_text=truncate_text,
         )
         attach_batch_lane_fields_to_summary(summary, payload)
-        attach_batch_terminal_record(summary, summary_path=summary_path)
+        if str(summary.get("effective_execution_lane") or "") == "gui" and gui_operation:
+            summary["phase"] = "gui_fallback"
+            summary["transport_outcome"] = "gui_operation_failed"
+            summary["unity_outcome"] = "unproven"
+        terminal_record = attach_batch_terminal_record(summary, summary_path=summary_path)
         write_batch_summary_artifact(summary_path, summary)
+        progress_reporter.emit_terminal_record(terminal_record)
         raise attach_batch_summary_to_error(
             exc,
             summary_path=summary_path,

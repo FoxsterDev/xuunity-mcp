@@ -9,6 +9,7 @@
     "result_file": "result.json",
     "same_project_editor_closed": false,
     "succeeded": false,
+    "error_code": "batch_preflight_blocked",
     "top_actionable_error": "Unity editor is already open.",
     "transport_outcome": "batch_prepare_blocked",
     "unity_outcome": "not_started"
