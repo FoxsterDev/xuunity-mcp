@@ -95,7 +95,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
             errorMessage = "";
 
             var wanted = (path ?? "").Trim();
+            var rootName = root.name ?? "";
+            var rootless = wanted.Length > 0 ? rootName + "/" + wanted : "";
             var matches = new List<Transform>();
+            var rootlessMatches = new List<Transform>();
+            var relativePaths = new List<string>();
             foreach (var transform in root.GetComponentsInChildren<Transform>(true))
             {
                 if (transform == null)
@@ -111,16 +115,27 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 }
 
                 var relative = RelativePath(root.transform, transform);
+                relativePaths.Add(relative);
                 if (string.Equals(relative, wanted, StringComparison.Ordinal))
                 {
                     matches.Add(transform);
+                }
+                else if (string.Equals(relative, rootless, StringComparison.Ordinal))
+                {
+                    rootlessMatches.Add(transform);
                 }
             }
 
             if (matches.Count == 0)
             {
+                matches = rootlessMatches;
+            }
+
+            if (matches.Count == 0)
+            {
                 errorCode = "prefab_mutation_target_not_found";
-                errorMessage = $"No object at '{wanted}' inside the prefab.";
+                errorMessage = $"No object at '{wanted}' inside the prefab. Paths start at the root '{rootName}'"
+                               + NearestPathHint(relativePaths, wanted) + ".";
                 return false;
             }
 
@@ -133,6 +148,43 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             resolved = matches[0];
             return true;
+        }
+
+        static string NearestPathHint(List<string> relativePaths, string wanted)
+        {
+            var trimmed = wanted.Trim('/');
+            var slash = trimmed.LastIndexOf('/');
+            var leaf = slash >= 0 ? trimmed.Substring(slash + 1) : trimmed;
+            if (leaf.Length == 0)
+            {
+                return "";
+            }
+
+            var nearest = new List<string>();
+            foreach (var relative in relativePaths)
+            {
+                if (relative.EndsWith("/" + trimmed, StringComparison.Ordinal)
+                    || relative.EndsWith("/" + leaf, StringComparison.Ordinal))
+                {
+                    nearest.Add(relative);
+                }
+            }
+
+            if (nearest.Count == 0)
+            {
+                return "";
+            }
+
+            nearest.Sort((left, right) => left.Length != right.Length
+                ? left.Length.CompareTo(right.Length)
+                : string.CompareOrdinal(left, right));
+            const int MaxHints = 5;
+            if (nearest.Count > MaxHints)
+            {
+                nearest.RemoveRange(MaxHints, nearest.Count - MaxHints);
+            }
+
+            return "; nearest matches: " + string.Join(", ", nearest);
         }
 
         public static string RelativePath(Transform root, Transform target)

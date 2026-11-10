@@ -94,6 +94,43 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             Assert.That(XUUnityLightMcpPrefabInspector.TypeChainContains(typeof(Image), "UnityEngine.UI.Button"), Is.False);
         }
 
+        [Test]
+        public void ARootlessPathResolvesWhenItIsUnique()
+        {
+            var operation = Operation("set_active", "Panel", "");
+            operation.boolValue = false;
+
+            var change = XUUnityLightMcpPrefabMutator.Apply(_root, operation, 0, AllowAny);
+
+            Assert.That(change.status, Is.EqualTo("applied"), change.error_message);
+            Assert.That(_root.transform.Find("Panel").gameObject.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void AnAmbiguousRootlessPathIsRefused()
+        {
+            for (var index = 0; index < 2; index++)
+            {
+                new GameObject("Dup", typeof(RectTransform)).transform.SetParent(_root.transform, false);
+            }
+
+            var resolved = XUUnityLightMcpPrefabMutator.TryResolveUnique(_root, "Dup", out _, out var code, out _);
+
+            Assert.That(resolved, Is.False);
+            Assert.That(code, Is.EqualTo("prefab_mutation_target_ambiguous"));
+        }
+
+        [Test]
+        public void AMissNamesTheRootAndTheNearestSuffixMatches()
+        {
+            var resolved = XUUnityLightMcpPrefabMutator.TryResolveUnique(_root, "Wrong/Panel", out _, out var code, out var message);
+
+            Assert.That(resolved, Is.False);
+            Assert.That(code, Is.EqualTo("prefab_mutation_target_not_found"));
+            StringAssert.Contains($"root '{ROOT}'", message);
+            StringAssert.Contains($"nearest matches: {ROOT}/Panel", message);
+        }
+
         static readonly HashSet<string> AllowAny = new();
 
         static void RequireUniqueShortName(string shortName)

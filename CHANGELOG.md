@@ -65,6 +65,12 @@
   entry by full or short name), the declared reference type and the prefab
   validator's reference type check, which also reports
   `observed_type_full_name` (RG-48).
+- A prefab path miss in `unity_prefab_mutate`, `unity_prefab_create` and the
+  `unity_prefab_render` overrides now names the root
+  (`Paths start at the root '<name>'`) and up to five nearest paths that end
+  with the requested name. A path without the root segment is accepted when it
+  resolves to exactly one object; an ambiguous one stays
+  `prefab_mutation_target_ambiguous` (RG-52).
 
 ## 0.3.88
 
