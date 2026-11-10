@@ -71,6 +71,14 @@
   with the requested name. A path without the root segment is accepted when it
   resolves to exactly one object; an ambiguous one stays
   `prefab_mutation_target_ambiguous` (RG-52).
+- `unity_console_grep` and `request-console-grep` take `beforeLines` /
+  `afterLines` (0–20) for `source: editor_log`. Each match carries its own
+  `context_before`, `context_after` and `context_first_line`, so structured
+  lines that follow a log message no longer need raw Editor.log reads. With
+  context or an explicit `maxPayloadBytes` the result stays inside the byte
+  budget (default 16384): the oldest blocks go first, then context lines of the
+  newest (`context_truncated_for_byte_budget`). Context on `source: console` is
+  refused (RG-50).
 
 ## 0.3.88
 

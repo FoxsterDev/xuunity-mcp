@@ -1656,6 +1656,28 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "type": "string",
                     "description": "Request id to anchor on when since=request_id. Ignored for other anchors."
                 },
+                "beforeLines": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 20,
+                    "description": "source=editor_log only: Editor.log lines returned before each match as context_before."
+                },
+                "afterLines": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 20,
+                    "description": (
+                        "source=editor_log only: Editor.log lines returned after each match as context_after, for "
+                        "structured lines that follow a log message. Each match is its own block; the result stays "
+                        "inside maxPayloadBytes by dropping the oldest blocks, then context lines of the newest."
+                    )
+                },
+                "maxPayloadBytes": {
+                    "type": "integer",
+                    "description": "Byte budget for the returned items (default 16384 when context lines are requested; negative disables)."
+                },
                 "timeoutMs": {"type": "integer", "default": 5000, "minimum": 1000}
             },
             "required": ["projectRoot", "pattern"]

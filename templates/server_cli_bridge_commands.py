@@ -500,6 +500,9 @@ def cmd_request_console_grep(args):
                 since_request_id=since_request_id,
                 bridge_state_is_live=anchor_state_is_live,
                 explicit_path_requested=bool(explicit_log_path),
+                before_lines=int(getattr(args, "before_lines", 0) or 0),
+                after_lines=int(getattr(args, "after_lines", 0) or 0),
+                max_payload_bytes=getattr(args, "max_payload_bytes", None),
             )
         except ValueError as exc:
             raise ToolInvocationError("invalid_editor_log_grep", str(exc)) from exc

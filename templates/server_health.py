@@ -48,6 +48,7 @@ EDITOR_LOG_STALE_MATCH_CAVEAT = (
     "current run; pass since=playmode_start or since=bridge_generation to bound the search to this session."
 )
 CONSOLE_TAIL_DEFAULT_MAX_PAYLOAD_BYTES = 16384
+CONSOLE_GREP_MAX_CONTEXT_LINES = 20
 CONSOLE_ITEM_BYTE_OVERHEAD = 64
 CONSOLE_TAIL_BYTE_TRUNCATION_MARKER = "\n[truncated_by_byte_budget]"
 CONSOLE_TAIL_TRUNCATION_RECOVERY_TOOL = "unity_console_grep"
@@ -828,10 +829,16 @@ def grep_editor_log_payload(
     since_request_id: str = "",
     bridge_state_is_live: bool = True,
     explicit_path_requested: bool = False,
+    before_lines: int = 0,
+    after_lines: int = 0,
+    max_payload_bytes: Any = None,
 ) -> dict[str, Any]:
     pattern = str(pattern or "").strip()
     if not pattern:
         raise ValueError("editor_log grep requires a non-empty pattern.")
+    for name, value in (("beforeLines", before_lines), ("afterLines", after_lines)):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0 or value > CONSOLE_GREP_MAX_CONTEXT_LINES:
+            raise ValueError(f"{name} must be an integer between 0 and {CONSOLE_GREP_MAX_CONTEXT_LINES}.")
     max_chars_explicit = max_chars is not None
     if max_chars is None:
         max_chars = EDITOR_LOG_GREP_MAX_CHARS
@@ -895,7 +902,9 @@ def grep_editor_log_payload(
     matches: list[dict[str, Any]] = []
     excluded_count = 0
     build_pipeline_suppressed_count = 0
-    for line_number, raw_line in enumerate(text.splitlines(), start=first_line_number):
+    lines = text.splitlines()
+    for line_index, raw_line in enumerate(lines):
+        line_number = first_line_number + line_index
         line = raw_line.rstrip("\n")
         if not line_matches(line, pattern, compiled):
             continue
@@ -918,6 +927,11 @@ def grep_editor_log_payload(
     limit = max(1, int(limit or 20))
     truncated = len(matches) > limit
     visible_matches = matches[-limit:] if truncated else matches
+    if before_lines or after_lines:
+        visible_matches = [
+            _with_grep_context(item, lines, item["line"] - first_line_number, before_lines, after_lines)
+            for item in visible_matches
+        ]
     scope_truncated = bool(anchor.get("scope_truncated"))
     lane_is_stale = lane.get("lane") == "stale_not_written_by_live_editor"
     if matches:
@@ -986,7 +1000,26 @@ def grep_editor_log_payload(
     }
     if search_verdict == "inconclusive" and scope_truncated:
         payload["recommended_next_action"] = EDITOR_LOG_PARTIAL_SCOPE_RECOVERY_ACTION
+    if before_lines or after_lines:
+        payload["context_lines"] = {"before": before_lines, "after": after_lines}
+    if before_lines or after_lines or max_payload_bytes is not None:
+        payload = apply_console_tail_byte_budget(payload, max_payload_bytes)
     return payload
+
+
+def _with_grep_context(
+    item: dict[str, Any],
+    lines: list[str],
+    index: int,
+    before_lines: int,
+    after_lines: int,
+) -> dict[str, Any]:
+    block = dict(item)
+    start = max(0, index - before_lines)
+    block["context_before"] = [line.rstrip("\n") for line in lines[start:index]]
+    block["context_after"] = [line.rstrip("\n") for line in lines[index + 1 : index + 1 + after_lines]]
+    block["context_first_line"] = int(item["line"]) - (index - start)
+    return block
 
 
 def tail_editor_log_payload(
@@ -1088,6 +1121,9 @@ def estimate_console_item_bytes(item: dict[str, Any]) -> int:
         value = item.get(field)
         if value:
             total += len(str(value).encode("utf-8"))
+    for field in ("context_before", "context_after"):
+        for line in item.get(field) or []:
+            total += len(str(line).encode("utf-8")) + 4
     return total
 
 
@@ -1103,6 +1139,20 @@ def _truncate_utf8(value: str, max_bytes: int) -> str:
 def _truncate_console_item_to_budget(item: dict[str, Any], budget: int) -> dict[str, Any]:
     clone = dict(item or {})
     clone["stack_trace"] = ""
+    if "context_before" in clone or "context_after" in clone:
+        before = list(clone.get("context_before") or [])
+        after = list(clone.get("context_after") or [])
+        while (before or after) and estimate_console_item_bytes({**clone, "context_before": before, "context_after": after}) > budget:
+            if len(before) >= len(after) and before:
+                before.pop(0)
+                clone["context_first_line"] = int(clone.get("context_first_line") or 0) + 1
+            else:
+                after.pop()
+        clone["context_before"] = before
+        clone["context_after"] = after
+        if estimate_console_item_bytes(clone) <= budget:
+            clone["context_truncated_for_byte_budget"] = True
+            return clone
     fixed_bytes = CONSOLE_ITEM_BYTE_OVERHEAD + len(CONSOLE_TAIL_BYTE_TRUNCATION_MARKER.encode("utf-8"))
     for field in ("type", "timestamp"):
         value = clone.get(field)

@@ -1837,6 +1837,13 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     exclude_pattern = arguments.get("excludePattern", "")
     if not isinstance(exclude_pattern, str):
         raise JsonRpcError(-32602, "excludePattern must be a string when provided.")
+    before_lines = arguments.get("beforeLines", 0)
+    after_lines = arguments.get("afterLines", 0)
+    max_payload_bytes = arguments.get("maxPayloadBytes")
+    if max_payload_bytes is not None and (not isinstance(max_payload_bytes, int) or isinstance(max_payload_bytes, bool)):
+        raise JsonRpcError(-32602, "maxPayloadBytes must be an integer when provided.")
+    if source == "console" and (before_lines or after_lines):
+        raise JsonRpcError(-32602, "beforeLines/afterLines require source=editor_log; console entries have no adjacent lines.")
 
     include_types = _optional_string_list_argument(arguments, "includeTypes")
     since = _editor_log_since_argument(arguments)
@@ -1876,6 +1883,9 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 journal_events=anchor_journal_events,
                 since_request_id=since_request_id,
                 bridge_state_is_live=anchor_state_is_live,
+                before_lines=before_lines,
+                after_lines=after_lines,
+                max_payload_bytes=max_payload_bytes,
             )
         except ValueError as exc:
             raise JsonRpcError(-32602, str(exc)) from exc
