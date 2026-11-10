@@ -76,6 +76,7 @@ def build_setup_plan(
     package_source: str,
     package_version: str,
     local_package_source: str,
+    answering_server_version: str = "",
 ) -> dict[str, Any]:
     explicit_project_roots = [normalize_project_root(value) for value in project_roots or []]
     projects = discover_unity_projects(
@@ -260,14 +261,17 @@ def build_setup_plan(
     selected_client_targets = [
         item for item in client_config_targets if item.get("selected_by_default")
     ]
+    answering_version = normalize_package_version(answering_server_version) if answering_server_version else ""
+    answering_matches = bool(answering_version) and answering_version == normalized_package_version
+    helpers_aligned = bool(selected_helpers) and all(bool(item.get("runtime_execution_allowed")) for item in selected_helpers)
     alignment_blockers: list[str] = []
     if not all(bool(project.get("runtime_execution_allowed")) for project in result["projects"]):
         alignment_blockers.append("project_package_alignment_required")
-    if not selected_helpers or not all(bool(item.get("runtime_execution_allowed")) for item in selected_helpers):
+    if not helpers_aligned and not answering_matches:
         alignment_blockers.append("helper_install_or_refresh_required")
     if not selected_client_targets:
         alignment_blockers.append("client_selection_required")
-    elif not all(bool(item.get("runtime_execution_allowed")) for item in selected_client_targets):
+    elif client_wiring_blocked(selected_client_targets):
         alignment_blockers.append("client_launcher_install_or_migration_required")
 
     on_disk_alignment_ready = not alignment_blockers
@@ -284,12 +288,18 @@ def build_setup_plan(
             else "blocked_until_upgrade_or_wiring_fix"
         ),
         "on_disk_alignment_ready": on_disk_alignment_ready,
-        "runtime_execution_allowed": False,
+        "runtime_execution_allowed": on_disk_alignment_ready and answering_matches,
         "runtime_execution_allowed_after_live_session_proof": on_disk_alignment_ready,
-        "current_mcp_session_safe": False,
-        "live_mcp_session_status": "unverified",
-        "live_session_proof_required": True,
+        "current_mcp_session_safe": on_disk_alignment_ready and answering_matches,
+        "live_mcp_session_status": (
+            "answering_server_matches_requested"
+            if answering_matches
+            else ("answering_server_version_mismatch" if answering_version else "unverified")
+        ),
+        "live_session_proof_required": not answering_matches,
         "required_live_server_version": normalized_package_version,
+        "answering_server_version": answering_version,
+        "helper_alignment_credited_to_answering_server": answering_matches and not helpers_aligned,
         "client_restart_required_after_host_changes": host_mutation_required,
         "blockers": alignment_blockers,
         "safety_rule": (

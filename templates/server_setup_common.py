@@ -768,6 +768,31 @@ def json_contains_server_block(path: Path) -> bool:
     return isinstance(servers, dict) and "xuunity_light_unity" in servers
 
 
+def ancestor_mcp_json_paths(project_root: Path, home: Path) -> list[Path]:
+    found: list[Path] = []
+    try:
+        home_key = home.resolve()
+    except OSError:
+        home_key = home
+    for parent in Path(project_root).resolve().parents:
+        if parent == home_key:
+            break
+        candidate = parent / ".mcp.json"
+        if candidate.is_file() and json_contains_server_block(candidate):
+            found.append(candidate)
+    return found
+
+
+def client_wiring_blocked(selected_client_targets: list[dict[str, Any]]) -> bool:
+    if any(item.get("server_block_present") and not item.get("runtime_execution_allowed") for item in selected_client_targets):
+        return True
+    clients = {str(item.get("client_id") or "") for item in selected_client_targets}
+    return any(
+        not any(item.get("runtime_execution_allowed") for item in selected_client_targets if item.get("client_id") == client)
+        for client in clients
+    )
+
+
 def build_client_config_targets(primary_project_root: Path | None) -> list[dict[str, Any]]:
     home = user_home_fallback()
     current_platform = platform_kind()
@@ -843,6 +868,14 @@ def build_client_config_targets(primary_project_root: Path | None) -> list[dict[
             config_format="json",
             restart_or_refresh_required="restart_or_refresh_claude_code_if_not_hot_reloaded",
         )
+        for ancestor in ancestor_mcp_json_paths(primary_project_root, home):
+            append_target(
+                client_id="claude_code",
+                scope="ancestor_project",
+                path=ancestor,
+                config_format="json",
+                restart_or_refresh_required="restart_or_refresh_claude_code_if_not_hot_reloaded",
+            )
         append_target(
             client_id="cursor",
             scope="project",

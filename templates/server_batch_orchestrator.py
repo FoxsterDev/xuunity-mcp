@@ -2330,6 +2330,7 @@ def call_xuunity_setup_plan_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             package_source=package_source,
             package_version=_optional_string_arg(arguments, "packageVersion") or default_light_mcp_package_version(),
             local_package_source=_optional_string_arg(arguments, "localPackageSource") or str(default_local_package_source()),
+            answering_server_version=str(SERVER_INFO.get("version") or ""),
         )
     except ToolInvocationError as exc:
         return mcp_json_result(build_tool_error_payload(exc), is_error=True)

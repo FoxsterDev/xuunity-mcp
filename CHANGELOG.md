@@ -41,6 +41,15 @@
   its `.venv`, like every other flavour. A wrapper command run from a Claude
   Code or Codex context refreshes the neutral install instead of overwriting the
   installer's delegate stubs with a venv-less copy (RG-02, F-1).
+- `xuunity_setup_plan` no longer blocks a session that already runs the
+  requested release. The MCP tool passes the answering server's version; when it
+  matches, a stale on-disk helper is credited
+  (`helper_alignment_credited_to_answering_server`), `live_mcp_session_status`
+  is `answering_server_matches_requested`, and runtime execution is allowed once
+  the project and wiring are aligned. The plan also reads `.mcp.json` files with
+  a server block in the project's parent directories (scope `ancestor_project`),
+  and a client counts as wired when any of its targets is compatible; an
+  existing incompatible block still blocks (RG-18).
 
 ## 0.3.88
 
