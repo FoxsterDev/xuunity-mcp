@@ -576,6 +576,66 @@ class ConsumerEvidenceTests(unittest.TestCase):
             self.assertEqual(f"{run_dir}/", result["workspaces"][0]["own_run_dir"])
             self.assertEqual(2, result["workspaces"][0]["own_run_dir_path_count"])
 
+    def test_compiler_servers_left_by_batch_compiles_are_recorded_and_closed_at_completion(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            follower = create_consumer(root, "Follower")
+            ledger = make_ledger(root, [canary, follower], canary)
+            install = root.resolve() / "Unity.app"
+            vbcs = (
+                f"{install}/Contents/NetCoreRuntime/dotnet exec "
+                f"{install}/Contents/DotNetSdkRoslyn/VBCSCompiler.dll -pipename:abc"
+            )
+            foreign = "/opt/dotnet/dotnet exec /opt/sdk/VBCSCompiler.dll -pipename:other"
+            ledger["preflight"]["compiler_servers_at_preflight"] = [700]
+            report = {
+                "available": True,
+                "commands": [(700, vbcs), (701, vbcs), (702, foreign), (703, "/usr/bin/python3 grep VBCSCompiler")],
+            }
+            terminated: list[int] = []
+            result = rollout.execute_rollout(
+                ledger,
+                runner=fake_runner_factory({}, []),
+                workspace_snapshot_fn=clean_workspace_snapshot,
+                process_report_fn=lambda: report,
+                terminate_fn=lambda pid, _timeout: terminated.append(pid) or True,
+            )
+
+            self.assertEqual("completed", result["status"])
+            statuses = {row["pid"]: row["status"] for row in result["compiler_servers"]}
+            self.assertEqual({701: "closed", 702: "left_open_identity_unproven"}, statuses)
+            self.assertEqual([701], terminated)
+            self.assertEqual("Canary", next(
+                row for row in result["projects"] if row["project_id"] == result["compiler_servers"][0]["first_seen_after_project_id"]
+            )["project"])
+            self.assertEqual(1, rollout.compact_projection(result)["compiler_servers_open"])
+
+    def test_compiler_servers_stay_open_while_a_unity_editor_is_live(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            ledger = make_ledger(root, [canary], canary)
+            install = root.resolve() / "Unity.app"
+            vbcs = f"{install}/Contents/NetCoreRuntime/dotnet exec {install}/Contents/DotNetSdkRoslyn/VBCSCompiler.dll"
+            ledger["compiler_servers"] = [
+                {"pid": 801, "command": vbcs, "unity_install_match": True, "status": "open"}
+            ]
+            report = {
+                "available": True,
+                "commands": [(801, vbcs), (802, f"{install}/Contents/MacOS/Unity -projectPath /tmp/Other")],
+            }
+            terminate = mock.Mock(return_value=True)
+            summary = rollout.close_compiler_servers(ledger, process_report_fn=lambda: report, terminate_fn=terminate)
+
+            terminate.assert_not_called()
+            self.assertEqual("live_unity_editor_may_share_the_server", summary["reason"])
+            self.assertEqual(1, summary["left_open"])
+            report["commands"] = []
+            summary = rollout.close_compiler_servers(ledger, process_report_fn=lambda: report, terminate_fn=terminate)
+            self.assertEqual(1, summary["exited"])
+            self.assertEqual("exited", ledger["compiler_servers"][0]["status"])
+
     def test_worker_packet_is_exact_and_denies_diagnosis_release_and_kill(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -21,6 +21,10 @@
   rollout as `new_unowned_workspace_side_effects`: the helper's own ledger,
   logs and packets are excluded and counted as `own_run_dir_path_count`
   (RG-23).
+- The rollout helper records the `VBCSCompiler` servers its batch compiles
+  leave behind and closes them when the run completes, after re-checking the
+  command and install; `close-compiler-servers` does the same after a stopped
+  run, and a live editor leaves them open (RG-25).
 
 ## 0.3.88
 

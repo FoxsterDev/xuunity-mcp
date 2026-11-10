@@ -615,6 +615,39 @@ def relevant_unity_processes(report: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def unity_install_root(unity_app: Path, unity_executable: Path) -> str:
+    if str(unity_app).lower().endswith(".app"):
+        return normalized_path(unity_app)
+    if str(unity_executable) not in {"", "."}:
+        return normalized_path(unity_executable.parent)
+    return normalized_path(unity_app)
+
+
+def compiler_server_processes(report: dict[str, Any], install_root: str = "") -> list[dict[str, Any]]:
+    root_key = path_match_key(install_root) if install_root else ""
+    rows = []
+    for entry in report.get("commands") or []:
+        try:
+            pid = int(entry[0])
+            command = str(entry[1])
+        except (IndexError, TypeError, ValueError, SystemError):
+            continue
+        lower = command.replace("\\", "/").lower()
+        if pid <= 0 or "vbcscompiler" not in lower:
+            continue
+        executable_name = (unity_command_executable(command).lower().rsplit("/", 1)[-1].split() or [""])[0]
+        if not (executable_name.startswith("vbcscompiler") or executable_name in {"dotnet", "dotnet.exe"}):
+            continue
+        rows.append(
+            {
+                "pid": pid,
+                "command": redact_command_text(command)[:1000],
+                "unity_install_match": bool(root_key) and root_key in lower,
+            }
+        )
+    return rows
+
+
 def build_preflight(
     *,
     inventory: dict[str, Any],
@@ -711,6 +744,8 @@ def build_preflight(
     process_report = process_report_fn()
     visibility_available = bool(process_report.get("available"))
     processes = relevant_unity_processes(process_report)
+    install_root = unity_install_root(unity_app, unity_executable)
+    compiler_servers_at_preflight = [row["pid"] for row in compiler_server_processes(process_report, install_root)]
     conflicts = [row for row in processes if row["role"] in {"main_editor", "worker"}]
     if not visibility_available:
         blockers.append(
@@ -762,6 +797,8 @@ def build_preflight(
         "unity_version": unity_version,
         "process_visibility_available": visibility_available,
         "global_unity_processes": processes,
+        "unity_install_root": install_root,
+        "compiler_servers_at_preflight": compiler_servers_at_preflight,
         "write_probes": write_probes,
         "workspace_baselines": workspace_baselines,
         "license_capabilities": {
@@ -990,6 +1027,9 @@ def compact_projection(ledger: dict[str, Any]) -> dict[str, Any]:
         "ledger_path": ledger.get("ledger_path") or "",
         "task_packet_path": ledger.get("task_packet_path") or "",
         "recommended_next_action": ledger.get("recommended_next_action") or "",
+        "compiler_servers_open": sum(
+            1 for row in ledger.get("compiler_servers") or [] if str(row.get("status") or "").startswith(("open", "left_open", "close_failed"))
+        ),
         "full_payload_available": True,
         "full_payload_cli_argument": "--output full",
     }
@@ -1263,6 +1303,8 @@ def execute_rollout(
     *,
     runner: Callable[..., dict[str, Any]] = run_project_validation,
     workspace_snapshot_fn: Callable[[Path], dict[str, Any]] = git_workspace_snapshot,
+    process_report_fn: Callable[[], dict[str, Any]] = list_process_commands_report,
+    terminate_fn: Callable[[int, int], bool] = terminate_editor_pid,
 ) -> dict[str, Any]:
     if (ledger.get("preflight") or {}).get("status") != "passed":
         raise RolloutError("Preflight did not pass; consumer mutation is forbidden.")
@@ -1413,6 +1455,7 @@ def execute_rollout(
             ledger["status"] = "needs_smart_escalation"
             ledger["first_unproven_project_id"] = row["project_id"]
             ledger["recommended_next_action"] = "root_review_unexpected_validation_result"
+        record_compiler_servers(ledger, after_project_id=str(row["project_id"]), process_report_fn=process_report_fn)
         side_effects = workspace_side_effects(ledger, workspace_snapshot_fn=workspace_snapshot_fn)
         row["workspace_side_effects"] = side_effects
         if row["state"] == "passed" and side_effects["status"] != "passed":
@@ -1470,11 +1513,78 @@ def execute_rollout(
 
     clean_rows = [row for row in projects if not row.get("dirty")]
     if clean_rows and all(row.get("state") == "passed" for row in clean_rows):
+        close_compiler_servers(ledger, process_report_fn=process_report_fn, terminate_fn=terminate_fn)
         ledger["status"] = "completed"
         ledger["first_unproven_project_id"] = ""
         ledger["recommended_next_action"] = "consumer_rollout_complete"
         write_ledger(ledger)
     return ledger
+
+
+def record_compiler_servers(
+    ledger: dict[str, Any],
+    *,
+    after_project_id: str,
+    process_report_fn: Callable[[], dict[str, Any]] = list_process_commands_report,
+) -> None:
+    preflight = ledger.get("preflight") or {}
+    report = process_report_fn()
+    if not report.get("available"):
+        return
+    known = {int(pid) for pid in preflight.get("compiler_servers_at_preflight") or []}
+    recorded = ledger.setdefault("compiler_servers", [])
+    known.update(int(row.get("pid") or 0) for row in recorded)
+    for row in compiler_server_processes(report, str(preflight.get("unity_install_root") or "")):
+        if row["pid"] in known:
+            continue
+        recorded.append(
+            {
+                **row,
+                "first_seen_after_project_id": after_project_id,
+                "recorded_at_utc": utc_now(),
+                "status": "open",
+            }
+        )
+
+
+def close_compiler_servers(
+    ledger: dict[str, Any],
+    *,
+    process_report_fn: Callable[[], dict[str, Any]] = list_process_commands_report,
+    terminate_fn: Callable[[int, int], bool] = terminate_editor_pid,
+) -> dict[str, Any]:
+    recorded = [row for row in ledger.get("compiler_servers") or [] if row.get("status") == "open"]
+    summary = {"checked_at_utc": utc_now(), "closed": 0, "exited": 0, "left_open": 0, "reason": ""}
+    if not recorded:
+        ledger["compiler_server_cleanup"] = summary
+        return summary
+    report = process_report_fn()
+    if not report.get("available"):
+        summary.update({"left_open": len(recorded), "reason": "process_visibility_unavailable"})
+        ledger["compiler_server_cleanup"] = summary
+        return summary
+    if any(row["role"] == "main_editor" for row in relevant_unity_processes(report)):
+        summary.update({"left_open": len(recorded), "reason": "live_unity_editor_may_share_the_server"})
+        ledger["compiler_server_cleanup"] = summary
+        return summary
+    install_root = str((ledger.get("preflight") or {}).get("unity_install_root") or "")
+    live = {row["pid"]: row for row in compiler_server_processes(report, install_root)}
+    for row in recorded:
+        current = live.get(int(row.get("pid") or 0))
+        if not current:
+            row["status"] = "exited"
+            summary["exited"] += 1
+            continue
+        if not (current["unity_install_match"] and row.get("unity_install_match") and current["command"] == row.get("command")):
+            row["status"] = "left_open_identity_unproven"
+            summary["left_open"] += 1
+            continue
+        closed = bool(terminate_fn(int(row["pid"]), PROCESS_CLEANUP_TIMEOUT_MS))
+        row["status"] = "closed" if closed else "close_failed"
+        row["closed_at_utc"] = utc_now()
+        summary["closed" if closed else "left_open"] += 1
+    ledger["compiler_server_cleanup"] = summary
+    return summary
 
 
 def cleanup_owned_process(
@@ -1672,6 +1782,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     resume_parser.add_argument("--confirm-release-tag", required=True)
     resume_parser.add_argument("--output", choices=("compact", "full"), default="compact")
 
+    compiler_parser = subparsers.add_parser(
+        "close-compiler-servers",
+        help="Root-only: close the VBCSCompiler servers the run's batch compiles left, after identity proof.",
+    )
+    compiler_parser.add_argument("--ledger", required=True)
+    compiler_parser.add_argument("--output", choices=("compact", "full"), default="compact")
+
     summary_parser = subparsers.add_parser("summary", help="Render a ledger decision projection.")
     summary_parser.add_argument("--ledger", required=True)
     summary_parser.add_argument("--output", choices=("compact", "full"), default="compact")
@@ -1724,6 +1841,11 @@ def main(argv: list[str]) -> int:
             ledger, cleaned = cleanup_owned_process(ledger, project_id=args.project_id)
             emit_ledger(ledger, args.output)
             return 0 if cleaned else 2
+        if args.command == "close-compiler-servers":
+            summary = close_compiler_servers(ledger)
+            write_ledger(ledger)
+            emit_ledger(ledger, args.output)
+            return 0 if summary["left_open"] == 0 else 2
         if args.command == "resume-project":
             ledger = authorize_resume(
                 ledger,

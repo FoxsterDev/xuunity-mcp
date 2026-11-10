@@ -92,6 +92,20 @@ rows intact and pending rows in the ledger.
 The per-project timeout is clamped to the remaining overall deadline. If the
 deadline expires after the canary, the helper stops before portfolio fan-out.
 
+Batch compiles leave detached `VBCSCompiler` servers behind. After each
+project the helper records every compiler server that was not running at
+planning time in the ledger's `compiler_servers`. When the run completes, it
+closes the ones whose command still matches the recorded one and lives under
+the selected Unity install; a server from another install, a changed command,
+or any live Unity editor (which may share the server) leaves them open. The
+compact summary reports `compiler_servers_open`. After a stopped run, close them
+with:
+
+```bash
+python3 scripts/testing/run_consumer_rollout.py close-compiler-servers \
+  --ledger /path/to/private-rollout-evidence/consumer_rollout_ledger.json
+```
+
 ## Resume After Root Review
 
 An unexpected result is terminal for the bounded worker. The root operator
