@@ -23,6 +23,7 @@ KEEP_PROJECTS="false"
 RECREATE_PROJECTS="false"
 LIST_DETECTED="false"
 SKIP_PACKAGE_SELF_TESTS="false"
+USE_HOST_INSTALL="false"
 
 usage() {
   cat <<EOF
@@ -35,6 +36,8 @@ Options:
   --recreate-projects      Recreate each clean project even if it already exists for this run.
   --skip-package-self-tests Skip optional Test Framework install plus package EditMode/PlayMode self-tests.
   --list-detected          Print detected Unity versions and editor executables, then exit.
+  --use-host-install       Install this checkout into the host's real neutral and client installs.
+                           Default: a per-run sandbox under the run root, so live MCP sessions keep their server.
   -h, --help               Show this help.
 
 If no Unity versions are provided, the script auto-discovers installed Unity editors on this host.
@@ -66,6 +69,9 @@ while [[ $# -gt 0 ]]; do
     --list-detected)
       LIST_DETECTED="true"
       ;;
+    --use-host-install)
+      USE_HOST_INSTALL="true"
+      ;;
     -h|--help)
       usage
       exit 0
@@ -95,6 +101,14 @@ SUMMARY_TSV="$RUN_ROOT/summary.tsv"
 DISCOVERED_EDITORS_TSV="$RUN_ROOT/discovered_editors.tsv"
 
 mkdir -p "$PROJECTS_ROOT" "$RESULTS_ROOT"
+
+if [[ "$USE_HOST_INSTALL" != "true" ]]; then
+  HOST_INSTALL_SANDBOX="$RUN_ROOT/host-install"
+  export XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR="$HOST_INSTALL_SANDBOX/neutral"
+  export CLAUDE_TOOLS_HOME="$HOST_INSTALL_SANDBOX/claude-tools"
+  export CODEX_TOOLS_HOME="$HOST_INSTALL_SANDBOX/codex-tools"
+  export CODEX_HOME="$HOST_INSTALL_SANDBOX/codex-home"
+fi
 
 echo -e "unity_version\tresult\tfailed_step\tbatchmode_supported\tlicense_blocker_code\teffective_execution_lane\tproject_root\tresult_dir\tnotes" > "$SUMMARY_TSV"
 

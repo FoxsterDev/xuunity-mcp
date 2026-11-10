@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- `scripts/testing/run_unity_version_matrix.sh` no longer installs the checkout
+  into the host's neutral MCP install and Claude/Codex delegate installs. A
+  matrix run used to repoint the shared install (`.source_root`) at the branch
+  under test, so every MCP session started afterwards ran that branch. The run
+  now installs into `<run>/host-install`; `--use-host-install` opts back in.
+
 ## 0.3.89
 
 Release tag: `v0.3.89`
