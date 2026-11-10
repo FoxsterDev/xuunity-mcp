@@ -2,23 +2,26 @@
 
 ## Unreleased
 
-### Fixed
+## 0.3.90
 
-- `scripts/testing/run_unity_version_matrix.sh` no longer installs the checkout
-  into the host's neutral MCP install and Claude/Codex delegate installs. A
-  matrix run used to repoint the shared install (`.source_root`) at the branch
-  under test, so every MCP session started afterwards ran that branch. The run
-  now installs into `<run>/host-install`; `--use-host-install` opts back in.
-- The version matrix now runs the `EditModeUgui` self-tests on 6000.x. Projects
-  created there by `-createProject` have no uGUI, so that assembly never
-  compiled and its tests silently did not run. The matrix adds the `ugui` lane
-  packages to each created project through the new
-  `scaffold_unity_ci_project.py --add-ugui-to-existing`; `--no-ugui` skips it.
-- The package self-test `Render_AcceptsAnIntentionallyBlankPrefabAsAnArtifact`
-  no longer fails under `-nographics`. Without a graphics device the capture is
-  not transparent, so the test checked pixels it could not get; it now checks
-  the artifact contract there and the pixels only when a device is present, as
-  the other render tests do.
+Release tag: `v0.3.90`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.90
+```
+
+A batch-mode Unity process that was killed or crashed left a `healthy` bridge
+state, and the host read it as a live non-main owner, so requests to the real
+editor were refused until someone deleted the file. The readiness timeout for an
+editor whose bridge had not attached said to restart while setup said to poll.
+Running the version matrix from a branch replaced the host's shared MCP install,
+and on Unity 6000.x the matrix never compiled the uGUI self-tests. This release
+makes dead batch writers read as gone, aligns the readiness guidance, and keeps
+the matrix off the host install while testing uGUI on every Unity line.
+
+### Fixed
 
 - A bridge state left by a batch process that died without quitting (SIGKILL,
   crash) no longer reads as a live non-main owner (RG-19 residual). Discovery
@@ -42,6 +45,21 @@
   `TryWritePendingCompletedResponse` under a thread-local project root override
   (`ProjectRootPathOverrideForCurrentThread`), so it never touches the live
   active-test-run file, and checks one `request_completed` per request.
+- `scripts/testing/run_unity_version_matrix.sh` no longer installs the checkout
+  into the host's neutral MCP install and Claude/Codex delegate installs. A
+  matrix run used to repoint the shared install (`.source_root`) at the branch
+  under test, so every MCP session started afterwards ran that branch. The run
+  now installs into `<run>/host-install`; `--use-host-install` opts back in.
+- The version matrix now runs the `EditModeUgui` self-tests on 6000.x. Projects
+  created there by `-createProject` have no uGUI, so that assembly never
+  compiled and its tests silently did not run. The matrix adds the `ugui` lane
+  packages to each created project through the new
+  `scaffold_unity_ci_project.py --add-ugui-to-existing`; `--no-ugui` skips it.
+- The package self-test `Render_AcceptsAnIntentionallyBlankPrefabAsAnArtifact`
+  no longer fails under `-nographics`. Without a graphics device the capture is
+  not transparent, so the test checked pixels it could not get; it now checks
+  the artifact contract there and the pixels only when a device is present, as
+  the other render tests do.
 
 ### Added
 
@@ -53,6 +71,34 @@
   them: Unity's JSON writer cannot omit an empty per-node field, and the node
   type is shared with scene snapshots and UI queries. The default snapshot is
   byte-for-byte unchanged.
+
+### Changed
+
+- Released `v0.3.90` package metadata, server metadata, package manifests, and Git UPM examples.
+
+### Validation
+
+- Host Python suite: 1508 tests ran, 1490 passed, 18 platform skips.
+- Package self-tests in clean generated projects, package from local source,
+  macOS, on Unity 2021.3.58f1, 2022.3.62f3, 6000.0.58f2, 6000.1.13f1,
+  6000.2.14f1, 6000.3.23f1, 6000.4.4f1, 6000.5.10f1 and 6000.6.0b3: EditMode
+  core 240/240, TextMeshPro 6/6, uGUI 79/79, PlayMode uGUI 22 passed and
+  6 skipped, PlayMode core 6/6 on every version. uGUI now runs on 6000.x.
+- The matrix ran with its new per-run install sandbox; the host's shared MCP
+  install was byte-identical before and after.
+- Live kill -9 of a batch Play Mode run on Unity 6000.0: the host reported
+  `process_exited` and `stale_state` while the file still said `healthy`.
+
+### Known limitations
+
+- `Unity Package CI` remains waived (no runner Unity license); the local
+  licensed runs above are the package evidence.
+- Live Unity runs were on macOS only. The new Windows and Linux launcher
+  scenarios run in CI, not on a live editor.
+- The reused-pid rule needs process visibility; without it a reused batch
+  writer pid is not reclassified.
+- Prefab snapshot nodes keep short type names; full names are in the separate
+  `component_type_full_names` rows.
 
 ## 0.3.89
 

@@ -410,7 +410,7 @@ Minimum evidence object:
   "workflowId": "post_change_validation",
   "projectRoot": "$PROJECT_ROOT",
   "unityVersion": "6000.0.58f2",
-  "packageVersion": "0.3.89",
+  "packageVersion": "0.3.90",
   "packageSourceMode": "git",
   "verdict": "pass",
   "checks": [
@@ -1225,7 +1225,7 @@ Production route:
 
 ```bash
 # First synchronize release-facing version references, for example with
-# --version 0.3.89 when preparing the next patch release.
+# --version 0.3.90 when preparing the next patch release.
 python3 scripts/tools/sync_release_version.py --version <next-version>
 python3 scripts/testing/check_release_version_consistency.py
 scripts/testing/run_host_python_tests.sh
