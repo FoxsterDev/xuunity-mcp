@@ -551,6 +551,31 @@ class ConsumerEvidenceTests(unittest.TestCase):
             self.assertIn(f"{git_root}:Unexpected.asset", result["new_unowned_dirty_paths"])
             self.assertNotIn(f"{git_root}:{relative_manifest}", result["new_unowned_dirty_paths"])
 
+    def test_workspace_side_effects_exclude_the_helpers_own_run_dir(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            ledger = make_ledger(root, [canary], canary)
+            git_root = Path(ledger["preflight"]["workspace_baselines"][0]["root"])
+            run_dir = Path(ledger["run_dir"]).resolve().relative_to(git_root.resolve()).as_posix()
+            result = rollout.workspace_side_effects(
+                ledger,
+                workspace_snapshot_fn=lambda _root: {
+                    "available": True,
+                    "root": str(git_root),
+                    "dirty_paths": [
+                        f"{run_dir}/consumer_rollout_ledger.json",
+                        f"{run_dir}/canary.unity.log",
+                        f"{run_dir}-sibling/notes.txt",
+                    ],
+                    "error_code": "",
+                },
+            )
+
+            self.assertEqual([f"{git_root}:{run_dir}-sibling/notes.txt"], result["new_unowned_dirty_paths"])
+            self.assertEqual(f"{run_dir}/", result["workspaces"][0]["own_run_dir"])
+            self.assertEqual(2, result["workspaces"][0]["own_run_dir_path_count"])
+
     def test_worker_packet_is_exact_and_denies_diagnosis_release_and_kill(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

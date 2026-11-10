@@ -1102,6 +1102,25 @@ def allowed_owned_package_paths(ledger: dict[str, Any], git_root: Path) -> set[s
     return allowed
 
 
+def run_dir_relative_prefix(ledger: dict[str, Any], git_root: Path) -> str:
+    run_dir = str(ledger.get("run_dir") or "")
+    if not run_dir:
+        return ""
+    try:
+        relative = Path(run_dir).resolve().relative_to(git_root.resolve())
+    except (OSError, ValueError):
+        return ""
+    text = relative.as_posix().strip("/")
+    return "" if text in {"", "."} else text + "/"
+
+
+def path_is_under_prefix(path: str, prefix: str) -> bool:
+    if not prefix:
+        return False
+    normalized = path.replace("\\", "/").strip('"')
+    return normalized == prefix.rstrip("/") or normalized.startswith(prefix)
+
+
 def workspace_side_effects(
     ledger: dict[str, Any],
     *,
@@ -1115,7 +1134,10 @@ def workspace_side_effects(
         baseline_paths = set(str(path) for path in baseline.get("dirty_paths") or [])
         current_paths = set(str(path) for path in current.get("dirty_paths") or [])
         allowed_paths = allowed_owned_package_paths(ledger, git_root)
+        run_dir_prefix = run_dir_relative_prefix(ledger, git_root)
         new_paths = sorted(current_paths - baseline_paths - allowed_paths) if current.get("available") else []
+        own_run_dir_paths = [path for path in new_paths if path_is_under_prefix(path, run_dir_prefix)]
+        new_paths = [path for path in new_paths if path not in own_run_dir_paths]
         if new_paths:
             all_new_paths.extend(f"{git_root}:{path}" for path in new_paths)
         rows.append(
@@ -1125,6 +1147,8 @@ def workspace_side_effects(
                 "baseline_dirty_count": len(baseline_paths),
                 "current_dirty_count": len(current_paths),
                 "allowed_owned_package_paths": sorted(allowed_paths),
+                "own_run_dir": run_dir_prefix,
+                "own_run_dir_path_count": len(own_run_dir_paths),
                 "new_unowned_dirty_paths": new_paths,
                 "error_code": str(current.get("error_code") or ""),
             }

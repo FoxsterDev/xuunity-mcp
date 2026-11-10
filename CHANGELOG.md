@@ -17,6 +17,10 @@
   name the Unity binary no longer blocks the preflight with
   `global_unity_process_conflict` (RG-24). Licensing clients are also matched
   by executable.
+- A rollout run directory inside a consumer git workspace no longer stops the
+  rollout as `new_unowned_workspace_side_effects`: the helper's own ledger,
+  logs and packets are excluded and counted as `own_run_dir_path_count`
+  (RG-23).
 
 ## 0.3.88
 
