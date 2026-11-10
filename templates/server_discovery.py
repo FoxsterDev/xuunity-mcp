@@ -513,9 +513,19 @@ def discover_project_context_state(
     host_session_pid_alive = pid_is_alive(host_session_pid) if host_session_pid > 0 else False
 
     writer_identity = inspect_bridge_state_writer_identity(bridge_state)
-    bridge_state_writer_exited = bool(bridge_state) and bridge_pid > 0 and not bridge_pid_alive
-    bridge_owned_by_non_main_process = bool(bridge_state) and (
-        (not bool(writer_identity.get("runtime_execution_allowed")) and not bridge_state_writer_exited)
+    bridge_state_writer_pid_reused = (
+        bool(bridge_state)
+        and bridge_pid_alive
+        and str(writer_identity.get("bridge_process_class") or "") == "batch"
+        and bool(process_visibility.get("process_visibility_available", True))
+        and bridge_pid not in detected_editor_pid_set
+        and bridge_pid not in detected_worker_pid_set
+    )
+    bridge_state_writer_exited = bool(bridge_state) and bridge_pid > 0 and (
+        not bridge_pid_alive or bridge_state_writer_pid_reused
+    )
+    bridge_owned_by_non_main_process = bool(bridge_state) and not bridge_state_writer_exited and (
+        not bool(writer_identity.get("runtime_execution_allowed"))
         or bridge_pid in detected_worker_pid_set
         or (
             bool(process_visibility.get("process_visibility_available", True))
@@ -630,8 +640,9 @@ def discover_project_context_state(
         "bridge_enabled": bridge_currently_enabled,
         "bridge_owned_by_non_main_process": bridge_owned_by_non_main_process,
         "bridge_state_writer_exited": bridge_state_writer_exited,
+        "bridge_state_writer_pid_reused": bridge_state_writer_pid_reused,
         "bridge_health_status_effective": effective_bridge_health_status(
-            bridge_state, pid_alive=bridge_pid_alive
+            bridge_state, pid_alive=bridge_pid_alive and not bridge_state_writer_pid_reused
         ),
         "bridge_process_class": str(writer_identity.get("bridge_process_class") or ""),
         "bridge_process_class_source": str(writer_identity.get("bridge_process_class_source") or ""),

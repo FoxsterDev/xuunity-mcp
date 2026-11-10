@@ -9,7 +9,10 @@
   `stale_bridge_state` instead of `bridge_owned_by_non_main_process`. The
   health views report `process_exited` for a dead batch writer and
   `editor_not_running` for any other dead writer, with the file's value kept as
-  `recorded_health_status`.
+  `recorded_health_status`. A batch writer pid that is alive but no longer a
+  Unity process for this project (a reused pid) counts as exited too
+  (`bridge_state_writer_pid_reused`); without process visibility the host
+  does not claim it.
 - The `editor_not_ready_bridge_not_attached` readiness timeout no longer
   contradicts setup's guidance (RG-04, F-8 item 4). It says to poll first and to
   restart only once import has settled without attachment, carries the same
