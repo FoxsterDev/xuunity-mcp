@@ -9,6 +9,11 @@
   matrix run used to repoint the shared install (`.source_root`) at the branch
   under test, so every MCP session started afterwards ran that branch. The run
   now installs into `<run>/host-install`; `--use-host-install` opts back in.
+- The version matrix now runs the `EditModeUgui` self-tests on 6000.x. Projects
+  created there by `-createProject` have no uGUI, so that assembly never
+  compiled and its tests silently did not run. The matrix adds the `ugui` lane
+  packages to each created project through the new
+  `scaffold_unity_ci_project.py --add-ugui-to-existing`; `--no-ugui` skips it.
 
 ## 0.3.89
 

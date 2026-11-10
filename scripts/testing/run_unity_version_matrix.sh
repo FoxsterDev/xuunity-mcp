@@ -9,6 +9,7 @@ PACKAGE_SELF_TESTS_SCRIPT="$PUBLIC_OPS_ROOT/templates/smoke/run_package_self_tes
 ACCEPTANCE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/interactive_acceptance_smoke.json"
 REFRESH_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/refresh_contract_smoke.json"
 COMPILE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/compile_contract_smoke.json"
+SCAFFOLD_SCRIPT="$SCRIPT_DIR/scaffold_unity_ci_project.py"
 
 ARTIFACT_ROOT="${XUUNITY_LIGHT_UNITY_MCP_VERSION_MATRIX_ROOT:-${TMPDIR:-/tmp}/xuunity-mcp-version-matrix}"
 RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')"
@@ -24,6 +25,7 @@ RECREATE_PROJECTS="false"
 LIST_DETECTED="false"
 SKIP_PACKAGE_SELF_TESTS="false"
 USE_HOST_INSTALL="false"
+ADD_UGUI="true"
 
 usage() {
   cat <<EOF
@@ -36,6 +38,8 @@ Options:
   --recreate-projects      Recreate each clean project even if it already exists for this run.
   --skip-package-self-tests Skip optional Test Framework install plus package EditMode/PlayMode self-tests.
   --list-detected          Print detected Unity versions and editor executables, then exit.
+  --no-ugui                Keep the created projects without uGUI; the EditModeUgui self-tests then do not compile or run.
+                           Default: add com.unity.ugui (and TextMeshPro before 6000) when the template lacks it.
   --use-host-install       Install this checkout into the host's real neutral and client installs.
                            Default: a per-run sandbox under the run root, so live MCP sessions keep their server.
   -h, --help               Show this help.
@@ -71,6 +75,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --use-host-install)
       USE_HOST_INSTALL="true"
+      ;;
+    --no-ugui)
+      ADD_UGUI="false"
       ;;
     -h|--help)
       usage
@@ -481,6 +488,15 @@ create_project_if_needed() {
     -logFile "$result_dir/create_project.log"
 }
 
+add_ugui_dependencies() {
+  local unity_version="$1"
+  local project_root="$2"
+  python3 "$SCAFFOLD_SCRIPT" \
+    --project-root "$project_root" \
+    --unity-version "$unity_version" \
+    --add-ugui-to-existing
+}
+
 install_mcp_package() {
   local project_root="$1"
   bash "$INIT_SCRIPT" \
@@ -540,6 +556,15 @@ run_version_matrix_entry() {
       CURRENT_LICENSE_BLOCKER_CODE="no_valid_editor_license"
       CURRENT_EFFECTIVE_EXECUTION_LANE="none"
     fi
+    write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
+    record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
+    return 0
+  fi
+
+  if [[ "$ADD_UGUI" == "true" ]] && ! add_ugui_dependencies "$unity_version" "$project_root" >"$result_dir/add_ugui.stdout.json" 2>"$result_dir/add_ugui.stderr.txt"; then
+    result="failed"
+    failed_step="add_ugui"
+    notes="adding uGUI to the created project manifest failed"
     write_json_result "$result_dir/result.json" "$result" "$unity_version" "$failed_step" "$notes"
     record_summary_row "$unity_version" "$result" "$failed_step" "$project_root" "$result_dir" "$notes"
     return 0
