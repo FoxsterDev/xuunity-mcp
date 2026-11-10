@@ -79,6 +79,14 @@
   budget (default 16384): the oldest blocks go first, then context lines of the
   newest (`context_truncated_for_byte_budget`). Context on `source: console` is
   refused (RG-50).
+- `editor_log` grep honours `includeStackTraces=false` (the default): lines
+  shaped like stack frames (namespaced Unity `Type:Method (...)` frames, frames
+  with `(at file:line)`, `(Filename: ...)` trailers, .NET `at` frames) are no
+  longer matches and are counted in `stack_frame_suppressed_count`; one search
+  used to return 26 frame lines out of 28 matches. With `includeStackTraces:
+  true` they are kept and `stack_frame_hint` appears when they are most of the
+  matches. `messagesOnly: true` (and `--messages-only`) returns each item as its
+  message plus line and context, or type for the console source (RG-20).
 
 ## 0.3.88
 

@@ -503,6 +503,7 @@ def cmd_request_console_grep(args):
                 before_lines=int(getattr(args, "before_lines", 0) or 0),
                 after_lines=int(getattr(args, "after_lines", 0) or 0),
                 max_payload_bytes=getattr(args, "max_payload_bytes", None),
+                messages_only=bool(getattr(args, "messages_only", False)),
             )
         except ValueError as exc:
             raise ToolInvocationError("invalid_editor_log_grep", str(exc)) from exc

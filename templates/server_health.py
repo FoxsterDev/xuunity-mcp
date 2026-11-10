@@ -78,6 +78,16 @@ BUILD_PIPELINE_PROGRESS_PATTERN = (
     r"(^\s*(CopyFiles|CopyDirs|CopyFile|MoveFiles|WriteFile|Compile|Link|Strip)\s)|(^\s*\[\s*\d+\s*/\s*\d+\s)"
 )
 BUILD_PIPELINE_PROGRESS = re.compile(BUILD_PIPELINE_PROGRESS_PATTERN)
+STACK_FRAME_LINE = re.compile(
+    r"^(?:"
+    r"[A-Za-z_][\w`<>+\[\],]*(?:\.[\w`<>+\[\],]+)+:[\w.`<>$|]+ ?\(.*\)(?: \(at .+\))?"
+    r"|[A-Za-z_][\w.`<>+\[\],]*:[\w.`<>$|]+ ?\(.*\) \(at .+:\d+\)"
+    r"|\(Filename: .* Line: -?\d+\)"
+    r"|\s+at .+"
+    r"|\s*#\d+ +0x[0-9A-Fa-f]+ .*"
+    r")\s*$"
+)
+STACK_FRAME_DOMINANT_RATIO = 0.5
 
 
 def _int_or_zero(value: Any) -> int:
@@ -832,6 +842,7 @@ def grep_editor_log_payload(
     before_lines: int = 0,
     after_lines: int = 0,
     max_payload_bytes: Any = None,
+    messages_only: bool = False,
 ) -> dict[str, Any]:
     pattern = str(pattern or "").strip()
     if not pattern:
@@ -902,6 +913,8 @@ def grep_editor_log_payload(
     matches: list[dict[str, Any]] = []
     excluded_count = 0
     build_pipeline_suppressed_count = 0
+    stack_frame_suppressed_count = 0
+    stack_frame_match_count = 0
     lines = text.splitlines()
     for line_index, raw_line in enumerate(lines):
         line_number = first_line_number + line_index
@@ -914,6 +927,11 @@ def grep_editor_log_payload(
         if not include_build_pipeline_noise and BUILD_PIPELINE_PROGRESS.search(line) is not None:
             build_pipeline_suppressed_count += 1
             continue
+        if STACK_FRAME_LINE.match(line) is not None:
+            if not include_stack_traces:
+                stack_frame_suppressed_count += 1
+                continue
+            stack_frame_match_count += 1
         matches.append(
             {
                 "type": "editor_log",
@@ -964,6 +982,7 @@ def grep_editor_log_payload(
         "match_count": len(matches),
         "excluded_count": excluded_count,
         "build_pipeline_suppressed_count": build_pipeline_suppressed_count,
+        "stack_frame_suppressed_count": stack_frame_suppressed_count,
         "items": visible_matches,
         "truncated": truncated,
         "searched_tail_chars": max_chars,
@@ -1000,11 +1019,34 @@ def grep_editor_log_payload(
     }
     if search_verdict == "inconclusive" and scope_truncated:
         payload["recommended_next_action"] = EDITOR_LOG_PARTIAL_SCOPE_RECOVERY_ACTION
+    if matches and stack_frame_match_count / len(matches) > STACK_FRAME_DOMINANT_RATIO:
+        payload["stack_frame_hint"] = (
+            f"{stack_frame_match_count} of {len(matches)} matches are stack-frame lines; "
+            "pass includeStackTraces=false to keep only log messages."
+        )
     if before_lines or after_lines:
         payload["context_lines"] = {"before": before_lines, "after": after_lines}
     if before_lines or after_lines or max_payload_bytes is not None:
         payload = apply_console_tail_byte_budget(payload, max_payload_bytes)
-    return payload
+    return project_console_messages_only(payload) if messages_only else payload
+
+
+MESSAGES_ONLY_ITEM_FIELDS = ("type", "message", "line", "context_first_line", "context_before", "context_after")
+
+
+def project_console_messages_only(payload: dict[str, Any]) -> dict[str, Any]:
+    projected = dict(payload or {})
+    items = []
+    for item in projected.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        compact = {field: item[field] for field in MESSAGES_ONLY_ITEM_FIELDS if item.get(field) not in (None, "", [])}
+        if compact.get("type") == "editor_log":
+            compact.pop("type")
+        items.append(compact)
+    projected["items"] = items
+    projected["items_projection"] = "messages_only"
+    return projected
 
 
 def _with_grep_context(

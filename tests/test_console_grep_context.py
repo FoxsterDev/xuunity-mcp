@@ -102,5 +102,55 @@ class ConsoleGrepContextTests(unittest.TestCase):
                 )
 
 
+class ConsoleGrepStackFrameTests(unittest.TestCase):
+    FRAMES = [
+        "[Logger] LevelCompleted level=3",
+        "UnityEngine.Debug:Log (object)",
+        "Game.Logging.Logger:Info (string) (at Assets/Logging/Logger.cs:41)",
+        "UnityEngine.UIElements.UIElementsUtility:DoDispatch (UnityEngine.UIElements.BaseVisualElementPanel)",
+        "(Filename: Assets/Logging/Logger.cs Line: 41)",
+        "  at Game.Flow.Level.Complete () [0x00000] in <abc>:0",
+        "Login:Start (LevelCompleted retry)",
+    ]
+
+    def setUp(self) -> None:
+        self._temp = tempfile.TemporaryDirectory()
+        self.root = Path(self._temp.name)
+        self.log = self.root / "Editor.log"
+        self.log.write_text("\n".join(self.FRAMES) + "\n", encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self._temp.cleanup()
+
+    def test_frame_lines_are_dropped_unless_stack_traces_are_requested(self) -> None:
+        payload = server_health.grep_editor_log_payload(self.root, self.log, pattern="LevelCompleted|Logger|UIElements|Level", regex=True)
+
+        self.assertEqual(
+            ["[Logger] LevelCompleted level=3", "Login:Start (LevelCompleted retry)"],
+            [item["message"] for item in payload["items"]],
+        )
+        self.assertEqual(4, payload["stack_frame_suppressed_count"])
+        self.assertNotIn("stack_frame_hint", payload)
+
+        kept = server_health.grep_editor_log_payload(
+            self.root, self.log, pattern="LevelCompleted|Logger|UIElements|Level", regex=True, include_stack_traces=True
+        )
+        self.assertEqual(6, kept["match_count"])
+        self.assertEqual(0, kept["stack_frame_suppressed_count"])
+        self.assertIn("4 of 6 matches are stack-frame lines", kept["stack_frame_hint"])
+
+    def test_messages_only_returns_message_and_line(self) -> None:
+        payload = server_health.grep_editor_log_payload(self.root, self.log, pattern="LevelCompleted", messages_only=True)
+
+        self.assertEqual("messages_only", payload["items_projection"])
+        self.assertEqual({"message": "[Logger] LevelCompleted level=3", "line": 1}, payload["items"][0])
+
+    def test_messages_only_projection_of_console_items_keeps_type_and_message(self) -> None:
+        projected = server_health.project_console_messages_only(
+            {"items": [{"type": "error", "message": "boom", "timestamp": "t", "stack_trace": "frames"}]}
+        )
+        self.assertEqual([{"type": "error", "message": "boom"}], projected["items"])
+
+
 if __name__ == "__main__":
     unittest.main()

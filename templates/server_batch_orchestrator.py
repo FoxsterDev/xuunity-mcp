@@ -45,6 +45,7 @@ from server_health import (
     EDITOR_LOG_GREP_MAX_CHARS,
     FRESH_HEARTBEAT_MAX_AGE_SECONDS,
     annotate_console_grep_false_empty,
+    project_console_messages_only,
     annotate_console_tail_payload,
     apply_console_tail_byte_budget,
     build_editor_log_identity,
@@ -1844,6 +1845,9 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         raise JsonRpcError(-32602, "maxPayloadBytes must be an integer when provided.")
     if source == "console" and (before_lines or after_lines):
         raise JsonRpcError(-32602, "beforeLines/afterLines require source=editor_log; console entries have no adjacent lines.")
+    messages_only = arguments.get("messagesOnly", False)
+    if not isinstance(messages_only, bool):
+        raise JsonRpcError(-32602, "messagesOnly must be a boolean.")
 
     include_types = _optional_string_list_argument(arguments, "includeTypes")
     since = _editor_log_since_argument(arguments)
@@ -1886,6 +1890,7 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 before_lines=before_lines,
                 after_lines=after_lines,
                 max_payload_bytes=max_payload_bytes,
+                messages_only=messages_only,
             )
         except ValueError as exc:
             raise JsonRpcError(-32602, str(exc)) from exc
@@ -1914,6 +1919,8 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             payload = {}
         if isinstance(payload, dict):
             payload = annotate_console_grep_false_empty(payload, include_types or [])
+            if messages_only:
+                payload = project_console_messages_only(payload)
             response = dict(response)
             response["payload_json"] = json.dumps(payload, ensure_ascii=True)
     return bridge_response_to_tool_result(response)

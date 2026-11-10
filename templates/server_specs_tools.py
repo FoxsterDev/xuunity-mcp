@@ -1613,7 +1613,21 @@ TOOLS: dict[str, dict[str, Any]] = {
                 },
                 "regex": {"type": "boolean", "default": False},
                 "ignoreCase": {"type": "boolean", "default": True},
-                "includeStackTraces": {"type": "boolean", "default": False},
+                "includeStackTraces": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "With source=editor_log and false, Editor.log lines shaped like stack frames (Unity "
+                        "Namespace.Type:Method frames, (Filename: ...) trailers, .NET 'at' frames) are not matches; "
+                        "they are counted in stack_frame_suppressed_count. With true they are kept, and "
+                        "stack_frame_hint appears when they are most of the matches."
+                    )
+                },
+                "messagesOnly": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Return each item as its message (plus line and context for editor_log, type for console) without empty metadata."
+                },
                 "limit": {"type": "integer", "default": 20, "minimum": 1},
                 "maxSearchChars": {
                     "type": "integer",
