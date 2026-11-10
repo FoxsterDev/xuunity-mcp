@@ -1051,6 +1051,81 @@ def _compact_project_action_currency_payload(payload: dict[str, Any], operation:
     return compact
 
 
+COMPACT_UI_QUERY_PAYLOAD_TYPES = {"unity.ui.query", "unity.ui.exists", "unity.ui.get_text"}
+COMPACT_UI_NODE_FIELDS = ("path", "name", "type", "scene_name", "components", "active_in_hierarchy", "visible")
+COMPACT_UI_NODE_FIELDS_WHEN_SET = (
+    "visible_via_descendant",
+    "visible_descendant_path",
+    "pointer_target_status",
+    "clipped_by",
+    "children_truncated",
+)
+COMPACT_UI_QUERY_DROPPED_FIELDS = ("component_detail_backends",)
+
+
+def compact_ui_node(node: dict[str, Any]) -> dict[str, Any]:
+    compact = {key: node[key] for key in COMPACT_UI_NODE_FIELDS if key in node}
+    for key in COMPACT_UI_NODE_FIELDS_WHEN_SET:
+        value = node.get(key)
+        if value and value != "not_evaluated":
+            compact[key] = value
+    if node.get("interactable_known"):
+        compact["interactable"] = bool(node.get("interactable"))
+    if node.get("has_bounds"):
+        compact["bounds"] = node.get("bounds")
+    if node.get("has_text"):
+        compact["text"] = node.get("text")
+    alpha = node.get("effective_alpha")
+    if isinstance(alpha, (int, float)) and alpha < 1:
+        compact["effective_alpha"] = alpha
+    clip_state = str(node.get("clip_state") or "")
+    if clip_state and clip_state not in {"not_evaluated", "not_clipped"}:
+        compact["clip_state"] = clip_state
+    return compact
+
+
+COMPACT_PREFAB_REFUSAL_PAYLOAD_TYPES = {"unity.prefab.mutate", "unity.prefab.create"}
+COMPACT_PREFAB_REFUSAL_FIELDS = (
+    "operation",
+    "success",
+    "status",
+    "prefab_path",
+    "preview_only",
+    "drift_guard",
+    "requested_operation_count",
+    "errors",
+    "warnings",
+    "recommended_next_action",
+)
+
+
+def compact_prefab_refusal_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    compact = {key: payload[key] for key in COMPACT_PREFAB_REFUSAL_FIELDS if key in payload}
+    compact["payload_mode"] = "compact_refusal"
+    compact["full_payload_available"] = True
+    compact["full_payload_tool_arguments"] = {"includeFullPayload": True}
+    return compact
+
+
+def is_prefab_refusal_before_any_change(payload: dict[str, Any]) -> bool:
+    return (
+        str(payload.get("status") or "") == "blocked"
+        and not payload.get("changes")
+        and bool(payload.get("errors"))
+    )
+
+
+def compact_ui_query_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    compact = {key: value for key, value in payload.items() if key not in COMPACT_UI_QUERY_DROPPED_FIELDS}
+    matches = payload.get("matches")
+    if isinstance(matches, list):
+        compact["matches"] = [compact_ui_node(node) if isinstance(node, dict) else node for node in matches]
+    compact["payload_mode"] = "compact_ui_query"
+    compact["full_payload_available"] = True
+    compact["full_payload_tool_arguments"] = {"includeFullPayload": True}
+    return compact
+
+
 def compact_operation_payload(payload: dict[str, Any], operation: str) -> dict[str, Any]:
     if operation in {"unity.compile.player_scripts", "unity.compile.matrix"}:
         return _compact_compile_payload(payload, operation)
@@ -1100,6 +1175,15 @@ def bridge_response_to_tool_result(
                 payload.update(editor_open_attribution)
         elif payload_type in {"unity.scenario.run", "unity.scenario.result"} and isinstance(payload, dict):
             payload = normalize_scenario_payload(payload, scenario_terminal_statuses)
+        if not include_full_payload and payload_type in COMPACT_UI_QUERY_PAYLOAD_TYPES and isinstance(payload, dict):
+            payload = compact_ui_query_payload(payload)
+        if (
+            not include_full_payload
+            and payload_type in COMPACT_PREFAB_REFUSAL_PAYLOAD_TYPES
+            and isinstance(payload, dict)
+            and is_prefab_refusal_before_any_change(payload)
+        ):
+            payload = compact_prefab_refusal_payload(payload)
 
         if (
             not include_full_payload

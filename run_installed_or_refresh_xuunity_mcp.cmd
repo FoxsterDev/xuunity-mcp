@@ -25,10 +25,19 @@ echo PYTHON is set to "%XUUNITY_PYTHON_OVERRIDE%" but it is not a working Python
 exit /b 9009
 
 :xuunity_try_venv
-if not exist "%SCRIPT_DIR%.venv\Scripts\python.exe" goto xuunity_try_py
+if not exist "%SCRIPT_DIR%.venv\Scripts\python.exe" goto xuunity_try_neutral_venv
 call :xuunity_probe "%SCRIPT_DIR%.venv\Scripts\python.exe"
-if errorlevel 1 goto xuunity_try_py
+if errorlevel 1 goto xuunity_try_neutral_venv
 set "XUUNITY_PYTHON_CMD="%SCRIPT_DIR%.venv\Scripts\python.exe""
+goto xuunity_run
+
+:xuunity_try_neutral_venv
+set "XUUNITY_NEUTRAL_DIR=%APPDATA%\xuunity-mcp"
+if defined XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR set "XUUNITY_NEUTRAL_DIR=%XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR%"
+if not exist "%XUUNITY_NEUTRAL_DIR%\.venv\Scripts\python.exe" goto xuunity_try_py
+call :xuunity_probe "%XUUNITY_NEUTRAL_DIR%\.venv\Scripts\python.exe"
+if errorlevel 1 goto xuunity_try_py
+set "XUUNITY_PYTHON_CMD="%XUUNITY_NEUTRAL_DIR%\.venv\Scripts\python.exe""
 goto xuunity_run
 
 :xuunity_try_py

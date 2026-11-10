@@ -13,8 +13,14 @@ def tool_error_result(
     exc: Exception,
     *,
     build_tool_error_payload: Callable[[Exception], dict[str, Any]],
+    include_full_payload: bool = False,
+    expand_full_error_payload: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     payload = build_tool_error_payload(exc)
+    if include_full_payload and expand_full_error_payload is not None:
+        payload = expand_full_error_payload(payload)
+    elif str(payload.get("request_final_status_payload_mode") or "") == "compact_transport_failure":
+        payload["full_payload_tool_arguments"] = {"includeFullPayload": True}
     return {
         "content": [
             {
@@ -527,6 +533,7 @@ def call_tool(
     invoke_bridge: Callable[[str, str, dict[str, Any], int], dict[str, Any]],
     build_tool_error_payload: Callable[[Exception], dict[str, Any]],
     bridge_response_to_tool_result: Callable[[dict[str, Any]], dict[str, Any]],
+    expand_full_error_payload: Callable[[Path, dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if name not in tools:
         raise JsonRpcError(-32601, f"Unknown tool: {name}")
@@ -571,6 +578,15 @@ def call_tool(
     try:
         response = invoke_bridge(str(resolved_project_root), tool["bridgeOperation"], bridge_args, timeout_ms)
     except tool_invocation_error_type as exc:
-        return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
+        return tool_error_result(
+            exc,
+            build_tool_error_payload=build_tool_error_payload,
+            include_full_payload=include_full_payload,
+            expand_full_error_payload=(
+                (lambda payload: expand_full_error_payload(resolved_project_root, payload))
+                if expand_full_error_payload is not None
+                else None
+            ),
+        )
 
     return bridge_response_to_tool_result(response, include_full_payload=include_full_payload)

@@ -934,7 +934,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "operations": {
                     "type": "array",
                     "items": {"type": "object"},
-                    "description": "Typed operations [{op, path, componentType, propertyPath, stringValue|numberValue|boolValue|x,y,z,w, templatePath, childName, siblingIndex, afterSibling, assetSubAssetName, valueKind}]. create_child adds an empty child (RectTransform under UI) named childName; create_child_from_template nests a prefab instance; both honour siblingIndex or afterSibling. set_rect_transform propertyPath: anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax, localScale, or stretch (full-parent fill). On an enum property, numberValue is the member index and stringValue is the member name. On an asset-typed object reference, stringValue is a project-relative asset path or a 32-character GUID, optionally with assetSubAssetName (or a path#SubAsset suffix) for a sub-asset such as a sliced sprite. A plain path or GUID whose main asset does not fit the field resolves to its only sub-asset that does, such as the sprite of a single-sprite texture; valueKind=\"null\" clears the reference."
+                    "description": "Typed operations [{op, path, componentType, propertyPath, stringValue|numberValue|boolValue|x,y,z,w, templatePath, childName, siblingIndex, afterSibling, assetSubAssetName, valueKind}]. create_child adds an empty child (RectTransform under UI) named childName; create_child_from_template nests a prefab instance; both honour siblingIndex or afterSibling. set_rect_transform propertyPath: anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax, localScale, or stretch (full-parent fill). On an enum property, numberValue is the member index and stringValue is the member name. On an asset-typed object reference, stringValue is a project-relative asset path or a 32-character GUID, optionally with assetSubAssetName (or a path#SubAsset suffix) for a sub-asset such as a sliced sprite. A plain path or GUID whose main asset does not fit the field resolves to its only sub-asset that does, such as the sprite of a single-sprite texture; valueKind=\"null\" clears the reference. componentType is a full name (UnityEngine.UI.Image), an assembly-qualified name, or a short name that names exactly one component type; an ambiguous short name is refused as prefab_mutation_component_type_ambiguous with the candidates."
                 },
                 "previewOnly": {"type": "boolean", "default": True},
                 "approve": {
@@ -950,6 +950,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Extra component types this transaction may add or remove, on top of the built-in layout allowlist."
+                },
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "A refusal before any change (operation limit, missing prefab, drifted hash) returns only its status, errors and next action; true adds the timing, artifact and validation blocks."
                 },
                 "timeoutMs": {"type": "integer", "default": 60000, "minimum": 1000}
             },
@@ -983,6 +988,11 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "previewOnly": {"type": "boolean", "default": True},
                 "approve": {"type": "boolean", "default": False},
                 "overwrite": {"type": "boolean", "default": False},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "A refusal before any change (operation limit, missing prefab, drifted hash) returns only its status, errors and next action; true adds the timing, artifact and validation blocks."
+                },
                 "timeoutMs": {"type": "integer", "default": 60000, "minimum": 1000}
             },
             "required": ["projectRoot", "prefabPath"]
@@ -1148,6 +1158,15 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
                 "maxMatches": {"type": "integer", "default": 20, "minimum": 1},
                 "includeInactive": {"type": "boolean", "default": False},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Matched nodes come back compact by default: path, name, type, scene, components, "
+                        "activity, visibility, interactability, pointer status, bounds and text, with "
+                        "default-valued and render-detail fields left out. true returns every node field."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector"]
@@ -1194,6 +1213,15 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "includeInactive": {"type": "boolean", "default": False},
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Matched nodes come back compact by default: path, name, type, scene, components, "
+                        "activity, visibility, interactability, pointer status, bounds and text, with "
+                        "default-valued and render-detail fields left out. true returns every node field."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector"]
@@ -1242,6 +1270,15 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "includeInactive": {"type": "boolean", "default": False},
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "Matched nodes come back compact by default: path, name, type, scene, components, "
+                        "activity, visibility, interactability, pointer status, bounds and text, with "
+                        "default-valued and render-detail fields left out. true returns every node field."
+                    )
+                },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },
             "required": ["projectRoot", "selector"]
@@ -1613,7 +1650,21 @@ TOOLS: dict[str, dict[str, Any]] = {
                 },
                 "regex": {"type": "boolean", "default": False},
                 "ignoreCase": {"type": "boolean", "default": True},
-                "includeStackTraces": {"type": "boolean", "default": False},
+                "includeStackTraces": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "With source=editor_log and false, Editor.log lines shaped like stack frames (Unity "
+                        "Namespace.Type:Method frames, (Filename: ...) trailers, .NET 'at' frames) are not matches; "
+                        "they are counted in stack_frame_suppressed_count. With true they are kept, and "
+                        "stack_frame_hint appears when they are most of the matches."
+                    )
+                },
+                "messagesOnly": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Return each item as its message (plus line and context for editor_log, type for console) without empty metadata."
+                },
                 "limit": {"type": "integer", "default": 20, "minimum": 1},
                 "maxSearchChars": {
                     "type": "integer",
@@ -1655,6 +1706,28 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "sinceRequestId": {
                     "type": "string",
                     "description": "Request id to anchor on when since=request_id. Ignored for other anchors."
+                },
+                "beforeLines": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 20,
+                    "description": "source=editor_log only: Editor.log lines returned before each match as context_before."
+                },
+                "afterLines": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 20,
+                    "description": (
+                        "source=editor_log only: Editor.log lines returned after each match as context_after, for "
+                        "structured lines that follow a log message. Each match is its own block; the result stays "
+                        "inside maxPayloadBytes by dropping the oldest blocks, then context lines of the newest."
+                    )
+                },
+                "maxPayloadBytes": {
+                    "type": "integer",
+                    "description": "Byte budget for the returned items (default 16384 when context lines are requested; negative disables)."
                 },
                 "timeoutMs": {"type": "integer", "default": 5000, "minimum": 1000}
             },

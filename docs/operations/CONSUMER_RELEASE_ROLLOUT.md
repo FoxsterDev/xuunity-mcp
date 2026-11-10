@@ -50,6 +50,14 @@ python3 scripts/testing/run_consumer_rollout.py plan \
   --run-dir /path/to/private-rollout-evidence
 ```
 
+Some projects rewrite a file on every batch import, for example a generated
+settings asset or a scripting-define list. Declare each such file with a
+repeatable `--expected-churn <glob>`, relative to the git root or to a project
+root. A matching new dirty path is reported under `expected_churn_paths` and
+does not stop the run; any other new path still does. Keep the globs to single
+files. `resume-project` accepts the same option for churn found mid-run, so the
+ledger never needs a manual edit.
+
 `--unity-app` accepts the Unity application/install path understood by the
 normal XUUnity host discovery. Every included project must declare the same
 exact Unity editor version in `ProjectSettings/ProjectVersion.txt`.
@@ -91,6 +99,20 @@ rows intact and pending rows in the ledger.
 
 The per-project timeout is clamped to the remaining overall deadline. If the
 deadline expires after the canary, the helper stops before portfolio fan-out.
+
+Batch compiles leave detached `VBCSCompiler` servers behind. After each
+project the helper records every compiler server that was not running at
+planning time in the ledger's `compiler_servers`. When the run completes, it
+closes the ones whose command still matches the recorded one and lives under
+the selected Unity install; a server from another install, a changed command,
+or any live Unity editor (which may share the server) leaves them open. The
+compact summary reports `compiler_servers_open`. After a stopped run, close them
+with:
+
+```bash
+python3 scripts/testing/run_consumer_rollout.py close-compiler-servers \
+  --ledger /path/to/private-rollout-evidence/consumer_rollout_ledger.json
+```
 
 ## Resume After Root Review
 

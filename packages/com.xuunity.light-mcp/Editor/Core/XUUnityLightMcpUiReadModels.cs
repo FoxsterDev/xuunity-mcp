@@ -501,6 +501,7 @@ namespace XUUnity.LightMcp.Editor.Core
         public string property_path = "";
         public string expected_type = "";
         public string observed_type = "";
+        public string observed_type_full_name = "";
         public string message = "";
     }
 

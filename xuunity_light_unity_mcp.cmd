@@ -6,7 +6,7 @@ if not defined XUUNITY_LIGHT_UNITY_MCP_LAUNCHER_NAME set "XUUNITY_LIGHT_UNITY_MC
 if not defined PYTHONUTF8 set "PYTHONUTF8=1"
 set "XUUNITY_PYTHON_CMD="
 
-if not defined PYTHON goto xuunity_try_py
+if not defined PYTHON goto xuunity_try_neutral_venv
 
 set "XUUNITY_PYTHON_OVERRIDE=%PYTHON:"=%"
 if /i "%XUUNITY_PYTHON_OVERRIDE%"=="py -3" goto xuunity_override_is_py
@@ -24,6 +24,15 @@ goto xuunity_run
 :xuunity_override_failed
 echo PYTHON is set to "%XUUNITY_PYTHON_OVERRIDE%" but it is not a working Python 3.10+ interpreter. 1>&2
 exit /b 9009
+
+:xuunity_try_neutral_venv
+set "XUUNITY_NEUTRAL_DIR=%APPDATA%\xuunity-mcp"
+if defined XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR set "XUUNITY_NEUTRAL_DIR=%XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR%"
+if not exist "%XUUNITY_NEUTRAL_DIR%\.venv\Scripts\python.exe" goto xuunity_try_py
+call :xuunity_probe "%XUUNITY_NEUTRAL_DIR%\.venv\Scripts\python.exe"
+if errorlevel 1 goto xuunity_try_py
+set "XUUNITY_PYTHON_CMD="%XUUNITY_NEUTRAL_DIR%\.venv\Scripts\python.exe""
+goto xuunity_run
 
 :xuunity_try_py
 call :xuunity_probe py -3

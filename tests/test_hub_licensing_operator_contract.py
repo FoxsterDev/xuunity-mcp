@@ -80,6 +80,23 @@ class HubLicensingResolutionTests(unittest.TestCase):
                     self.assertTrue(evidence["editor_live"])
                     self.assertEqual(licensed, evidence["licensed_editor_live"])
 
+    def test_license_probe_does_not_count_its_own_unity_app_argument_as_a_live_editor(self):
+        import server_host_platform
+        unity = "/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity"
+        report = process_report("macos", [
+            {"pid": 30, "ppid": 1, "command": f"/opt/homebrew/bin/python3 /x/xuunity_light_unity_mcp.py license-capabilities --unity-app {unity} --refresh"},
+            {"pid": 31, "ppid": 1, "command": f"/bin/zsh -c {unity} -projectPath /tmp/P"},
+            {"pid": 32, "ppid": 1, "command": f"python3 run_unity_version_matrix.py --unity-app '{unity}'"},
+        ])
+        adapter = mock.Mock(platform_kind="macos")
+        adapter.list_process_commands_report.return_value = report
+        adapter.pid_is_alive.return_value = True
+        with (mock.patch.object(server_host_platform, "current_host_platform_adapter", return_value=adapter),
+              mock.patch.object(server_hub_licensing, "current_host_platform_adapter", return_value=adapter)):
+            evidence = server_licensing_state.live_editor_licensing_evidence()
+        self.assertFalse(evidence["editor_live"])
+        self.assertFalse(evidence["licensed_editor_live"])
+
     def test_shared_bridge_recovery_uses_only_accepted_helper_verbs(self):
         import argparse
         parser = server_cli_parser.build_parser()

@@ -359,12 +359,31 @@ def build_discovery_status_summary_for_error_data(
         include_full_payload=include_full_payload,
     )
     if exc is not None:
+        details = enrich_error_details_with_discovery(project_root, exc.details)
         summary["error"] = {
             "code": exc.code,
             "message": exc.message,
-            "details": enrich_error_details_with_discovery(project_root, exc.details),
+            "details": details if include_full_payload else compact_status_error_details(details),
         }
     return summary
+
+
+def compact_status_error_details(details: dict[str, Any] | None) -> dict[str, Any]:
+    details = dict(details or {})
+    stale = dict(details.get("stale_request_artifacts") or {})
+    diagnosis = dict(details.get("editor_log_diagnosis") or {})
+    compact = {
+        key: details[key]
+        for key in ("recommended_next_action", "recommended_recovery_command", "manual_action")
+        if details.get(key)
+    }
+    if stale:
+        compact["stale_request_artifact_count"] = int(stale.get("candidate_count") or 0)
+        compact["stale_request_artifact_classifications"] = stale.get("classifications") or {}
+    if diagnosis.get("classification"):
+        compact["editor_log_classification"] = str(diagnosis.get("classification"))
+    compact["details_omitted"] = "top-level summary fields carry the rest; pass includeFullPayload=true for every detail"
+    return compact
 
 
 def build_scenario_result_summary_from_context_data(

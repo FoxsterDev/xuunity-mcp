@@ -1066,7 +1066,10 @@ def build_test_verdict_summary(
         test_verdict = "unity_unproven"
 
     playmode_state = str((active_state or {}).get("playmode_state") or "")
-    cleanup_recommended = test_verdict in {"runtime_timeout", "unity_unproven", "in_progress"} and playmode_state in {
+    run_still_active = test_verdict == "in_progress" or (
+        run_phase in {"started", "running"} and not runtime_timeout_observed and not source_completed
+    )
+    cleanup_recommended = not run_still_active and test_verdict in {"runtime_timeout", "unity_unproven"} and playmode_state in {
         "playing",
         "paused",
         "will_enter_playmode",
@@ -1105,14 +1108,23 @@ def build_test_verdict_summary(
         or 0
     )
     elapsed_runtime_seconds = None
-    baseline_timestamp = str(
-        (source_payload or {}).get("last_progress_at_utc")
-        or (source_payload or {}).get("started_at_utc")
-        or ""
+    seconds_since_last_progress = None
+    started_unix = parse_journal_utc_timestamp(str((source_payload or {}).get("started_at_utc") or ""))
+    if started_unix > 0:
+        elapsed_runtime_seconds = round(max(0.0, time.time() - started_unix), 3)
+    progress_unix = parse_journal_utc_timestamp(str((source_payload or {}).get("last_progress_at_utc") or ""))
+    if progress_unix > 0:
+        seconds_since_last_progress = round(max(0.0, time.time() - progress_unix), 3)
+    reported_timeout_classification = (
+        timeout_classification
+        if (
+            explicit_timeout_classification
+            or runtime_timeout_observed
+            or test_verdict == "runtime_timeout"
+            or (source_payload is not None and not source_completed and _runtime_deadline_expired(source_payload))
+        )
+        else ""
     )
-    baseline_unix = parse_journal_utc_timestamp(baseline_timestamp)
-    if baseline_unix > 0:
-        elapsed_runtime_seconds = round(max(0.0, time.time() - baseline_unix), 3)
 
     recommended_recovery_command = (
         render_launcher_cli("request-project-refresh", project_root, "--timeout-ms", "180000")
@@ -1150,9 +1162,10 @@ def build_test_verdict_summary(
         "last_finished_test": str((source_payload or {}).get("last_finished_test") or ""),
         "last_progress_at_utc": str((source_payload or {}).get("last_progress_at_utc") or ""),
         "runtime_timeout_observed": runtime_timeout_observed or test_verdict == "runtime_timeout",
-        "timeout_classification": timeout_classification,
+        "timeout_classification": reported_timeout_classification,
         "runtime_timeout_ms": max(0, runtime_timeout_ms),
         "elapsed_runtime_seconds": elapsed_runtime_seconds,
+        "seconds_since_last_progress": seconds_since_last_progress,
         "lifecycle_churn_observed": bool((source_payload or {}).get("lifecycle_churn_observed")) or bridge_changed_since_submission,
         "editor_cleanup_recommended": cleanup_recommended,
         "cleanup_command": (
@@ -1403,6 +1416,8 @@ def build_lifecycle_reset_tool_error(
         "recommended_next_action": recommended_next_action,
         "result_trust_class": result_trust_class,
         "recommended_recovery_command": recommended_recovery_command,
+        "recovery_tool": "unity_request_final_status",
+        "recovery_tool_arguments": {"projectRoot": str(project_root), "requestId": request_id},
         "initial_bridge_generation": initial_bridge_generation,
         "initial_bridge_session_id": initial_bridge_session_id,
         "current_bridge_generation": current_generation,

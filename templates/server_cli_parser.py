@@ -256,6 +256,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bound the editor_log search to the current session. Editor.log spans multiple editor and play sessions, so an unanchored match may predate this run.",
     )
     console_grep_cmd.add_argument("--since-request-id", default="", help="Request id to anchor on when --since request_id.")
+    console_grep_cmd.add_argument("--before-lines", type=int, default=0, help="Editor.log lines before each match (0..20).")
+    console_grep_cmd.add_argument("--after-lines", type=int, default=0, help="Editor.log lines after each match (0..20).")
+    console_grep_cmd.add_argument("--max-payload-bytes", type=int, default=None)
+    console_grep_cmd.add_argument("--messages-only", action="store_true", help="Return each match as its message and line only.")
     console_grep_cmd.add_argument("--timeout-ms", type=int, default=5000)
     console_grep_cmd.set_defaults(func_name="cmd_request_console_grep")
 

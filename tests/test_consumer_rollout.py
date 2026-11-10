@@ -275,6 +275,23 @@ class ConsumerPreflightTests(unittest.TestCase):
             self.assertIn("global_unity_process_conflict", {row["code"] for row in preflight["blockers"]})
             license_probe.assert_not_called()
 
+    def test_preflight_ignores_unity_paths_in_arguments_of_other_processes(self) -> None:
+        unity = "/Applications/Unity/Unity.app/Contents/MacOS/Unity"
+        report = {
+            "available": True,
+            "commands": [
+                (8201, f"/bin/zsh -c {unity} -batchmode -projectPath /private/other-project"),
+                (8202, f"/usr/bin/python3 run_consumer_rollout.py plan --unity-app {unity}"),
+                (8203, "/usr/bin/python3 helper.py --label '/opt/Unity Licensing Client/UnityLicensingClient'"),
+                (8204, f"{unity} -projectPath /private/other-project"),
+                (8205, "/Applications/Unity Hub.app/Contents/Frameworks/UnityLicensingClient_V1.app/Contents/MacOS/Unity.Licensing.Client"),
+            ],
+        }
+        rows = rollout.relevant_unity_processes(report)
+        self.assertEqual({8204: "main_editor"}, {row["pid"]: row["role"] for row in rows if row["role"] != "launcher"})
+        report["commands"] = report["commands"][:3]
+        self.assertEqual([], rollout.relevant_unity_processes(report))
+
     def test_preflight_proves_writes_visibility_and_batch_license(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -533,6 +550,143 @@ class ConsumerEvidenceTests(unittest.TestCase):
             self.assertEqual("needs_smart_escalation", result["status"])
             self.assertIn(f"{git_root}:Unexpected.asset", result["new_unowned_dirty_paths"])
             self.assertNotIn(f"{git_root}:{relative_manifest}", result["new_unowned_dirty_paths"])
+
+    def test_workspace_side_effects_exclude_the_helpers_own_run_dir(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            ledger = make_ledger(root, [canary], canary)
+            git_root = Path(ledger["preflight"]["workspace_baselines"][0]["root"])
+            run_dir = Path(ledger["run_dir"]).resolve().relative_to(git_root.resolve()).as_posix()
+            result = rollout.workspace_side_effects(
+                ledger,
+                workspace_snapshot_fn=lambda _root: {
+                    "available": True,
+                    "root": str(git_root),
+                    "dirty_paths": [
+                        f"{run_dir}/consumer_rollout_ledger.json",
+                        f"{run_dir}/canary.unity.log",
+                        f"{run_dir}-sibling/notes.txt",
+                    ],
+                    "error_code": "",
+                },
+            )
+
+            self.assertEqual([f"{git_root}:{run_dir}-sibling/notes.txt"], result["new_unowned_dirty_paths"])
+            self.assertEqual(f"{run_dir}/", result["workspaces"][0]["own_run_dir"])
+            self.assertEqual(2, result["workspaces"][0]["own_run_dir_path_count"])
+
+    def test_compiler_servers_left_by_batch_compiles_are_recorded_and_closed_at_completion(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            follower = create_consumer(root, "Follower")
+            ledger = make_ledger(root, [canary, follower], canary)
+            install = root.resolve() / "Unity.app"
+            vbcs = (
+                f"{install}/Contents/NetCoreRuntime/dotnet exec "
+                f"{install}/Contents/DotNetSdkRoslyn/VBCSCompiler.dll -pipename:abc"
+            )
+            foreign = "/opt/dotnet/dotnet exec /opt/sdk/VBCSCompiler.dll -pipename:other"
+            ledger["preflight"]["compiler_servers_at_preflight"] = [700]
+            report = {
+                "available": True,
+                "commands": [(700, vbcs), (701, vbcs), (702, foreign), (703, "/usr/bin/python3 grep VBCSCompiler")],
+            }
+            terminated: list[int] = []
+            result = rollout.execute_rollout(
+                ledger,
+                runner=fake_runner_factory({}, []),
+                workspace_snapshot_fn=clean_workspace_snapshot,
+                process_report_fn=lambda: report,
+                terminate_fn=lambda pid, _timeout: terminated.append(pid) or True,
+            )
+
+            self.assertEqual("completed", result["status"])
+            statuses = {row["pid"]: row["status"] for row in result["compiler_servers"]}
+            self.assertEqual({701: "closed", 702: "left_open_identity_unproven"}, statuses)
+            self.assertEqual([701], terminated)
+            self.assertEqual("Canary", next(
+                row for row in result["projects"] if row["project_id"] == result["compiler_servers"][0]["first_seen_after_project_id"]
+            )["project"])
+            self.assertEqual(1, rollout.compact_projection(result)["compiler_servers_open"])
+
+    def test_compiler_servers_stay_open_while_a_unity_editor_is_live(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            ledger = make_ledger(root, [canary], canary)
+            install = root.resolve() / "Unity.app"
+            vbcs = f"{install}/Contents/NetCoreRuntime/dotnet exec {install}/Contents/DotNetSdkRoslyn/VBCSCompiler.dll"
+            ledger["compiler_servers"] = [
+                {"pid": 801, "command": vbcs, "unity_install_match": True, "status": "open"}
+            ]
+            report = {
+                "available": True,
+                "commands": [(801, vbcs), (802, f"{install}/Contents/MacOS/Unity -projectPath /tmp/Other")],
+            }
+            terminate = mock.Mock(return_value=True)
+            summary = rollout.close_compiler_servers(ledger, process_report_fn=lambda: report, terminate_fn=terminate)
+
+            terminate.assert_not_called()
+            self.assertEqual("live_unity_editor_may_share_the_server", summary["reason"])
+            self.assertEqual(1, summary["left_open"])
+            report["commands"] = []
+            summary = rollout.close_compiler_servers(ledger, process_report_fn=lambda: report, terminate_fn=terminate)
+            self.assertEqual(1, summary["exited"])
+            self.assertEqual("exited", ledger["compiler_servers"][0]["status"])
+
+    def test_expected_churn_allowlist_reports_but_does_not_stop(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canary = create_consumer(root, "Canary")
+            follower = create_consumer(root, "Follower")
+            ledger = make_ledger(root, [canary, follower], canary)
+            rollout.add_expected_churn(
+                ledger,
+                ["Assets/Settings/GeneratedEffectSettings.asset", "Follower/ProjectSettings/ProjectSettings.asset", ""],
+                "plan",
+            )
+            with self.assertRaises(rollout.RolloutError):
+                rollout.add_expected_churn(ledger, ["**"], "plan")
+            git_root = Path(ledger["preflight"]["workspace_baselines"][0]["root"])
+            result = rollout.workspace_side_effects(
+                ledger,
+                workspace_snapshot_fn=lambda _root: {
+                    "available": True,
+                    "root": str(git_root),
+                    "dirty_paths": [
+                        "Canary/Assets/Settings/GeneratedEffectSettings.asset",
+                        "Follower/ProjectSettings/ProjectSettings.asset",
+                        "Canary/ProjectSettings/ProjectSettings.asset",
+                    ],
+                    "error_code": "",
+                },
+            )
+
+            self.assertEqual([f"{git_root}:Canary/ProjectSettings/ProjectSettings.asset"], result["new_unowned_dirty_paths"])
+            self.assertEqual(
+                {
+                    "Canary/Assets/Settings/GeneratedEffectSettings.asset": "Assets/Settings/GeneratedEffectSettings.asset",
+                    "Follower/ProjectSettings/ProjectSettings.asset": "Follower/ProjectSettings/ProjectSettings.asset",
+                },
+                {row["path"]: row["pattern"] for row in result["workspaces"][0]["expected_churn_paths"]},
+            )
+            self.assertEqual(2, len(ledger["expected_churn"]))
+
+    def test_expected_churn_is_accepted_by_plan_and_resume_arguments(self) -> None:
+        plan = rollout.parse_args(
+            [
+                "plan", "--search-root", "/w", "--expected-project-root", "/w/A", "--canary-project-root", "/w/A",
+                "--release-tag", RELEASE_TAG, "--release-commit", RELEASE_COMMIT, "--unity-app", "/u",
+                "--run-dir", "/r", "--expected-churn", "Assets/A.asset", "--expected-churn", "Assets/B.asset",
+            ]
+        )
+        self.assertEqual(["Assets/A.asset", "Assets/B.asset"], plan.expected_churn)
+        resume = rollout.parse_args(
+            ["resume-project", "--ledger", "/l", "--project-id", "A", "--confirm-release-tag", RELEASE_TAG, "--expected-churn", "x"]
+        )
+        self.assertEqual(["x"], resume.expected_churn)
 
     def test_worker_packet_is_exact_and_denies_diagnosis_release_and_kill(self) -> None:
         with TemporaryDirectory() as temp_dir:

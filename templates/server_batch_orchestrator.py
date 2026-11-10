@@ -45,6 +45,7 @@ from server_health import (
     EDITOR_LOG_GREP_MAX_CHARS,
     FRESH_HEARTBEAT_MAX_AGE_SECONDS,
     annotate_console_grep_false_empty,
+    project_console_messages_only,
     annotate_console_tail_payload,
     apply_console_tail_byte_budget,
     build_editor_log_identity,
@@ -504,6 +505,8 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "bridge_stabilization",
         "request_final_status",
         "request_final_status_payload_mode",
+        "recovery_tool",
+        "recovery_tool_arguments",
         "journal_event_path",
         "delivery_event_path",
         "recommended_recovery_command",
@@ -522,6 +525,26 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         if key in payload and isinstance(error.get("details"), dict):
             error["details"].pop(key, None)
     return payload
+
+
+def expand_full_error_payload(project_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    if str(payload.get("request_final_status_payload_mode") or "") != "compact_transport_failure":
+        return payload
+    request_id = str(payload.get("request_id") or "")
+    if not request_id:
+        return payload
+    expanded = dict(payload)
+    try:
+        expanded["request_final_status"] = build_request_final_status(
+            project_root,
+            request_id,
+            str(payload.get("operation") or ""),
+            return_reclassified_terminal_immediately=False,
+        )
+    except Exception:
+        return payload
+    expanded["request_final_status_payload_mode"] = "full"
+    return expanded
 
 
 def emit_tool_error_summary(payload: dict[str, Any]) -> None:
@@ -1837,6 +1860,16 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     exclude_pattern = arguments.get("excludePattern", "")
     if not isinstance(exclude_pattern, str):
         raise JsonRpcError(-32602, "excludePattern must be a string when provided.")
+    before_lines = arguments.get("beforeLines", 0)
+    after_lines = arguments.get("afterLines", 0)
+    max_payload_bytes = arguments.get("maxPayloadBytes")
+    if max_payload_bytes is not None and (not isinstance(max_payload_bytes, int) or isinstance(max_payload_bytes, bool)):
+        raise JsonRpcError(-32602, "maxPayloadBytes must be an integer when provided.")
+    if source == "console" and (before_lines or after_lines):
+        raise JsonRpcError(-32602, "beforeLines/afterLines require source=editor_log; console entries have no adjacent lines.")
+    messages_only = arguments.get("messagesOnly", False)
+    if not isinstance(messages_only, bool):
+        raise JsonRpcError(-32602, "messagesOnly must be a boolean.")
 
     include_types = _optional_string_list_argument(arguments, "includeTypes")
     since = _editor_log_since_argument(arguments)
@@ -1853,10 +1886,10 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         editor_log_path = arguments.get("editorLogPath")
         if editor_log_path is not None and not isinstance(editor_log_path, str):
             raise JsonRpcError(-32602, "editorLogPath must be a string when provided.")
-        log_path = resolve_editor_log_path(project_root, editor_log_path)
         anchor_bridge_state, anchor_host_session_state, anchor_state_is_live = editor_log_anchor_state(
             project_root, since
         )
+        log_path = resolve_editor_log_path(project_root, editor_log_path, bridge_state=anchor_bridge_state)
         anchor_journal_events = editor_log_anchor_journal(project_root, since, since_request_id)
         try:
             payload = grep_editor_log_payload(
@@ -1876,6 +1909,11 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 journal_events=anchor_journal_events,
                 since_request_id=since_request_id,
                 bridge_state_is_live=anchor_state_is_live,
+                explicit_path_requested=bool(editor_log_path),
+                before_lines=before_lines,
+                after_lines=after_lines,
+                max_payload_bytes=max_payload_bytes,
+                messages_only=messages_only,
             )
         except ValueError as exc:
             raise JsonRpcError(-32602, str(exc)) from exc
@@ -1904,6 +1942,8 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             payload = {}
         if isinstance(payload, dict):
             payload = annotate_console_grep_false_empty(payload, include_types or [])
+            if messages_only:
+                payload = project_console_messages_only(payload)
             response = dict(response)
             response["payload_json"] = json.dumps(payload, ensure_ascii=True)
     return bridge_response_to_tool_result(response)
@@ -1942,10 +1982,10 @@ def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
         editor_log_path = arguments.get("editorLogPath")
         if editor_log_path is not None and not isinstance(editor_log_path, str):
             raise JsonRpcError(-32602, "editorLogPath must be a string when provided.")
-        log_path = resolve_editor_log_path(project_root, editor_log_path)
         anchor_bridge_state, anchor_host_session_state, anchor_state_is_live = editor_log_anchor_state(
             project_root, since
         )
+        log_path = resolve_editor_log_path(project_root, editor_log_path, bridge_state=anchor_bridge_state)
         anchor_journal_events = editor_log_anchor_journal(project_root, since, since_request_id)
         return mcp_json_result(
             tail_editor_log_payload(
@@ -1959,6 +1999,7 @@ def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 since_request_id=since_request_id,
                 bridge_state_is_live=anchor_state_is_live,
                 max_payload_bytes=max_payload_bytes,
+                explicit_path_requested=bool(editor_log_path),
             )
         )
 
@@ -2330,6 +2371,7 @@ def call_xuunity_setup_plan_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             package_source=package_source,
             package_version=_optional_string_arg(arguments, "packageVersion") or default_light_mcp_package_version(),
             local_package_source=_optional_string_arg(arguments, "localPackageSource") or str(default_local_package_source()),
+            answering_server_version=str(SERVER_INFO.get("version") or ""),
         )
     except ToolInvocationError as exc:
         return mcp_json_result(build_tool_error_payload(exc), is_error=True)
@@ -3088,6 +3130,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
         tool_invocation_error_type=ToolInvocationError,
         ensure_project_root=ensure_project_root,
         resolve_operation_timeout_ms=resolve_operation_timeout_ms,
+        expand_full_error_payload=expand_full_error_payload,
         invoke_bridge=invoke_bridge,
         build_tool_error_payload=build_tool_error_payload,
         bridge_response_to_tool_result=bridge_response_to_tool_result,

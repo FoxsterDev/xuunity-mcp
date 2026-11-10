@@ -2448,5 +2448,31 @@ class ServerProjectHelperTests(unittest.TestCase):
         self.assertEqual("", result)
 
 
+    def test_classify_unity_process_role_matches_the_executable_not_an_argument(self) -> None:
+        mac = "/Applications/Unity/Hub/Editor/6000.0.58f2/Unity.app/Contents/MacOS/Unity"
+        cases = {
+            f"{mac} -projectPath /tmp/P": "main_editor",
+            f"/Applications/Unity 2021/Unity.app/Contents/MacOS/Unity -projectPath /tmp/P": "main_editor",
+            f"/opt/homebrew/bin/python3 /x/server.py license-capabilities --unity-app {mac}": "",
+            f"python3 server.py --unity-app {mac}": "",
+            f"/bin/zsh -c {mac} -projectPath /tmp/P": "",
+            f"/bin/zsh -c '{mac} -projectPath /tmp/P'": "",
+            '"C:\\Program Files\\Unity\\Editor\\Unity.exe" -projectpath C:\\P': "main_editor",
+            "C:\\Program Files\\Unity\\Editor\\Unity.exe -projectPath C:\\P": "main_editor",
+            'python.exe server.py --unity-app "C:\\Program Files\\Unity\\Editor\\Unity.exe"': "",
+            "/mnt/d/Unity/Editor/Unity.exe -projectPath x": "main_editor",
+            "/opt/Unity -projectPath /tmp/P": "main_editor",
+            "/usr/bin/env /opt/Unity -projectPath /tmp/P": "",
+            f"{mac} -batchMode -name AssetImportWorker0 -projectPath /tmp/P": "worker",
+            "/Applications/Unity.app/Contents/Tools/UnityShaderCompiler /x 123": "worker",
+            "python3 tool.py --name AssetImportWorker0": "",
+            "/Applications/Unity Hub.app/Contents/MacOS/Unity Hub -- --silent": "launcher",
+            "python helper.py --label '/Applications/Unity Hub.app/Contents/MacOS/Unity Hub'": "",
+        }
+        for command, expected in cases.items():
+            with self.subTest(command=command):
+                self.assertEqual(expected, server_editor_host.classify_unity_process_role(command))
+
+
 if __name__ == "__main__":
     unittest.main()

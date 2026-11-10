@@ -41,6 +41,7 @@ NO_TIMEOUT_ALLOWLIST = {
     ("server_batch_recovery.py", "run_self_json_command_with_completed"),
     ("server_batch_recovery.py", "run_self_json_command"),
     ("run_installed_or_refresh_xuunity_mcp.py", "exec_run"),
+    ("server_python_gate.py", "ensure_supported_python"),
 }
 
 HIDDEN_WINDOW_FILES = (

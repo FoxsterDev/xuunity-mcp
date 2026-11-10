@@ -259,6 +259,80 @@ class SetupWizardTests(unittest.TestCase):
 
         self.assertIn("codex", {target["client_id"] for target in targets})
 
+    def _plan_with_ancestor_wiring(self, root: Path, *, ancestor_launcher: str, answering_server_version: str = "") -> dict:
+        project_root = create_unity_project(
+            root / "Monorepo" / "Game",
+            unity_version="6000.3.2f1",
+            dependencies={"com.xuunity.light-mcp": wizard.default_git_dependency("0.3.45")},
+        )
+        wizard.write_bridge_config(project_root)
+        (root / "Monorepo" / ".mcp.json").write_text(
+            json.dumps(
+                {
+                    "mcpServers": {
+                        "xuunity_light_unity": {
+                            "command": "/bin/bash",
+                            "args": ["-c", f"exec {ancestor_launcher}"],
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        env = {
+            "HOME": str(root / "home"),
+            "CLAUDECODE": "1",
+            "CLAUDE_CONFIG_PATH": str(root / "home" / ".claude.json"),
+            "CODEX_TOOLS_HOME": str(root / "codex-tools"),
+            "CLAUDE_TOOLS_HOME": str(root / "claude-tools"),
+            "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR": str(root / "neutral"),
+        }
+        with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(
+            server_setup_common, "platform_kind", return_value="macos"
+        ):
+            return wizard.build_setup_plan(
+                workspace_root=None,
+                project_roots=[str(project_root)],
+                recursive=False,
+                include_test_framework="no",
+                package_source="git",
+                package_version="0.3.45",
+                local_package_source="/unused",
+                answering_server_version=answering_server_version,
+            )
+
+    def test_setup_plan_reads_ancestor_mcp_json_and_credits_the_answering_server(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = self._plan_with_ancestor_wiring(
+                Path(tmp),
+                ancestor_launcher="/opt/xuunity-mcp/run_installed_or_refresh_xuunity_mcp.sh",
+                answering_server_version="0.3.45",
+            )
+
+        ancestors = [item for item in plan["preflight_review"]["planned_client_config_targets"] if item["scope"] == "ancestor_project"]
+        self.assertEqual(1, len(ancestors))
+        self.assertEqual("compatible", ancestors[0]["launcher_status"])
+        alignment = plan["installation_alignment"]
+        self.assertEqual([], alignment["blockers"])
+        self.assertEqual("answering_server_matches_requested", alignment["live_mcp_session_status"])
+        self.assertTrue(alignment["helper_alignment_credited_to_answering_server"])
+        self.assertTrue(alignment["runtime_execution_allowed"])
+        self.assertFalse(alignment["live_session_proof_required"])
+
+    def test_setup_plan_still_blocks_stale_ancestor_wiring_and_an_older_answering_server(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = self._plan_with_ancestor_wiring(
+                Path(tmp),
+                ancestor_launcher="/opt/xuunity-mcp/run.sh",
+                answering_server_version="0.3.44",
+            )
+
+        alignment = plan["installation_alignment"]
+        self.assertIn("client_launcher_install_or_migration_required", alignment["blockers"])
+        self.assertIn("helper_install_or_refresh_required", alignment["blockers"])
+        self.assertEqual("answering_server_version_mismatch", alignment["live_mcp_session_status"])
+        self.assertFalse(alignment["runtime_execution_allowed"])
+
     def test_setup_plan_upgrades_stale_canonical_pin_instead_of_reporting_configured(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

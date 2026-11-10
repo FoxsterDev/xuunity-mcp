@@ -14,6 +14,11 @@ SERVER_INFO = {
 }
 PROTOCOL_VERSION = "2025-06-18"
 
+if __name__ == "__main__":
+    from server_python_gate import ensure_supported_python
+
+    ensure_supported_python(__file__, sys.argv[1:], [Path(__file__).resolve().parent])
+
 # ProcessLauncher configuration
 from server_process_launcher import ProcessLauncher
 ProcessLauncher.configure(Path(__file__).resolve())

@@ -45,6 +45,63 @@ class ScenarioOptionalStepTests(unittest.TestCase):
         self.assertEqual(("ui_click", "ui_exists", "ui_get_text"), SCENARIO_OPTIONAL_STEP_KINDS)
         self.assertIn("skipped_optional_absent", server_specs.SCENARIO_STEP_STATUSES)
 
+    def _failed_run(self, step: dict) -> dict:
+        payload = {
+            "status": "failed",
+            "terminal": True,
+            "total_steps": 2,
+            "passed_steps": 1,
+            "failed_steps": 1,
+            "skipped_steps": 0,
+            "steps": [
+                {"stepId": "login", "kind": "playmode_set", "status": "passed", "outcome": "entered"},
+                step,
+            ],
+        }
+        return server_summaries.build_scenario_decision_verdict(payload, TERMINAL)
+
+    def test_required_click_refused_after_a_complete_search_is_a_clean_failure(self) -> None:
+        for refusal, failure_class in (
+            ("ui_node_not_found", "precondition"),
+            ("ui_target_not_visible", "precondition"),
+            ("ui_target_occluded", "blocking_popup"),
+        ):
+            with self.subTest(refusal=refusal):
+                verdict = self._failed_run(
+                    {
+                        "stepId": "tab_quests",
+                        "kind": "ui_click",
+                        "status": "failed",
+                        "error_code": refusal,
+                        "error_message": "Interaction 'tab_quests' was not delivered.",
+                        "payload_json": _click_payload("tab_quests", refusal_code=refusal),
+                    }
+                )
+                self.assertEqual("failed", verdict["verdict"])
+                self.assertEqual(failure_class, verdict["failure_class"])
+                self.assertEqual("authoritative", verdict["trust_class"])
+
+    def test_truncated_click_search_and_incomplete_read_stay_unproven(self) -> None:
+        truncated = json.dumps(
+            {"ui_interaction": {"delivered": False, "refusal_code": "ui_node_not_found", "search_truncated": True}}
+        )
+        click = self._failed_run(
+            {"stepId": "tab", "kind": "ui_click", "status": "failed", "error_code": "ui_node_not_found",
+             "payload_json": truncated}
+        )
+        self.assertEqual("inconclusive", click["verdict"])
+        read = self._failed_run(
+            {"stepId": "tile", "kind": "ui_exists", "status": "failed", "error_code": "ui_node_not_found",
+             "payload_json": json.dumps({"query": {"exists": False, "truncated": True}})}
+        )
+        self.assertEqual("inconclusive", read["verdict"])
+        complete = self._failed_run(
+            {"stepId": "tile", "kind": "ui_exists", "status": "failed", "error_code": "ui_node_not_found",
+             "payload_json": json.dumps({"query": {"exists": False, "truncated": False, "success": False}})}
+        )
+        self.assertEqual("failed", complete["verdict"])
+        self.assertEqual("precondition", complete["failure_class"])
+
     def test_optional_absent_click_with_passing_required_steps_is_passed(self) -> None:
         payload = {
             "status": "passed",

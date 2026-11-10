@@ -2,6 +2,128 @@
 
 ## Unreleased
 
+### Fixed
+
+- `license-capabilities --unity-app <path to the Unity executable>` no longer
+  refuses with `licensing_busy` when no editor is open. The process scan
+  matched `Unity.app/Contents/MacOS/Unity`, `Unity.exe` or `/Unity` anywhere in
+  a command line, so the probe's own Python process, whose arguments carry that
+  path, counted as a live editor. A process is now an editor, worker or Hub
+  launcher only when its executable (the leading path of the command line) is
+  one; a path in an argument, or a shell wrapper such as `zsh -c <Unity path>`,
+  no longer matches.
+- The consumer rollout helper's global Unity process scan uses the same
+  executable rule, so an operator shell wrapper or a helper whose arguments
+  name the Unity binary no longer blocks the preflight with
+  `global_unity_process_conflict` (RG-24). Licensing clients are also matched
+  by executable.
+- A rollout run directory inside a consumer git workspace no longer stops the
+  rollout as `new_unowned_workspace_side_effects`: the helper's own ledger,
+  logs and packets are excluded and counted as `own_run_dir_path_count`
+  (RG-23).
+- The rollout helper records the `VBCSCompiler` servers its batch compiles
+  leave behind and closes them when the run completes, after re-checking the
+  command and install; `close-compiler-servers` does the same after a stopped
+  run, and a live editor leaves them open (RG-25).
+- `run_consumer_rollout.py plan|resume-project --expected-churn <glob>`
+  declares files a batch import rewrites deterministically; matching new dirty
+  paths are reported as `expected_churn_paths` instead of stopping the run, so
+  known churn no longer needs a manual ledger edit (RG-26).
+- A GUI-spawned MCP client whose `PATH` puts an old system `python3` first
+  no longer fails with `CONNECTION_CLOSED` while a supported venv exists. The
+  shell launchers stay thin; every Python entrypoint (`server.py`,
+  `server_launcher.py`, the refresh launcher) now re-runs itself with the first
+  Python 3.10+ it finds: the launcher's `.venv`, the neutral install's `.venv`,
+  then `python3.15` … `python3.10`, `python3`, `python` on `PATH`. An explicit
+  `PYTHON` that is too old is still an error. The `.cmd` and `.ps1` launchers
+  probe every candidate, know the neutral venv, and skip the Store stub; the
+  installer probes versions too. `templates/run.sh` now honours `PYTHON` before
+  its `.venv`, like every other flavour. A wrapper command run from a Claude
+  Code or Codex context refreshes the neutral install instead of overwriting the
+  installer's delegate stubs with a venv-less copy (RG-02, F-1).
+- `xuunity_setup_plan` no longer blocks a session that already runs the
+  requested release. The MCP tool passes the answering server's version; when it
+  matches, a stale on-disk helper is credited
+  (`helper_alignment_credited_to_answering_server`), `live_mcp_session_status`
+  is `answering_server_matches_requested`, and runtime execution is allowed once
+  the project and wiring are aligned. The plan also reads `.mcp.json` files with
+  a server block in the project's parent directories (scope `ancestor_project`),
+  and a client counts as wired when any of its targets is compatible; an
+  existing incompatible block still blocks (RG-18).
+- A scenario whose first failure is a required UI step that found no node after
+  a complete search is now a clean `failed` with `failure_class: precondition`
+  and an authoritative trust class, not `inconclusive` / `unity_unproven`. A
+  `ui_click` refused as `ui_target_occluded` is `blocking_popup`. A truncated or
+  out-of-scope search still reads as unproven (RG-53).
+- `unity_prefab_mutate` and `unity_prefab_create` resolve `componentType` by full
+  name (`UnityEngine.UI.Image`) or assembly-qualified name first, then by a
+  short name that names exactly one component type. A fully qualified name used
+  to fail as unresolved and roll back the whole transaction, and a short name
+  shared by two namespaces picked whichever type came first; it is now refused
+  as `prefab_mutation_component_type_ambiguous` with the candidates. The same
+  matcher serves the component on the target, the component allowlist (an
+  entry by full or short name), the declared reference type and the prefab
+  validator's reference type check, which also reports
+  `observed_type_full_name` (RG-48).
+- A prefab path miss in `unity_prefab_mutate`, `unity_prefab_create` and the
+  `unity_prefab_render` overrides now names the root
+  (`Paths start at the root '<name>'`) and up to five nearest paths that end
+  with the requested name. A path without the root segment is accepted when it
+  resolves to exactly one object; an ambiguous one stays
+  `prefab_mutation_target_ambiguous` (RG-52).
+- `unity_console_grep` and `request-console-grep` take `beforeLines` /
+  `afterLines` (0–20) for `source: editor_log`. Each match carries its own
+  `context_before`, `context_after` and `context_first_line`, so structured
+  lines that follow a log message no longer need raw Editor.log reads. With
+  context or an explicit `maxPayloadBytes` the result stays inside the byte
+  budget (default 16384): the oldest blocks go first, then context lines of the
+  newest (`context_truncated_for_byte_budget`). Context on `source: console` is
+  refused (RG-50).
+- `editor_log` grep honours `includeStackTraces=false` (the default): lines
+  shaped like stack frames (namespaced Unity `Type:Method (...)` frames, frames
+  with `(at file:line)`, `(Filename: ...)` trailers, .NET `at` frames) are no
+  longer matches and are counted in `stack_frame_suppressed_count`; one search
+  used to return 26 frame lines out of 28 matches. With `includeStackTraces:
+  true` they are kept and `stack_frame_hint` appears when they are most of the
+  matches. `messagesOnly: true` (and `--messages-only`) returns each item as its
+  message plus line and context, or type for the console source (RG-20).
+- `unity_console_grep` and `unity_console_tail` with an `editorLogPath` now
+  report `log_lane.explicit_path_requested: true`, as the CLI does, and resolve
+  the default log from the live bridge state the same way, so an explicitly
+  chosen log is no longer classified like a guessed default (RG-22b).
+- The compact `unity_status_summary` with no live editor dropped from about
+  23 KB to 7 KB on a real project (12 KB to 6 KB on two others). Measured:
+  three quarters of it was the nested `error.details`, mostly the stale request
+  artifact candidates (8 KB), state groups and host prerequisite checks, all of
+  which the top-level fields already summarise. The compact error now carries
+  the code, message, recommended next action and recovery command, the stale
+  artifact count and classifications, and the editor-log classification;
+  `includeFullPayload: true` returns every detail as before (QPF-MCP-05, RG-51).
+- `unity_ui_query`, `unity_ui_exists` and `unity_ui_get_text` return compact
+  matched nodes by default. A node carried about 40 fields (1.3 KB); it now
+  carries path, name, type, scene, components, activity, visibility, pointer
+  status, bounds and text, plus interactability, alpha below 1, clipping and
+  descendant visibility only when they say something. Ten matches went from
+  12.6 KB to 4.0 KB; `includeFullPayload: true` returns every field.
+- A `unity_prefab_mutate` or `unity_prefab_create` refusal before any change
+  (operation limit, missing prefab, drifted hash) returns only its status,
+  errors, requested operation count and next action: 570 bytes instead of
+  about 5 KB of timing, artifact and empty validation blocks. Measured live, the
+  refusal never echoed the plan (65 and 96 operations gave the same size)
+  (RG-51).
+- Lifecycle-reset and transport errors from bridge tools honour
+  `includeFullPayload`: the default keeps the compact final status and names
+  `full_payload_tool_arguments`; `true` rebuilds the full request final status.
+  The reset error also names the MCP recovery tool (`recovery_tool:
+  unity_request_final_status` with `recovery_tool_arguments`) next to the shell
+  command. In the test final status, `elapsed_runtime_seconds` now counts from
+  the run start (it used to count from the last progress event, so a run at
+  4 m 52 s read as 14 s) and `seconds_since_last_progress` is reported
+  separately; `timeout_classification` stays empty unless a timeout was
+  observed or the deadline passed; and a run that is still running never gets
+  `editor_cleanup_recommended` with a Play Mode exit command, which would have
+  aborted it (RG-17).
+
 ## 0.3.88
 
 Release tag: `v0.3.88`

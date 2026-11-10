@@ -85,40 +85,64 @@ def unity_command_targets_project(command: str, project_root: Path) -> bool:
     return _normalized_project_match_key(project_path_argument) == _normalized_project_match_key(project_root)
 
 
-def classify_unity_process_role(command: str) -> str:
-    normalized_command = str(command or "").replace("\\ ", " ").strip()
-    if not normalized_command:
+_ARGUMENT_BOUNDARY = re.compile(r"\s(?=[-/\"']|[A-Za-z]:/)")
+_ABSOLUTE_EXECUTABLE = re.compile(r"^(?:/|[A-Za-z]:/|\./)")
+_WORKER_EXECUTABLE_MARKERS = (
+    "unityshadercompiler",
+    "unity shader compiler",
+    "unitypackagemanager",
+    "unity package manager",
+    "/unity helper.app/",
+)
+_WORKER_ARGUMENT_MARKERS = ("assetimportworker", "asset import worker")
+
+
+def unity_command_executable(command: str) -> str:
+    text = str(command or "").replace("\\ ", " ").strip().replace("\\", "/")
+    if not text:
         return ""
+    if text.startswith('"'):
+        end = text.find('"', 1)
+        return text[1:end] if end > 0 else text[1:]
+    if text.startswith("'"):
+        end = text.find("'", 1)
+        return text[1:end] if end > 0 else text[1:]
+    boundary = _ARGUMENT_BOUNDARY.search(text)
+    return text[: boundary.start()] if boundary else text
 
-    lower_command = normalized_command.lower()
-    command_for_match = normalized_command.replace("\\", "/")
-    lower_command_for_match = command_for_match.lower()
 
-    if "/unity hub.app/" in lower_command_for_match or "unity hub helper" in lower_command:
+def _is_unity_editor_executable(executable: str) -> bool:
+    if not executable:
+        return False
+    if executable.lower() == "unity.exe":
+        return True
+    if not _ABSOLUTE_EXECUTABLE.match(executable):
+        return False
+    return executable.lower().endswith("/unity.exe") or executable.endswith("/Unity")
+
+
+def classify_unity_process_role(command: str) -> str:
+    try:
+        executable = unity_command_executable(command)
+    except (TypeError, ValueError, SystemError):
+        return ""
+    if not executable:
+        return ""
+    lower_executable = executable.lower()
+
+    if "/unity hub.app/" in lower_executable or "unity hub helper" in lower_executable:
         return "launcher"
 
-    worker_markers = (
-        "assetimportworker",
-        "asset import worker",
-        "-assetimportworker",
-        "unityshadercompiler",
-        "unity shader compiler",
-        "unitypackagemanager",
-        "unity package manager",
-        "/unity helper.app/",
-    )
-    if any(marker in lower_command_for_match for marker in worker_markers):
+    if any(marker in lower_executable for marker in _WORKER_EXECUTABLE_MARKERS):
         return "worker"
 
-    if (
-        "Unity.app/Contents/MacOS/Unity" in normalized_command
-        or "unity.exe" in lower_command
-        or re.search(r'(^|\s)"?/[^"\s]*/Unity"?(?:\s|$)', command_for_match)
-        or command_for_match.endswith("/Unity")
-    ):
-        return "main_editor"
+    if not _is_unity_editor_executable(executable):
+        return ""
 
-    return ""
+    lower_command = str(command).lower()
+    if any(marker in lower_command for marker in _WORKER_ARGUMENT_MARKERS):
+        return "worker"
+    return "main_editor"
 
 
 def find_running_unity_editors_for_project(

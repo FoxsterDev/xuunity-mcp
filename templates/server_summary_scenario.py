@@ -1153,6 +1153,35 @@ def build_refresh_timeout_recovery_summary(normalized: dict[str, Any], step_item
     return summary
 
 
+UI_ABSENT_REFUSAL_CODES = {"ui_node_not_found", "ui_target_not_visible"}
+
+
+def _complete_search_ui_refusal_class(step: dict[str, Any], payload: dict[str, Any]) -> str:
+    kind = str(step.get("kind") or "")
+    error_code = str(step.get("error_code") or "")
+    if kind == "ui_click":
+        interaction = payload.get("ui_interaction")
+        if not isinstance(interaction, dict) or bool(interaction.get("delivered")):
+            return ""
+        refusal = str(interaction.get("refusal_code") or error_code)
+        if refusal == "ui_target_occluded":
+            return "blocking_popup"
+        if refusal in UI_ABSENT_REFUSAL_CODES and not bool(interaction.get("search_truncated")):
+            return "precondition"
+        return ""
+    if kind in {"ui_exists", "ui_get_text"}:
+        query = payload.get("query")
+        if not isinstance(query, dict) or error_code != "ui_node_not_found":
+            return ""
+        if bool(query.get("exists")) or bool(query.get("truncated")) or bool(query.get("out_of_scope")):
+            return ""
+        warnings = query.get("warnings") if isinstance(query.get("warnings"), list) else []
+        if any(isinstance(item, dict) and item.get("code") == "ui_scope_probe_incomplete" for item in warnings):
+            return ""
+        return "precondition"
+    return ""
+
+
 def classify_scenario_failure(
     normalized: dict[str, Any],
     step_items: list[Any],
@@ -1193,6 +1222,10 @@ def classify_scenario_failure(
 
     if bool(payload.get("blocking_popup")) or bool(payload.get("blockingPopup")):
         return "blocking_popup"
+
+    ui_refusal_class = _complete_search_ui_refusal_class(first_failed, payload)
+    if ui_refusal_class:
+        return ui_refusal_class
 
     error_code = str(first_failed.get("error_code") or payload.get("error_code") or payload.get("code") or "")
     kind = str(first_failed.get("kind") or "")

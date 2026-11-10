@@ -22,13 +22,11 @@ from pathlib import Path
 
 MINIMUM_PYTHON_VERSION = "3.10"
 
-if sys.version_info[:2] < (3, 10):
-    current = ".".join(str(v) for v in sys.version_info[:3])
-    sys.stderr.write(
-        "Python %s or newer is required. Selected interpreter reports %s. "
-        "Set PYTHON to a Python 3.10+ executable.\n" % (MINIMUM_PYTHON_VERSION, current)
-    )
-    raise SystemExit(1)
+if __name__ == "__main__":
+    from server_python_gate import ensure_supported_python
+
+    _launcher_dir = Path(__file__).resolve().parent
+    ensure_supported_python(__file__, sys.argv[1:], [_launcher_dir, _launcher_dir.parent])
 
 PACKAGE_NAME = "com.xuunity.light-mcp"
 SERVER_TEMPLATE_RELATIVE_PATH = "templates/server.py"
@@ -163,6 +161,21 @@ def neutral_install_dir() -> str:
     return str(server_setup_wizard.get_neutral_install_dir())
 
 
+def is_installer_delegate_dir(install_dir: str) -> bool:
+    try:
+        text = Path(install_dir, "run.sh").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return len(lines) == 2 and lines[1].startswith('exec "$BASH" "') and lines[1].endswith('/run.sh" "$@"')
+
+
+def client_install_dir_or_neutral(install_dir: str) -> str:
+    # Installer delegates hop to the neutral install and its venv; replacing them with a
+    # full copy would leave the client dir without a venv.
+    return neutral_install_dir() if is_installer_delegate_dir(install_dir) else install_dir
+
+
 def resolve_install_dir() -> str:
     install_target = os.environ.get("XUUNITY_LIGHT_UNITY_MCP_INSTALL_TARGET") or "auto"
     if install_target == "neutral":
@@ -178,9 +191,9 @@ def resolve_install_dir() -> str:
         )
 
     if server_setup_wizard.codex_context_detected():
-        return codex_install_dir()
+        return client_install_dir_or_neutral(codex_install_dir())
     if server_setup_wizard.claude_code_context_detected():
-        return claude_install_dir()
+        return client_install_dir_or_neutral(claude_install_dir())
     for candidate in (neutral_install_dir(), claude_install_dir(), codex_install_dir()):
         if os.path.isfile(os.path.join(candidate, "server.py")):
             return candidate
