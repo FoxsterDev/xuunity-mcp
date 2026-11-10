@@ -9,6 +9,7 @@ import contextlib
 import io
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -35,17 +36,67 @@ def write_executable(path: Path, text: str) -> Path:
     return path
 
 
+OLD_PYTHON_ENV = "XUUNITY_TEST_OLD_PYTHON"
+REQUIRE_E2E_ENV = "XUUNITY_REQUIRE_LAUNCHER_E2E"
+PROBE_SERVER = (
+    "import sys\n"
+    "print('XUUNITY_PROBE_EXECUTABLE=' + sys.executable)\n"
+    "print('XUUNITY_PROBE_VERSION=%d.%d' % sys.version_info[:2])\n"
+    "print('XUUNITY_PROBE_ARGS=' + ' '.join(sys.argv[1:]))\n"
+)
+
+
 def old_system_python() -> str:
-    candidate = "/usr/bin/python3"
-    if os.name == "nt" or not os.path.isfile(candidate):
-        return ""
-    completed = subprocess.run(
-        [candidate, "-c", "import sys; print(sys.version_info[:2] < (3, 10))"],
+    explicit = os.environ.get(OLD_PYTHON_ENV, "").strip()
+    if explicit:
+        candidates = [explicit]
+    elif os.name == "nt":
+        candidates = []
+    else:
+        candidates = ["/usr/bin/python3"]
+    for candidate in candidates:
+        if not os.path.isfile(candidate):
+            continue
+        completed = subprocess.run(
+            [candidate, "-c", "import sys; print(sys.version_info[:2] < (3, 10))"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        if completed.stdout.strip() == "True":
+            return candidate
+    return ""
+
+
+def skip_or_fail_without(test: unittest.TestCase, reason: str) -> None:
+    if os.environ.get(REQUIRE_E2E_ENV) == "1":
+        test.fail(f"{REQUIRE_E2E_ENV}=1 but the launcher end-to-end prerequisite is missing: {reason}")
+    test.skipTest(reason)
+
+
+def probe_fields(stdout: str) -> dict:
+    fields = {}
+    for line in stdout.splitlines():
+        if line.startswith("XUUNITY_PROBE_") and "=" in line:
+            key, value = line.split("=", 1)
+            fields[key[len("XUUNITY_PROBE_"):].lower()] = value.strip()
+    return fields
+
+
+def same_path(left: str, right: str) -> bool:
+    return os.path.normcase(os.path.normpath(left)) == os.path.normcase(os.path.normpath(right))
+
+
+def make_venv(target: Path) -> Path:
+    subprocess.run(
+        [sys.executable, "-m", "venv", "--without-pip", str(target)],
+        check=True,
         capture_output=True,
-        text=True,
-        check=False,
+        timeout=180,
     )
-    return candidate if completed.stdout.strip() == "True" else ""
+    name = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+    return target / name
 
 
 class PythonGateUnitTests(unittest.TestCase):
@@ -170,7 +221,46 @@ class GuiPathEndToEndTests(unittest.TestCase):
         skip_if_prior_subprocess_timeout(self)
         self.old_python = old_system_python()
         if not self.old_python:
-            self.skipTest("needs a system python3 older than 3.10")
+            skip_or_fail_without(self, f"needs a python3 older than 3.10 (set {OLD_PYTHON_ENV})")
+
+    def old_first_env(self, **extra: str) -> dict:
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in {"PYTHON", "XUUNITY_LIGHT_UNITY_MCP_REEXEC", "XUUNITY_LIGHT_UNITY_MCP_SERVER"}
+        }
+        old_dir = Path(self.old_python).parent
+        shim_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, shim_dir, True)
+        write_executable(shim_dir / "python3", f'#!/bin/sh\nexec "{self.old_python}" "$@"\n')
+        env["PATH"] = os.pathsep.join([str(shim_dir), str(old_dir), "/usr/bin", "/bin", "/usr/sbin", "/sbin"])
+        env.update(extra)
+        return env
+
+    def test_run_sh_with_an_old_explicit_python_refuses_instead_of_running(self) -> None:
+        completed = run_with_timeout(
+            [resolve_bash_executable(), (TEMPLATES_DIR / "run.sh").as_posix(), "--help"],
+            env=self.old_first_env(PYTHON=self.old_python),
+            timeout_seconds=120,
+        )
+
+        self.assertNotEqual(0, completed.returncode, completed.stdout)
+        self.assertIn("Python 3.10 or newer is required", completed.stderr)
+        self.assertIn("Set PYTHON", completed.stderr)
+
+    def test_server_py_under_an_old_python3_reexecs_into_the_neutral_venv(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_python = make_venv(Path(tmp) / "neutral" / ".venv")
+            completed = run_with_timeout(
+                [self.old_python, (TEMPLATES_DIR / "server.py").as_posix(), "--help"],
+                env=self.old_first_env(XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR=str(Path(tmp) / "neutral")),
+                timeout_seconds=120,
+            )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("usage:", completed.stdout.lower())
+        self.assertIn("too old; re-running with", completed.stderr)
+        self.assertIn(str(venv_python), completed.stderr)
 
     def test_wrapper_answers_help_under_a_gui_path_with_an_old_python3_first(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -185,8 +275,7 @@ class GuiPathEndToEndTests(unittest.TestCase):
                 for key, value in os.environ.items()
                 if key not in {"PYTHON", "XUUNITY_LIGHT_UNITY_MCP_REEXEC"}
             }
-            env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
-            env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(neutral)
+            env = self.old_first_env(XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR=str(neutral))
             completed = run_with_timeout(
                 [resolve_bash_executable(), (REPO_ROOT / "xuunity_light_unity_mcp.sh").as_posix(), "--help"],
                 env=env,
@@ -255,7 +344,7 @@ class LauncherFlavourParityTests(unittest.TestCase):
     def test_entrypoints_parse_on_old_interpreters(self) -> None:
         old = old_system_python()
         if not old:
-            self.skipTest("needs a system python3 older than 3.10")
+            skip_or_fail_without(self, f"needs a python3 older than 3.10 (set {OLD_PYTHON_ENV})")
         for entrypoint in (*self.PYTHON_ENTRYPOINTS, TEMPLATES_DIR / "server_python_gate.py"):
             completed = subprocess.run(
                 [old, "-c", "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read())", str(entrypoint)],
@@ -264,6 +353,102 @@ class LauncherFlavourParityTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, completed.returncode, f"{entrypoint.name}: {completed.stderr}")
+
+
+
+@unittest.skipUnless(os.name == "nt", "native Windows launchers")
+class WindowsNativeLauncherEndToEndTests(unittest.TestCase):
+    FLAVOURS = ("cmd", "ps1")
+
+    def setUp(self) -> None:
+        self.old_python = old_system_python()
+        if not self.old_python:
+            skip_or_fail_without(self, f"set {OLD_PYTHON_ENV} to a Python older than 3.10")
+        self.pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        self._temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._temp.cleanup)
+        self.root = Path(self._temp.name)
+        self.probe = self.root / "probe.py"
+        self.probe.write_text(PROBE_SERVER, encoding="utf-8")
+        self.neutral = self.root / "neutral"
+
+    def env(self, **extra: str) -> dict:
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key.upper() not in {"PYTHON", "XUUNITY_LIGHT_UNITY_MCP_REEXEC", "XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"}
+        }
+        system_root = os.environ.get("SystemRoot", r"C:\Windows")
+        env["PATH"] = os.pathsep.join(
+            [
+                str(Path(self.old_python).parent),
+                str(Path(system_root) / "System32"),
+                system_root,
+                str(Path(system_root) / "System32" / "WindowsPowerShell" / "v1.0"),
+            ]
+        )
+        env["XUUNITY_LIGHT_UNITY_MCP_SERVER"] = str(self.probe)
+        env["XUUNITY_LIGHT_UNITY_MCP_NEUTRAL_INSTALL_DIR"] = str(self.neutral)
+        env.update(extra)
+        return env
+
+    def launch(self, flavour: str, env: dict) -> subprocess.CompletedProcess:
+        if flavour == "cmd":
+            command = [os.environ.get("ComSpec", "cmd.exe"), "/d", "/c", str(TEMPLATES_DIR / "run.cmd"), "probe-arg"]
+        else:
+            if not self.pwsh:
+                skip_or_fail_without(self, "no pwsh or powershell on PATH")
+            command = [self.pwsh, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(TEMPLATES_DIR / "run.ps1"), "probe-arg"]
+        return run_with_timeout(command, env=env, timeout_seconds=120)
+
+    def test_an_old_explicit_python_is_refused(self) -> None:
+        for flavour in self.FLAVOURS:
+            with self.subTest(flavour=flavour):
+                completed = self.launch(flavour, self.env(PYTHON=self.old_python))
+
+                self.assertNotEqual(0, completed.returncode, completed.stdout)
+                self.assertNotIn("XUUNITY_PROBE_EXECUTABLE", completed.stdout)
+                self.assertIn("not a working Python 3.10+", completed.stdout + completed.stderr)
+
+    def test_the_neutral_venv_wins_over_an_old_python_first_on_path(self) -> None:
+        venv_python = make_venv(self.neutral / ".venv")
+        for flavour in self.FLAVOURS:
+            with self.subTest(flavour=flavour):
+                completed = self.launch(flavour, self.env())
+
+                self.assertEqual(0, completed.returncode, completed.stderr)
+                fields = probe_fields(completed.stdout)
+                self.assertTrue(same_path(str(venv_python), fields.get("executable", "")), completed.stdout)
+                self.assertEqual("probe-arg", fields.get("args"))
+
+    def test_without_a_venv_the_old_python_first_on_path_is_never_used(self) -> None:
+        for flavour in self.FLAVOURS:
+            with self.subTest(flavour=flavour):
+                completed = self.launch(flavour, self.env())
+
+                fields = probe_fields(completed.stdout)
+                if completed.returncode == 0:
+                    self.assertFalse(same_path(self.old_python, fields.get("executable", "")), completed.stdout)
+                    major, minor = (int(part) for part in fields["version"].split("."))
+                    self.assertGreaterEqual((major, minor), (3, 10))
+                else:
+                    self.assertNotIn("XUUNITY_PROBE_EXECUTABLE", completed.stdout)
+                    self.assertIn("Python 3.10 or newer was not found", completed.stdout + completed.stderr)
+
+    def test_server_py_under_the_old_python_reexecs_into_the_neutral_venv(self) -> None:
+        venv_python = make_venv(self.neutral / ".venv")
+        env = self.env()
+        env.pop("XUUNITY_LIGHT_UNITY_MCP_SERVER", None)
+        completed = run_with_timeout(
+            [self.old_python, str(TEMPLATES_DIR / "server.py"), "--help"],
+            env=env,
+            timeout_seconds=120,
+        )
+
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("usage:", completed.stdout.lower())
+        self.assertIn("too old; re-running with", completed.stderr)
+        self.assertIn(os.path.normcase(str(venv_python)), os.path.normcase(completed.stderr))
 
 
 if __name__ == "__main__":

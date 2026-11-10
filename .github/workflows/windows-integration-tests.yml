@@ -37,6 +37,14 @@ jobs:
         timeout-minutes: 1
         uses: actions/checkout@v4
 
+      - name: Set up an old Python for launcher discovery checks
+        id: old-python
+        timeout-minutes: 2
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          update-environment: false
+
       - name: Set up Python
         timeout-minutes: 1
         uses: actions/setup-python@v5
@@ -51,6 +59,15 @@ jobs:
           for suite in test_bash_spawn_canary test_server_protocol_and_parser test_tcp_transport_framing test_setup_wizard test_cmd_launcher_contract test_ci_workflow_contract test_release_ci_gates; do
             PYTHONPATH=templates python -m unittest discover -s tests -p "${suite}.py" -v || exit 1
           done
+
+      - name: Launcher interpreter discovery with an old Python first (RG-02)
+        timeout-minutes: 4
+        shell: bash
+        env:
+          XUUNITY_TEST_OLD_PYTHON: ${{ steps.old-python.outputs.python-path }}
+          XUUNITY_REQUIRE_LAUNCHER_E2E: "1"
+        run: |
+          PYTHONPATH=templates python -m unittest discover -s tests -p "test_launcher_python_discovery.py" -v
 
       - name: Smoke run.cmd Launcher
         timeout-minutes: 1
