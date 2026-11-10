@@ -1170,21 +1170,56 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
     )
 
 
+NON_MAIN_OWNER_WAIT_MAX_MS = 10000
+NON_MAIN_OWNER_POLL_SECONDS = 0.5
+
+
+def await_main_bridge_owner(project_root: Path, discovery: dict[str, Any], timeout_ms: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Give a transient non-main state writer a bounded window to hand the state file back before refusing."""
+
+    if not bool(discovery.get("bridge_owned_by_non_main_process")):
+        return discovery, {}
+    started = time.monotonic()
+    budget_seconds = max(0, min(int(timeout_ms or 0), NON_MAIN_OWNER_WAIT_MAX_MS)) / 1000.0
+    first_pid = int(discovery.get("bridge_pid") or 0)
+    while bool(discovery.get("bridge_owned_by_non_main_process")) and time.monotonic() - started < budget_seconds:
+        time.sleep(NON_MAIN_OWNER_POLL_SECONDS)
+        discovery = dict(getattr(refresh_project_context(project_root), "discovery_details", {}) or {})
+    return discovery, {
+        "non_main_owner_observed": True,
+        "non_main_owner_pid": first_pid,
+        "non_main_owner_wait_ms": int(round((time.monotonic() - started) * 1000)),
+        "non_main_owner_cleared": not bool(discovery.get("bridge_owned_by_non_main_process")),
+    }
+
+
 def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
     project_root = context.project_root
-    discovery = dict(getattr(context, "discovery_details", {}) or {})
+    discovery, owner_wait = await_main_bridge_owner(
+        project_root, dict(getattr(context, "discovery_details", {}) or {}), timeout_ms
+    )
     if bool(discovery.get("bridge_owned_by_non_main_process")):
         raise ToolInvocationError(
             "bridge_owned_by_non_main_process",
-            "The recorded bridge state was written by a Unity worker or another non-main process; runtime execution is refused.",
+            (
+                "The recorded bridge state was written by a Unity worker or another non-main process and did not "
+                "return to the main editor within the wait window; the request was not submitted and is safe to retry."
+            ),
             {
                 "project_root": str(project_root),
+                "operation": operation,
                 "bridge_pid": int(discovery.get("bridge_pid") or 0),
                 "bridge_process_class": str(discovery.get("bridge_process_class") or "non_main_process"),
                 "bridge_state_writer_trust_class": str(discovery.get("bridge_state_writer_trust_class") or "untrusted_non_main_process"),
                 "runtime_execution_allowed": False,
                 "request_submitted": False,
-                "recommended_next_action": "wait_for_main_editor_bridge",
+                "request_ownership_acquired": False,
+                "transport_outcome": "request_not_submitted",
+                "operation_outcome": "request_not_dispatched",
+                "retryable": True,
+                "safe_to_retry": True,
+                **owner_wait,
+                "recommended_next_action": "wait_for_main_editor_bridge_then_retry",
             },
         )
 
@@ -1222,6 +1257,8 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
             ignored_override_cap_ms = int(policy.get("post_reset_recovery_ignored_override_cap_ms") or 0)
             if ignored_override_cap_ms > 0:
                 lifecycle["post_reset_recovery_ignored_override_cap_ms"] = ignored_override_cap_ms
+            if owner_wait:
+                lifecycle["non_main_owner_wait"] = owner_wait
 
             dispatch_started = False
             pre_idle_state = pre_request_state

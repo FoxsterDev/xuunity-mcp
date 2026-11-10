@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Fixed
+
+- `unity_scenario_run_and_wait` no longer reports a dispatched run as not
+  submitted. Dispatch and wait are separate phases: a failure while waiting
+  returns `scenario_wait_failed_after_dispatch` (or `scenario_wait_timeout`)
+  with `scenario_run_submitted: true`, `request_submitted: true`, the `run_id`,
+  the poll's own code in `scenario_wait_error_code` and
+  `poll_scenario_result_do_not_rerun`, and a terminal persisted result is
+  returned instead of the poll error when one exists. A result poll treats
+  `bridge_owned_by_non_main_process` as transient. Before submission, a bridge
+  state written by a non-main process gets a bounded wait (10 s) for the main
+  editor to take it back; if it does not, the refusal says
+  `request_submitted: false`, `retryable: true` and how long it waited (RG-15).
+
 ## 0.3.88
 
 Release tag: `v0.3.88`
