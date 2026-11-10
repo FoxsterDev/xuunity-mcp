@@ -91,6 +91,14 @@
   report `log_lane.explicit_path_requested: true`, as the CLI does, and resolve
   the default log from the live bridge state the same way, so an explicitly
   chosen log is no longer classified like a guessed default (RG-22b).
+- The compact `unity_status_summary` with no live editor dropped from about
+  23 KB to 7 KB on a real project (12 KB to 6 KB on two others). Measured:
+  three quarters of it was the nested `error.details`, mostly the stale request
+  artifact candidates (8 KB), state groups and host prerequisite checks, all of
+  which the top-level fields already summarise. The compact error now carries
+  the code, message, recommended next action and recovery command, the stale
+  artifact count and classifications, and the editor-log classification;
+  `includeFullPayload: true` returns every detail as before (QPF-MCP-05, RG-51).
 
 ## 0.3.88
 
