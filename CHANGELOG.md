@@ -16,6 +16,8 @@
   `restart_criterion` as setup, and sets `attachment_pending_predates_install`
   (with `attachment_pending_basis`) when the host-opened editor predates the
   manifest change, adding the focus or Assets > Refresh hint.
+- The recovered Play Mode completion's no-duplicate check is a named predicate
+  with an EditMode test (RG-04 F-6).
 
 ## 0.3.89
 

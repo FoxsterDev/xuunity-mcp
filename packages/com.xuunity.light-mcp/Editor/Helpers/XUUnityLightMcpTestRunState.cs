@@ -382,7 +382,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             {
                 var status = response?.status ?? "ok";
                 XUUnityLightMcpBridgeRuntimeState.MarkRequestProcessed(state.request_id, state.operation, status, state.started_at_utc, 0);
-                if (!JournalHasEvent(state.request_id, "request_completed"))
+                if (ShouldJournalRecoveredCompletion(state.request_id))
                 {
                     XUUnityLightMcpRequestJournal.WriteRequestCompleted(
                         state.request_id,
@@ -397,6 +397,11 @@ namespace XUUnity.LightMcp.Editor.Helpers
             catch
             {
             }
+        }
+
+        internal static bool ShouldJournalRecoveredCompletion(string requestId)
+        {
+            return !string.IsNullOrWhiteSpace(requestId) && !JournalHasEvent(requestId, "request_completed");
         }
 
         internal static bool JournalHasEvent(string requestId, string eventType)

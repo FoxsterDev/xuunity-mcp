@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
+using UnityEngine;
 using XUUnity.LightMcp.Editor.Bridge;
 using XUUnity.LightMcp.Editor.Core;
 using XUUnity.LightMcp.Editor.Helpers;
@@ -82,6 +86,42 @@ namespace XUUnity.LightMcp.Tests.EditMode
             Assert.That(
                 XUUnityLightMcpTestRunState.CompletedAfterRuntimeBudget,
                 Is.EqualTo("completed_after_runtime_budget"));
+        }
+
+        [Test]
+        public void RecoveredCompletion_IsJournaledOnlyWhenNoCompletionExists()
+        {
+            var completedId = "selftest-f6-" + Guid.NewGuid().ToString("N");
+            var startedOnlyId = "selftest-f6-" + Guid.NewGuid().ToString("N");
+            var written = new List<string>();
+            try
+            {
+                written.Add(WriteJournalEventFile(completedId, "request_started"));
+                written.Add(WriteJournalEventFile(completedId, "request_completed"));
+                written.Add(WriteJournalEventFile(startedOnlyId, "request_started"));
+
+                Assert.That(XUUnityLightMcpTestRunState.ShouldJournalRecoveredCompletion(completedId), Is.False);
+                Assert.That(XUUnityLightMcpTestRunState.ShouldJournalRecoveredCompletion(startedOnlyId), Is.True);
+                Assert.That(XUUnityLightMcpTestRunState.ShouldJournalRecoveredCompletion(""), Is.False);
+            }
+            finally
+            {
+                foreach (var path in written)
+                {
+                    File.Delete(path);
+                }
+            }
+        }
+
+        static string WriteJournalEventFile(string requestId, string eventType)
+        {
+            XUUnityLightMcpFileIpcPaths.EnsureDirectories();
+            var path = Path.Combine(
+                XUUnityLightMcpFileIpcPaths.RequestJournalDirectory,
+                "19700101T000000000Z_" + Guid.NewGuid().ToString("N") + "_" + eventType + ".json");
+            var payload = new XUUnityLightMcpRequestJournalEvent { event_type = eventType, request_id = requestId };
+            File.WriteAllText(path, JsonUtility.ToJson(payload));
+            return path;
         }
     }
 }
