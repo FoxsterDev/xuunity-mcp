@@ -55,6 +55,16 @@
   and an authoritative trust class, not `inconclusive` / `unity_unproven`. A
   `ui_click` refused as `ui_target_occluded` is `blocking_popup`. A truncated or
   out-of-scope search still reads as unproven (RG-53).
+- `unity_prefab_mutate` and `unity_prefab_create` resolve `componentType` by full
+  name (`UnityEngine.UI.Image`) or assembly-qualified name first, then by a
+  short name that names exactly one component type. A fully qualified name used
+  to fail as unresolved and roll back the whole transaction, and a short name
+  shared by two namespaces picked whichever type came first; it is now refused
+  as `prefab_mutation_component_type_ambiguous` with the candidates. The same
+  matcher serves the component on the target, the component allowlist (an
+  entry by full or short name), the declared reference type and the prefab
+  validator's reference type check, which also reports
+  `observed_type_full_name` (RG-48).
 
 ## 0.3.88
 

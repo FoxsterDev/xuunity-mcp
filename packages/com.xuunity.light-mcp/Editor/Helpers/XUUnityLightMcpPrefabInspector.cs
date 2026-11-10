@@ -348,6 +348,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 property_path = property.propertyPath,
                 expected_type = declared,
                 observed_type = observed.Name,
+                observed_type_full_name = observed.FullName ?? observed.Name,
                 message = "A serialized reference holds an object whose type is not in the declared field's type chain."
             });
         }
@@ -357,7 +358,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             var current = type;
             while (current != null)
             {
-                if (string.Equals(current.Name, declared, StringComparison.Ordinal))
+                if (XUUnityLightMcpTypeNameMatcher.Matches(current, declared))
                 {
                     return true;
                 }
@@ -367,7 +368,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
             foreach (var contract in type.GetInterfaces())
             {
-                if (string.Equals(contract.Name, declared, StringComparison.Ordinal))
+                if (XUUnityLightMcpTypeNameMatcher.Matches(contract, declared))
                 {
                     return true;
                 }

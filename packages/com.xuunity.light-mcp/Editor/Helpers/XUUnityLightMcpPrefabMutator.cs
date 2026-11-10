@@ -493,7 +493,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
             bool allowAnyComponentType)
         {
             var typeName = (operation.componentType ?? "").Trim();
-            if (!allowAnyComponentType && !allowedComponentTypes.Contains(typeName))
+            var type = XUUnityLightMcpTypeNameMatcher.ResolveComponentType(typeName, out var candidates);
+            if (!allowAnyComponentType && !XUUnityLightMcpTypeNameMatcher.AllowlistAccepts(allowedComponentTypes, typeName, type))
             {
                 return Fail(
                     change,
@@ -501,13 +502,14 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     $"'{typeName}' is not in the component allowlist for this transaction.");
             }
 
-            var type = ResolveComponentType(typeName);
             if (type == null)
             {
-                return Fail(
-                    change,
-                    "prefab_mutation_component_type_unresolved",
-                    $"Component type '{typeName}' could not be resolved.");
+                return candidates.Count > 1
+                    ? AmbiguousType(change, typeName, candidates)
+                    : Fail(
+                        change,
+                        "prefab_mutation_component_type_unresolved",
+                        $"Component type '{typeName}' could not be resolved by full name, assembly-qualified name or short name.");
             }
 
             if (type.IsAbstract || type == typeof(Transform) || type == typeof(RectTransform))
@@ -537,7 +539,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
 
             change.before = "absent";
-            change.after = $"added:{typeName}";
+            change.after = $"added:{type.FullName}";
             change.inverse_op = "remove_component";
             change.status = "applied";
             return change;
@@ -550,17 +552,22 @@ namespace XUUnity.LightMcp.Editor.Helpers
             HashSet<string> allowedComponentTypes)
         {
             var typeName = (operation.componentType ?? "").Trim();
-            if (!allowedComponentTypes.Contains(typeName))
+            if (!TryFindComponent(target, typeName, out var component, out var failure))
+            {
+                return allowedComponentTypes.Contains(typeName)
+                    ? Fail(change, failure.Item1, failure.Item2)
+                    : Fail(
+                        change,
+                        "prefab_mutation_component_not_allowlisted",
+                        $"'{typeName}' is not in the component allowlist for this transaction.");
+            }
+
+            if (!XUUnityLightMcpTypeNameMatcher.AllowlistAccepts(allowedComponentTypes, typeName, component.GetType()))
             {
                 return Fail(
                     change,
                     "prefab_mutation_component_not_allowlisted",
-                    $"'{typeName}' is not in the component allowlist for this transaction.");
-            }
-
-            if (!TryFindComponent(target, typeName, out var component, out var failure))
-            {
-                return Fail(change, failure.Item1, failure.Item2);
+                    $"'{component.GetType().FullName}' is not in the component allowlist for this transaction.");
             }
 
             if (component is Transform)
@@ -604,7 +611,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     continue;
                 }
 
-                if (string.Equals(candidate.GetType().Name, wanted, StringComparison.Ordinal))
+                if (XUUnityLightMcpTypeNameMatcher.Matches(candidate.GetType(), wanted))
                 {
                     matches.Add(candidate);
                 }
@@ -615,6 +622,25 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 failure = Tuple.Create(
                     "prefab_mutation_component_not_found",
                     $"No component named '{wanted}' on the target.");
+                return false;
+            }
+
+            var distinctTypes = new List<string>();
+            foreach (var match in matches)
+            {
+                if (!distinctTypes.Contains(match.GetType().FullName))
+                {
+                    distinctTypes.Add(match.GetType().FullName);
+                }
+            }
+
+            if (distinctTypes.Count > 1)
+            {
+                distinctTypes.Sort(StringComparer.Ordinal);
+                failure = Tuple.Create(
+                    "prefab_mutation_component_type_ambiguous",
+                    $"'{wanted}' matches {distinctTypes.Count} component types on the target; use the full name: "
+                    + string.Join(", ", distinctTypes) + ".");
                 return false;
             }
 
@@ -630,17 +656,15 @@ namespace XUUnity.LightMcp.Editor.Helpers
             return true;
         }
 
-        static Type ResolveComponentType(string typeName)
+        static XUUnityLightMcpPrefabMutationChange AmbiguousType(
+            XUUnityLightMcpPrefabMutationChange change,
+            string typeName,
+            List<string> candidates)
         {
-            foreach (var candidate in TypeCache.GetTypesDerivedFrom<Component>())
-            {
-                if (string.Equals(candidate.Name, typeName, StringComparison.Ordinal))
-                {
-                    return candidate;
-                }
-            }
-
-            return null;
+            return Fail(
+                change,
+                "prefab_mutation_component_type_ambiguous",
+                $"'{typeName}' names {candidates.Count} component types; use the full name: {string.Join(", ", candidates)}.");
         }
 
         static bool TryAssign(
@@ -1114,8 +1138,8 @@ namespace XUUnity.LightMcp.Editor.Helpers
                 return true;
             }
 
-            var type = ResolveComponentType(declared);
-            return type != null;
+            var type = XUUnityLightMcpTypeNameMatcher.ResolveComponentType(declared, out var candidates);
+            return type != null || candidates.Count > 0;
         }
 
         static int IndexOfEnumName(string[] names, string wanted)
