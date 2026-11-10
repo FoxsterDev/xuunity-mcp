@@ -1734,6 +1734,34 @@ class BridgeRuntimeTests(unittest.TestCase):
         self.assertEqual("unity_completed_confirmed", summary["result_trust_class"])
         self.assertEqual("none", summary["recommended_next_action"])
 
+    def test_completed_run_past_its_budget_keeps_its_classification(self) -> None:
+        summary = server_bridge_runtime.build_test_verdict_summary(
+            project_root=Path("/tmp/FakeProject"),
+            request_id="req-budget-overrun",
+            operation="unity.tests.run_playmode",
+            response_payload={
+                "run_phase": "completed",
+                "started_at_utc": "2026-10-05T14:44:00Z",
+                "completed_at_utc": "2026-10-05T15:00:44Z",
+                "runtime_timeout_ms": 900000,
+                "total": 3,
+                "passed": 3,
+            },
+            persisted_test_result=None,
+            request_submitted=True,
+            request_started=True,
+            request_completed=True,
+            completion_status="ok",
+            operation_outcome="completed_ok",
+            active_state=None,
+            bridge_changed_since_submission=False,
+        )
+
+        self.assertEqual("completed_after_runtime_budget", summary["timeout_classification"])
+        self.assertTrue(summary["runtime_budget_exceeded"])
+        self.assertEqual(104.0, summary["runtime_budget_overrun_seconds"])
+        self.assertFalse(summary["runtime_timeout_observed"])
+
     def test_test_timeout_promotes_console_error_pressure_and_recovery(self) -> None:
         summary = server_bridge_runtime.build_test_verdict_summary(
             project_root=Path("/tmp/FakeProject"),
