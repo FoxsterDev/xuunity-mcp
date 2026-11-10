@@ -111,6 +111,18 @@
   about 5 KB of timing, artifact and empty validation blocks. Measured live, the
   refusal never echoed the plan (65 and 96 operations gave the same size)
   (RG-51).
+- Lifecycle-reset and transport errors from bridge tools honour
+  `includeFullPayload`: the default keeps the compact final status and names
+  `full_payload_tool_arguments`; `true` rebuilds the full request final status.
+  The reset error also names the MCP recovery tool (`recovery_tool:
+  unity_request_final_status` with `recovery_tool_arguments`) next to the shell
+  command. In the test final status, `elapsed_runtime_seconds` now counts from
+  the run start (it used to count from the last progress event, so a run at
+  4 m 52 s read as 14 s) and `seconds_since_last_progress` is reported
+  separately; `timeout_classification` stays empty unless a timeout was
+  observed or the deadline passed; and a run that is still running never gets
+  `editor_cleanup_recommended` with a Play Mode exit command, which would have
+  aborted it (RG-17).
 
 ## 0.3.88
 

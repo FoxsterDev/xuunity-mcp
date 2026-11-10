@@ -505,6 +505,8 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         "bridge_stabilization",
         "request_final_status",
         "request_final_status_payload_mode",
+        "recovery_tool",
+        "recovery_tool_arguments",
         "journal_event_path",
         "delivery_event_path",
         "recommended_recovery_command",
@@ -523,6 +525,26 @@ def build_tool_error_payload(exc: ToolInvocationError) -> dict[str, Any]:
         if key in payload and isinstance(error.get("details"), dict):
             error["details"].pop(key, None)
     return payload
+
+
+def expand_full_error_payload(project_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    if str(payload.get("request_final_status_payload_mode") or "") != "compact_transport_failure":
+        return payload
+    request_id = str(payload.get("request_id") or "")
+    if not request_id:
+        return payload
+    expanded = dict(payload)
+    try:
+        expanded["request_final_status"] = build_request_final_status(
+            project_root,
+            request_id,
+            str(payload.get("operation") or ""),
+            return_reclassified_terminal_immediately=False,
+        )
+    except Exception:
+        return payload
+    expanded["request_final_status_payload_mode"] = "full"
+    return expanded
 
 
 def emit_tool_error_summary(payload: dict[str, Any]) -> None:
@@ -3108,6 +3130,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
         tool_invocation_error_type=ToolInvocationError,
         ensure_project_root=ensure_project_root,
         resolve_operation_timeout_ms=resolve_operation_timeout_ms,
+        expand_full_error_payload=expand_full_error_payload,
         invoke_bridge=invoke_bridge,
         build_tool_error_payload=build_tool_error_payload,
         bridge_response_to_tool_result=bridge_response_to_tool_result,

@@ -1171,6 +1171,50 @@ class BridgeRuntimeTests(unittest.TestCase):
                 summary["cleanup_command"],
             )
 
+    def test_a_running_test_run_gets_no_timeout_label_and_no_play_mode_exit_hint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            project_root = Path(tmp_dir)
+            journal_dir = project_root / "Library" / "XUUnityLightMcp" / "journal" / "requests"
+            result_dir = project_root / "Library" / "XUUnityLightMcp" / "state" / "test_results"
+            request_id = "req-playmode-still-running"
+            write_json(
+                journal_dir / "01_request_submitted.json",
+                {"event_type": "request_submitted", "event_at_utc": "2026-05-15T10:00:00Z", "request_id": request_id,
+                 "operation": "unity.tests.run_playmode"},
+            )
+            write_json(
+                journal_dir / "02_request_started.json",
+                {"event_type": "request_started", "event_at_utc": "2026-05-15T10:00:01Z",
+                 "started_at_utc": "2026-05-15T10:00:01Z", "request_id": request_id,
+                 "operation": "unity.tests.run_playmode"},
+            )
+            write_json(
+                result_dir / f"{request_id}.json",
+                {"request_id": request_id, "operation": "unity.tests.run_playmode", "run_phase": "running",
+                 "started_at_utc": "2026-05-15T10:00:00Z", "last_progress_at_utc": "2026-05-15T10:04:52Z",
+                 "last_started_test": "Game.Tests.LongRunning", "request_timeout_ms": 1800000,
+                 "runtime_timeout_ms": 1800000},
+            )
+            now = server_bridge_runtime.parse_journal_utc_timestamp("2026-05-15T10:05:06Z")
+            with mock.patch.object(server_bridge_runtime.time, "time", return_value=now), mock.patch.object(
+                server_bridge_final_status.time, "time", return_value=now
+            ):
+                summary = server_bridge_runtime.build_request_final_status(
+                    project_root,
+                    request_id,
+                    "unity.tests.run_playmode",
+                    current_state={"playmode_state": "playing"},
+                    poll_timeout_ms=0,
+                )
+
+            self.assertEqual("in_progress", summary["test_verdict"])
+            self.assertEqual("", summary["timeout_classification"])
+            self.assertFalse(summary["runtime_timeout_observed"])
+            self.assertFalse(summary["editor_cleanup_recommended"])
+            self.assertEqual("", summary["cleanup_command"])
+            self.assertEqual(306.0, summary["elapsed_runtime_seconds"])
+            self.assertEqual(14.0, summary["seconds_since_last_progress"])
+
     def test_build_request_final_status_does_not_call_pre_start_timeout_runtime_timeout(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             project_root = Path(tmp_dir)
@@ -1469,6 +1513,31 @@ class BridgeRuntimeTests(unittest.TestCase):
             self.assertEqual("wrapper_failed_unity_unproven", error.details["result_trust_class"])
             self.assertEqual("wrapper_failed_unity_unproven", error.details["request_final_status"]["result_trust_class"])
             self.assertEqual(1, error.details["safe_retry_budget_total"])
+            self.assertEqual("unity_request_final_status", error.details["recovery_tool"])
+            self.assertEqual(
+                {"projectRoot": str(project_root), "requestId": request_id}, error.details["recovery_tool_arguments"]
+            )
+
+            import server_batch_orchestrator
+            import server_mcp_tools
+
+            compact = server_mcp_tools.tool_error_result(
+                error, build_tool_error_payload=server_batch_orchestrator.build_tool_error_payload
+            )["structuredContent"]
+            self.assertEqual("compact_transport_failure", compact["request_final_status_payload_mode"])
+            self.assertEqual({"includeFullPayload": True}, compact["full_payload_tool_arguments"])
+            self.assertEqual("unity_request_final_status", compact["recovery_tool"])
+            full = server_mcp_tools.tool_error_result(
+                error,
+                build_tool_error_payload=server_batch_orchestrator.build_tool_error_payload,
+                include_full_payload=True,
+                expand_full_error_payload=lambda payload: server_batch_orchestrator.expand_full_error_payload(
+                    project_root, payload
+                ),
+            )["structuredContent"]
+            self.assertEqual("full", full["request_final_status_payload_mode"])
+            self.assertIn("bridge_stabilization", full["request_final_status"])
+            self.assertGreater(len(json.dumps(full)), len(json.dumps(compact)))
 
     def test_transport_response_missing_embeds_compact_final_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
