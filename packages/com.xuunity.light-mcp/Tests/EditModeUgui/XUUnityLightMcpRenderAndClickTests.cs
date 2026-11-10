@@ -331,6 +331,13 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             Directory.CreateDirectory(evidenceDirectory);
             File.Copy(payload.screenshot_path, Path.Combine(evidenceDirectory, "intentional-blank.png"), true);
             File.WriteAllText(Path.Combine(evidenceDirectory, "intentional-blank.json"), JsonUtility.ToJson(payload, true));
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(_prefabPath));
+
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+            {
+                return;
+            }
+
             var texture = new Texture2D(2, 2);
             try
             {
@@ -344,8 +351,6 @@ namespace XUUnity.LightMcp.Tests.EditModeUgui
             {
                 Object.DestroyImmediate(texture);
             }
-
-            CollectionAssert.AreEqual(before, File.ReadAllBytes(_prefabPath));
         }
 
         [Test]

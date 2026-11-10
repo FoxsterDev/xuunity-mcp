@@ -156,5 +156,42 @@ class ScaffoldProjectTests(unittest.TestCase):
             self.assertEqual(raised.exception.code, 2)
 
 
+
+class AddUguiToExistingProjectTests(unittest.TestCase):
+    def write_manifest(self, root: Path, dependencies: dict) -> Path:
+        manifest_path = root / "Packages" / "manifest.json"
+        manifest_path.parent.mkdir(parents=True)
+        manifest_path.write_text(json.dumps({"dependencies": dependencies, "scopedRegistries": []}), encoding="utf-8")
+        return manifest_path
+
+    def test_a_6000_created_project_gains_ugui_and_keeps_everything_else(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path = self.write_manifest(Path(tmp), {"com.unity.modules.ui": "1.0.0"})
+
+            added = scaffold.add_ugui_lane_dependencies(manifest_path, "6000.5.10f1")
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(["com.unity.ugui"], added)
+            self.assertEqual({"com.unity.modules.ui": "1.0.0", "com.unity.ugui": "2.0.0"}, manifest["dependencies"])
+            self.assertEqual([], manifest["scopedRegistries"])
+
+    def test_existing_ugui_and_textmeshpro_versions_are_left_alone(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path = self.write_manifest(
+                Path(tmp), {"com.unity.ugui": "1.0.0", "com.unity.textmeshpro": "3.0.7"}
+            )
+            before = manifest_path.read_bytes()
+
+            self.assertEqual([], scaffold.add_ugui_lane_dependencies(manifest_path, "2021.3.58f1"))
+            self.assertEqual(before, manifest_path.read_bytes())
+
+    def test_cli_needs_an_existing_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(SystemExit):
+            scaffold.main(["--project-root", tmp, "--unity-version", "6000.0.58f2", "--add-ugui-to-existing"])
+
+    def test_cli_still_requires_a_lane_for_a_new_scaffold(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaises(SystemExit):
+            scaffold.main(["--project-root", tmp, "--unity-version", "6000.0.58f2"])
+
 if __name__ == "__main__":
     unittest.main()

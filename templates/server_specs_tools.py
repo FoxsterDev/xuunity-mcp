@@ -756,6 +756,7 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_prefab_snapshot": {
         "bridgeOperation": "unity.prefab.snapshot",
+        "forwardIncludeFullPayload": True,
         "description": (
             "Read a prefab asset's hierarchy as normalized ui.read.v1 nodes (path, active state, components, "
             "canvas context, and component detail where a uGUI/TMP reader is available). Read-only; the prefab "
@@ -786,6 +787,14 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "snapshotOutputPath": {
                     "type": "string",
                     "description": "Defaults to the project's MCP captures directory."
+                },
+                "includeFullPayload": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "When true, add component_type_full_names: per node (node_id, path), the namespace-qualified "
+                        "type of each entry in that node's components list, in the same order."
+                    )
                 },
                 "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
             },

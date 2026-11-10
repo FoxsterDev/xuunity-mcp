@@ -41,6 +41,16 @@ def ugui_lane_dependencies(unity_version: str) -> dict[str, str]:
     return {"com.unity.ugui": "1.0.0", "com.unity.textmeshpro": "3.0.6"}
 
 
+def add_ugui_lane_dependencies(manifest_path: Path, unity_version: str) -> list[str]:
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    dependencies = payload.setdefault("dependencies", {})
+    missing = {name: version for name, version in ugui_lane_dependencies(unity_version).items() if name not in dependencies}
+    if missing:
+        dependencies.update(missing)
+        manifest_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return sorted(missing)
+
+
 def package_dependency_value(package_dir: PurePath, packages_dir: PurePath) -> str:
     if package_dir.anchor != packages_dir.anchor:
         return "file:" + package_dir.as_posix()
@@ -110,10 +120,25 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--unity-version", required=True)
-    parser.add_argument("--lane", required=True, choices=LANES)
+    parser.add_argument("--lane", choices=LANES)
     parser.add_argument("--package-dir", default=str(DEFAULT_PACKAGE_DIR))
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--add-ugui-to-existing",
+        action="store_true",
+        help="Add the ugui lane packages missing from an existing project's manifest and change nothing else.",
+    )
     args = parser.parse_args(argv)
+
+    if args.add_ugui_to_existing:
+        manifest_path = Path(args.project_root) / "Packages" / "manifest.json"
+        if not manifest_path.is_file():
+            parser.error(f"--add-ugui-to-existing needs an existing manifest: {manifest_path}")
+        added = add_ugui_lane_dependencies(manifest_path, args.unity_version)
+        print(json.dumps({"status": "ok", "manifest_path": manifest_path.as_posix(), "added": added}, indent=2))
+        return 0
+    if args.lane is None:
+        parser.error("--lane is required unless --add-ugui-to-existing is given")
 
     package_dir = Path(args.package_dir)
     if not (package_dir / "package.json").is_file():

@@ -629,6 +629,8 @@ def call_tool(
 
     bridge_args = dict(args)
     include_full_payload = bool(bridge_args.pop("includeFullPayload", False))
+    if include_full_payload and tool.get("forwardIncludeFullPayload"):
+        bridge_args["includeFullPayload"] = True
     bridge_args.pop("projectRoot", None)
     bridge_args.pop("timeoutMs", None)
 

@@ -113,3 +113,14 @@ python3 scripts/testing/scaffold_unity_ci_project.py --project-root /tmp/CiProje
 
 The richer interactive matrix (bridge, scenarios, license-aware batch compile)
 remains available through `scripts/testing/run_unity_version_matrix.sh`.
+
+The matrix installs the checkout into a sandbox under its run root
+(`<run>/host-install`): the neutral install, the Claude and Codex delegate
+installs and `CODEX_HOME` all point there, so MCP sessions already running on
+the host keep their server. `--use-host-install` restores the old behaviour of
+installing into the host's real locations.
+
+`-createProject` on 6000.x makes a project without uGUI, so the matrix adds
+the `ugui` lane packages to each created project (`scaffold_unity_ci_project.py
+--add-ugui-to-existing`); without them the `EditModeUgui` self-tests would not
+compile or run there. `--no-ugui` keeps the bare template.

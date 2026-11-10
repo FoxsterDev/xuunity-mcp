@@ -276,6 +276,45 @@ namespace XUUnity.LightMcp.Tests.EditMode
         }
 
         [Test]
+        public void PrefabSnapshot_AddsFullComponentTypeNamesOnlyForTheFullPayload()
+        {
+            CreatePrefab();
+
+            var compact = RunPrefabSnapshot($"{{\"prefabPath\":\"{_prefabPath}\",\"writeSnapshot\":false}}");
+            var full = RunPrefabSnapshot(
+                $"{{\"prefabPath\":\"{_prefabPath}\",\"writeSnapshot\":false,\"includeFullPayload\":true}}");
+
+            StringAssert.DoesNotContain("component_type_full_names", compact);
+            var payload = JsonUtility.FromJson<XUUnityLightMcpPrefabSnapshotFullPayload>(full);
+            Assert.That(payload.component_type_full_names.Count, Is.EqualTo(payload.nodes.Count));
+            for (var index = 0; index < payload.nodes.Count; index++)
+            {
+                var node = payload.nodes[index];
+                var row = payload.component_type_full_names[index];
+                Assert.That(row.node_id, Is.EqualTo(node.node_id));
+                Assert.That(row.full_names.Count, Is.EqualTo(node.components.Count), node.path);
+                for (var component = 0; component < node.components.Count; component++)
+                {
+                    StringAssert.EndsWith(node.components[component], row.full_names[component]);
+                }
+            }
+
+            var child = payload.component_type_full_names.Find(row => row.path.EndsWith("/Child"));
+            Assert.That(child.full_names, Does.Contain("UnityEngine.RectTransform"));
+            Assert.That(child.full_names, Does.Contain("UnityEngine.MeshFilter"));
+        }
+
+        static string RunPrefabSnapshot(string argsJson)
+        {
+            return new XUUnityLightMcpPrefabSnapshotOperation().Execute(new XUUnityLightMcpRequest
+            {
+                request_id = "prefab-snapshot-full-types",
+                operation = "unity.prefab.snapshot",
+                args_json = argsJson
+            }).payload_json;
+        }
+
+        [Test]
         public void UiOperations_AreRegisteredAndCapabilityGated()
         {
             foreach (var operation in new[]

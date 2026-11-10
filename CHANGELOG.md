@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Fixed
+
+- `scripts/testing/run_unity_version_matrix.sh` no longer installs the checkout
+  into the host's neutral MCP install and Claude/Codex delegate installs. A
+  matrix run used to repoint the shared install (`.source_root`) at the branch
+  under test, so every MCP session started afterwards ran that branch. The run
+  now installs into `<run>/host-install`; `--use-host-install` opts back in.
+- The version matrix now runs the `EditModeUgui` self-tests on 6000.x. Projects
+  created there by `-createProject` have no uGUI, so that assembly never
+  compiled and its tests silently did not run. The matrix adds the `ugui` lane
+  packages to each created project through the new
+  `scaffold_unity_ci_project.py --add-ugui-to-existing`; `--no-ugui` skips it.
+- The package self-test `Render_AcceptsAnIntentionallyBlankPrefabAsAnArtifact`
+  no longer fails under `-nographics`. Without a graphics device the capture is
+  not transparent, so the test checked pixels it could not get; it now checks
+  the artifact contract there and the pixels only when a device is present, as
+  the other render tests do.
+
 - A bridge state left by a batch process that died without quitting (SIGKILL,
   crash) no longer reads as a live non-main owner (RG-19 residual). Discovery
   sets `bridge_state_writer_exited` and treats the file as stale state, so a
@@ -24,6 +42,17 @@
   `TryWritePendingCompletedResponse` under a thread-local project root override
   (`ProjectRootPathOverrideForCurrentThread`), so it never touches the live
   active-test-run file, and checks one `request_completed` per request.
+
+### Added
+
+- `unity_prefab_snapshot` with `includeFullPayload: true` returns
+  `component_type_full_names`: one row per node (`node_id`, `path`) with the
+  namespace-qualified type of each entry of that node's `components`, in the
+  same order, so two components that share a short name can be told apart
+  before a `componentType` edit (RG-48). The rows sit beside `nodes`, not in
+  them: Unity's JSON writer cannot omit an empty per-node field, and the node
+  type is shared with scene snapshots and UI queries. The default snapshot is
+  byte-for-byte unchanged.
 
 ## 0.3.89
 
