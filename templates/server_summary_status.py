@@ -110,6 +110,8 @@ def build_status_summary(
     editor_running = bool(payload.get("editor_running", editor_pid > 0))
     if editor_pid > 0:
         editor_running = editor_running and pid_is_alive(editor_pid)
+    if bool((discovery_details or {}).get("bridge_state_writer_pid_reused")):
+        editor_running = False
 
     heartbeat_age = heartbeat_age_seconds(effective)
     busy_reason = derive_busy_reason(effective)

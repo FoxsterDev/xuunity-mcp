@@ -30,6 +30,7 @@ from server_core import (
     ToolInvocationError,
     hidden_window_subprocess_kwargs,
     is_windows_like_host,
+    parse_utc_timestamp,
     read_json,
     render_launcher_cli,
     write_json,
@@ -1208,9 +1209,18 @@ def _readiness_error_from_log_observation(
         or observed_state.get("bridge_bootstrap_attached") is False
     ):
         code = "editor_not_ready_bridge_not_attached"
+        details.update(_attachment_predates_install_details(project_root, live_editor_pids))
         summary = (
-            "A matching Unity editor is live, but a current bridge has not attached yet. Poll bridge readiness, "
-            "then retry; do not restart the editor based on this observation. No compile result was measured."
+            "A matching Unity editor is live, but a current bridge has not attached yet. Poll bridge readiness "
+            "first. "
+            + (
+                "The editor was opened before the package was declared, so focus it or use Assets > Refresh to "
+                "resolve the manifest. "
+                if details["attachment_pending_predates_install"]
+                else ""
+            )
+            + "Restart the editor only if the bridge has not attached once import has settled. No compile result "
+            "was measured."
         )
         next_action = "poll_bridge_bootstrap_attached_then_retry"
     else:
@@ -1229,6 +1239,38 @@ def _readiness_error_from_log_observation(
     details["readiness_summary"] = summary
     details["recommended_next_action"] = next_action
     return ToolInvocationError(code, summary, details)
+
+
+def _attachment_predates_install_details(project_root: Path, live_editor_pids: list[int]) -> dict[str, Any]:
+    try:
+        manifest_mtime: float | None = (project_root / "Packages" / "manifest.json").stat().st_mtime
+    except OSError:
+        manifest_mtime = None
+    session_path = host_editor_session_state_path(project_root)
+    try:
+        session = read_json(session_path) if session_path.is_file() else {}
+    except Exception:
+        session = {}
+    session = session if isinstance(session, dict) else {}
+    opened_at = (
+        parse_utc_timestamp(session.get("opened_at_utc"))
+        if int(session.get("editor_pid") or 0) in live_editor_pids
+        else None
+    )
+    if manifest_mtime is None or opened_at is None:
+        basis = "editor_start_time_unknown"
+        predates = False
+    elif opened_at < manifest_mtime:
+        basis = "host_session_opened_before_manifest_change"
+        predates = True
+    else:
+        basis = "host_session_opened_after_manifest_change"
+        predates = False
+    return {
+        "attachment_pending_predates_install": predates,
+        "attachment_pending_basis": basis,
+        "restart_criterion": "only if the bridge has not attached once import has settled",
+    }
 
 
 def _editor_log_idle_seconds(editor_log_path: Path) -> float | None:

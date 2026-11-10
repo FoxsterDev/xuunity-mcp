@@ -50,7 +50,9 @@ Pass criteria:
 - transient bridge-attach/import/identity conditions keep polling, so stale
   log markers cannot preempt a bridge that becomes healthy inside the budget
 - bridge-not-attached and import/compile-busy readiness conditions recommend a
-  status poll, not editor restart/recovery
+  status poll first; bridge-not-attached names setup's restart criterion (only
+  once import has settled without attachment) and
+  `attachment_pending_predates_install`
 - a blocking readiness condition must set `host_prerequisites.ready=false`,
   include its code in `blocking_codes`, and expose the matching
   `checks.readiness_gate` row

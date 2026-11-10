@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- A bridge state left by a batch process that died without quitting (SIGKILL,
+  crash) no longer reads as a live non-main owner (RG-19 residual). Discovery
+  sets `bridge_state_writer_exited` and treats the file as stale state, so a
+  live main editor is routed normally and an empty project reads
+  `stale_bridge_state` instead of `bridge_owned_by_non_main_process`. The
+  health views report `process_exited` for a dead batch writer and
+  `editor_not_running` for any other dead writer, with the file's value kept as
+  `recorded_health_status`. A batch writer pid that is alive but no longer a
+  Unity process for this project (a reused pid) counts as exited too
+  (`bridge_state_writer_pid_reused`); without process visibility the host
+  does not claim it.
+- The `editor_not_ready_bridge_not_attached` readiness timeout no longer
+  contradicts setup's guidance (RG-04, F-8 item 4). It says to poll first and to
+  restart only once import has settled without attachment, carries the same
+  `restart_criterion` as setup, and sets `attachment_pending_predates_install`
+  (with `attachment_pending_basis`) when the host-opened editor predates the
+  manifest change, adding the focus or Assets > Refresh hint.
+- The recovered Play Mode completion's no-duplicate check is a named predicate
+  with an EditMode test (RG-04 F-6). An end-to-end EditMode test drives
+  `TryWritePendingCompletedResponse` under a thread-local project root override
+  (`ProjectRootPathOverrideForCurrentThread`), so it never touches the live
+  active-test-run file, and checks one `request_completed` per request.
+
 ## 0.3.89
 
 Release tag: `v0.3.89`

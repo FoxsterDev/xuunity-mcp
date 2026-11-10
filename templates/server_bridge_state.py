@@ -89,6 +89,17 @@ def pid_is_alive(pid: int) -> bool:
     return current_host_platform_adapter().pid_is_alive(pid)
 
 
+def effective_bridge_health_status(state: dict[str, Any] | None, *, pid_alive: bool) -> str:
+    effective = state or {}
+    recorded = str(effective.get("health_status") or "")
+    if not effective or pid_alive or int(effective.get("editor_pid") or 0) <= 0:
+        return recorded
+    if recorded == "process_exited":
+        return recorded
+    process_class = str(effective.get("bridge_process_class") or "").strip().lower()
+    return "process_exited" if process_class == "batch" else "editor_not_running"
+
+
 def try_read_live_editor_state(project_root: Path) -> dict[str, Any] | None:
     state = try_read_bridge_state(project_root)
     if not state:

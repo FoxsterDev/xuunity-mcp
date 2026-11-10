@@ -146,7 +146,12 @@ def build_bridge_stabilization_summary(
     recorded_health_status = health_status
     recorded_listener_state = transport_listener_state
     if not editor_running_effective:
-        health_status = "editor_not_running"
+        recorded_health_status = str(effective.get("health_status") or "unknown")
+        health_status = (
+            "process_exited"
+            if str(writer_identity.get("bridge_process_class") or "") == "batch"
+            else "editor_not_running"
+        )
         transport_listener_state = "no_live_editor"
         transport_ready_for_requests = False
         request_flow_state = "not_ready"
@@ -157,7 +162,7 @@ def build_bridge_stabilization_summary(
         blocking_reasons.append("editor_not_running")
     if not mcp_reachable_effective:
         blocking_reasons.append("mcp_not_reachable")
-    if not runtime_execution_allowed:
+    if not runtime_execution_allowed and editor_running_effective:
         blocking_reasons.append("bridge_owned_by_non_main_process")
     if recorded_health_status != "healthy":
         blocking_reasons.append("health_not_healthy")
