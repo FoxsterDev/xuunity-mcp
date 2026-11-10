@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server_bridge_runtime import build_bridge_stabilization_summary, compiler_diagnostics_trust_from_state
+from server_capability_generation import read_capability_report_generation_view
 from server_cli_test_progress import read_cli_test_progress
 from server_licensing_state import editor_license_evidence
 
@@ -351,6 +352,7 @@ def build_status_summary(
         if not session.get("opened_by_host"):
             summary["licensing_handoff_classification"] = "licensing_ipc_not_forwarded_external_launch"
             summary["recommended_next_action"] = "Reopen using open-editor --unity-arg=<argument> so the wrapper forwards the Hub licensing channel."
+    summary.update(read_capability_report_generation_view(project_root, effective))
     cli_test_progress = read_cli_test_progress(project_root, pid_is_alive=pid_is_alive)
     if cli_test_progress:
         summary["cli_test_progress"] = cli_test_progress

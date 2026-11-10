@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import os
 import sys
 import threading
@@ -146,9 +147,15 @@ def record_request_refused_event(
 ) -> Path:
     from server_recovery_commands import recommended_recovery_command_for_project
 
-    details = dict(error.details or {})
+    details = json_safe_details(error.details or {})
     next_action = str(details.get("recommended_next_action") or "")
-    effective = state or {}
+    decision_state = details.get("decision_state")
+    if isinstance(decision_state, dict) and decision_state:
+        effective = decision_state
+        fingerprint_source = "idle_timeout_snapshot"
+    else:
+        effective = state or {}
+        fingerprint_source = "compile_gate" if str(error.code) in COMPILE_GATE_REFUSAL_CODES else "pre_idle"
     return write_host_request_journal_event(project_root, "request_refused", {
         "request_id": request_id,
         "request_submitted": False,
@@ -157,13 +164,23 @@ def record_request_refused_event(
         "reason": error.message,
         "recommended_next_action": next_action,
         "recommended_recovery_command": details.get("recommended_recovery_command") or recommended_recovery_command_for_project(project_root, next_action),
-        "state_fingerprint": {key: effective.get(key) for key in (
+        "state_fingerprint": json_safe_details({key: effective.get(key) for key in (
             "editor_pid", "bridge_generation", "bridge_session_id", "heartbeat_utc", "busy_reason",
             "busy_reason_detail", "compiler_diagnostics_captured_utc", "compiler_diagnostics_bridge_generation",
             "script_compilation_failed", "compiler_error_count",
-        )},
+        )}),
+        "state_fingerprint_source": fingerprint_source,
         "details": details,
     })
+
+
+COMPILE_GATE_REFUSAL_CODES = frozenset({"compile_broken", "compile_verdict_unavailable"})
+
+
+def json_safe_details(details: dict[str, Any]) -> dict[str, Any]:
+    """Stringify values JSON cannot carry (paths, sets, exceptions) so journaling can never replace a refusal."""
+
+    return json.loads(json.dumps(dict(details), default=str))
 
 
 def record_operation_progress_event(

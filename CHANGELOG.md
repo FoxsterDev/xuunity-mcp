@@ -62,6 +62,33 @@
   and the other reload codes) from the persisted scenario result, marked
   `scenario_result_source: persisted_result_file` with the miss code and the
   editor's busy reason.
+- Refusals, completions and capability reports say what the host decided on
+  (RG-04, follow-ups F-5 to F-8 of the 2026-09-15 recovery review):
+  - Every request the host refuses before submission, and will not retry
+    itself, writes exactly one `request_refused`: transport-stage refusals
+    (`bridge_disabled`, `editor_not_running`, `transport_connect_failed`) and
+    the non-main bridge owner refusal included. A refused stale-diagnostics
+    recovery refresh is folded into the operator's refusal as
+    `recovery_refresh_refusal`. Detail values JSON cannot carry are
+    stringified, and a journaling failure is attached as
+    `refusal_journal_error` instead of replacing the refusal.
+  - `editor_idle_timeout` details carry `decision_state`, the snapshot the
+    timeout was decided on; the refusal's `state_fingerprint` uses it and
+    `state_fingerprint_source` names the source.
+  - A Play Mode test response written by the post-reload recovery path now
+    journals `request_completed`, so the run no longer ends at
+    `request_started`.
+  - `unity_capabilities` and `unity_status_summary` compare the report's
+    `probe_bridge_generation` with the live bridge and set
+    `capability_report_generation_behind` when the report predates it.
+  - Setup plan, apply and `validate-setup` flag a running editor whose pid owns
+    no bridge state, also when the manifest already declares the package
+    (`declared_but_bridge_not_attached`), from one process listing per
+    command; an unavailable listing reports `check_status: unavailable`. Each
+    pending root gets `unity_editor_bridge_attachment_guidance` with
+    `ensure-ready --open-editor`, the manual fallback and the restart
+    criterion, shown before the approval sentence in the review summary and in
+    the README review template.
 
 ## 0.3.88
 

@@ -424,23 +424,58 @@ class SetupAndCatalogGuidanceTests(unittest.TestCase):
                     self.assertEqual("project-hook-scaffold", parsed.command)
                     self.assertTrue(parsed.write)
 
-    def test_setup_warns_about_attachment_only_for_live_first_install(self):
-        for live, installed in [(True, False), (False, False), (True, True)]:
-            with self.subTest(live=live, installed=installed), tempfile.TemporaryDirectory() as tmp:
-                root = Path(tmp)
-                (root / "Assets").mkdir()
-                (root / "ProjectSettings").mkdir()
-                (root / "ProjectSettings/ProjectVersion.txt").write_text("m_EditorVersion: 6000.0.58f2", encoding="utf-8")
-                write_json(root / "Packages/manifest.json", {"dependencies": {"com.xuunity.light-mcp": "file:existing"} if installed else {}})
-                with mock.patch.object(server_setup_common, "find_running_unity_editors_for_project", return_value=[{"pid": 123}] if live else []):
-                    plan = server_setup_plan.build_setup_plan(workspace_root=None, project_roots=[str(root)], recursive=False, include_test_framework="no", package_source="file", package_version="", local_package_source=str(ROOT / "packages/com.xuunity.light-mcp"))
-                    expected = [str(root.resolve())] if live and not installed else []
+    def _setup_root(self, tmp, installed):
+        root = Path(tmp)
+        (root / "Assets").mkdir()
+        (root / "ProjectSettings").mkdir()
+        (root / "ProjectSettings/ProjectVersion.txt").write_text("m_EditorVersion: 6000.0.58f2", encoding="utf-8")
+        write_json(root / "Packages/manifest.json", {"dependencies": {"com.xuunity.light-mcp": "file:existing"} if installed else {}})
+        return root
+
+    def _plan(self, root):
+        return server_setup_plan.build_setup_plan(workspace_root=None, project_roots=[str(root)], recursive=False, include_test_framework="no", package_source="file", package_version="", local_package_source=str(ROOT / "packages/com.xuunity.light-mcp"))
+
+    def test_setup_warns_about_a_live_editor_that_owns_no_bridge_state(self):
+        listing = {"available": True, "commands": [(123, "Unity -projectPath x")]}
+        for live, installed, bridge_pid, reason in [
+            (True, False, 0, "first_package_declaration"),
+            (False, False, 0, ""),
+            (True, True, 0, "declared_but_bridge_not_attached"),
+            (True, True, 999, "declared_but_bridge_not_attached"),
+            (True, True, 123, ""),
+        ]:
+            with self.subTest(live=live, installed=installed, bridge_pid=bridge_pid), tempfile.TemporaryDirectory() as tmp:
+                root = self._setup_root(tmp, installed)
+                if bridge_pid:
+                    write_json(bridge_state_path(root), {"editor_pid": bridge_pid})
+                with (
+                    mock.patch.object(server_setup_common, "find_running_unity_editors_for_project", return_value=[{"pid": 123}] if live else []),
+                    mock.patch.object(server_setup_common, "setup_process_report", return_value=listing) as listing_call,
+                ):
+                    plan = self._plan(root)
+                    expected = [str(root.resolve())] if reason else []
                     self.assertEqual(expected, plan["unity_editor_bridge_attachment_pending"])
+                    self.assertEqual(1, listing_call.call_count)
                     applied = server_setup_apply.apply_setup_plan(plan, approve=True)
                     self.assertEqual(expected, applied["unity_editor_bridge_attachment_pending"])
                     if expected:
-                        self.assertIn("If refresh does not attach", applied["unity_editor_bridge_attachment_message"])
+                        guidance = plan["unity_editor_bridge_attachment_guidance"][0]
+                        self.assertEqual(reason, guidance["reason"])
+                        self.assertIn("ensure-ready", guidance["next_command"])
+                        self.assertIn("--open-editor", guidance["next_command"])
+                        self.assertNotIn("request-project-refresh", applied["unity_editor_bridge_attachment_message"])
+                        self.assertIn("ensure-ready --open-editor", applied["unity_editor_bridge_attachment_message"])
+                        summary = plan["preflight_review"]["preferred_review_summary"]
+                        self.assertLess(summary.index("Running editor without an attached bridge"), summary.index("Do not run setup-apply"))
                     self.assertNotIn("unity_editor_restart_required", applied)
+
+    def test_unavailable_process_listing_is_reported_not_read_as_no_editor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._setup_root(tmp, installed=False)
+            with mock.patch.object(server_setup_common, "setup_process_report", return_value={"available": False, "commands": [], "error_code": "process_listing_tool_missing"}):
+                plan = self._plan(root)
+        self.assertEqual([], plan["unity_editor_bridge_attachment_pending"])
+        self.assertEqual("unavailable", plan["unity_editor_bridge_attachment_check_status"])
 
 
 if __name__ == "__main__":

@@ -149,3 +149,37 @@ outputs: it does not. The current setup plan in the archive already has the
 package dependency. No blanket restart requirement or generic repair mapping is
 inferred from it. Detailed private evidence IDs and hashes remain in the private
 verification report; no consumer logs or identities were promoted here.
+
+## Corrections After the Follow-Up Review
+
+A later review of this release found four claims above that did not hold as
+written. They are corrected here rather than rewritten above.
+
+- **"One renderer" (M-6).** An older duplicate renderer in the orchestrator still
+  raised on new tokens and was the copy the public module exported; some emitted
+  tokens rendered an empty command. Resolved by v0.3.87: every next-action token
+  renders a non-empty command through `server_recovery_commands.py`.
+- **"Undated evidence is classified stale and refreshed once" (M-1).** Freshness was
+  judged only from the few files named in the diagnostics, so a fix in another
+  compile input kept the error `confirmed`. Resolved by v0.3.88 (RG-03): freshness
+  is judged over every compile input.
+- **"Decision evidence" on refusals (M-7).** The refusal's `state_fingerprint` was
+  the snapshot read before the idle wait, not the one the decision was made on.
+  Now `editor_idle_timeout` details carry `decision_state`, the refusal prefers it,
+  and `state_fingerprint_source` names `idle_timeout_snapshot`, `compile_gate` or
+  `pre_idle`. Values JSON cannot carry are stringified, and a journaling failure is
+  attached as `refusal_journal_error` instead of replacing the refusal.
+- **"Compile/idle refusals" as the whole refusal scope (M-7).** Transport-stage
+  refusals (`bridge_disabled`, `editor_not_running`, `transport_connect_failed`)
+  and the non-main bridge owner refusal wrote no event. Now every refusal that was
+  not submitted, and will not be retried by the host, writes exactly one
+  `request_refused`; a refused stale-diagnostics recovery refresh is folded into
+  the operator's refusal as `recovery_refresh_refusal` instead of a second event.
+  The refusal carries the request id the host's progress events already used, so
+  the chain closes; that id is planned before submission, never one Unity saw.
+
+The same review's remaining items: the pending-response recovery path now journals
+`request_completed` (F-6); the host compares a capability report's
+`probe_bridge_generation` with the live bridge (`capability_report_generation_behind`);
+and setup computes editor attachment from bridge liveness with a reachable next
+command, `ensure-ready --open-editor` (F-8).

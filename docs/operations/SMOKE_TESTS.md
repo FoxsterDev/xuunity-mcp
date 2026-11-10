@@ -1356,7 +1356,10 @@ Scenario payload contract:
 
 ## Diagnostics Freshness and Recovery Regression
 
-Host fixtures: `python3 -m unittest tests.test_retro_recovery`.
+Host fixtures: `python3 -m unittest tests.test_retro_recovery tests.test_refusal_journaling`.
+Disabling the bridge in `bridge_config.json` and requesting `unity.status` must
+also journal exactly one `request_refused`, with no dangling `operation_progress`
+chain (the refusal carries the progress events' request id).
 These exercise host behavior against an editor transport boundary; they are not
 live Unity proof. Run the following separately on a disposable Unity project
 using this package revision before claiming editor lifecycle validation:
@@ -1367,7 +1370,9 @@ using this package revision before claiming editor lifecycle validation:
 2. Fix the named source on disk without a manual refresh. The next test request
    must classify the old error as `stale`, refresh once, settle and then run.
    If the error remains after refresh, it must refuse; deferred or missing
-   compile evidence must never dispatch the test.
+   compile evidence must never dispatch the test. A refused recovery refresh
+   still leaves exactly one `request_refused`, for the original operation, with
+   `details.recovery_refresh_refusal`.
 3. With the editor closed, use an isolated copied state fixture with a dead PID
    and old heartbeat. The idle timeout must identify `editor_state_frozen`,
    preserve the timestamp/detail of the last busy reason, and name

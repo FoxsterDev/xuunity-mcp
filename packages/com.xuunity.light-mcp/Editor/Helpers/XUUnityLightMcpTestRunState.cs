@@ -360,11 +360,13 @@ namespace XUUnity.LightMcp.Editor.Helpers
 
                 try
                 {
-                    XUUnityLightMcpResponseWriter.Write(BuildResponseLocked(state));
+                    var response = BuildResponseLocked(state);
+                    XUUnityLightMcpResponseWriter.Write(response);
                     state.response_handoff_state = "written";
                     state.run_phase = "response_written";
                     PersistResultLocked(state);
                     DeleteLocked();
+                    JournalRecoveredCompletion(state, response);
                     return true;
                 }
                 catch
@@ -372,6 +374,55 @@ namespace XUUnity.LightMcp.Editor.Helpers
                     return false;
                 }
             }
+        }
+
+        static void JournalRecoveredCompletion(XUUnityLightMcpPersistedTestRunState state, XUUnityLightMcpResponse response)
+        {
+            try
+            {
+                var status = response?.status ?? "ok";
+                XUUnityLightMcpBridgeRuntimeState.MarkRequestProcessed(state.request_id, state.operation, status, state.started_at_utc, 0);
+                if (!JournalHasEvent(state.request_id, "request_completed"))
+                {
+                    XUUnityLightMcpRequestJournal.WriteRequestCompleted(
+                        state.request_id,
+                        state.operation,
+                        status,
+                        state.started_at_utc,
+                        state.completed_at_utc,
+                        0,
+                        response);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        internal static bool JournalHasEvent(string requestId, string eventType)
+        {
+            if (string.IsNullOrWhiteSpace(requestId) || !Directory.Exists(XUUnityLightMcpFileIpcPaths.RequestJournalDirectory))
+            {
+                return false;
+            }
+
+            var suffix = "_" + eventType + ".json";
+            foreach (var path in Directory.EnumerateFiles(XUUnityLightMcpFileIpcPaths.RequestJournalDirectory, "*" + suffix))
+            {
+                try
+                {
+                    var payload = UnityEngine.JsonUtility.FromJson<XUUnityLightMcpRequestJournalEvent>(File.ReadAllText(path));
+                    if (payload != null && string.Equals(payload.request_id, requestId, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return false;
         }
 
         public static void Clear()

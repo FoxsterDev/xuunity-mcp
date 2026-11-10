@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from server_setup_common import *
+import server_setup_common as _setup_common
 
 def render_preferred_review_summary(
     *,
@@ -108,16 +109,24 @@ def build_setup_plan(
         "projects": [],
         "unity_editor_bridge_attachment_pending": [],
         "unity_editor_bridge_attachment_message": "",
+        "unity_editor_bridge_attachment_guidance": [],
+        "unity_editor_bridge_attachment_check_status": "not_checked",
     }
     primary_project_root = explicit_project_roots[0] if explicit_project_roots else (projects[0] if projects else None)
     client_config_targets = build_client_config_targets(primary_project_root)
 
+    process_report = _setup_common.setup_process_report() if projects else {"available": True, "commands": []}
     for project_root in projects:
         unity_version = parse_unity_version(project_root)
         package_dependency = manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME)
-        if unity_editor_bridge_attachment_pending(project_root):
+        attachment = unity_editor_bridge_attachment(project_root, process_report)
+        result["unity_editor_bridge_attachment_check_status"] = attachment["check_status"]
+        if attachment["pending"]:
             result["unity_editor_bridge_attachment_pending"].append(str(project_root))
             result["unity_editor_bridge_attachment_message"] = UNITY_EDITOR_ATTACHMENT_MESSAGE
+            result["unity_editor_bridge_attachment_guidance"].append(
+                unity_editor_bridge_attachment_guidance(project_root, attachment)
+            )
         tf_state = classify_test_framework_state(project_root, unity_version)
         bridge_state = bridge_config_state(project_root)
         planned_actions: list[dict[str, Any]] = []
@@ -380,8 +389,24 @@ def build_setup_plan(
         recommended_next_step=str(result["preflight_review"]["recommended_next_step"]),
     )
     if result["unity_editor_bridge_attachment_pending"]:
-        result["preflight_review"]["preferred_review_summary"] += "\n" + UNITY_EDITOR_ATTACHMENT_MESSAGE
+        result["preflight_review"]["preferred_review_summary"] = insert_attachment_bullet_before_approval(
+            result["preflight_review"]["preferred_review_summary"],
+            result["unity_editor_bridge_attachment_guidance"],
+        )
     return result
+
+
+def insert_attachment_bullet_before_approval(summary: str, guidance: list[dict[str, Any]]) -> str:
+    bullet = "- Running editor without an attached bridge: " + "; ".join(
+        f"{item['project_root']} (pids {', '.join(str(pid) for pid in item['editor_pids'])}) -> {item['next_command']}"
+        for item in guidance
+    ) + ". " + UNITY_EDITOR_ATTACHMENT_MESSAGE
+    marker = "Do not run setup-apply"
+    index = summary.find(marker)
+    if index < 0:
+        return summary + "\n" + bullet
+    line_start = summary.rfind("\n", 0, index) + 1
+    return summary[:line_start] + bullet + "\n" + summary[line_start:]
 
 
 __all__ = [name for name in globals() if not name.startswith("__")]

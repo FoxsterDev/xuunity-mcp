@@ -352,6 +352,10 @@ def build_editor_idle_timeout_details(
         "result_trust_class": "stale_snapshot" if frozen else "editor_state_not_idle",
         "heartbeat_age_seconds": None if age_seconds is None else round(age_seconds, 3),
         "busy_reason": busy_reason,
+        "decision_state": {
+            key: (last_state or {}).get(key)
+            for key in ("editor_pid", "bridge_generation", "bridge_session_id", "heartbeat_utc", "busy_reason", "busy_reason_detail")
+        },
         "editor_busy_in_build": busy_in_build,
         "unresponsive_cause": "build_player_in_progress" if (frozen and busy_in_build) else "",
         "blocking_reasons": blocking_reasons,

@@ -15,15 +15,74 @@ from server_project_context import inspect_light_mcp_import_state, project_not_f
 from server_editor_host_processes import find_running_unity_editors_for_project
 
 UNITY_EDITOR_ATTACHMENT_MESSAGE = (
-    "A Unity editor is already running for a project receiving its first MCP package declaration. "
-    "It must import the package and load the bridge before MCP requests can reach it. "
-    "If refresh does not attach the bridge, save work, close and reopen that editor out of band; "
-    "request-editor-quit requires an attached bridge."
+    "A Unity editor is running for this project without an attached MCP bridge, so MCP requests cannot reach "
+    "it yet (they fail with editor_not_running over file IPC or transport_not_ready over TCP loopback). "
+    "Run ensure-ready --open-editor: it reuses and activates the running editor and waits for "
+    "bridge_bootstrap_attached. Whether activation resolves the new manifest depends on the editor's Auto "
+    "Refresh preference, so if it does not attach, focus the editor or use Assets > Refresh. Restart the "
+    "editor only if the bridge has not attached once import has settled; request-editor-quit needs an "
+    "attached bridge."
 )
+UNITY_EDITOR_ATTACHMENT_MANUAL_FALLBACK = (
+    "focus the running editor or use Assets > Refresh so Unity resolves the new manifest"
+)
+UNITY_EDITOR_ATTACHMENT_RESTART_CRITERION = "only if the bridge has not attached once import has settled"
 
 
-def unity_editor_bridge_attachment_pending(project_root: Path) -> bool:
-    return not manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME) and bool(find_running_unity_editors_for_project(project_root))
+def setup_process_report() -> dict[str, Any]:
+    from server_editor_host_discovery import list_process_commands_report
+
+    return list_process_commands_report()
+
+
+def unity_editor_bridge_attachment(
+    project_root: Path,
+    process_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """A live project editor whose pid owns no bridge state cannot be reached, whether or not the manifest declares the package."""
+
+    from server_bridge_state import try_read_bridge_state
+
+    report = process_report if process_report is not None else setup_process_report()
+    if not bool(report.get("available", True)):
+        return {
+            "pending": False,
+            "check_status": "unavailable",
+            "check_error_code": str(report.get("error_code") or "process_listing_unavailable"),
+            "editor_pids": [],
+            "reason": "",
+        }
+    live = find_running_unity_editors_for_project(project_root, process_commands=list(report.get("commands") or []))
+    pids = sorted({int(item.get("pid") or 0) for item in live if int(item.get("pid") or 0) > 0})
+    if not pids:
+        return {"pending": False, "check_status": "checked", "editor_pids": [], "reason": ""}
+    state = try_read_bridge_state(project_root) or {}
+    if int(state.get("editor_pid") or 0) in pids:
+        return {"pending": False, "check_status": "checked", "editor_pids": pids, "reason": "bridge_attached"}
+    declared = bool(manifest_dependency(project_root, LIGHT_MCP_PACKAGE_NAME))
+    return {
+        "pending": True,
+        "check_status": "checked",
+        "editor_pids": pids,
+        "reason": "declared_but_bridge_not_attached" if declared else "first_package_declaration",
+    }
+
+
+def unity_editor_bridge_attachment_pending(project_root: Path, process_report: dict[str, Any] | None = None) -> bool:
+    return bool(unity_editor_bridge_attachment(project_root, process_report)["pending"])
+
+
+def unity_editor_bridge_attachment_guidance(project_root: Path, attachment: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "project_root": str(project_root),
+        "editor_pids": list(attachment.get("editor_pids") or []),
+        "reason": str(attachment.get("reason") or ""),
+        "bridge_requests_reachable": False,
+        "error_until_attached": "editor_not_running (file IPC) or transport_not_ready (TCP loopback)",
+        "next_command": render_launcher_cli("ensure-ready", project_root, "--open-editor"),
+        "manual_fallback": UNITY_EDITOR_ATTACHMENT_MANUAL_FALLBACK,
+        "restart_criterion": UNITY_EDITOR_ATTACHMENT_RESTART_CRITERION,
+    }
 
 LIGHT_MCP_PACKAGE_NAME = "com.xuunity.light-mcp"
 TEST_FRAMEWORK_PACKAGE_NAME = "com.unity.test-framework"
