@@ -109,6 +109,47 @@ def _with_post_reset_recovery_fields(
     return response
 
 
+def write_lifecycle_reclassification_event(
+    project_root: Path,
+    *,
+    request_id: str,
+    operation: str,
+    retryable: bool,
+    initial_generation: int,
+    initial_session_id: str,
+    state: dict[str, Any] | None,
+    trigger: str,
+    recovery_fields: dict[str, Any],
+) -> Path:
+    """Journal the reclassification against the identity read now, and only claim a generation change that happened."""
+
+    current_state = read_best_effort_bridge_state(project_root) or state
+    current_generation, current_session_id = bridge_identity_from_state(current_state)
+    changed = bridge_identity_changed(initial_generation, initial_session_id, current_state)
+    return write_host_request_journal_event(
+        project_root,
+        "request_reclassified",
+        {
+            "request_id": request_id,
+            "operation": operation,
+            "reason": "bridge_generation_changed_before_response" if changed else f"{trigger}_before_response",
+            "reclassification_trigger": trigger,
+            "bridge_generation_changed": changed,
+            "retryable": retryable,
+            "reclassified_status": (
+                "retryable_after_lifecycle_reset"
+                if retryable
+                else "response_missing_after_lifecycle_reset"
+            ),
+            "previous_bridge_generation": initial_generation,
+            "previous_bridge_session_id": initial_session_id,
+            "bridge_generation": current_generation,
+            "bridge_session_id": current_session_id,
+            **recovery_fields,
+        },
+    )
+
+
 class BridgeTransportAdapter:
     name = "unknown"
 
@@ -124,6 +165,7 @@ class BridgeTransportAdapter:
         args: dict[str, Any],
         timeout_ms: int,
         post_reset_recovery_cap_ms: int = 0,
+        request_id: str = "",
     ) -> tuple[dict[str, Any], str, float]:
         raise NotImplementedError
 
@@ -147,6 +189,7 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
         args: dict[str, Any],
         timeout_ms: int,
         post_reset_recovery_cap_ms: int = 0,
+        request_id: str = "",
     ) -> tuple[dict[str, Any], str, float]:
         state_path = bridge_state_path(project_root)
         if not state_path.is_file():
@@ -174,7 +217,7 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
         in_dir.mkdir(parents=True, exist_ok=True)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        request_id = str(uuid.uuid4())
+        request_id = str(request_id or uuid.uuid4())
         request_path = in_dir / f"{request_id}.json"
         response_path = out_dir / f"{request_id}.json"
         request_started_at = time.time()
@@ -274,32 +317,22 @@ class FileIpcBridgeTransport(BridgeTransportAdapter):
             recovery_fields = _post_reset_recovery_fields(
                 post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
             )
-            current_generation, current_session_id = bridge_identity_from_state(state)
             processed = bool(
                 recovered_status.get("request_started")
                 or recovered_status.get("request_completed")
                 or str((state or {}).get("last_processed_request_id") or "") == request_id
             )
             retryable = not processed
-            journal_path = write_host_request_journal_event(
+            journal_path = write_lifecycle_reclassification_event(
                 project_root,
-                "request_reclassified",
-                {
-                    "request_id": request_id,
-                    "operation": operation,
-                    "reason": "bridge_generation_changed_before_response",
-                    "retryable": retryable,
-                    "reclassified_status": (
-                        "retryable_after_lifecycle_reset"
-                        if retryable
-                        else "response_missing_after_lifecycle_reset"
-                    ),
-                    "previous_bridge_generation": initial_generation,
-                    "previous_bridge_session_id": initial_session_id,
-                    "bridge_generation": current_generation,
-                    "bridge_session_id": current_session_id,
-                    **recovery_fields,
-                },
+                request_id=request_id,
+                operation=operation,
+                retryable=retryable,
+                initial_generation=initial_generation,
+                initial_session_id=initial_session_id,
+                state=state,
+                trigger="lifecycle_reset",
+                recovery_fields=recovery_fields,
             )
             try:
                 if request_path.exists():
@@ -374,6 +407,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
         args: dict[str, Any],
         timeout_ms: int,
         post_reset_recovery_cap_ms: int = 0,
+        request_id: str = "",
     ) -> tuple[dict[str, Any], str, float]:
         raw_state = try_read_bridge_state(project_root)
         state = read_best_effort_bridge_state(project_root)
@@ -412,7 +446,7 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                 ),
             )
 
-        request_id = str(uuid.uuid4())
+        request_id = str(request_id or uuid.uuid4())
         request_started_at = time.time()
         initial_state = state
         initial_generation, initial_session_id = bridge_identity_from_state(initial_state)
@@ -603,26 +637,16 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
                     recovery_fields = _post_reset_recovery_fields(
                         post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
                     )
-                    current_generation, current_session_id = bridge_identity_from_state(current_state)
-                    journal_path = write_host_request_journal_event(
+                    journal_path = write_lifecycle_reclassification_event(
                         project_root,
-                        "request_reclassified",
-                        {
-                            "request_id": request_id,
-                            "operation": operation,
-                            "reason": "bridge_generation_changed_before_response",
-                            "retryable": retryable,
-                            "reclassified_status": (
-                                "retryable_after_lifecycle_reset"
-                                if retryable
-                                else "response_missing_after_lifecycle_reset"
-                            ),
-                            "previous_bridge_generation": initial_generation,
-                            "previous_bridge_session_id": initial_session_id,
-                            "bridge_generation": current_generation,
-                            "bridge_session_id": current_session_id,
-                            **recovery_fields,
-                        },
+                        request_id=request_id,
+                        operation=operation,
+                        retryable=retryable,
+                        initial_generation=initial_generation,
+                        initial_session_id=initial_session_id,
+                        state=current_state,
+                        trigger="transport_restarting",
+                        recovery_fields=recovery_fields,
                     )
                     raise build_lifecycle_reset_tool_error(
                         project_root,
@@ -684,32 +708,22 @@ class TcpLoopbackBridgeTransport(BridgeTransportAdapter):
             recovery_fields = _post_reset_recovery_fields(
                 post_reset_recovery_cap_ms, recovery_timeout_ms, recovered_status
             )
-            current_generation, current_session_id = bridge_identity_from_state(state)
             processed = bool(
                 recovered_status.get("request_started")
                 or recovered_status.get("request_completed")
                 or str((state or {}).get("last_processed_request_id") or "") == request_id
             )
             retryable = not processed
-            journal_path = write_host_request_journal_event(
+            journal_path = write_lifecycle_reclassification_event(
                 project_root,
-                "request_reclassified",
-                {
-                    "request_id": request_id,
-                    "operation": operation,
-                    "reason": "bridge_generation_changed_before_response",
-                    "retryable": retryable,
-                    "reclassified_status": (
-                        "retryable_after_lifecycle_reset"
-                        if retryable
-                        else "response_missing_after_lifecycle_reset"
-                    ),
-                    "previous_bridge_generation": initial_generation,
-                    "previous_bridge_session_id": initial_session_id,
-                    "bridge_generation": current_generation,
-                    "bridge_session_id": current_session_id,
-                    **recovery_fields,
-                },
+                request_id=request_id,
+                operation=operation,
+                retryable=retryable,
+                initial_generation=initial_generation,
+                initial_session_id=initial_session_id,
+                state=state,
+                trigger="lifecycle_reset",
+                recovery_fields=recovery_fields,
             )
             raise build_lifecycle_reset_tool_error(
                 project_root,
@@ -806,6 +820,7 @@ def invoke_bridge_transport(
     args: dict[str, Any],
     timeout_ms: int,
     post_reset_recovery_cap_ms: int = 0,
+    request_id: str = "",
 ) -> tuple[dict[str, Any], str, float, dict[str, Any]]:
     if not bridge_enabled(project_root):
         emit_request_not_submitted_ack(
@@ -838,5 +853,6 @@ def invoke_bridge_transport(
         args,
         timeout_ms,
         post_reset_recovery_cap_ms=post_reset_recovery_cap_ms,
+        request_id=request_id,
     )
     return response, request_id, request_started_at, transport.metadata(project_root)

@@ -96,6 +96,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
             XUUnityLightMcpBackgroundExecution.ApplyIfConfigured();
             EditorApplication.quitting -= XUUnityLightMcpBackgroundExecution.Restore;
             EditorApplication.quitting += XUUnityLightMcpBackgroundExecution.Restore;
+            if (processClass == XUUnityLightMcpBridgeProcessIdentity.BatchProcessClass)
+            {
+                EditorApplication.quitting -= WriteBatchProcessExited;
+                EditorApplication.quitting += WriteBatchProcessExited;
+            }
             XUUnityLightMcpBridgeRuntimeState.InitializeBridgeSession();
             XUUnityLightMcpBridgeTransportRuntime.Initialize(config);
             XUUnityLightMcpLifecycleMonitor.InitializeIfNeeded();
@@ -116,10 +121,22 @@ namespace XUUnity.LightMcp.Editor.Bridge
             EditorApplication.update += OnUpdate;
         }
 
+        static void WriteBatchProcessExited()
+        {
+            try
+            {
+                XUUnityLightMcpBridgeStateWriter.WriteProcessExited();
+            }
+            catch
+            {
+            }
+        }
+
         static void OnUpdate()
         {
             XUUnityLightMcpEditorQuitScheduler.Tick();
             XUUnityLightMcpUiClickTreeWatch.Tick();
+            XUUnityLightMcpBuildPlayerRuntime.Tick();
             var now = EditorApplication.timeSinceStartup;
 
             if (now - _lastHeartbeatAt >= _heartbeatIntervalSeconds)

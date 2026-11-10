@@ -260,14 +260,20 @@ changed; a red probe sets `reopen_blocked`.
 
 ### Alive Editor Without an Attached Bridge
 
-A running editor may predate package installation. Setup plan/apply report
-`unity_editor_bridge_attachment_pending` and explain the boundary: until package import
-and domain reload attach a bridge, `request-editor-quit` has no receiver.
-`recover-editor-session` cannot restart an unbridged live process. Check
-`same_project_editor_process_without_live_bridge_state` and project discovery.
-Allow the editor to import/refresh; if the bridge still does not attach, save
-work and close/reopen that editor out of band. An attachment warning is not authority
-to force-kill a process or discard unsaved work.
+A running editor may predate package installation, or the package may already be
+declared while that editor's pid owns no bridge state. Setup plan, apply and
+`validate-setup` report `unity_editor_bridge_attachment_pending` (reason
+`first_package_declaration` or `declared_but_bridge_not_attached`) with
+`unity_editor_bridge_attachment_guidance`: until package import and domain reload
+attach a bridge, requests fail with `editor_not_running` (file IPC) or
+`transport_not_ready` (TCP loopback) and `request-editor-quit` has no receiver.
+Run the guidance's `next_command`, `ensure-ready --open-editor`, which reuses and
+activates the running editor and waits for `bridge_bootstrap_attached`; if the
+editor's Auto Refresh preference keeps it from resolving the manifest, focus it or
+use Assets > Refresh. Restart it only if the bridge has not attached once import
+has settled. When the process table cannot be listed, `check_status: unavailable`
+says so instead of reporting no editor. An attachment warning is not authority to
+force-kill a process or discard unsaved work.
 
 ### A Frozen Heartbeat Is Not a Current Busy Reason
 
@@ -277,7 +283,10 @@ An idle timeout reports PID liveness, `state_frozen`, `busy_reason_detail` and
 waiter's freshness limit yields `editor_alive_but_unresponsive` with
 `inspect_editor_log_and_observe`: the process may be blocked, compiling or
 waiting on a dialog, and the snapshot does not prove a crash. Read
-`busy_reason` as the last observation at that timestamp. Thresholds: heartbeat
+`busy_reason` as the last observation at that timestamp. During a player build
+the package writes `busy_reason: build_player` before the main thread blocks, so
+a live pid with a stale heartbeat in a build reports `editor_busy_in_build: true`
+and `wait_for_build_player_to_finish`; host health keeps it observe-only. Thresholds: heartbeat
 fresh under 5 s, stale from 15 s, ANR suspected from 30 s (`status_summary`
 host health); the idle waiter's own limit is `--heartbeat-max-age-seconds`
 (10 s). `recover-editor-session` refuses a live PID unless `--force-terminate`

@@ -171,7 +171,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
         }
 
-        static string NormalizeStatus(TestStatus testStatus)
+        internal static string NormalizeStatus(TestStatus testStatus)
         {
             switch (testStatus)
             {
@@ -186,7 +186,7 @@ namespace XUUnity.LightMcp.Editor.Helpers
             }
         }
 
-        static int CountLeafTests(ITestAdaptor test)
+        internal static int CountLeafTests(ITestAdaptor test)
         {
             if (test == null)
             {

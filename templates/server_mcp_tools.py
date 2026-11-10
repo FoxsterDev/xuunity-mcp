@@ -126,6 +126,48 @@ def call_unity_compile_build_config_matrix_tool(
     return tool_result
 
 
+def scenario_wait_error_after_dispatch(
+    exc: Exception,
+    *,
+    project_root: Path,
+    run_id: str,
+    scenario_name: str,
+    tool_invocation_error_type: type[Exception],
+) -> Exception:
+    """A failure while waiting describes the result poll, never the scenario dispatch that already succeeded."""
+
+    wait_code = str(getattr(exc, "code", "") or "scenario_wait_failed")
+    details = dict(getattr(exc, "details", None) or {})
+    poll_request_submitted = details.get("request_submitted")
+    result_arguments: dict[str, Any] = {"projectRoot": str(project_root)}
+    if run_id:
+        result_arguments["runId"] = run_id
+    elif scenario_name:
+        result_arguments["scenarioName"] = scenario_name
+    details.update(
+        {
+            "scenario_wait_error_code": wait_code,
+            "scenario_run_submitted": True,
+            "request_submitted": True,
+            "scenario_dispatch_outcome": "submitted",
+            "poll_request_submitted": poll_request_submitted,
+            "run_id": run_id,
+            "scenario_name": scenario_name,
+            "rerun_safe": False,
+            "recommended_next_action": "poll_scenario_result_do_not_rerun",
+            "scenario_result_tool": "unity_scenario_result",
+            "scenario_result_tool_arguments": result_arguments,
+        }
+    )
+    if wait_code == "scenario_wait_timeout":
+        return tool_invocation_error_type(wait_code, str(getattr(exc, "message", "") or exc), details)
+    message = (
+        f"Scenario '{scenario_name or run_id or 'unknown'}' was dispatched (run_id={run_id or 'unknown'}) and may still "
+        f"be running in Unity; waiting for its result failed with {wait_code}. Poll the result; do not rerun."
+    )
+    return tool_invocation_error_type("scenario_wait_failed_after_dispatch", message, details)
+
+
 def call_unity_scenario_run_and_wait_tool(
     arguments: dict[str, Any],
     *,
@@ -178,13 +220,19 @@ def call_unity_scenario_run_and_wait_tool(
             {"scenario": scenario},
             max(5000, min(timeout_ms, 15000)),
         )
-        run_tool_result = bridge_response_to_tool_result(run_response)
-        if run_tool_result.get("isError"):
-            return run_tool_result
+    except tool_invocation_error_type as exc:
+        exc.details = {**(getattr(exc, "details", None) or {}), "scenario_run_submitted": bool(
+            (getattr(exc, "details", None) or {}).get("request_submitted")
+        )}
+        return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
+    run_tool_result = bridge_response_to_tool_result(run_response)
+    if run_tool_result.get("isError"):
+        return run_tool_result
 
-        run_payload = run_tool_result.get("structuredContent") or {}
-        run_id = str(run_payload.get("run_id") or "")
-        scenario_name = str(run_payload.get("scenario_name") or scenario.get("name") or "")
+    run_payload = run_tool_result.get("structuredContent") or {}
+    run_id = str(run_payload.get("run_id") or "")
+    scenario_name = str(run_payload.get("scenario_name") or scenario.get("name") or "")
+    try:
         result_payload = wait_for_scenario_result(
             project_root=project_root,
             run_id=run_id,
@@ -193,7 +241,16 @@ def call_unity_scenario_run_and_wait_tool(
             poll_interval_ms=poll_interval_ms,
         )
     except tool_invocation_error_type as exc:
-        return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
+        return tool_error_result(
+            scenario_wait_error_after_dispatch(
+                exc,
+                project_root=project_root,
+                run_id=run_id,
+                scenario_name=scenario_name,
+                tool_invocation_error_type=tool_invocation_error_type,
+            ),
+            build_tool_error_payload=build_tool_error_payload,
+        )
 
     result_payload["run_start"] = compact_run_start_payload(
         run_payload,

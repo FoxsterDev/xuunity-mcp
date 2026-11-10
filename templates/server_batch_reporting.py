@@ -62,6 +62,7 @@ COMPACT_BATCH_NESTED_SUMMARY_KEYS = {
         "rebuilt_assembly_count", "cached_assembly_count", "rebuild_evidence_status",
         "tests_status", "result_file", "summary_file",
         "top_actionable_error", "recommended_next_action",
+        "error_code", "retry_recommended", "retry_reason",
     ),
 }
 
@@ -107,6 +108,9 @@ def build_batch_terminal_record(summary: dict[str, Any], *, summary_path: Path |
         "summary_file": str(summary_path) if summary_path else "",
         "top_actionable_error": str(summary.get("top_actionable_error") or ""),
         "recommended_next_action": str(summary.get("recommended_next_action") or ""),
+        "error_code": str(summary.get("error_code") or summary.get("gui_operation_error_code") or ""),
+        "retry_recommended": bool(summary.get("retry_recommended")),
+        "retry_reason": str(summary.get("retry_reason") or ""),
     }
 
 
@@ -435,6 +439,9 @@ def summarize_batch_result_payload(
             summary[key] = result_payload[key]
 
     compile_payload = result_payload.get("compile") or {}
+    if operation == "unity.compile.player_scripts" and isinstance(result_payload.get("result"), dict):
+        compile_payload = {"result": result_payload.get("result")}
+        operation = "compile-player-scripts"
     if operation == "compile-player-scripts" and isinstance(compile_payload, dict) and compile_payload:
         compile_result = compile_payload.get("result") or {}
         if isinstance(compile_result, dict) and compile_result:
@@ -451,6 +458,9 @@ def summarize_batch_result_payload(
                 summary["compile"]["warning_count"] = compile_result.get("warning_count")
 
     matrix_payload = result_payload.get("matrix") or {}
+    if operation == "unity.compile.matrix" and not matrix_payload and "status" in result_payload:
+        matrix_payload = result_payload
+        operation = "compile-matrix"
     if operation == "compile-matrix" and isinstance(matrix_payload, dict) and matrix_payload:
         summary["matrix"] = {
             "status": matrix_payload.get("status"),
@@ -565,6 +575,7 @@ def build_batch_prepare_failure_summary(
         "transport_outcome": "batch_prepare_blocked",
         "unity_outcome": "not_started",
         "succeeded": False,
+        "error_code": str(getattr(exc, "code", "") or ""),
         "top_actionable_error": first_non_empty_line(
             exc.message or exc.code,
             limit=320,
@@ -597,6 +608,13 @@ def build_batch_prepare_failure_summary(
         "start_editor_state",
         "restore_editor_state",
         "gui_fallback_log_path",
+        "classification",
+        "retry_recommended",
+        "retry_reason",
+        "safe_to_retry",
+        "heartbeat_age_seconds",
+        "busy_reason",
+        "editor_quit_by_wrapper",
     ):
         if key in details:
             summary[key] = details[key]

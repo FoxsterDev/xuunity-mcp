@@ -20,7 +20,14 @@ namespace XUUnity.LightMcp.Editor.Bridge
             return process.Id;
         }
 
-        public static void WriteHeartbeat(string lastError = "")
+        internal const string ProcessExitedHealthStatus = "process_exited";
+
+        public static void WriteProcessExited()
+        {
+            WriteHeartbeat("batch process exited", ProcessExitedHealthStatus);
+        }
+
+        public static void WriteHeartbeat(string lastError = "", string healthStatusOverride = "")
         {
             if (BridgeProcessClass == XUUnityLightMcpBridgeProcessIdentity.ImportWorkerProcessClass)
             {
@@ -146,6 +153,13 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 capabilities_report_path = XUUnityLightMcpFileIpcPaths.CapabilitiesReportPath
             };
 
+            if (!string.IsNullOrEmpty(healthStatusOverride))
+            {
+                state.health_status = healthStatusOverride;
+                state.runtime_execution_allowed = false;
+                state.pending_request_count = 0;
+            }
+
             XUUnityLightMcpAtomicFileWriter.WriteAllText(XUUnityLightMcpFileIpcPaths.BridgeStatePath, JsonUtility.ToJson(state, true));
         }
 
@@ -167,6 +181,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         static string ResolveBusyReason()
         {
+            if (XUUnityLightMcpBuildPlayerRuntime.InProgress)
+            {
+                return XUUnityLightMcpBuildPlayerRuntime.BusyReason;
+            }
+
             if (XUUnityLightMcpBridgeRuntimeState.DomainReloadInProgress)
             {
                 return "domain_reload";
@@ -232,6 +251,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
 
         static string ResolveBusyReasonDetail()
         {
+            if (XUUnityLightMcpBuildPlayerRuntime.InProgress)
+            {
+                return $"target:{XUUnityLightMcpBuildPlayerRuntime.Target}:started:{XUUnityLightMcpBuildPlayerRuntime.StartedUtc}";
+            }
+
             if (XUUnityLightMcpBridgeRuntimeState.DomainReloadInProgress)
             {
                 return "AssemblyReloadEvents.beforeAssemblyReload";

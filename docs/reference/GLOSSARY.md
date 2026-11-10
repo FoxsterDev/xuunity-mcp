@@ -82,6 +82,13 @@ after Unity reloads, transport churn, or wrapper timeouts.
 
 A scenario is a bounded JSON workflow that asks Unity MCP to perform ordered validation steps such as refresh, compile, Play Mode, scene checks, screenshots, or project-defined hooks.
 
+`unity_scenario_run_and_wait` dispatches the run, then waits for its result as a
+separate phase. A failure while waiting is `scenario_wait_failed_after_dispatch`
+(or `scenario_wait_timeout`) with `scenario_run_submitted: true`, the `run_id`,
+`scenario_wait_error_code` and `recommended_next_action: poll_scenario_result_do_not_rerun`;
+the run may still be executing, so poll `unity_scenario_result` instead of rerunning.
+Only a refusal before dispatch carries `scenario_run_submitted: false`.
+
 ## Trust, Outcome and Warning Vocabulary
 
 Every value this system publishes in a trust, outcome, warning or gap field.

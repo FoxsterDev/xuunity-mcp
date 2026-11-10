@@ -5,6 +5,7 @@ import sys
 import json
 import time
 import subprocess
+import uuid
 from server_host_call_timing import measure_host_stage, timed_host_call
 from server_core import bridge_enable_recovery_command
 
@@ -62,6 +63,7 @@ from server_license import (
     gui_admission_override_enabled,
 )
 from server_loading_timing import request_loading_timing_summary
+from server_capability_generation import capability_report_generation_view
 from server_host_platform import current_host_platform_adapter
 from server_mcp_protocol import (
     JsonRpcError,
@@ -1193,23 +1195,113 @@ def invoke_bridge(project_root_value: str, operation: str, args: dict[str, Any],
     )
 
 
-def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
+NON_MAIN_OWNER_WAIT_MAX_MS = 10000
+NON_MAIN_OWNER_POLL_SECONDS = 0.5
+
+
+def await_main_bridge_owner(project_root: Path, discovery: dict[str, Any], timeout_ms: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Give a transient non-main state writer a bounded window to hand the state file back before refusing."""
+
+    if not bool(discovery.get("bridge_owned_by_non_main_process")):
+        return discovery, {}
+    started = time.monotonic()
+    budget_seconds = max(0, min(int(timeout_ms or 0), NON_MAIN_OWNER_WAIT_MAX_MS)) / 1000.0
+    first_pid = int(discovery.get("bridge_pid") or 0)
+    while bool(discovery.get("bridge_owned_by_non_main_process")) and time.monotonic() - started < budget_seconds:
+        time.sleep(NON_MAIN_OWNER_POLL_SECONDS)
+        discovery = dict(getattr(refresh_project_context(project_root), "discovery_details", {}) or {})
+    return discovery, {
+        "non_main_owner_observed": True,
+        "non_main_owner_pid": first_pid,
+        "non_main_owner_wait_ms": int(round((time.monotonic() - started) * 1000)),
+        "non_main_owner_cleared": not bool(discovery.get("bridge_owned_by_non_main_process")),
+    }
+
+
+def refusal_will_be_retried(
+    exc: ToolInvocationError, policy: dict[str, Any], attempt_index: int, max_attempts: int
+) -> bool:
+    if attempt_index + 1 >= max_attempts:
+        return False
+    details = exc.details or {}
+    if exc.code == "request_lifecycle_reset":
+        return bool(policy.get("retry_on_lifecycle_reset")) and bool(details.get("retryable")) and not bool(
+            details.get("request_processed")
+        )
+    if exc.code == "transport_response_missing":
+        return (
+            bool(policy.get("retry_on_transport_response_missing"))
+            and not bool(details.get("request_processed"))
+            and bool(details.get("automatic_retry_safe", True))
+        )
+    if exc.code == "transport_connect_failed":
+        return bool(policy.get("retry_on_transport_connect_failed"))
+    return False
+
+
+def journal_request_refusal(
+    project_root: Path,
+    operation: str,
+    exc: ToolInvocationError,
+    state: dict[str, Any] | None,
+    request_id: str = "",
+) -> None:
+    """Write exactly one request_refused event; a journaling failure is attached to the refusal, never raised over it."""
+
+    try:
+        record_request_refused_event(project_root, operation, exc, state, request_id=request_id)
+    except Exception as journal_error:
+        exc.details = {**(exc.details or {}), "refusal_journal_error": f"{type(journal_error).__name__}: {journal_error}"}
+
+
+def refusal_was_not_submitted(exc: ToolInvocationError, dispatch_started: bool) -> bool:
+    details = exc.details or {}
+    return (
+        not dispatch_started
+        or details.get("request_submitted") is False
+        or str(details.get("transport_outcome") or "") == "request_not_submitted"
+    )
+
+
+def _invoke_bridge_locked(
+    context: ProjectContext,
+    operation: str,
+    args: dict[str, Any],
+    timeout_ms: int,
+    *,
+    journal_refusals: bool = True,
+) -> dict[str, Any]:
     project_root = context.project_root
-    discovery = dict(getattr(context, "discovery_details", {}) or {})
+    discovery, owner_wait = await_main_bridge_owner(
+        project_root, dict(getattr(context, "discovery_details", {}) or {}), timeout_ms
+    )
     if bool(discovery.get("bridge_owned_by_non_main_process")):
-        raise ToolInvocationError(
+        refusal = ToolInvocationError(
             "bridge_owned_by_non_main_process",
-            "The recorded bridge state was written by a Unity worker or another non-main process; runtime execution is refused.",
+            (
+                "The recorded bridge state was written by a Unity worker or another non-main process and did not "
+                "return to the main editor within the wait window; the request was not submitted and is safe to retry."
+            ),
             {
                 "project_root": str(project_root),
+                "operation": operation,
                 "bridge_pid": int(discovery.get("bridge_pid") or 0),
                 "bridge_process_class": str(discovery.get("bridge_process_class") or "non_main_process"),
                 "bridge_state_writer_trust_class": str(discovery.get("bridge_state_writer_trust_class") or "untrusted_non_main_process"),
                 "runtime_execution_allowed": False,
                 "request_submitted": False,
-                "recommended_next_action": "wait_for_main_editor_bridge",
+                "request_ownership_acquired": False,
+                "transport_outcome": "request_not_submitted",
+                "operation_outcome": "request_not_dispatched",
+                "retryable": True,
+                "safe_to_retry": True,
+                **owner_wait,
+                "recommended_next_action": "wait_for_main_editor_bridge_then_retry",
             },
         )
+        if journal_refusals:
+            journal_request_refusal(project_root, operation, refusal, {})
+        raise refusal
 
     def perform_invoke() -> dict[str, Any]:
         policy = resolve_operation_lifecycle_policy(project_root, operation)
@@ -1245,15 +1337,19 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
             ignored_override_cap_ms = int(policy.get("post_reset_recovery_ignored_override_cap_ms") or 0)
             if ignored_override_cap_ms > 0:
                 lifecycle["post_reset_recovery_ignored_override_cap_ms"] = ignored_override_cap_ms
+            if owner_wait:
+                lifecycle["non_main_owner_wait"] = owner_wait
 
             dispatch_started = False
             pre_idle_state = pre_request_state
+            planned_request_id = str(uuid.uuid4())
             try:
                 if policy["activate_unity"]:
                     report_operation_progress_phase(
                         project_root=project_root,
                         operation=operation,
                         phase="activation",
+                        request_id=planned_request_id,
                         state=pre_request_state,
                     )
                     lifecycle["activation_requested"] = True
@@ -1270,7 +1366,27 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
 
                 pre_idle_state = try_read_live_editor_state(project_root) or current_project_context_bridge_state(project_root)
                 if fail_if_compile_broken_for_operation(project_root, operation, pre_idle_state, args):
-                    refresh_response = _invoke_bridge_locked(context, "unity.project.refresh", {}, timeout_ms)
+                    try:
+                        refresh_response = _invoke_bridge_locked(
+                            context, "unity.project.refresh", {}, timeout_ms, journal_refusals=False
+                        )
+                    except ToolInvocationError as refresh_exc:
+                        inner = refresh_exc.details or {}
+                        raise ToolInvocationError(
+                            refresh_exc.code,
+                            f"Stale-diagnostics recovery refresh before {operation} was refused: {refresh_exc.message}",
+                            {
+                                **inner,
+                                "operation": operation,
+                                "request_submitted": False,
+                                "transport_outcome": "request_not_submitted",
+                                "recovery_refresh_refusal": {
+                                    "code": refresh_exc.code,
+                                    "reason": refresh_exc.message,
+                                    "recommended_recovery_command": str(inner.get("recommended_recovery_command") or ""),
+                                },
+                            },
+                        ) from refresh_exc
                     try:
                         refresh_payload = json.loads(str(refresh_response.get("payload_json") or "{}"))
                     except ValueError:
@@ -1300,6 +1416,7 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                         project_root=project_root,
                         operation=operation,
                         phase="wait_for_idle_before",
+                        request_id=planned_request_id,
                         state=pre_idle_state,
                     )
                     lifecycle["idle_wait_before"] = timed_host_call(
@@ -1317,12 +1434,14 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                         project_root=project_root,
                         operation=operation,
                         phase="dispatching",
+                        request_id=planned_request_id,
                         state=dispatch_state,
                     )
                     report_operation_progress_phase(
                         project_root=project_root,
                         operation=operation,
                         phase="waiting_for_response",
+                        request_id=planned_request_id,
                         state=dispatch_state,
                     )
                 dispatch_started = True
@@ -1333,6 +1452,7 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                     args,
                     timeout_ms,
                     post_reset_recovery_cap_ms=int(policy.get("post_reset_recovery_cap_ms") or 0),
+                    request_id=planned_request_id,
                 )
                 lifecycle["transport"] = transport_metadata
                 post_reset_recovery = response.pop(POST_RESET_RECOVERY_RESPONSE_KEY, None)
@@ -1477,11 +1597,12 @@ def _invoke_bridge_locked(context: ProjectContext, operation: str, args: dict[st
                 refresh_project_context(project_root)
                 return response
             except ToolInvocationError as exc:
-                if not dispatch_started:
-                    try:
-                        record_request_refused_event(project_root, operation, exc, pre_idle_state)
-                    except (OSError, ValueError) as journal_error:
-                        exc.details = {**(exc.details or {}), "refusal_journal_error": str(journal_error)}
+                if (
+                    journal_refusals
+                    and refusal_was_not_submitted(exc, dispatch_started)
+                    and not refusal_will_be_retried(exc, policy, attempt_index, max_attempts)
+                ):
+                    journal_request_refusal(project_root, operation, exc, pre_idle_state, planned_request_id)
                 if (
                     exc.code == "request_lifecycle_reset"
                     and bool(policy.get("retry_on_lifecycle_reset"))
@@ -2117,6 +2238,87 @@ def call_unity_request_final_status_tool(arguments: dict[str, Any]) -> dict[str,
         ensure_project_root=ensure_project_root,
         build_request_final_status_summary=build_request_final_status_from_context,
     )
+
+
+def call_unity_capabilities_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    result = call_tool_base(
+        "unity_capabilities",
+        arguments,
+        tools={"unity_capabilities": TOOLS["unity_capabilities"]},
+        special_tool_handlers={},
+        tool_invocation_error_type=ToolInvocationError,
+        ensure_project_root=ensure_project_root,
+        resolve_operation_timeout_ms=resolve_operation_timeout_ms,
+        invoke_bridge=invoke_bridge,
+        build_tool_error_payload=build_tool_error_payload,
+        bridge_response_to_tool_result=bridge_response_to_tool_result,
+    )
+    structured = result.get("structuredContent")
+    if result.get("isError") or not isinstance(structured, dict):
+        return result
+    project_root = ensure_project_root(str(arguments.get("projectRoot") or ""))
+    view = capability_report_generation_view(
+        structured.get("report") if isinstance(structured.get("report"), dict) else None,
+        try_read_live_editor_state(project_root) or try_read_bridge_state(project_root) or {},
+    )
+    if view:
+        structured.update(view)
+        result["content"] = [{"type": "text", "text": json.dumps(structured, ensure_ascii=True)}]
+    return result
+
+
+SCENARIO_RESULT_PERSISTED_FALLBACK_ERROR_CODES = DISCOVERY_STATUS_FALLBACK_ERROR_CODES.union(
+    SCENARIO_RECOVERY_ERROR_CODES, {"editor_idle_timeout"}
+)
+
+
+def call_unity_scenario_result_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Read a scenario result; when the editor cannot answer (a synchronous build, a reload), serve the persisted result."""
+
+    project_root_value = arguments.get("projectRoot")
+    if not isinstance(project_root_value, str) or not project_root_value.strip():
+        raise JsonRpcError(-32602, "projectRoot is required.")
+    project_root = ensure_project_root(project_root_value)
+    timeout_ms = resolve_operation_timeout_ms(project_root, "unity.scenario.result", arguments.get("timeoutMs"), 5000)
+    bridge_args: dict[str, Any] = {}
+    for key in ("runId", "scenarioName"):
+        value = arguments.get(key)
+        if value is not None and not isinstance(value, str):
+            raise JsonRpcError(-32602, f"{key} must be a string when provided.")
+        if isinstance(value, str) and value.strip():
+            bridge_args[key] = value.strip()
+
+    try:
+        response = invoke_bridge(str(project_root), "unity.scenario.result", bridge_args, timeout_ms)
+    except ToolInvocationError as exc:
+        if exc.code in SCENARIO_RESULT_PERSISTED_FALLBACK_ERROR_CODES:
+            reconciliation = reconcile_persisted_scenario_result(
+                project_root, bridge_args.get("runId", ""), bridge_args.get("scenarioName", "")
+            )
+            if bool(reconciliation.get("lookup_found")):
+                state = try_read_bridge_state(project_root) or {}
+                busy_reason = derive_busy_reason(state) if state else ""
+                payload = normalize_scenario_payload(dict(reconciliation.get("payload") or {}), SCENARIO_TERMINAL_STATUSES)
+                terminal = bool(reconciliation.get("terminal_result_found"))
+                payload.update(
+                    {
+                        "scenario_result_source": "persisted_result_file",
+                        "scenario_result_lookup_strategy": str(reconciliation.get("lookup_strategy") or ""),
+                        "transport_miss_code": exc.code,
+                        "transport_miss_message": truncate_text(exc.message, 240),
+                        "editor_busy_reason": busy_reason,
+                        "editor_busy_in_build": busy_reason == "build_player",
+                        "persisted_result_terminal": terminal,
+                    }
+                )
+                if not terminal:
+                    payload["recommended_next_action"] = (
+                        "wait_for_build_player_to_finish" if busy_reason == "build_player" else "poll_scenario_result_again"
+                    )
+                return mcp_json_result(payload, is_error=False)
+        return mcp_json_result(build_tool_error_payload(exc), is_error=True)
+
+    return bridge_response_to_tool_result(response, include_full_payload=False)
 
 
 def call_unity_scenario_result_summary_tool(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -3100,6 +3302,8 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_status_summary": call_unity_status_summary_tool,
             "unity_ensure_ready": call_unity_ensure_ready_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
+            "unity_scenario_result": call_unity_scenario_result_tool,
+            "unity_capabilities": call_unity_capabilities_tool,
             "unity_scenario_result_summary": call_unity_scenario_result_summary_tool,
             "unity_scenario_results_list": call_unity_scenario_results_list_tool,
             "unity_scenario_result_latest": call_unity_scenario_result_latest_tool,

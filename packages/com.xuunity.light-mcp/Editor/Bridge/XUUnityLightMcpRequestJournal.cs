@@ -94,7 +94,8 @@ namespace XUUnity.LightMcp.Editor.Bridge
         public static void WriteRequestAbandoned(
             XUUnityLightMcpActiveRequestSnapshot snapshot,
             string reason,
-            bool retryable)
+            bool retryable,
+            bool resumesAfterDomainReload = false)
         {
             if (snapshot == null || string.IsNullOrWhiteSpace(snapshot.request_id))
             {
@@ -109,8 +110,11 @@ namespace XUUnity.LightMcp.Editor.Bridge
                 operation = snapshot.operation ?? "",
                 started_at_utc = snapshot.started_at_utc ?? "",
                 reason = reason ?? "",
-                retryable = retryable,
-                reclassified_status = retryable ? "retryable_after_lifecycle_reset" : "abandoned_after_lifecycle_reset",
+                retryable = retryable && !resumesAfterDomainReload,
+                resumes_after_domain_reload = resumesAfterDomainReload,
+                reclassified_status = resumesAfterDomainReload
+                    ? "resumes_after_domain_reload"
+                    : retryable ? "retryable_after_lifecycle_reset" : "abandoned_after_lifecycle_reset",
             });
         }
 

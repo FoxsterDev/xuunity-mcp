@@ -353,8 +353,18 @@ When xuunity-mcp is available, use MCP commands. Fallback to Unity CLI if MCP un
 
 ### Unity CLI Alternative
 - EditMode batch: `Unity -runTests -testPlatform editmode -batchmode -projectPath <path>`
-- PlayMode batch: `Unity -runTests -testPlatform playmode -batchmode -projectPath <path>`
-- Use when MCP bridge unavailable or not installed
+- Use when MCP bridge unavailable or not installed.
+- PlayMode goes through the GUI bridge (`request-playmode-tests`), not raw
+  `-batchmode -runTests -testPlatform playmode`. Batch mode does not render
+  frames: a test that yields `WaitForEndOfFrame` (directly or inside a nested
+  `IEnumerator`) can hang without a timeout and without any output. CI that
+  must run PlayMode in batch keeps render-dependent tests out of that lane.
+- Any `-batchmode -runTests` process with the package installed writes
+  `Library/XUUnityLightMcp/state/cli_test_progress.json` (run phase, counts,
+  last started and finished test, progress time), and `unity_status_summary`
+  reports it as `cli_test_progress` with `status` `running`,
+  `running_without_progress` (no progress for 5 minutes) or
+  `process_exited_before_completion`. Read it before deciding a CLI run hung.
 
 ### Bridge Health Requirements
 Always run `ensure-ready` before MCP requests. Check `unity.status` if issues

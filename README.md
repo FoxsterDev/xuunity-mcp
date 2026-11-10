@@ -257,6 +257,7 @@ Preflight review
 - Planned project file changes: <manifest, bridge config, lockfile, none>
 - Planned user-level config changes: <exact file paths or none>
 - Restart or refresh required after mutation: <yes/no and which client>
+- Running editor without an attached bridge: <none | project root, pids, then ensure-ready --open-editor>
 - Required live proof after restart: <server listed, tools listed, unity_status_summary healthy with mcp_server_info.version=0.3.88>
 - Planned commands after approval: <setup-apply, validate-setup, ensure-ready, request-status-summary, unity_status_summary after reload, ...>
 

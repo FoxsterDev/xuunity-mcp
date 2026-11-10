@@ -15,6 +15,7 @@ TRANSIENT_SCENARIO_POLL_ERROR_CODES = frozenset(
         "transport_response_missing",
         "request_lifecycle_reset",
         "response_missing_after_lifecycle_reset",
+        "bridge_owned_by_non_main_process",
     }
 )
 
@@ -127,6 +128,27 @@ def wait_for_scenario_result_data(
     recovery_attempt_count = 0
     last_heartbeat_key = ""
     last_heartbeat_unix = 0.0
+    last_reconciliation: dict[str, Any] = {}
+
+    def reconciled_terminal_payload(reason: str) -> dict[str, Any] | None:
+        nonlocal last_reconciliation
+        last_reconciliation = reconcile_persisted_scenario_result(project_root, run_id, scenario_name)
+        if not bool(last_reconciliation.get("terminal_result_found")):
+            return None
+        payload = normalize_scenario_payload(dict(last_reconciliation.get("payload") or {}), scenario_terminal_statuses)
+        payload["waited_for_terminal_state"] = True
+        payload["wait_duration_seconds"] = round(time.time() - started_at, 3)
+        payload["recovery_attempt_count"] = recovery_attempt_count
+        payload["scenario_result_reconciled_from_persisted"] = True
+        payload["scenario_result_reconciliation_reason"] = reason
+        payload["scenario_result_lookup_strategy"] = str(last_reconciliation.get("lookup_strategy") or "")
+        payload["scenario_result_matched_result_count"] = int(last_reconciliation.get("matched_result_count") or 0)
+        payload["scenario_result_terminal_result_count"] = int(last_reconciliation.get("terminal_result_count") or 0)
+        if payload.get("status") == "passed":
+            payload.setdefault("recommended_next_action", "none")
+        elif payload.get("status") == "failed":
+            payload.setdefault("recommended_next_action", "inspect_persisted_scenario_failure")
+        return apply_discovery_to_scenario_payload(payload, project_root)
 
     while time.time() < deadline:
         live_state = try_read_live_editor_state(project_root)
@@ -170,6 +192,9 @@ def wait_for_scenario_result_data(
             if exc_code in TRANSIENT_SCENARIO_POLL_ERROR_CODES and time.time() + effective_poll_interval < deadline:
                 time.sleep(effective_poll_interval)
                 continue
+            reconciled = reconciled_terminal_payload(f"terminal_persisted_result_after_poll_error:{exc_code or 'unknown'}")
+            if reconciled is not None:
+                return reconciled
             raise enrich_tool_invocation_error_with_discovery(project_root, exc)
 
         tool_result = bridge_response_to_tool_result(response)
@@ -201,23 +226,10 @@ def wait_for_scenario_result_data(
 
         time.sleep(effective_poll_interval)
 
-    reconciliation = reconcile_persisted_scenario_result(project_root, run_id, scenario_name)
-    if bool(reconciliation.get("terminal_result_found")):
-        payload = dict(reconciliation.get("payload") or {})
-        payload = normalize_scenario_payload(payload, scenario_terminal_statuses)
-        payload["waited_for_terminal_state"] = True
-        payload["wait_duration_seconds"] = round(time.time() - started_at, 3)
-        payload["recovery_attempt_count"] = recovery_attempt_count
-        payload["scenario_result_reconciled_from_persisted"] = True
-        payload["scenario_result_reconciliation_reason"] = "terminal_persisted_result_after_poll_timeout"
-        payload["scenario_result_lookup_strategy"] = str(reconciliation.get("lookup_strategy") or "")
-        payload["scenario_result_matched_result_count"] = int(reconciliation.get("matched_result_count") or 0)
-        payload["scenario_result_terminal_result_count"] = int(reconciliation.get("terminal_result_count") or 0)
-        if payload.get("status") == "passed":
-            payload.setdefault("recommended_next_action", "none")
-        elif payload.get("status") == "failed":
-            payload.setdefault("recommended_next_action", "inspect_persisted_scenario_failure")
-        return apply_discovery_to_scenario_payload(payload, project_root)
+    reconciled = reconciled_terminal_payload("terminal_persisted_result_after_poll_timeout")
+    if reconciled is not None:
+        return reconciled
+    reconciliation = last_reconciliation
 
     scenario_label = scenario_name or run_id or "unknown"
     suffix = ""

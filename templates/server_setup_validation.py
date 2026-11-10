@@ -100,8 +100,13 @@ def validate_setup(
     if include_tests and not tf_state["supported"]:
         blockers.append("test_framework_unavailable")
     offline_status = "ready" if not blockers else "blocked"
+    attachment = unity_editor_bridge_attachment(project_root)
     return {
         "action": "validate_setup",
+        "unity_editor_bridge_attachment": attachment,
+        "unity_editor_bridge_attachment_guidance": (
+            unity_editor_bridge_attachment_guidance(project_root, attachment) if attachment["pending"] else {}
+        ),
         "project_root": str(project_root),
         "unity_version": unity_version,
         "package_dependency_state": "declared" if package_dependency else "missing",
@@ -117,6 +122,7 @@ def validate_setup(
         "readiness_scope": "offline_manifest_and_bridge_config_only",
         "readiness_scope_note": (
             "validate-setup checks the canonical package pin when an expected release is supplied, "
+            "and whether a running editor for the project owns the bridge state, "
             "but does not prove Unity package resolution, package import, or live bridge heartbeat; "
             "run ensure-ready --open-editor only after package/helper/client alignment is ready."
         ),

@@ -299,6 +299,7 @@ namespace XUUnity.LightMcp.Editor.Core
             public string editor_log_path = "";
             public string reason = "";
             public bool retryable;
+            public bool resumes_after_domain_reload;
             public string reclassified_status = "";
             public int previous_bridge_generation;
             public string previous_bridge_session_id = "";

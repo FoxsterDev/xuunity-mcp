@@ -120,9 +120,102 @@
   the run start (it used to count from the last progress event, so a run at
   4 m 52 s read as 14 s) and `seconds_since_last_progress` is reported
   separately; `timeout_classification` stays empty unless a timeout was
-  observed or the deadline passed; and a run that is still running never gets
+  observed, the deadline passed or a completed run overran its budget; and a run that is still running never gets
   `editor_cleanup_recommended` with a Play Mode exit command, which would have
   aborted it (RG-17).
+- `unity_scenario_run_and_wait` no longer reports a dispatched run as not
+  submitted. Dispatch and wait are separate phases: a failure while waiting
+  returns `scenario_wait_failed_after_dispatch` (or `scenario_wait_timeout`)
+  with `scenario_run_submitted: true`, `request_submitted: true`, the `run_id`,
+  the poll's own code in `scenario_wait_error_code` and
+  `poll_scenario_result_do_not_rerun`, and a terminal persisted result is
+  returned instead of the poll error when one exists. A result poll treats
+  `bridge_owned_by_non_main_process` as transient. Before submission, a bridge
+  state written by a non-main process gets a bounded wait (10 s) for the main
+  editor to take it back; if it does not, the refusal says
+  `request_submitted: false`, `retryable: true` and how long it waited (RG-15).
+- The request journal tells the truth through reloads and exits (RG-19):
+  - A Play Mode test run that the Play-entry domain reload interrupts, and that
+    resumes in the new domain, is journaled as `request_abandoned` with
+    `resumes_after_domain_reload` and `retryable: false`. `request-final-status`
+    reports `resumes_after_domain_reload` / `wait_for_final_status` for it, also
+    for events written by older packages, so it no longer invites replaying a
+    long suite.
+  - `request_reclassified` reads the bridge identity when it is written and
+    claims `bridge_generation_changed_before_response` only when the generation
+    or session actually changed; otherwise the reason names the trigger
+    (`transport_restarting_before_response`).
+  - Host progress events carry the request id the transport then submits, a
+    request refused before submission journals `request_refused` under the
+    same id (final status `refused_before_submission`), and host events carry
+    `host_event_sequence` so same-millisecond events read in causal order.
+  - A test run that completes after its runtime budget reports
+    `timeout_classification: completed_after_runtime_budget` with
+    `runtime_budget_overrun_seconds`; the verdict stays the run's own.
+  - `request-final-status` consumes a completed outbox response that no host
+    call is waiting for any more and journals `request_outbox_reconciled`, so a
+    recovered run no longer leaves `stale_request_artifacts_present`. Internal
+    recovery never consumes it.
+  - A batch-mode Unity process that attached the bridge writes
+    `health_status: process_exited` when it quits, instead of leaving a
+    `healthy` state file behind a dead pid.
+- A raw `-batchmode -runTests` run is no longer invisible (RG-21). The package
+  registers its own test callbacks in such a process and writes
+  `Library/XUUnityLightMcp/state/cli_test_progress.json` (run phase, totals,
+  last started and finished test, progress time, domain reloads survived).
+  `unity_status_summary` reports it as `cli_test_progress` with `status`
+  `running`, `running_without_progress` (quiet for 5 minutes) or
+  `process_exited_before_completion`. `AI_INTEGRATION.md` no longer offers raw
+  batch PlayMode as the fallback and names the `WaitForEndOfFrame` hang.
+- A player build is reported as a build, not as a hung editor (RG-40). The
+  package writes `busy_reason: build_player` (with the target in
+  `busy_reason_detail`) to the bridge state before the synchronous build
+  blocks the main thread, for `unity.build_player` and for any build a project
+  hook starts (`IPreprocessBuildWithReport`), and clears it after. On the host
+  a live pid with a stale heartbeat during a build stays
+  `editor_alive_but_unresponsive` (the v0.3.88 rule) with
+  `editor_busy_in_build: true`, `unresponsive_cause: build_player_in_progress`
+  and `wait_for_build_player_to_finish`; host health no longer escalates a
+  build to `anr` with a `graceful_terminate` policy. `unity_scenario_result`
+  answers a transport miss (`transport_response_missing`, `editor_idle_timeout`
+  and the other reload codes) from the persisted scenario result, marked
+  `scenario_result_source: persisted_result_file` with the miss code and the
+  editor's busy reason.
+- Refusals, completions and capability reports say what the host decided on
+  (RG-04, follow-ups F-5 to F-8 of the 2026-09-15 recovery review):
+  - Every request the host refuses before submission, and will not retry
+    itself, writes exactly one `request_refused`: transport-stage refusals
+    (`bridge_disabled`, `editor_not_running`, `transport_connect_failed`) and
+    the non-main bridge owner refusal included. A refused stale-diagnostics
+    recovery refresh is folded into the operator's refusal as
+    `recovery_refresh_refusal`. Detail values JSON cannot carry are
+    stringified, and a journaling failure is attached as
+    `refusal_journal_error` instead of replacing the refusal.
+  - `editor_idle_timeout` details carry `decision_state`, the snapshot the
+    timeout was decided on; the refusal's `state_fingerprint` uses it and
+    `state_fingerprint_source` names the source.
+  - A Play Mode test response written by the post-reload recovery path now
+    journals `request_completed`, so the run no longer ends at
+    `request_started`.
+  - `unity_capabilities` and `unity_status_summary` compare the report's
+    `probe_bridge_generation` with the live bridge and set
+    `capability_report_generation_behind` when the report predates it.
+  - Setup plan, apply and `validate-setup` flag a running editor whose pid owns
+    no bridge state, also when the manifest already declares the package
+    (`declared_but_bridge_not_attached`), from one process listing per
+    command; an unavailable listing reports `check_status: unavailable`. Each
+    pending root gets `unity_editor_bridge_attachment_guidance` with
+    `ensure-ready --open-editor`, the manual fallback and the restart
+    criterion, shown before the approval sentence in the review summary and in
+    the README review template.
+- Batch runs end with one comparable terminal record on every path (RG-08
+  residual). A GUI-fallback run that fails (for example `editor_idle_timeout`
+  while the editor imports) now also writes the terminal record as the last
+  NDJSON progress line, with `phase: gui_fallback`; the record carries
+  `error_code`, `retry_recommended` and `retry_reason`. The GUI lane's
+  `result.status` (and a GUI matrix's top-level `status`) now fill the same
+  `compile` / `matrix` sections as the batch lane's `compile.status`, so
+  `compile_status` in the record no longer comes back empty on the GUI lane.
 
 ## 0.3.88
 

@@ -180,6 +180,9 @@ def parse_utc_timestamp(value: Any) -> float | None:
     return parse_core_utc_timestamp(value)
 
 
+BUILD_PLAYER_BUSY_REASON = "build_player"
+
+
 def state_is_idle(state: dict[str, Any]) -> bool:
     return (
         not bool(state.get("domain_reload_in_progress"))
@@ -192,6 +195,7 @@ def state_is_idle(state: dict[str, Any]) -> bool:
         and not bool(state.get("is_compiling"))
         and not bool(state.get("is_updating"))
         and not bool(state.get("active_operation"))
+        and str(state.get("busy_reason") or "") != BUILD_PLAYER_BUSY_REASON
         and (bool(state.get("is_playing")) or not bool(state.get("is_playing_or_will_change_playmode")))
     )
 
@@ -251,6 +255,8 @@ def idle_wait_blocking_reasons(
         reasons.append("asset_import_in_progress")
     if bool(state.get("is_updating")):
         reasons.append("is_updating")
+    if str(state.get("busy_reason") or "") == BUILD_PLAYER_BUSY_REASON:
+        reasons.append("build_player_in_progress")
     if str(state.get("active_operation") or ""):
         reasons.append("active_operation")
     if (
@@ -322,12 +328,14 @@ def build_editor_idle_timeout_details(
         and busy_reason in TRANSIENT_BUSY_REASONS_FOR_RETRY
     )
     frozen = bool(last_state) and (not pid_alive or (heartbeat_stale and not stale_while_busy))
+    # A synchronous player build blocks the heartbeat writer for its whole duration; it is never a reason to recover.
+    busy_in_build = bool(last_state) and pid_alive and busy_reason == BUILD_PLAYER_BUSY_REASON
     if frozen and not pid_alive:
         classification = "editor_state_frozen"
         next_action = "recover_editor_session"
     elif frozen:
         classification = "editor_alive_but_unresponsive"
-        next_action = "inspect_editor_log_and_observe"
+        next_action = "wait_for_build_player_to_finish" if busy_in_build else "inspect_editor_log_and_observe"
     elif stale_while_busy:
         classification = "editor_busy_heartbeat_stale"
         next_action = "wait_for_editor_idle_then_retry"
@@ -344,6 +352,12 @@ def build_editor_idle_timeout_details(
         "result_trust_class": "stale_snapshot" if frozen else "editor_state_not_idle",
         "heartbeat_age_seconds": None if age_seconds is None else round(age_seconds, 3),
         "busy_reason": busy_reason,
+        "decision_state": {
+            key: (last_state or {}).get(key)
+            for key in ("editor_pid", "bridge_generation", "bridge_session_id", "heartbeat_utc", "busy_reason", "busy_reason_detail")
+        },
+        "editor_busy_in_build": busy_in_build,
+        "unresponsive_cause": "build_player_in_progress" if (frozen and busy_in_build) else "",
         "blocking_reasons": blocking_reasons,
         "safe_to_retry": stale_while_busy,
         "retry_recommended": stale_while_busy,
