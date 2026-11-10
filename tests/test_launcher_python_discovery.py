@@ -102,14 +102,23 @@ def make_venv(target: Path) -> Path:
 class PythonGateUnitTests(unittest.TestCase):
     def run_gate(self, env: dict, *, supported: set, path_names: dict, script_dirs: list):
         stderr = io.StringIO()
-        execv = mock.Mock(side_effect=SystemExit(0))
+        execv = mock.Mock()
+
+        def posix_exec(candidate, command):
+            execv(candidate, command)
+            raise SystemExit(0)
+
+        def windows_run(command, check=False):
+            execv(command[0], list(command))
+            return subprocess.CompletedProcess(command, 0)
+
         with (
             mock.patch.object(sys, "version_info", (3, 9, 6, "final", 0)),
             mock.patch.dict(os.environ, env, clear=True),
             mock.patch.object(server_python_gate.shutil, "which", side_effect=lambda name: path_names.get(name)),
             mock.patch.object(server_python_gate, "interpreter_is_supported", side_effect=lambda c: c in supported),
-            mock.patch.object(server_python_gate.os, "execv", execv),
-            mock.patch.object(server_python_gate.os, "name", "posix"),
+            mock.patch.object(server_python_gate.os, "execv", side_effect=posix_exec),
+            mock.patch.object(server_python_gate.subprocess, "run", side_effect=windows_run),
             contextlib.redirect_stderr(stderr),
         ):
             with self.assertRaises(SystemExit) as raised:
