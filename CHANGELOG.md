@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 0.3.89
+
+Release tag: `v0.3.89`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.89
+```
+
+When the Unity path appeared in a command line, `license-capabilities` counted its
+own probe as a running editor and refused with `licensing_busy`. Logs and payloads
+cost more than they had to: a console grep returned stack frames as matches, an
+offline `unity_status_summary` was about 23 KB, and a fully qualified component
+type made a prefab edit roll back. A scenario run that had been dispatched could
+read as "not submitted", a Play Mode test run interrupted by its own domain reload
+looked abandoned, and a player build looked like a hung editor. This release makes
+the probes, the journal and the compact results say what actually happened.
+
 ### Fixed
 
 - `license-capabilities --unity-app <path to the Unity executable>` no longer
@@ -120,9 +139,9 @@
   the run start (it used to count from the last progress event, so a run at
   4 m 52 s read as 14 s) and `seconds_since_last_progress` is reported
   separately; `timeout_classification` stays empty unless a timeout was
-  observed, the deadline passed or a completed run overran its budget; and a run that is still running never gets
-  `editor_cleanup_recommended` with a Play Mode exit command, which would have
-  aborted it (RG-17).
+  observed, the deadline passed or a completed run overran its budget; and a
+  run that is still running never gets `editor_cleanup_recommended` with a Play
+  Mode exit command, which would have aborted it (RG-17).
 - `unity_scenario_run_and_wait` no longer reports a dispatched run as not
   submitted. Dispatch and wait are separate phases: a failure while waiting
   returns `scenario_wait_failed_after_dispatch` (or `scenario_wait_timeout`)
@@ -216,6 +235,39 @@
   `result.status` (and a GUI matrix's top-level `status`) now fill the same
   `compile` / `matrix` sections as the batch lane's `compile.status`, so
   `compile_status` in the record no longer comes back empty on the GUI lane.
+
+### Changed
+
+- Released `v0.3.89` package metadata, server metadata, package manifests, and Git UPM examples.
+
+### Validation
+
+- Host Python suite: 1475 tests passed, 14 platform skips.
+- Package self-tests in clean generated projects with the package resolved
+  from local source, macOS, on Unity 2021.3.58f1, 2022.3.62f3, 6000.0.58f2,
+  6000.1.13f1, 6000.2.14f1, 6000.3.23f1, 6000.4.4f1, 6000.5.10f1 and
+  6000.6.0b3: EditMode core 237/237 and PlayMode core 6/6 on every version;
+  on 2021.3.58f1 also TextMeshPro 6/6, uGUI 79/79, PlayMode uGUI 22 passed
+  with 6 skipped. The license probe ran with the Unity executable path, which
+  returned `licensing_busy` before this release.
+
+### Known limitations
+
+- `Unity Package CI` remains waived (no runner Unity license); the local
+  licensed runs above are the package evidence.
+- Live Unity runs were on macOS only. The Windows `.cmd` and `.ps1` launcher
+  changes are covered by host tests and the Windows CI job, not by a live
+  Windows editor run.
+- `cli_test_progress` and the `build_player` busy reason are written by this
+  package version; a project still on an older package shows neither.
+- A batch-mode Unity process that is killed hard (crash, `SIGKILL`) still
+  leaves a `healthy` bridge state behind; only a normal quit writes
+  `process_exited`.
+- Prefab snapshots do not carry full component type names; the validator's
+  reference type check does.
+- `run_unity_version_matrix.sh` installs the server from the checkout it runs
+  in, so running it from a branch replaces the shared install until it is
+  reinstalled from the release checkout.
 
 ## 0.3.88
 
