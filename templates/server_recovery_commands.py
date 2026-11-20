@@ -39,6 +39,28 @@ DISCOVERY_NEXT_ACTION_COMMANDS = {
 }
 
 
+RECOVERY_TOOL_BY_NEXT_ACTION = {
+    "close_same_project_editor_or_use_interactive_lane": "unity_editor_quit",
+    "open_editor_or_ensure_ready": "unity_ensure_ready",
+    "ensure_ready_or_recover_bridge": "unity_ensure_ready",
+    "start_or_recover_editor": "unity_ensure_ready",
+    "wait_for_editor_idle_or_inspect_busy_state": "unity_status_summary",
+    "wait_for_editor_idle_then_retry": "unity_status_summary",
+    "wait_for_build_player_to_finish": "unity_status_summary",
+}
+
+
+def recommended_recovery_tool_for_action(next_action: str) -> str:
+    return RECOVERY_TOOL_BY_NEXT_ACTION.get(str(next_action or "").strip(), "")
+
+
+def with_recovery_tool(payload: dict, next_action: str) -> dict:
+    tool = recommended_recovery_tool_for_action(next_action)
+    if tool:
+        payload["recommended_recovery_tool"] = tool
+    return payload
+
+
 def recommended_recovery_command_for_project(project_root: Path, next_action: str) -> str:
     action = str(next_action or "").strip()
     template = DISCOVERY_NEXT_ACTION_COMMANDS.get(action)

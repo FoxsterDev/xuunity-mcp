@@ -170,6 +170,42 @@ DEVICE_TOOLS: dict[str, dict] = {
             "required": ["projectRoot", "package", "builds"],
         },
     },
+    "unity_editor_quit": {
+        "description": (
+            "Quit this project's Unity editor and verify the process exited, returning closeout_classification "
+            "(quit_ack_and_process_exit_verified on success). It is the request-editor-quit and "
+            "verify-editor-closed host helpers as one tool, so an MCP-only agent can close an editor before a "
+            "closed-editor batch lane or a ProjectSettings revert. The quit closes the editor whoever opened it and "
+            "discards unsaved scene and prefab changes, so approve=true is required. It refuses while the editor "
+            "is in Play Mode, running tests or executing an operation unless allowWhileBusy=true. It never "
+            "force-terminates a process."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "projectRoot": {"type": "string"},
+                "approve": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true. Confirms that closing this editor and losing unsaved changes is intended.",
+                },
+                "waitForExit": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Verify process exit after the quit acknowledgement. false returns quit_ack_unverified.",
+                },
+                "allowWhileBusy": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Quit even in Play Mode or during a test run or operation. Use only for work this session owns.",
+                },
+                "timeoutMs": {"type": "integer", "default": 15000, "minimum": 1000},
+                "exitTimeoutMs": {"type": "integer", "default": 30000, "minimum": 1000},
+                "includeFullPayload": {"type": "boolean", "default": False},
+            },
+            "required": ["projectRoot", "approve"],
+        },
+    },
     "unity_tests_cancel": {
         "description": "Cancel a running EditMode or PlayMode test run by its request id (TestRunnerApi.CancelTestRun, Test Framework 1.4+). The current test is marked canceled and the rest not run; the run completes with status cancelled and partial counts, a PlayMode run returns to Edit Mode, and the journal records a non-retryable cancellation.",
         "inputSchema": {

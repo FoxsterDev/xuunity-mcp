@@ -217,7 +217,7 @@
     ]
   },
   "mcp_tools_list": {
-    "tool_count": 81,
+    "tool_count": 82,
     "tool_names": [
       "xuunity_setup_plan",
       "xuunity_setup_apply",
@@ -299,9 +299,10 @@
       "unity_device_frame_pacing",
       "unity_device_metrics",
       "unity_device_coldstart_ab",
+      "unity_editor_quit",
       "unity_tests_cancel"
     ],
-    "sha256": "8d80ca9f1992cdd9719161ba6ac8b8ebe01d7efe0c656cf9fd513e0702fc585a"
+    "sha256": "daf1a6d81b4ade383b4f334d15332034b087a6e809321eeb35bfe4c1e744982d"
   },
   "request_final_status_projection": {
     "bridge_changed_since_submission": true,

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from server_core import render_launcher_cli
-from server_recovery_commands import recommended_recovery_command_for_project
+from server_recovery_commands import recommended_recovery_command_for_project, with_recovery_tool
 
 
 def _int_or_zero(value: Any) -> int:
@@ -220,6 +220,7 @@ def build_ensure_ready_summary(
 
     if next_action and next_action != "none":
         summary["recovery_command"] = recommended_recovery_command_for_project(project_root, next_action)
+        with_recovery_tool(summary, next_action)
     summary["recommended_recovery_command"] = summary["recovery_command"]
 
     return summary

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+
+- `unity_editor_quit` closes a project's editor and verifies the process exit
+  from MCP (RG-63). It runs the existing `request-editor-quit` and
+  `verify-editor-closed` host helpers and returns `closeout_classification`
+  (`quit_ack_and_process_exit_verified` on success), so an MCP-only agent no
+  longer has to find the launcher and drop to a shell. `approve: true` is
+  required because the quit discards unsaved scene and prefab changes. The tool
+  refuses with `editor_quit_refused_editor_busy` while the editor is in Play
+  Mode, running tests or executing an operation unless `allowWhileBusy: true`,
+  and it never force-terminates a process. The batch editor-conflict details and
+  the `ensure-ready` summary name the MCP tool for their next action in
+  `recommended_recovery_tool`.
+
 ### Fixed
 
 - A scenario whose required `ui_click` was refused before delivery now ends

@@ -266,6 +266,7 @@ from server_runtime_config import (
 )
 from server_artifact_probe import load_artifact_probe_config, run_artifact_probe
 from server_artifact_registry import register_artifact, resolve_workspace_root, write_artifact_report
+from server_recovery_commands import recommended_recovery_tool_for_action
 from server_sdk_dependency_verify import run_sdk_dependency_verify
 from server_sdk_diff_guard import run_sdk_generated_diff_guard
 from server_sdk_package_restore import run_sdk_package_restore
@@ -796,6 +797,7 @@ def build_batch_editor_conflict_details(project_root: Path, live_editor_pids: li
         "recommended_next_action": next_action,
         "next_distinct_action": "request_quit_wait_for_exit_then_verify_closed",
         "recommended_recovery_command": recommended_recovery_command_for_project(project_root, next_action),
+        "recommended_recovery_tool": recommended_recovery_tool_for_action(next_action),
         "closeout_verification_required": True,
         "closeout_verification_note": "Verify editor process exit before rerunning the closed-project batch lane.",
     }
@@ -3245,6 +3247,13 @@ def invoke_project_action_from_catalog(
     return result, wait_for_result and not bool(result.get("succeeded"))
 
 
+def call_unity_editor_quit_tool(arguments: dict[str, Any]) -> dict[str, Any]:
+    # Imported on call: the quit runner lives with the CLI commands, which import this module.
+    from server_editor_quit_tool import call_unity_editor_quit_tool as handler
+
+    return handler(arguments)
+
+
 def call_unity_tests_cancel_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     validate_declared_argument_types("unity_tests_cancel", TOOLS["unity_tests_cancel"], arguments)
     project_root_value = arguments.get("projectRoot")
@@ -3326,6 +3335,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None) -> dict[str, Any]:
             "unity_license_capabilities": call_unity_license_capabilities_tool,
             **{tool_name: _device_tool_handler(tool_name) for tool_name in DEVICE_TOOL_HANDLERS},
             "unity_tests_cancel": call_unity_tests_cancel_tool,
+            "unity_editor_quit": call_unity_editor_quit_tool,
             "unity_status_summary": call_unity_status_summary_tool,
             "unity_ensure_ready": call_unity_ensure_ready_tool,
             "unity_request_final_status": call_unity_request_final_status_tool,
