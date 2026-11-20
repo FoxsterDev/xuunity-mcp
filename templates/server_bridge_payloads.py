@@ -621,6 +621,49 @@ COMPACT_OPERATION_PAYLOADS = {
 }
 
 
+EDM4U_RESOLVE_OPERATION = "unity.edm4u.resolve"
+EDM4U_TRACKED_OUTPUT_CANDIDATES = (
+    "Assets/Plugins/Android/mainTemplate.gradle",
+    "ProjectSettings/AndroidResolverDependencies.xml",
+    "Assets/Plugins/Android/settingsTemplate.gradle",
+    "Assets/Plugins/Android/gradleTemplate.properties",
+)
+
+
+def edm4u_resolve_next_tools(payload: dict[str, Any]) -> dict[str, Any]:
+    if str(payload.get("platform") or "android").strip().lower() != "android":
+        return {}
+    project_root = str(payload.get("project_root") or "")
+    present = [
+        candidate
+        for candidate in EDM4U_TRACKED_OUTPUT_CANDIDATES
+        if project_root and (Path(project_root) / candidate).is_file()
+    ]
+    tracked = present or list(EDM4U_TRACKED_OUTPUT_CANDIDATES[:2])
+    return {
+        "recommended_next_tool": "unity_sdk_generated_diff_guard",
+        "next_tools_tracked_paths_basis": "present_on_disk" if present else "conventional_defaults",
+        "next_tools": [
+            {
+                "tool": "unity_sdk_generated_diff_guard",
+                "purpose": (
+                    "Compare the generated files to the Git baseline and fail on unexpected or dropped lines "
+                    "before accepting the resolve."
+                ),
+                "arguments": {"projectRoot": project_root, "trackedPaths": tracked},
+            },
+            {
+                "tool": "unity_sdk_android_resolve",
+                "purpose": (
+                    "Rollout proof: a callback-settled resolve that passes only when the tracked outputs are "
+                    "hash-stable and the expected coordinates verify."
+                ),
+                "arguments": {"projectRoot": project_root, "trackedGeneratedPaths": tracked},
+            },
+        ],
+    }
+
+
 def _copy_if_present(target: dict[str, Any], source: dict[str, Any], keys: tuple[str, ...]) -> None:
     for key in keys:
         if key in source:
@@ -1175,6 +1218,8 @@ def bridge_response_to_tool_result(
                 payload.update(editor_open_attribution)
         elif payload_type in {"unity.scenario.run", "unity.scenario.result"} and isinstance(payload, dict):
             payload = normalize_scenario_payload(payload, scenario_terminal_statuses)
+        if isinstance(payload, dict) and EDM4U_RESOLVE_OPERATION in {payload_type, operation}:
+            payload.update(edm4u_resolve_next_tools(payload))
         if not include_full_payload and payload_type in COMPACT_UI_QUERY_PAYLOAD_TYPES and isinstance(payload, dict):
             payload = compact_ui_query_payload(payload)
         if (

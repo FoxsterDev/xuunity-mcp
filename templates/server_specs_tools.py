@@ -1363,7 +1363,7 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "unity_edm4u_resolve": {
         "bridgeOperation": "unity.edm4u.resolve",
-        "description": "Request a whitelisted External Dependency Manager for Unity resolver menu item. Android resolve fails closed unless BuildTarget.Android is already active; menu execution and editor-idle settle do not prove resolver-output freshness.",
+        "description": "Request a whitelisted External Dependency Manager for Unity resolver menu item. Android resolve fails closed unless BuildTarget.Android is already active; menu execution and editor-idle settle do not prove resolver-output freshness. For rollout proof prefer unity_sdk_android_resolve plus unity_sdk_generated_diff_guard; an Android result lists both in next_tools with the tracked generated paths prefilled.",
         "inputSchema": {
             "type": "object",
             "properties": {

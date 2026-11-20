@@ -54,6 +54,15 @@
   `restore_dropped_unity_template_lines_then_rerun_guard`. An allowlisted
   template that lost those lines used to pass unless the caller supplied
   `requiredMarkersAfter`. `templateMarkerGuard: false` turns the check off.
+- An Android `unity_edm4u_resolve` result names the tools that prove it
+  (RG-54). `next_tools` lists `unity_sdk_generated_diff_guard` and
+  `unity_sdk_android_resolve` with `projectRoot` and the tracked generated paths
+  filled from the files present in the project (`mainTemplate.gradle`,
+  `AndroidResolverDependencies.xml`, `settingsTemplate.gradle`,
+  `gradleTemplate.properties`), and `recommended_next_tool` names the guard. The
+  result used to carry only the prose action
+  `verify_resolver_output_freshness_and_generated_diff`. The tool description
+  points at the typed lane for rollout proof.
 
 ## 0.3.90
 
