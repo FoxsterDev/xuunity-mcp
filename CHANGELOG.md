@@ -45,6 +45,15 @@
   `13.0` used to pass against `13.0.1` as a substring. `version` and
   `minVersion` apply to these kinds as they do to `podfile_lock_pod`. A value
   that is not a coordinate keeps the plain contains check.
+- `unity_sdk_generated_diff_guard` fails when a changed Unity Gradle template
+  lost lines the baseline had, even when the path is on
+  `expectedChangedAllowlist` (RG-55). For `*Template.gradle` and
+  `*Template.properties` it checks every `**PLACEHOLDER**` token and the
+  `namespace`, `ndkPath` and `ndkVersion` statements of the baseline, lists the
+  missing ones in `template_markers_dropped`, and recommends
+  `restore_dropped_unity_template_lines_then_rerun_guard`. An allowlisted
+  template that lost those lines used to pass unless the caller supplied
+  `requiredMarkersAfter`. `templateMarkerGuard: false` turns the check off.
 
 ## 0.3.90
 

@@ -231,6 +231,89 @@ class SdkGeneratedDiffGuardTests(unittest.TestCase):
         self.assertEqual(["signingConfig"], result["required_marker_missing"])
         self.assertEqual("restore_required_generated_markers_or_review_resolver_output", result["recommended_next_action"])
 
+    UNITY_TEMPLATE = (
+        "dependencies {\n    implementation 'com.vendor:sdk:1.2.3'\n}\n"
+        "android {\n    namespace \"com.unity3d.player\"\n    ndkPath \"**NDKPATH**\"\n"
+        "    ndkVersion \"**NDKVERSION**\"\n    compileSdk **APIVERSION**\n}\n"
+    )
+
+    def _template_project(self, root: Path) -> tuple[Path, Path]:
+        project = self._project(root)
+        source = project / "Assets" / "Plugins" / "Android" / "mainTemplate.gradle"
+        source.write_text(self.UNITY_TEMPLATE, encoding="utf-8")
+        self._git(project, "add", ".")
+        self._git(project, "commit", "-m", "unity template")
+        return project, source
+
+    def test_allowlisted_template_change_that_drops_unity_lines_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project, source = self._template_project(Path(tmp))
+            damaged = self.UNITY_TEMPLATE.replace("1.2.3", "1.3.0")
+            for line in ('    namespace "com.unity3d.player"\n', '    ndkPath "**NDKPATH**"\n',
+                         '    ndkVersion "**NDKVERSION**"\n'):
+                damaged = damaged.replace(line, "")
+            source.write_text(damaged, encoding="utf-8")
+            config = {
+                "trackedPaths": ["Assets/Plugins/Android/mainTemplate.gradle"],
+                "expectedChangedAllowlist": ["Assets/Plugins/Android/mainTemplate.gradle"],
+            }
+
+            result = run_sdk_generated_diff_guard(project_root=project, config=config)
+            waived = run_sdk_generated_diff_guard(
+                project_root=project, config={**config, "templateMarkerGuard": False}
+            )
+
+        self.assertEqual("failed", result["verdict"])
+        self.assertEqual("expected_allowlisted_change", result["paths"][0]["change_class"])
+        self.assertEqual(
+            ["**NDKPATH**", "**NDKVERSION**", "namespace", "ndkPath", "ndkVersion"],
+            result["paths"][0]["dropped_template_markers"],
+        )
+        self.assertEqual("Assets/Plugins/Android/mainTemplate.gradle", result["template_markers_dropped"][0]["path"])
+        self.assertEqual("restore_dropped_unity_template_lines_then_rerun_guard", result["recommended_next_action"])
+        self.assertEqual("passed", waived["verdict"])
+        self.assertIs(False, waived["template_marker_guard"])
+
+    def test_allowlisted_template_change_that_keeps_unity_lines_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project, source = self._template_project(Path(tmp))
+            source.write_text(
+                self.UNITY_TEMPLATE.replace(
+                    "implementation 'com.vendor:sdk:1.2.3'",
+                    "implementation 'com.vendor:sdk:1.3.0'\n    implementation 'com.vendor:extra:2.0.0'",
+                ).replace('ndkPath "**NDKPATH**"', 'ndkPath  "**NDKPATH**" // moved'),
+                encoding="utf-8",
+            )
+            result = run_sdk_generated_diff_guard(
+                project_root=project,
+                config={
+                    "trackedPaths": ["Assets/Plugins/Android/mainTemplate.gradle"],
+                    "expectedChangedAllowlist": ["Assets/Plugins/Android/mainTemplate.gradle"],
+                },
+            )
+
+        self.assertEqual("passed", result["verdict"])
+        self.assertEqual([], result["template_markers_dropped"])
+
+    def test_template_marker_guard_ignores_non_template_files_and_validates_its_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(Path(tmp))
+            generated = project / "Assets" / "Plugins" / "Android" / "generated.gradle"
+            generated.write_text('android {\n    namespace "x"\n    token **DEPS**\n}\n', encoding="utf-8")
+            self._git(project, "add", ".")
+            self._git(project, "commit", "-m", "generated")
+            generated.write_text("android {\n}\n", encoding="utf-8")
+            config = {
+                "trackedPaths": ["Assets/Plugins/Android/generated.gradle"],
+                "expectedChangedAllowlist": ["Assets/Plugins/Android/generated.gradle"],
+            }
+            result = run_sdk_generated_diff_guard(project_root=project, config=config)
+            with self.assertRaises(server_core.ToolInvocationError):
+                run_sdk_generated_diff_guard(project_root=project, config={**config, "templateMarkerGuard": "no"})
+
+        self.assertEqual("passed", result["verdict"])
+        self.assertEqual([], result["paths"][0]["dropped_template_markers"])
+
     def test_stale_previous_version_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = self._project(Path(tmp))

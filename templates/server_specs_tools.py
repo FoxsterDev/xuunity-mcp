@@ -1559,6 +1559,16 @@ TOOLS: dict[str, dict[str, Any]] = {
                     "default": {}
                 },
                 "failOnUnexpectedChangedFile": {"type": "boolean", "default": True},
+                "templateMarkerGuard": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": (
+                        "For tracked Unity Gradle templates (*Template.gradle, *Template.properties): fail when a "
+                        "changed file lost a **PLACEHOLDER** token or a namespace/ndkPath/ndkVersion statement that "
+                        "the baseline had, even when the path is on expectedChangedAllowlist. Dropped items are "
+                        "listed in template_markers_dropped."
+                    )
+                },
                 "reportFile": {"type": "string"}
             },
             "required": ["projectRoot", "trackedPaths"]

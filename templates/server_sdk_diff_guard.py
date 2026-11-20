@@ -22,6 +22,9 @@ LIBRARY_BASELINE_MANIFEST = "baseline_manifest.json"
 _SAFE_GIT_REF = re.compile(r"^[A-Za-z0-9._/@^~-]+$")
 _XML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _DIFF_MODES = {"xml_structural", "gradle_tokenized", "line_normalized"}
+_UNITY_TEMPLATE_FILE = re.compile(r"(?:^|/)[A-Za-z]*Template\.(?:gradle|properties)$")
+_UNITY_TEMPLATE_PLACEHOLDER = re.compile(r"\*\*[A-Z][A-Z0-9_]*\*\*")
+_UNITY_TEMPLATE_STRUCTURAL_KEYS = ("namespace", "ndkPath", "ndkVersion")
 _DEFAULT_DIFF_MODES = {
     "*.xml": "xml_structural",
     "*.gradle": "gradle_tokenized",
@@ -94,6 +97,7 @@ def run_sdk_generated_diff_guard(
     current_text_by_path: dict[str, str] = {}
     comment_free_current_text_by_path: dict[str, str] = {}
     diff_mode_by_path: dict[str, str] = {}
+    template_markers_dropped: list[dict[str, Any]] = []
 
     for relative_path in normalized["tracked_paths"]:
         if git_tracked_by_path[relative_path]:
@@ -163,9 +167,18 @@ def run_sdk_generated_diff_guard(
         else:
             change_class = "unchanged"
 
+        dropped_template_markers = (
+            _dropped_template_markers(relative_path, baseline_text, current_text, diff_mode)
+            if changed and current_exists and normalized["template_marker_guard"]
+            else []
+        )
+        if dropped_template_markers:
+            template_markers_dropped.append({"path": relative_path, "markers": dropped_template_markers})
+
         rows.append(
             {
                 "path": relative_path,
+                "dropped_template_markers": dropped_template_markers,
                 "baseline_source": baseline_source,
                 "baseline_ref": baseline_ref if baseline_source == "git_head" else "",
                 "change_class": change_class,
@@ -210,7 +223,13 @@ def run_sdk_generated_diff_guard(
                     }
                 )
 
-    failed = bool(required_marker_missing or stale_versions or missing_current_files or invalid_generated_files)
+    failed = bool(
+        required_marker_missing
+        or stale_versions
+        or missing_current_files
+        or invalid_generated_files
+        or template_markers_dropped
+    )
     if normalized["fail_on_unexpected_changed_file"] and unexpected_changed_files:
         failed = True
     verdict = "failed" if failed else "passed"
@@ -230,12 +249,15 @@ def run_sdk_generated_diff_guard(
         "changed_paths": changed_paths,
         "paths": rows,
         "required_marker_missing": required_marker_missing,
+        "template_markers_dropped": template_markers_dropped,
+        "template_marker_guard": normalized["template_marker_guard"],
         "missing_current_files": missing_current_files,
         "invalid_generated_files": invalid_generated_files,
         "stale_versions": stale_versions,
         "unexpected_changed_files": unexpected_changed_files,
         "fail_on_unexpected_changed_file": normalized["fail_on_unexpected_changed_file"],
         "recommended_next_action": _recommended_next_action(
+            template_markers_dropped=template_markers_dropped,
             required_marker_missing=required_marker_missing,
             missing_current_files=missing_current_files,
             invalid_generated_files=invalid_generated_files,
@@ -263,6 +285,7 @@ def run_sdk_generated_diff_guard(
             "tracked_path_count": len(rows),
             "changed_path_count": len(changed_paths),
             "required_marker_missing_count": len(required_marker_missing),
+            "template_markers_dropped_count": len(template_markers_dropped),
             "missing_current_file_count": len(missing_current_files),
             "invalid_generated_file_count": len(invalid_generated_files),
             "stale_version_count": len(stale_versions),
@@ -309,7 +332,14 @@ def _normalize_config(config: dict[str, Any]) -> dict[str, Any]:
             "sdk_generated_diff_guard_config_invalid",
             "failOnUnexpectedChangedFile must be a boolean.",
         )
+    template_marker_guard = config.get("templateMarkerGuard", True)
+    if not isinstance(template_marker_guard, bool):
+        raise ToolInvocationError(
+            "sdk_generated_diff_guard_config_invalid",
+            "templateMarkerGuard must be a boolean.",
+        )
     return {
+        "template_marker_guard": template_marker_guard,
         "baseline_ref": baseline_ref,
         "baseline_source": baseline_source,
         "library_baseline_dir": str(config.get("libraryBaselineDir", DEFAULT_LIBRARY_BASELINE_DIR) or DEFAULT_LIBRARY_BASELINE_DIR),
@@ -834,6 +864,26 @@ def _normalize_lines(value: str) -> str:
     )
 
 
+def _dropped_template_markers(relative_path: str, baseline_text: str, current_text: str, diff_mode: str) -> list[str]:
+    if _UNITY_TEMPLATE_FILE.search(relative_path.replace("\\", "/")) is None:
+        return []
+    try:
+        baseline = _comment_free_text(baseline_text, diff_mode)
+        current = _comment_free_text(current_text, diff_mode)
+    except ValueError:
+        return []
+    dropped = [
+        placeholder
+        for placeholder in sorted(set(_UNITY_TEMPLATE_PLACEHOLDER.findall(baseline)))
+        if placeholder not in current
+    ]
+    for key in _UNITY_TEMPLATE_STRUCTURAL_KEYS:
+        statement = re.compile(rf"(?m)^\s*{key}\b")
+        if statement.search(baseline) is not None and statement.search(current) is None:
+            dropped.append(key)
+    return dropped
+
+
 def _comment_free_text(value: str, diff_mode: str) -> str:
     if diff_mode == "xml_structural":
         return _XML_COMMENT.sub("", value)
@@ -977,6 +1027,7 @@ def _report_artifact_destination(project_root: Path, report_path: Path) -> str:
 
 def _recommended_next_action(
     *,
+    template_markers_dropped: list[dict[str, Any]],
     required_marker_missing: list[str],
     missing_current_files: list[str],
     invalid_generated_files: list[dict[str, str]],
@@ -987,6 +1038,8 @@ def _recommended_next_action(
         return "restore_missing_generated_files_or_review_resolver_output"
     if invalid_generated_files:
         return "repair_invalid_generated_files_or_select_conservative_diff_mode"
+    if template_markers_dropped:
+        return "restore_dropped_unity_template_lines_then_rerun_guard"
     if required_marker_missing:
         return "restore_required_generated_markers_or_review_resolver_output"
     if stale_versions:
