@@ -1722,6 +1722,13 @@ def build_transport_response_missing_tool_error(
     return ToolInvocationError("transport_response_missing", message, details)
 
 
+def _state_editor_pid(state: dict[str, Any] | None) -> int:
+    try:
+        return max(0, int((state or {}).get("editor_pid") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 def maybe_record_settle_lifecycle_transition(
     project_root: Path,
     operation: str,
@@ -1756,6 +1763,8 @@ def maybe_record_settle_lifecycle_transition(
         "previous_bridge_session_id": initial_session_id,
         "current_bridge_generation": current_generation,
         "current_bridge_session_id": current_session_id,
+        "previous_editor_pid": _state_editor_pid(before_state),
+        "current_editor_pid": _state_editor_pid(after_state),
         "journal_event_path": str(journal_path),
         "reclassified_status": "settled_after_lifecycle_reset",
     }

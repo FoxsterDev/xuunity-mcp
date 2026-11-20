@@ -95,6 +95,14 @@
   `enable_bridge_and_retry` advice sent agents through setup-plan, setup-apply
   and a reopen for nothing. Setup is still recommended when the package is not
   declared. Discovery reports `light_mcp_package_declared`.
+- `unity_project_refresh` no longer attaches a `stale_risk` Play Mode caveat
+  after an ordinary domain reload (RG-71). When the bridge identity changed
+  during settle but the editor process is the same and the host observed Edit
+  Mode after the reload, `playmode_state_after_settle_trust_class` is
+  `expected_domain_reload` with no follow-up action, as the test tools already
+  report. A different editor pid, an unknown pid, a relaunch or a settled Play
+  Mode state keeps `stale_risk`. The settle transition records
+  `previous_editor_pid` and `current_editor_pid`.
 
 ## 0.3.90
 

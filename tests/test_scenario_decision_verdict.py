@@ -808,6 +808,51 @@ class ScenarioDecisionVerdictTests(unittest.TestCase):
             compact["playmode_state_after_settle_recommended_next_action"],
         )
 
+    def _refresh_after_reload(self, *, playmode_state: str, previous_pid: int, current_pid: int) -> dict:
+        return server_bridge_payloads.normalize_refresh_payload_from_lifecycle(
+            {"outcome": "refresh_requested", "settle_request_id": "req-refresh"},
+            {
+                "bridge_identity_transition": {
+                    "reclassified_status": "settled_after_lifecycle_reset",
+                    "previous_bridge_generation": 4,
+                    "current_bridge_generation": 5,
+                    "previous_editor_pid": previous_pid,
+                    "current_editor_pid": current_pid,
+                },
+                "idle_wait_after": {
+                    "refresh_settle_phase": "settled",
+                    "refresh_settle_request_id": "req-refresh",
+                    "playmode_state": playmode_state,
+                    "is_compiling": False,
+                    "is_updating": False,
+                    "compiler_error_count": 0,
+                },
+            },
+        )
+
+    def test_refresh_domain_reload_in_the_same_editor_is_expected_not_stale(self) -> None:
+        normalized = self._refresh_after_reload(playmode_state="edit", previous_pid=4242, current_pid=4242)
+
+        self.assertEqual("expected_domain_reload", normalized["playmode_state_after_settle_trust_class"])
+        self.assertEqual("none", normalized["playmode_state_after_settle_recommended_next_action"])
+        self.assertEqual("expected_refresh_domain_reload", normalized["lifecycle_churn_classification"])
+        compact = server_bridge_payloads.compact_operation_payload(normalized, "unity.project.refresh")
+        self.assertEqual("expected_domain_reload", compact["playmode_state_after_settle_trust_class"])
+
+    def test_refresh_reload_stays_stale_risk_without_same_editor_edit_mode_proof(self) -> None:
+        for case in (
+            {"playmode_state": "playing", "previous_pid": 4242, "current_pid": 4242},
+            {"playmode_state": "edit", "previous_pid": 4242, "current_pid": 5151},
+            {"playmode_state": "edit", "previous_pid": 0, "current_pid": 4242},
+        ):
+            with self.subTest(case=case):
+                normalized = self._refresh_after_reload(**case)
+                self.assertEqual("stale_risk", normalized["playmode_state_after_settle_trust_class"])
+                self.assertEqual(
+                    "confirm_via_unity_playmode_state",
+                    normalized["playmode_state_after_settle_recommended_next_action"],
+                )
+
     def test_response_payload_promotes_editor_relaunch_attribution_from_lifecycle(self) -> None:
         response = server_bridge_payloads.normalize_response_payload_from_lifecycle(
             {

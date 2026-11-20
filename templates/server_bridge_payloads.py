@@ -302,6 +302,23 @@ def _attach_editor_relaunch_attribution(normalized: dict[str, Any], lifecycle: d
         normalized.update(attribution)
 
 
+def _is_same_editor_edit_mode_reload(
+    normalized: dict[str, Any],
+    transition: dict[str, Any],
+    lifecycle: dict[str, Any],
+) -> bool:
+    try:
+        previous_pid = int(transition.get("previous_editor_pid") or 0)
+        current_pid = int(transition.get("current_editor_pid") or 0)
+    except (TypeError, ValueError):
+        return False
+    if previous_pid <= 0 or previous_pid != current_pid:
+        return False
+    if str(normalized.get("playmode_state_after_settle") or "") != "edit":
+        return False
+    return not _editor_relaunch_attribution_from_lifecycle(lifecycle)
+
+
 def _attach_post_settle_playmode_accounting(
     normalized: dict[str, Any],
     idle_wait_after: dict[str, Any],
@@ -312,6 +329,15 @@ def _attach_post_settle_playmode_accounting(
 
     transition = lifecycle.get("bridge_identity_transition")
     if isinstance(transition, dict) and transition:
+        if _is_same_editor_edit_mode_reload(normalized, transition, lifecycle):
+            normalized["playmode_state_after_settle_trust_class"] = "expected_domain_reload"
+            normalized["playmode_state_after_settle_note"] = (
+                "The refresh reloaded the scripting domain in the same editor process, so the bridge identity "
+                "changed during settle; Edit Mode is the host's own post-reload observation."
+            )
+            normalized["playmode_state_after_settle_recommended_next_action"] = "none"
+            normalized["lifecycle_churn_classification"] = "expected_refresh_domain_reload"
+            return
         normalized["playmode_state_after_settle_trust_class"] = "stale_risk"
         normalized["playmode_state_after_settle_note"] = (
             "bridge identity changed during post-request settle; confirm current Play Mode via unity_playmode_state"
