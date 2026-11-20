@@ -346,3 +346,18 @@ is in Edit Mode and is not the active app.
 | `quit_ack_and_process_exit_verified` | `closeout_classification` | the acknowledgement was followed by verified same-project process exit |
 | `editor_quit_ack_without_exit` | `closeout_classification` and error code | the editor stayed live after the exit timeout; `quit_executing_observed` and `quit_expired_observed` say whether the journal shows `editor_quit_executing` or `editor_quit_expired` for that request; the recovery command is `restore-editor-state --require-closed` only when `host_opened_session_found` is `true` |
 | `quit_request_rejected` | `closeout_classification` (error code `editor_quit_request_rejected`) | the bridge answered the quit with `status: error`, so no exit was armed; `quit_request_error_code` carries the bridge code and no exit wait runs |
+
+## Reused Batch Writer Pid
+
+A bridge state file left by a batch process names that process's pid. When the
+pid is alive but no longer belongs to a Unity process for the project, the host
+treats the writer as exited (`bridge_state_writer_pid_reused`). This rule needs
+host process visibility by design: without a readable process table the host
+cannot tell a reused pid from the original writer and does not claim it.
+
+## Unity Slot
+
+An advisory host-wide lock (`unity_slot.lock.json` under the neutral install's
+`state` directory) taken by the test runners, so only one of them drives Unity
+at a time. It records the holder's pid, owner, start time and command. The MCP
+tools do not take it.

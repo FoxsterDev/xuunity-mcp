@@ -56,6 +56,18 @@ Pass criteria:
 - a blocking readiness condition must set `host_prerequisites.ready=false`,
   include its code in `blocking_codes`, and expose the matching
   `checks.readiness_gate` row
+- an editor started on code with a compile error makes `ensure-ready` return
+  `editor_startup_modal_blocked` before its timeout, with the compiler lines
+  and `recovery_steps`; an editor that was already blocked before the call is
+  reported on the first pass (`startup_modal_block_observed=before_wait`)
+- with the editor closed and compile inputs changed to red code,
+  `ensure-ready --open-editor` refuses with `editor_open_refused_compile_red`
+  and opens nothing; the next open on unchanged inputs refuses again without a
+  new batch probe (`compile_red_recorded_by_host_probe_inputs_unchanged`)
+- the first open after a package upgrade, when no input snapshot exists yet,
+  runs the batch compile probe once
+- a disabled bridge on a closed project that declares the package recommends
+  `open_editor_or_ensure_ready`, not setup
 
 ### 1a. Closeout Truth Smoke
 
@@ -70,6 +82,11 @@ Pass criteria:
   for the smoke, not as a passing closeout
 - when closeout proof is incomplete, the wrapper surfaces one obvious follow-up
   command through `recommended_recovery_command`
+
+MCP-only variant: call `unity_editor_quit {approve: true}`. It must return
+`closeout_classification=quit_ack_and_process_exit_verified`, refuse without
+`approve`, and refuse with `editor_quit_refused_editor_busy` while the editor
+is in Play Mode or running tests.
 
 ### 1b. Unfocused Editor Quit Smoke
 
@@ -1200,6 +1217,70 @@ Pass criteria:
 - immediately after a domain reload or a play-state change, a single sample may
   report `unknown`; `unknown` is not `advancing` and must not be read as
   liveness proof
+
+### 25. SDK Lane Discoverability Smoke
+
+Run `unity_edm4u_resolve` for Android, then follow the result.
+
+Pass criteria:
+
+- the result carries `next_tools` naming `unity_sdk_generated_diff_guard` and
+  `unity_sdk_android_resolve`, each with `projectRoot` and the tracked
+  generated paths that exist in the project
+- `unity_sdk_dependency_verify` on a closed project answers from the files,
+  reports `editor_required=false`, and no editor process is started
+- a coordinate expectation returns `actual_version`; an expectation for
+  `13.0` fails against a resolved `13.0.1`
+- with a Unity Gradle template on `expectedChangedAllowlist`, removing its
+  `namespace`, `ndkPath` or `ndkVersion` line makes the guard fail with
+  `template_markers_dropped`
+
+### 26. UI Selector And Scenario Verdict Smoke
+
+Pass criteria:
+
+- a selector with an unknown key (for example `nameContains`) is refused as
+  `unknown_selector_key` before anything reaches Unity, on a direct UI tool and
+  on a scenario step
+- a scenario with one `optional: true` click whose target is absent passes,
+  and the step reads `skipped_optional_absent`
+- a required click on a target that exists but is not interactable ends
+  `failed` / `precondition`, not `inconclusive`
+- a delivered click that changes nothing ends `failed` / `precondition`
+- a scenario `ui_click` step without `interactionId` validates and reports its
+  `stepId` as the interaction id
+- `unity_prefab_mutate` `add_component` with `UnityEngine.UI.Image` resolves;
+  an ambiguous short type name is refused with candidates
+
+### 27. Console Hygiene Smoke
+
+Pass criteria:
+
+- `unity_console_grep` without `includeStackTraces` returns no frames of
+  async state machines or nested types (`Type/<Method>d__N:MoveNext ()`)
+- a log line that carries a session token, a Bearer header or a JWT comes back
+  with `[REDACTED]` and `redacted_secret_count` above zero
+- a line longer than 2048 bytes is cut and carries `message_bytes_before_cap`;
+  `maxItemBytes=-1` returns it whole
+- `unity_project_refresh` after an ordinary script reload reports
+  `playmode_state_after_settle_trust_class=expected_domain_reload`
+
+### 28. Unity Slot And Stopped-Run Smoke
+
+Pass criteria:
+
+- while `scripts/testing/run_unity_version_matrix.sh` runs, a second matrix
+  run, `run_consumer_rollout.py execute` and `run_package_selftests.sh` refuse
+  with `unity_slot_busy` and the holder's pid, owner, start time and command
+- sending TERM to a running matrix leaves no Unity process for the run's
+  projects directory, writes `stopped` for the current row and releases the slot
+- a lock whose holder exited is taken over by the next run
+  (`stale_lock_taken_over`)
+- `run_package_selftests.sh <unity> <project> --filter <name>` passes on a
+  project made by `-createProject`, and a run that writes no results file ends
+  with `results_not_written_within_bound` and no surviving editor
+- a bare `-runTests` in a project without the Test Framework shows
+  `cli_test_progress.status=test_framework_missing` in `unity_status_summary`
 
 ## Public Template Assets
 

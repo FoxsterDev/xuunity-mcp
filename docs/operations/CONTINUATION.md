@@ -258,6 +258,38 @@ With the editor closed, it compares the compile inputs with the snapshot the
 package wrote after its last compile and runs the batch compile probe when they
 changed; a red probe sets `reopen_blocked`.
 
+The same preflight runs on the first open after a package upgrade, when no
+snapshot exists yet and the project has compiled before. A red probe is
+remembered: the host writes the snapshot itself (`trigger: host_batch_probe`),
+so reopening on unchanged inputs refuses without running the probe again. Fix
+the code, then reopen.
+
+### Closed Editor: Order Of Moves
+
+- Changed code and a closed editor: let `ensure-ready --open-editor` run its
+  batch compile preflight, or run `batch-compile` yourself first. Do not open
+  the GUI editor on red code; it stops on the "Enter Safe Mode?" dialog.
+- `ensure-ready` reports `editor_startup_modal_blocked` itself, including for
+  an editor that was already blocked before the call. `unity_status_summary`
+  stays the place to read progress while a long wait runs.
+- A closed project that already declares the package needs
+  `unity_ensure_ready {openEditor: true}` only; it enables the bridge. Run
+  setup-plan and setup-apply when the package is missing from the manifest.
+- To close an editor from an MCP-only session, call
+  `unity_editor_quit {approve: true}` and read `closeout_classification`. It
+  refuses a busy editor; pass `allowWhileBusy` only for work the session owns.
+- On a checkout shared with another session, poll `unity_status_summary` for
+  the busy state; do not read `bridge_state.json` in a shell loop.
+
+### One Unity Run Per Host
+
+The test runners (`run_unity_version_matrix.sh`,
+`run_consumer_rollout.py execute`, `run_package_selftests.sh`) take the
+host-wide Unity slot and refuse with `unity_slot_busy` while another live run
+holds it. `python3 scripts/testing/unity_run_guard.py lock-status` shows the
+holder. The MCP tools do not take the slot, so check for a running editor that
+is not yours before a batch run.
+
 ### Alive Editor Without an Attached Bridge
 
 A running editor may predate package installation, or the package may already be

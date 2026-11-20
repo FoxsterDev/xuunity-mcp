@@ -31,6 +31,13 @@ that is known not to be an adoption target. Tool-owned `.claude`, `.codex`, and
 `.agents` trees are pruned automatically so worktree copies do not inflate the
 consumer denominator.
 
+`execute` takes the host-wide Unity slot for the whole run and refuses with
+`unity_slot_busy` (exit code 3) and the holder's pid, owner, start time and
+command while a version matrix, a self-test run or another rollout holds it.
+Nothing is modified on that refusal. A lock whose holder exited is taken over.
+`python3 scripts/testing/unity_run_guard.py lock-status` shows the current
+holder.
+
 ## Plan
 
 Planning performs the Unity license probe after the inventory, write, version,
