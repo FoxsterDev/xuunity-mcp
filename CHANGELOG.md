@@ -16,6 +16,12 @@
   the `ensure-ready` summary name the MCP tool for their next action in
   `recommended_recovery_tool`.
 
+- `scripts/testing/run_package_selftests.sh <unity> <project> [--filter X]`
+  runs the package's own tests in a closed project. It adds the Test Framework
+  and the package's `testables` entry, takes the host Unity slot, passes its
+  own `-logFile`, and stops the editor with `results_not_written_within_bound`
+  when no results file appears within `--bound-seconds`.
+
 ### Fixed
 
 - A scenario whose required `ui_click` was refused before delivery now ends
@@ -149,6 +155,13 @@
   holder's details while another live run holds it (`unity_slot_busy`); a lock
   whose holder exited or whose pid was reused is taken over. The MCP tools do
   not take the lock.
+- A `-batchmode -runTests` process in a project without the Test Framework is
+  named instead of looking like a silent wait. On Unity 6000.x a project made
+  by `-createProject` has no `com.unity.test-framework`, so the editor loads
+  and never starts a test. `status_summary` now reports `cli_test_progress`
+  with `status: test_framework_missing` and
+  `recommended_recovery_tool: unity_package_install_test_framework` when such a
+  process is live and neither the manifest nor the lock names the package.
 
 ## 0.3.90
 
