@@ -27,6 +27,7 @@ UI_SELECTOR_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 SCENARIO_STEP_GROUPS = ("steps", "cleanupSteps")
+UI_CLICK_STEP_KIND = "ui_click"
 
 
 def unknown_ui_selector_keys(selector: Any) -> list[str]:
@@ -76,3 +77,31 @@ def assert_scenario_ui_selector_keys(scenario: Any) -> None:
                 continue
             step_id = str(step.get("stepId") or step.get("step_id") or index)
             assert_ui_selector_keys(step.get("selector"), where=f"scenario {group}[{index}] '{step_id}'")
+
+
+def default_scenario_interaction_ids(scenario: Any) -> Any:
+    """Give a ui_click step without interactionId its stepId, as the direct tool needs none."""
+    if not isinstance(scenario, dict):
+        return scenario
+    normalized = scenario
+    for group in SCENARIO_STEP_GROUPS:
+        steps = scenario.get(group)
+        if not isinstance(steps, list):
+            continue
+        updated: list[Any] = []
+        changed = False
+        for step in steps:
+            if (
+                isinstance(step, dict)
+                and str(step.get("kind") or "").strip() == UI_CLICK_STEP_KIND
+                and not str(step.get("interactionId") or "").strip()
+                and str(step.get("stepId") or "").strip()
+            ):
+                step = {**step, "interactionId": str(step.get("stepId")).strip()}
+                changed = True
+            updated.append(step)
+        if changed:
+            if normalized is scenario:
+                normalized = dict(scenario)
+            normalized[group] = updated
+    return normalized

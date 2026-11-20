@@ -8,7 +8,7 @@ from typing import Any
 
 from server_core import ToolInvocationError
 from server_recovery_commands import recommended_recovery_command_for_project
-from server_ui_selector import assert_scenario_ui_selector_keys
+from server_ui_selector import assert_scenario_ui_selector_keys, default_scenario_interaction_ids
 
 
 PROJECT_ACTION_SCHEMA_VERSION = "xuunity.project-actions.v1"
@@ -689,6 +689,7 @@ def normalize_project_action_scenario(
     catalog_path: str = "",
 ) -> dict[str, Any]:
     assert_scenario_ui_selector_keys(scenario)
+    scenario = default_scenario_interaction_ids(scenario)
     scenario = normalize_poll_until_scenario(scenario)
     if not scenario_has_project_action_steps(scenario):
         return scenario

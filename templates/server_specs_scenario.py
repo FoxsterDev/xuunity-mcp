@@ -159,7 +159,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
         "assetRefreshStepId": {"type": "string"},
         "interactionId": {
             "type": "string",
-            "description": "ui_click only. Stable id a reference can require via required_interactions.",
+            "description": "ui_click only. Stable id a reference can require via required_interactions. Defaults to stepId.",
         },
         "targetKind": {
             "type": "string",

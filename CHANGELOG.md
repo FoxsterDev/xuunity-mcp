@@ -84,6 +84,11 @@
   the key, the closest valid keys and the full key list. `nameContains` used to
   be dropped silently and the query returned unrelated nodes. The five tools now
   declare the selector keys in their schema, as scenario steps already did.
+- A scenario `ui_click` step without `interactionId` takes its `stepId`
+  (RG-72). The direct `unity_ui_click` tool never needed the id, so a scenario
+  copied from direct calls failed validation with `missing_interaction_id`. The
+  host fills it for `steps` and `cleanupSteps` on the MCP and CLI paths; a step
+  with neither id is still refused by the package.
 
 ## 0.3.90
 

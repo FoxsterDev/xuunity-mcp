@@ -302,7 +302,7 @@
       "unity_editor_quit",
       "unity_tests_cancel"
     ],
-    "sha256": "daf1a6d81b4ade383b4f334d15332034b087a6e809321eeb35bfe4c1e744982d"
+    "sha256": "91269bf161cf72832b1984a5a135e61773803df69a5931749c8605ae5cac191a"
   },
   "request_final_status_projection": {
     "bridge_changed_since_submission": true,

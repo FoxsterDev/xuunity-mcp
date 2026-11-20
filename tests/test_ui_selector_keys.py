@@ -98,6 +98,30 @@ class ScenarioSelectorRefusalTests(unittest.TestCase):
                 valid, server_project_actions.normalize_project_action_scenario(project_root=root, scenario=valid)
             )
 
+    def test_ui_click_step_without_interaction_id_takes_its_step_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            scenario = {
+                "name": "s",
+                "steps": [
+                    {"stepId": "open_shop", "kind": "ui_click", "selector": {"name": "Shop"}, "approve": True},
+                    {"stepId": "named", "kind": "ui_click", "interactionId": "buy", "selector": {"name": "Buy"}},
+                    {"stepId": "check", "kind": "ui_exists", "selector": {"name": "Shop"}},
+                    {"kind": "ui_click", "selector": {"name": "NoId"}},
+                ],
+                "cleanupSteps": [{"stepId": "close", "kind": "ui_click", "interactionId": " ", "selector": {"name": "X"}}],
+            }
+            original = json.loads(json.dumps(scenario))
+            normalized = server_project_actions.normalize_project_action_scenario(
+                project_root=Path(temp), scenario=scenario
+            )
+        self.assertEqual(original, scenario)
+        self.assertEqual("open_shop", normalized["steps"][0]["interactionId"])
+        self.assertEqual("buy", normalized["steps"][1]["interactionId"])
+        self.assertNotIn("interactionId", normalized["steps"][2])
+        self.assertNotIn("interactionId", normalized["steps"][3])
+        self.assertEqual("close", normalized["cleanupSteps"][0]["interactionId"])
+        self.assertIn("Defaults to stepId", SCENARIO_STEP_SCHEMA["properties"]["interactionId"]["description"])
+
     def test_mcp_scenario_tool_returns_the_typed_refusal(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp).resolve()
