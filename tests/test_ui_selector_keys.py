@@ -52,7 +52,7 @@ class UiSelectorToolRefusalTests(unittest.TestCase):
     def test_unknown_key_is_refused_before_the_bridge(self) -> None:
         for name in UI_SELECTOR_TOOLS:
             with self.subTest(tool=name):
-                arguments = {"projectRoot": "/tmp/p", "selector": {"nameContains": "Spin"}}
+                arguments = {"projectRoot": "/tmp/p", "selector": {"nameContains": "Shop"}}
                 if name == "unity_ui_click":
                     arguments["approve"] = True
                 result, invoke_bridge = self._call(name, arguments)
@@ -66,7 +66,7 @@ class UiSelectorToolRefusalTests(unittest.TestCase):
     def test_valid_selector_reaches_the_bridge(self) -> None:
         result, invoke_bridge = self._call(
             "unity_ui_query",
-            {"projectRoot": "/tmp/p", "selector": {"pathContains": "Spin", "requireVisible": True}},
+            {"projectRoot": "/tmp/p", "selector": {"pathContains": "Shop", "requireVisible": True}},
         )
         invoke_bridge.assert_called_once()
         self.assertFalse(result["isError"])

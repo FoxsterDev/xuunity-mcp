@@ -156,22 +156,22 @@ class ConsoleGrepStackFrameTests(unittest.TestCase):
 
     def test_nested_type_and_async_state_machine_frames_are_dropped(self) -> None:
         frames = [
-            "Game.Spin.SpinController/<RunSpinAsync>d__91:MoveNext () (at Assets/Game/SpinController.cs:412)",
-            "Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`1<Game.Spin.SpinController/<RunSpinAsync>d__91>:Run ()"
+            "Game.Flow.LevelController/<RunLevelAsync>d__91:MoveNext () (at Assets/Game/LevelController.cs:412)",
+            "Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`1<Game.Flow.LevelController/<RunLevelAsync>d__91>:Run ()"
             " (at ./Library/PackageCache/com.cysharp.unitask/Runtime/CompilerServices/StateMachineRunner.cs:104)",
             "DG.Tweening.Tween/<>c__DisplayClass452`1<single>:<Custom_internal>b__452_0 (single)"
             " (at Assets/Plugins/Tween.cs:88)",
-            "SpinController/<Run>d__9:MoveNext () (at Assets/SpinController.cs:12)",
+            "LevelController/<Run>d__9:MoveNext () (at Assets/LevelController.cs:12)",
             "Game.Outer/Inner:Handle (int)",
         ]
         messages = [
-            "[Spin] SpinController result=win",
-            "[Net] GET https://api.example.test/v1/SpinController: 200 (12 ms)",
-            "Loaded Assets/Scenes/SpinController.unity: ok (3 objects)",
+            "[Flow] LevelController result=win",
+            "[Net] GET https://api.example.test/v1/LevelController: 200 (12 ms)",
+            "Loaded Assets/Scenes/LevelController.unity: ok (3 objects)",
         ]
         self.log.write_text("\n".join(messages + frames) + "\n", encoding="utf-8")
 
-        payload = server_health.grep_editor_log_payload(self.root, self.log, pattern="SpinController|Tween|Outer", regex=True)
+        payload = server_health.grep_editor_log_payload(self.root, self.log, pattern="LevelController|Tween|Outer", regex=True)
 
         self.assertEqual(messages, [item["message"] for item in payload["items"]])
         self.assertEqual(len(frames), payload["stack_frame_suppressed_count"])

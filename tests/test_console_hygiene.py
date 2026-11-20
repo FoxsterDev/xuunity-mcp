@@ -23,8 +23,8 @@ class ConsoleSecretRedactionTests(unittest.TestCase):
             'POST /login -> {"sessionToken":"%s","player":"p1"}' % SESSION_TOKEN:
                 'POST /login -> {"sessionToken":"[REDACTED]","player":"p1"}',
             "Authorization: Bearer abcDEF123456.ghi-789_xyz": "Authorization: Bearer [REDACTED]",
-            "GET https://api.example.test/v1/spin?access_token=9f8e7d6c5b4a3210&x=1":
-                "GET https://api.example.test/v1/spin?access_token=[REDACTED]&x=1",
+            "GET https://api.example.test/v1/level?access_token=9f8e7d6c5b4a3210&x=1":
+                "GET https://api.example.test/v1/level?access_token=[REDACTED]&x=1",
             "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c ok":
                 "jwt [REDACTED] ok",
             "password=hunter2x; next": "password=[REDACTED]; next",
@@ -38,7 +38,7 @@ class ConsoleSecretRedactionTests(unittest.TestCase):
 
     def test_ordinary_log_lines_are_untouched(self) -> None:
         for text in (
-            "[Spin] result=win reward=50",
+            "[Flow] result=win reward=50",
             "tokenCount=12 cancellationToken: System.Threading.CancellationToken",
             "Assets/Game/TokenView.cs(12,4): error CS0103: The name 'token' does not exist",
             "cookie: none",
