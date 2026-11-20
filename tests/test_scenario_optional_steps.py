@@ -199,6 +199,45 @@ class ScenarioOptionalStepTests(unittest.TestCase):
         self.assertEqual(0, verdict["skipped_optional_step_count"])
         self.assertEqual([], verdict["skipped_optional_steps"])
 
+    def _no_change_click(self, *, optional: bool, delivered: bool, **interaction: object) -> dict:
+        block = {"interaction_id": "close_rating", "delivered": delivered, "state_changed": False}
+        block.update(interaction)
+        step = {
+            "stepId": "close_rating",
+            "kind": "ui_click",
+            "status": "failed",
+            "error_code": "ui_interaction_no_state_change" if delivered else "ui_interaction_not_delivered",
+            "payload_json": json.dumps({"expect_state_change": True, "ui_interaction": block}),
+        }
+        if optional:
+            step["optional"] = True
+        return self._failed_run(step)
+
+    def test_delivered_click_without_the_expected_change_is_a_precondition_failure(self) -> None:
+        for optional in (False, True):
+            with self.subTest(optional=optional):
+                verdict = self._no_change_click(optional=optional, delivered=True)
+                self.assertEqual("failed", verdict["verdict"])
+                self.assertEqual("precondition", verdict["failure_class"])
+                self.assertEqual("authoritative", verdict["trust_class"])
+                self.assertEqual("satisfy_precondition_then_rerun", verdict["recommended_next_action"])
+
+    def test_click_without_proven_delivery_or_liveness_stays_inconclusive(self) -> None:
+        for optional in (False, True):
+            with self.subTest(optional=optional, case="not_delivered"):
+                verdict = self._no_change_click(optional=optional, delivered=False)
+                self.assertEqual("inconclusive", verdict["verdict"])
+                self.assertEqual("unity_unproven", verdict["failure_class"])
+            for evidence in (
+                {"playmode_loop_liveness": "throttled"},
+                {"playmode_loop_liveness": "unknown"},
+                {"result_trust_class": "playmode_throttled"},
+                {"result_trust_class": "playmode_liveness_unproven"},
+            ):
+                with self.subTest(optional=optional, evidence=evidence):
+                    verdict = self._no_change_click(optional=optional, delivered=True, **evidence)
+                    self.assertEqual("inconclusive", verdict["verdict"])
+
     def test_step_summary_carries_optional_flag_and_reason(self) -> None:
         summary = server_summaries.summarize_scenario_step(
             _optional_absent_click("accept_dialog", "ui_target_occluded")

@@ -1162,6 +1162,19 @@ UI_COMPLETE_SEARCH_REFUSAL_CODES = {
     "ui_target_does_not_block_raycasts",
     "selector_ambiguous",
 }
+UI_DELIVERED_NO_CHANGE_ERROR_CODE = "ui_interaction_no_state_change"
+UI_UNPROVEN_LIVENESS_STATES = {"throttled", "unknown"}
+UI_UNPROVEN_TRUST_CLASSES = {"playmode_throttled", "playmode_liveness_unproven"}
+
+
+def _delivered_click_without_change_class(interaction: dict[str, Any], error_code: str) -> str:
+    if error_code != UI_DELIVERED_NO_CHANGE_ERROR_CODE or bool(interaction.get("state_changed")):
+        return ""
+    if str(interaction.get("playmode_loop_liveness") or "") in UI_UNPROVEN_LIVENESS_STATES:
+        return ""
+    if str(interaction.get("result_trust_class") or "") in UI_UNPROVEN_TRUST_CLASSES:
+        return ""
+    return "precondition"
 
 
 def _complete_search_ui_refusal_class(step: dict[str, Any], payload: dict[str, Any]) -> str:
@@ -1169,8 +1182,10 @@ def _complete_search_ui_refusal_class(step: dict[str, Any], payload: dict[str, A
     error_code = str(step.get("error_code") or "")
     if kind == "ui_click":
         interaction = payload.get("ui_interaction")
-        if not isinstance(interaction, dict) or bool(interaction.get("delivered")):
+        if not isinstance(interaction, dict):
             return ""
+        if bool(interaction.get("delivered")):
+            return _delivered_click_without_change_class(interaction, error_code)
         refusal = str(interaction.get("refusal_code") or error_code)
         if refusal == "ui_target_occluded":
             return "blocking_popup"

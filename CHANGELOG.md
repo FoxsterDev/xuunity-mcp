@@ -11,6 +11,10 @@
   `ui_target_does_not_block_raycasts` and `selector_ambiguous` join
   `ui_node_not_found` and `ui_target_not_visible`. A truncated search and
   refusals that prove nothing about the target stay `inconclusive`.
+- A scenario `ui_click`, optional or required, that was delivered but did not
+  produce the expected state change now ends `failed` / `precondition` instead
+  of `inconclusive`. A click whose delivery is unproven, or one made while the
+  Play Mode loop was throttled or unsampled, stays `inconclusive`.
 
 ## 0.3.90
 
