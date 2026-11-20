@@ -15,6 +15,12 @@
   produce the expected state change now ends `failed` / `precondition` instead
   of `inconclusive`. A click whose delivery is unproven, or one made while the
   Play Mode loop was throttled or unsampled, stays `inconclusive`.
+- `unity_console_grep` without `includeStackTraces` now also drops Unity
+  managed frames of nested and compiler-generated types (RG-61): async state
+  machines (`Type/<Method>d__N:MoveNext ()`), generic runners that carry such a
+  type argument, and closure classes (`` Type/<>c__DisplayClassN`1<T>:<M>b__N_0 ``).
+  The frame pattern did not accept `/` in a type name, so up to half of a
+  result could be frames.
 
 ## 0.3.90
 

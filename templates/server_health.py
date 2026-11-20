@@ -80,8 +80,8 @@ BUILD_PIPELINE_PROGRESS_PATTERN = (
 BUILD_PIPELINE_PROGRESS = re.compile(BUILD_PIPELINE_PROGRESS_PATTERN)
 STACK_FRAME_LINE = re.compile(
     r"^(?:"
-    r"[A-Za-z_][\w`<>+\[\],]*(?:\.[\w`<>+\[\],]+)+:[\w.`<>$|]+ ?\(.*\)(?: \(at .+\))?"
-    r"|[A-Za-z_][\w.`<>+\[\],]*:[\w.`<>$|]+ ?\(.*\) \(at .+:\d+\)"
+    r"[A-Za-z_][\w`<>+\[\],/]*(?:\.[\w`<>+\[\],/]+)+:[\w.`<>$|]+ ?\(.*\)(?: \(at .+\))?"
+    r"|[A-Za-z_][\w.`<>+\[\],/]*:[\w.`<>$|]+ ?\(.*\) \(at .+:\d+\)"
     r"|\(Filename: .* Line: -?\d+\)"
     r"|\s+at .+"
     r"|\s*#\d+ +0x[0-9A-Fa-f]+ .*"

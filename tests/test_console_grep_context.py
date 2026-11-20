@@ -154,6 +154,28 @@ class ConsoleGrepStackFrameTests(unittest.TestCase):
         self.assertEqual(0, kept["stack_frame_suppressed_count"])
         self.assertIn("4 of 6 matches are stack-frame lines", kept["stack_frame_hint"])
 
+    def test_nested_type_and_async_state_machine_frames_are_dropped(self) -> None:
+        frames = [
+            "Game.Spin.SpinController/<RunSpinAsync>d__91:MoveNext () (at Assets/Game/SpinController.cs:412)",
+            "Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`1<Game.Spin.SpinController/<RunSpinAsync>d__91>:Run ()"
+            " (at ./Library/PackageCache/com.cysharp.unitask/Runtime/CompilerServices/StateMachineRunner.cs:104)",
+            "DG.Tweening.Tween/<>c__DisplayClass452`1<single>:<Custom_internal>b__452_0 (single)"
+            " (at Assets/Plugins/Tween.cs:88)",
+            "SpinController/<Run>d__9:MoveNext () (at Assets/SpinController.cs:12)",
+            "Game.Outer/Inner:Handle (int)",
+        ]
+        messages = [
+            "[Spin] SpinController result=win",
+            "[Net] GET https://api.example.test/v1/SpinController: 200 (12 ms)",
+            "Loaded Assets/Scenes/SpinController.unity: ok (3 objects)",
+        ]
+        self.log.write_text("\n".join(messages + frames) + "\n", encoding="utf-8")
+
+        payload = server_health.grep_editor_log_payload(self.root, self.log, pattern="SpinController|Tween|Outer", regex=True)
+
+        self.assertEqual(messages, [item["message"] for item in payload["items"]])
+        self.assertEqual(len(frames), payload["stack_frame_suppressed_count"])
+
     def test_messages_only_returns_message_and_line(self) -> None:
         payload = server_health.grep_editor_log_payload(self.root, self.log, pattern="LevelCompleted", messages_only=True)
 
