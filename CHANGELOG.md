@@ -111,6 +111,16 @@
   `attachment_pending_basis: process_start_time` with
   `editor_process_started_at_utc`. `editor_start_time_unknown` remains only
   when that read fails.
+- `ensure-ready` reports an editor that was already blocked on the startup
+  dialog before the call began. The wait only read log lines written during
+  the wait, so an editor that had gone quiet earlier waited out the full
+  timeout and pointed at `status_summary` through `stronger_diagnosis`. The
+  wait now checks the same fingerprint as `status_summary` on its first pass
+  and again at the deadline, and raises `editor_startup_modal_blocked` with the
+  compiler lines, `recovery_steps` and the recovery command;
+  `startup_modal_block_observed` says `before_wait`, `during_wait` or
+  `at_deadline`. A log last written before the live editor process started is
+  ignored, so a relaunch after a blocked session is not misread.
 
 ## 0.3.90
 

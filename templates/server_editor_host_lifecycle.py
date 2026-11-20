@@ -59,7 +59,9 @@ from server_licensing_state import guard_editor_licensing_launch, editor_license
 from server_health import (
     STARTUP_MODAL_FINGERPRINT_LOG_CODES,
     STARTUP_MODAL_QUIESCENCE_SECONDS,
+    build_editor_log_diagnosis,
     compile_error_lines_from_log,
+    read_editor_log_scope,
 )
 
 ACTIVATION_DELAY_SECONDS = 0.35
@@ -1429,6 +1431,7 @@ def _startup_modal_block_error(
     readiness_error: ToolInvocationError,
     log_text: str,
     startup_stage: str,
+    observed: str = "during_wait",
 ) -> ToolInvocationError | None:
     """Unity logs no marker while the "Enter Safe Mode?" prompt is up; this is the status_summary fingerprint."""
 
@@ -1465,6 +1468,7 @@ def _startup_modal_block_error(
         {
             "readiness_condition": "editor_startup_modal_blocked",
             "startup_stage": startup_stage,
+            "startup_modal_block_observed": observed,
             "startup_modal_block_basis": "live_editor_compile_markers_no_live_bridge_quiescent_log",
             "editor_log_idle_seconds": round(idle_seconds, 3),
             "startup_modal_quiescence_seconds": STARTUP_MODAL_QUIESCENCE_SECONDS,
@@ -1489,14 +1493,73 @@ def _startup_modal_block_error(
             ],
         }
     )
+    written_when = "during this wait" if observed == "during_wait" else "before this wait began"
     summary = (
         "The Unity editor is alive, the MCP bridge never attached, and Editor.log has been idle for "
-        f"~{round(idle_seconds)}s after compile errors written during this wait: the editor is most likely "
+        f"~{round(idle_seconds)}s after compile errors written {written_when}: the editor is most likely "
         "blocked on the 'Enter Safe Mode?' startup dialog. Quit it, run the batch compile, fix the errors, "
         "then reopen. The compile errors are a log observation, not a measured compile verdict."
     )
     modal_details["readiness_summary"] = summary
     return ToolInvocationError("editor_startup_modal_blocked", summary, modal_details)
+
+
+def _editor_log_written_by_live_editor(
+    project_root: Path,
+    editor_log_path: Path,
+    live_editor_pids: list[int],
+    session: dict[str, Any],
+) -> bool:
+    """A log last written before the live editor started belongs to an earlier process, not to this one."""
+    try:
+        log_modified_at = float(editor_log_path.stat().st_mtime)
+    except OSError:
+        return False
+    started_at = (
+        parse_utc_timestamp(session.get("opened_at_utc"))
+        if int(session.get("editor_pid") or 0) in live_editor_pids
+        else None
+    )
+    if started_at is None:
+        started_at = _live_editor_process_start_time(live_editor_pids)
+    return started_at is not None and log_modified_at >= started_at - 1.0
+
+
+def _preexisting_startup_modal_block_error(
+    project_root: Path,
+    editor_log_path: Path,
+    state: dict[str, Any] | None,
+    startup_policy: str,
+    startup_stage: str,
+    observed: str,
+) -> ToolInvocationError | None:
+    """An editor blocked before this wait began writes nothing during it, so the in-loop log window is empty."""
+    session = try_read_host_editor_session_state(project_root) or {}
+    scope_arguments = {
+        "session_start_offset_bytes": session.get("log_session_start_offset_bytes"),
+        "session_start_mtime": session.get("log_session_start_mtime"),
+    }
+    diagnosis = build_editor_log_diagnosis(
+        editor_log_path,
+        startup_policy=startup_policy,
+        classify_editor_log=classify_editor_log,
+        **scope_arguments,
+    )
+    log_code = str(diagnosis.get("code") or "")
+    if log_code not in STARTUP_MODAL_FINGERPRINT_LOG_CODES:
+        return None
+    readiness_error = _readiness_error_from_log_observation(
+        project_root, state, (log_code, str(diagnosis.get("summary") or ""))
+    )
+    live_editor_pids = [
+        int(pid) for pid in (readiness_error.details or {}).get("observed_live_editor_pids") or [] if int(pid or 0) > 0
+    ]
+    if not _editor_log_written_by_live_editor(project_root, editor_log_path, live_editor_pids, session):
+        return None
+    log_text, _scope = read_editor_log_scope(editor_log_path, **scope_arguments)
+    return _startup_modal_block_error(
+        project_root, editor_log_path, readiness_error, log_text, startup_stage, observed=observed
+    )
 
 
 def _startup_log_observation_after_ready(
@@ -1549,9 +1612,18 @@ def wait_for_ready(
     state: dict[str, Any] | None = None
     last_readiness_error: ToolInvocationError | None = None
     last_log_text = ""
+    preexisting_block_checked = False
     while time.time() < deadline:
         state = try_read_bridge_state(project_root)
-        if bridge_state_is_ready(state, heartbeat_max_age_seconds):
+        ready = bridge_state_is_ready(state, heartbeat_max_age_seconds)
+        if not ready and not preexisting_block_checked:
+            preexisting_block_checked = True
+            modal_error = _preexisting_startup_modal_block_error(
+                project_root, editor_log_path, state, startup_policy, "waiting_for_bridge_readiness", "before_wait"
+            )
+            if modal_error is not None:
+                raise modal_error
+        if ready:
             session = try_read_host_editor_session_state(project_root) or {}
             license_evidence = editor_license_evidence(editor_log_path, session)
             if license_evidence["license_state"] == "unlicensed":
@@ -1660,6 +1732,12 @@ def wait_for_ready(
             last_readiness_error.details["dialog_block_basis"] = "readiness_deadline_reached_with_safe_mode_markers"
         last_readiness_error.details["startup_stage"] = "readiness_deadline_reached"
         raise last_readiness_error
+
+    modal_error = _preexisting_startup_modal_block_error(
+        project_root, editor_log_path, state, startup_policy, "readiness_deadline_reached", "at_deadline"
+    )
+    if modal_error is not None:
+        raise modal_error
 
     blocker_observation = _startup_blocker_observation(project_root, editor_log_path, started_at)
     if blocker_observation.get("live_project_editor_pids"):
