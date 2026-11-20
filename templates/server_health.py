@@ -1735,7 +1735,11 @@ def classify_project_health(
     elif not bridge_enabled and not live_editor_present:
         classification = "bridge_disabled"
         reason = "bridge_disabled_in_project_config"
-        recommended_next_action = "enable_bridge_and_retry"
+        recommended_next_action = (
+            "open_editor_or_ensure_ready"
+            if bool(discovery.get("light_mcp_package_declared"))
+            else "enable_bridge_and_retry"
+        )
     elif not live_editor_present:
         classification = "offline"
         if str(discovery.get("discovery_classification") or "") == "stale_state":

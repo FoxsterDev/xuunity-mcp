@@ -28,6 +28,18 @@ def bridge_enabled(project_root: Path) -> bool:
     return bool(data.get("enabled"))
 
 
+LIGHT_MCP_PACKAGE_NAME = "com.xuunity.light-mcp"
+
+
+def light_mcp_package_declared(project_root: Path) -> bool:
+    try:
+        manifest = read_json(project_root / "Packages" / "manifest.json")
+    except Exception:
+        return False
+    dependencies = manifest.get("dependencies") if isinstance(manifest, dict) else None
+    return isinstance(dependencies, dict) and bool(str(dependencies.get(LIGHT_MCP_PACKAGE_NAME) or "").strip())
+
+
 def try_read_bridge_config(project_root: Path) -> dict[str, Any] | None:
     config_path = bridge_config_path(project_root)
     if not config_path.is_file():

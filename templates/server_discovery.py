@@ -3,7 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from server_bridge_state import effective_bridge_health_status, inspect_bridge_state_writer_identity
+from server_bridge_state import (
+    effective_bridge_health_status,
+    inspect_bridge_state_writer_identity,
+    light_mcp_package_declared,
+)
 from server_core import render_launcher_cli
 
 TRANSPORT_METADATA_KEYS = (
@@ -346,6 +350,11 @@ def _build_host_prerequisites(
     }
 
 
+def bridge_disabled_next_action(package_declared: bool) -> str:
+    # ensure-ready with openEditor enables the bridge itself; setup is needed only when the package is absent.
+    return "open_editor_or_ensure_ready" if package_declared else "enable_bridge_and_retry"
+
+
 def _reconciliation_summary(
     *,
     bridge_state: dict[str, Any],
@@ -358,6 +367,7 @@ def _reconciliation_summary(
     detected_editor_pids: list[int],
     process_visibility_restricted: bool,
     bridge_owned_by_non_main_process: bool,
+    package_declared: bool = False,
 ) -> dict[str, str]:
     bridge_pid = int(bridge_state.get("editor_pid") or 0)
     host_session_pid = int(host_editor_session_state.get("editor_pid") or 0)
@@ -413,7 +423,7 @@ def _reconciliation_summary(
             "case": "bridge_disabled",
             "status": "offline",
             "reason": "bridge_disabled_in_project_config",
-            "recommended_next_action": "enable_bridge_and_retry",
+            "recommended_next_action": bridge_disabled_next_action(package_declared),
         }
 
     if process_visibility_restricted:
@@ -563,7 +573,9 @@ def discover_project_context_state(
     bridge_state_live = bool(bridge_state) and bridge_pid_matches_project
     host_session_live = bool(host_editor_session_state) and host_session_pid_matches_project
     bridge_currently_enabled = bool(bridge_enabled(project_root))
+    package_declared = light_mcp_package_declared(project_root)
     reconciliation = _reconciliation_summary(
+        package_declared=package_declared,
         bridge_state=bridge_state,
         host_editor_session_state=host_editor_session_state,
         bridge_state_live=bridge_state_live,
@@ -638,6 +650,7 @@ def discover_project_context_state(
         "bridge_state_live": bridge_state_live,
         "host_session_live": host_session_live,
         "bridge_enabled": bridge_currently_enabled,
+        "light_mcp_package_declared": package_declared,
         "bridge_owned_by_non_main_process": bridge_owned_by_non_main_process,
         "bridge_state_writer_exited": bridge_state_writer_exited,
         "bridge_state_writer_pid_reused": bridge_state_writer_pid_reused,

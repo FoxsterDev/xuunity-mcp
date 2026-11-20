@@ -181,6 +181,49 @@ class ProjectDiscoveryTests(unittest.TestCase):
         self.assertEqual("enable_bridge_and_retry", result["reconciliation_recommended_next_action"])
         self.assertFalse(result["host_prerequisites"]["ready"])
         self.assertIn("bridge_disabled", result["host_prerequisites"]["blocking_codes"])
+        self.assertFalse(result["light_mcp_package_declared"])
+
+    def test_disabled_bridge_with_declared_package_recommends_ensure_ready_first(self) -> None:
+        import json
+        import tempfile
+
+        import server_health
+        import server_recovery_commands
+
+        with tempfile.TemporaryDirectory() as temp:
+            project_root = Path(temp)
+            (project_root / "Packages").mkdir()
+            (project_root / "Packages" / "manifest.json").write_text(
+                json.dumps({"dependencies": {"com.xuunity.light-mcp": "https://example.invalid/pkg.git#v1.0.0"}}),
+                encoding="utf-8",
+            )
+            result = discover_project_context_state(
+                project_root,
+                try_read_bridge_state=lambda _: None,
+                try_read_host_editor_session_state=lambda _: None,
+                find_running_unity_editors_for_project=lambda _: [],
+                pid_is_alive=lambda pid: False,
+                bridge_enabled=lambda _: False,
+            )
+            health = server_health.classify_project_health(
+                bridge_state={},
+                discovery=result,
+                editor_log_diagnosis={},
+                heartbeat_age_seconds=lambda _: None,
+                derive_busy_reason=lambda _: "idle",
+            )
+
+        self.assertTrue(result["light_mcp_package_declared"])
+        self.assertEqual("bridge_disabled", result["reconciliation_case"])
+        self.assertEqual("open_editor_or_ensure_ready", result["reconciliation_recommended_next_action"])
+        self.assertEqual("bridge_disabled", health["host_health_classification"])
+        self.assertEqual("open_editor_or_ensure_ready", health["host_health_recommended_next_action"])
+        self.assertEqual(
+            "unity_ensure_ready",
+            server_recovery_commands.recommended_recovery_tool_for_action(
+                health["host_health_recommended_next_action"]
+            ),
+        )
         self.assertIn("editor_not_running", result["host_prerequisites"]["blocking_codes"])
         self.assertIn("transport_not_ready", result["host_prerequisites"]["blocking_codes"])
 

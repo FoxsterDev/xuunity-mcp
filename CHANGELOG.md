@@ -89,6 +89,12 @@
   copied from direct calls failed validation with `missing_interaction_id`. The
   host fills it for `steps` and `cleanupSteps` on the MCP and CLI paths; a step
   with neither id is still refused by the package.
+- A disabled bridge on a closed project whose manifest already declares the
+  package now recommends `open_editor_or_ensure_ready` (RG-66).
+  `ensure-ready --open-editor` enables the bridge itself, so the earlier
+  `enable_bridge_and_retry` advice sent agents through setup-plan, setup-apply
+  and a reopen for nothing. Setup is still recommended when the package is not
+  declared. Discovery reports `light_mcp_package_declared`.
 
 ## 0.3.90
 
