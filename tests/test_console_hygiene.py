@@ -29,12 +29,14 @@ class ConsoleSecretRedactionTests(unittest.TestCase):
                 "jwt [REDACTED] ok",
             "password=hunter2x; next": "password=[REDACTED]; next",
             "X-Api-Key: 0123456789abcdef0123": "X-Api-Key: [REDACTED]",
+            "refresh_tokens=ab12cd34ef56": "refresh_tokens=[REDACTED]",
+            "tokenValue: ab12cd34ef56 passwordHash=5f4dcc3b": "tokenValue: [REDACTED] passwordHash=[REDACTED]",
         }
         for text, expected in cases.items():
             with self.subTest(text=text):
                 redacted, count = server_console_hygiene.redact_console_secrets(text)
                 self.assertEqual(expected, redacted)
-                self.assertEqual(1, count)
+                self.assertEqual(expected.count("[REDACTED]"), count)
 
     def test_ordinary_log_lines_are_untouched(self) -> None:
         for text in (
@@ -42,6 +44,9 @@ class ConsoleSecretRedactionTests(unittest.TestCase):
             "tokenCount=12 cancellationToken: System.Threading.CancellationToken",
             "Assets/Game/TokenView.cs(12,4): error CS0103: The name 'token' does not exist",
             "cookie: none",
+            "Loading System.Runtime, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+            "Game.Security.AppPrivateKeychainStorage: initialised store 12345678",
+            "tokenizer=whitespace8x tokenBudget: 12345678",
         ):
             with self.subTest(text=text):
                 self.assertEqual((text, 0), server_console_hygiene.redact_console_secrets(text))

@@ -18,11 +18,13 @@ _AUTH_SCHEME_PATTERN = re.compile(r"(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]
 _KEYED_VALUE_PATTERN = re.compile(
     r"(?i)(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z0-9_.-]{0,48}?"
     r"(?:token|secret|passw(?:or)?d|api[_-]?key|authorization|credential|cookie|private[_-]?key)"
-    r"[A-Za-z0-9_.-]{0,48})"
+    r"(?:s|[_-]?(?:id|key|value|hash|secret))?)"
     r"(?P<sep>[\"']?\s*[:=]\s*[\"']?)"
     r"(?P<value>[^\s\"',;&<>{}\[\]()]+)"
 )
 _ALWAYS_SECRET_KEY_PATTERN = re.compile(r"(?i)secret|passw(?:or)?d|private[_-]?key")
+# An assembly's PublicKeyToken is part of its public name, not a credential.
+_PUBLIC_KEY_SUFFIXES = ("publickeytoken",)
 _ITEM_TEXT_FIELDS = ("message", "stack_trace")
 _ITEM_LINE_LIST_FIELDS = ("context_before", "context_after")
 
@@ -57,10 +59,11 @@ def redact_console_secrets(text: str, scan_chars: int = -1) -> tuple[str, int]:
 
     def replace_keyed(match: re.Match[str]) -> str:
         nonlocal count
-        if not _keyed_value_is_secret(match.group("key"), match.group("value")):
+        key = match.group("key")
+        if key.lower().endswith(_PUBLIC_KEY_SUFFIXES) or not _keyed_value_is_secret(key, match.group("value")):
             return match.group(0)
         count += 1
-        return f"{match.group('key')}{match.group('sep')}{REDACTED}"
+        return f"{key}{match.group('sep')}{REDACTED}"
 
     redacted = _JWT_PATTERN.sub(replace_jwt, text)
     redacted = _AUTH_SCHEME_PATTERN.sub(replace_scheme, redacted)

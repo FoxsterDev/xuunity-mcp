@@ -46,7 +46,10 @@
   of `token`, `secret`, `password`, `api-key`, `authorization`, `cookie` and
   `credential` keys come back as `[REDACTED]` in messages, stack traces and
   context lines, for both `source` values and for the CLI commands;
-  `redacted_secret_count` reports how many. The log file is not changed.
+  `redacted_secret_count` reports how many. The log file is not changed. A
+  key counts only when the secret word ends it (optionally followed by `s`,
+  `id`, `key`, `value`, `hash` or `secret`), so `tokenCount` and type names are
+  left alone, and an assembly's `PublicKeyToken` is never redacted.
 - One returned console line is capped at 2048 bytes by default (RG-70). A
   longer line is cut and carries `message_bytes_before_cap`;
   `items_truncated_for_item_cap` counts them. The new `maxItemBytes`
