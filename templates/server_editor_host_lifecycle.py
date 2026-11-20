@@ -1257,20 +1257,41 @@ def _attachment_predates_install_details(project_root: Path, live_editor_pids: l
         if int(session.get("editor_pid") or 0) in live_editor_pids
         else None
     )
-    if manifest_mtime is None or opened_at is None:
-        basis = "editor_start_time_unknown"
-        predates = False
-    elif opened_at < manifest_mtime:
-        basis = "host_session_opened_before_manifest_change"
-        predates = True
-    else:
-        basis = "host_session_opened_after_manifest_change"
-        predates = False
-    return {
-        "attachment_pending_predates_install": predates,
-        "attachment_pending_basis": basis,
+    details: dict[str, Any] = {
         "restart_criterion": "only if the bridge has not attached once import has settled",
     }
+    process_started_at = None if opened_at is not None else _live_editor_process_start_time(live_editor_pids)
+    if manifest_mtime is None or (opened_at is None and process_started_at is None):
+        basis = "editor_start_time_unknown"
+        predates = False
+    elif opened_at is not None:
+        predates = opened_at < manifest_mtime
+        basis = (
+            "host_session_opened_before_manifest_change" if predates else "host_session_opened_after_manifest_change"
+        )
+    else:
+        predates = process_started_at < manifest_mtime
+        basis = "process_start_time"
+        details["editor_process_started_at_utc"] = time.strftime(
+            "%Y-%m-%dT%H:%M:%SZ", time.gmtime(process_started_at)
+        )
+    details["attachment_pending_predates_install"] = predates
+    details["attachment_pending_basis"] = basis
+    return details
+
+
+def _live_editor_process_start_time(live_editor_pids: list[int]) -> float | None:
+    """Latest start among the live same-project editors; None when any of them cannot be read."""
+    if not live_editor_pids:
+        return None
+    adapter = current_host_platform_adapter()
+    started: list[float] = []
+    for pid in live_editor_pids:
+        value = adapter.process_start_time(pid)
+        if value is None:
+            return None
+        started.append(value)
+    return max(started)
 
 
 def _editor_log_idle_seconds(editor_log_path: Path) -> float | None:

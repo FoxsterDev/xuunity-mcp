@@ -7,7 +7,9 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from server_core import hidden_window_subprocess_kwargs, is_windows_like_host
@@ -332,6 +334,93 @@ class HostPlatformAdapter:
         report = self.list_process_commands_report()
         commands = report.get("commands") if isinstance(report, dict) else []
         return list(commands or [])
+
+    def process_start_time(self, pid: int) -> float | None:
+        """Epoch seconds when the process started, or None when the host cannot tell."""
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            return None
+        if pid <= 0:
+            return None
+        if os.name == "nt" or is_wsl():
+            return _windows_process_start_time(pid)
+        return _posix_process_start_time(pid)
+
+
+def _windows_process_start_time(pid: int) -> float | None:
+    shell_path = (
+        shutil.which("powershell.exe" if is_wsl() else "powershell")
+        or shutil.which("powershell")
+        or shutil.which("powershell.exe")
+        or shutil.which("pwsh")
+        or shutil.which("pwsh.exe")
+    )
+    if not shell_path:
+        return None
+    script = (
+        "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; "
+        f"(Get-Process -Id {pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o')"
+    )
+    try:
+        completed = subprocess.run(
+            [shell_path, "-NoProfile", "-Command", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=PID_PROBE_TIMEOUT_SECONDS,
+            **hidden_window_subprocess_kwargs(),
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if completed.returncode != 0:
+        return None
+    return parse_powershell_round_trip_utc((completed.stdout or "").strip())
+
+
+def parse_powershell_round_trip_utc(value: str) -> float | None:
+    match = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z$", value or "")
+    if match is None:
+        return None
+    try:
+        whole = datetime.strptime(match.group(1) + "+0000", "%Y-%m-%dT%H:%M:%S%z").timestamp()
+    except ValueError:
+        return None
+    fraction = float("0." + match.group(2)) if match.group(2) else 0.0
+    return whole + fraction
+
+
+def _posix_process_start_time(pid: int) -> float | None:
+    environment = dict(os.environ)
+    environment.update({"LC_ALL": "C", "LANG": "C"})
+    try:
+        completed = subprocess.run(
+            ["ps", "-o", "lstart=", "-p", str(pid)],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=PID_PROBE_TIMEOUT_SECONDS,
+            env=environment,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if completed.returncode != 0:
+        return None
+    return parse_ps_lstart((completed.stdout or "").strip())
+
+
+def parse_ps_lstart(value: str) -> float | None:
+    text = " ".join((value or "").split())
+    if not text:
+        return None
+    try:
+        return time.mktime(time.strptime(text, "%a %b %d %H:%M:%S %Y"))
+    except (ValueError, OverflowError):
+        return None
 
 
 def is_wsl() -> bool:

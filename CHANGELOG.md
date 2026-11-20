@@ -103,6 +103,14 @@
   report. A different editor pid, an unknown pid, a relaunch or a settled Play
   Mode state keeps `stale_risk`. The settle transition records
   `previous_editor_pid` and `current_editor_pid`.
+- The readiness error for an editor that was not opened by the host no longer
+  reports `editor_start_time_unknown` when the process can be read. The host
+  reads the editor's start time (`ps -o lstart=` on macOS and Linux,
+  `Get-Process` through PowerShell on Windows and WSL, each with a timeout),
+  compares it with the manifest's modification time, and reports
+  `attachment_pending_basis: process_start_time` with
+  `editor_process_started_at_utc`. `editor_start_time_unknown` remains only
+  when that read fails.
 
 ## 0.3.90
 
