@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any, Iterator
 
-from server_core import parse_utc_timestamp
+from server_core import parse_utc_timestamp, write_json
 
 EDITOR_INPUT_EXTENSIONS = frozenset({".cs", ".asmdef", ".asmref", ".rsp"})
 EDITOR_INPUT_SNAPSHOT_FILE_NAME = "editor_input_snapshot.json"
 CHANGED_PATH_LIMIT = 8
+HOST_BATCH_PROBE_TRIGGER = "host_batch_probe"
+SNAPSHOT_COMPILE_ERROR_LINE_LIMIT = 8
 FNV_OFFSET_BASIS = 14695981039346656037
 FNV_PRIME = 1099511628211
 FNV_MASK = (1 << 64) - 1
@@ -200,22 +203,93 @@ def compare_editor_inputs_with_snapshot(project_root: Path) -> dict[str, Any]:
             "snapshot_captured_utc": str(snapshot.get("captured_utc") or ""),
             "snapshot_compile_outcome": str(snapshot.get("compile_outcome") or "unknown"),
             "snapshot_compile_error_count": int(snapshot.get("compile_error_count") or 0),
+            "snapshot_compile_error_lines": [
+                str(line) for line in snapshot.get("compile_error_lines") or [] if isinstance(line, str)
+            ][:SNAPSHOT_COMPILE_ERROR_LINE_LIMIT],
         }
     )
     return result
+
+
+def project_has_compiled_before(project_root: Path) -> bool:
+    return (project_root / "Library" / "ScriptAssemblies").is_dir()
+
+
+def _snapshot_utc(epoch: float) -> str:
+    whole = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(epoch))
+    return f"{whole}.{int((epoch % 1) * 10_000_000):07d}Z"
+
+
+def write_host_probe_red_snapshot(
+    project_root: Path,
+    *,
+    probe_started_epoch: float,
+    compile_error_count: int,
+    compile_error_lines: list[str],
+) -> dict[str, Any]:
+    """Record a red batch probe: Unity loads no domain on red code, so the editor never refreshes the snapshot."""
+    paths: list[str] = []
+    hashes: list[str] = []
+    dirty: list[str] = []
+    for path in iter_editor_inputs(resolve_editor_input_roots(project_root)):
+        try:
+            digest = hash_editor_input(path)
+            modified = path.stat().st_mtime
+        except OSError:
+            continue
+        key = editor_input_key(project_root, path)
+        paths.append(key)
+        hashes.append(digest)
+        if modified > probe_started_epoch:
+            # Edited while the probe ran: the red verdict does not cover this content.
+            dirty.append(key)
+    snapshot_path = editor_input_snapshot_path(project_root)
+    write_json(
+        snapshot_path,
+        {
+            "schema_version": 1,
+            "trigger": HOST_BATCH_PROBE_TRIGGER,
+            "basis_utc": _snapshot_utc(probe_started_epoch),
+            "captured_utc": _snapshot_utc(time.time()),
+            "editor_pid": 0,
+            "compile_outcome": "failed",
+            "compile_error_count": max(1, int(compile_error_count or 0)),
+            "input_count": len(paths),
+            "paths": paths,
+            "hashes": hashes,
+            "dirty_at_capture": dirty,
+            "compile_error_lines": [str(line) for line in compile_error_lines][:SNAPSHOT_COMPILE_ERROR_LINE_LIMIT],
+        },
+    )
+    return {
+        "written": True,
+        "snapshot_path": str(snapshot_path),
+        "trigger": HOST_BATCH_PROBE_TRIGGER,
+        "input_count": len(paths),
+        "dirty_at_capture_count": len(dirty),
+    }
 
 
 def editor_open_compile_preflight_decision(project_root: Path) -> dict[str, Any]:
     comparison = compare_editor_inputs_with_snapshot(project_root)
     decision: dict[str, Any] = {"input_comparison": comparison, "run_compile_probe": False}
     if comparison["state"] != "ready":
-        decision["reason"] = "input_snapshot_unavailable"
+        if project_has_compiled_before(project_root):
+            # No snapshot yet (first open after a package upgrade): the last compile outcome is unknown.
+            decision["run_compile_probe"] = True
+            decision["reason"] = "input_snapshot_missing_compile_outcome_unknown"
+        else:
+            decision["reason"] = "input_snapshot_unavailable"
     elif comparison["changed_count"] > 0:
         decision["run_compile_probe"] = True
         decision["reason"] = "editor_inputs_changed_since_last_compile"
     elif comparison.get("snapshot_compile_outcome") == "failed":
-        decision["run_compile_probe"] = True
-        decision["reason"] = "last_recorded_compile_failed"
+        if comparison.get("snapshot_trigger") == HOST_BATCH_PROBE_TRIGGER:
+            decision["recorded_red"] = True
+            decision["reason"] = "compile_red_recorded_by_host_probe_inputs_unchanged"
+        else:
+            decision["run_compile_probe"] = True
+            decision["reason"] = "last_recorded_compile_failed"
     else:
         decision["reason"] = "editor_inputs_unchanged_since_last_compile"
     return decision

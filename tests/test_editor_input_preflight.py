@@ -108,11 +108,28 @@ class ComparisonTests(SnapshotFixture):
     def compare(self) -> dict:
         return snapshot_module.compare_editor_inputs_with_snapshot(self.root)
 
-    def test_no_snapshot_is_unavailable_and_never_runs_a_probe(self) -> None:
+    def test_no_snapshot_on_a_never_compiled_project_never_runs_a_probe(self) -> None:
         decision = snapshot_module.editor_open_compile_preflight_decision(self.root)
         self.assertEqual("unavailable", decision["input_comparison"]["state"])
         self.assertFalse(decision["run_compile_probe"])
         self.assertEqual("input_snapshot_unavailable", decision["reason"])
+
+    def test_no_snapshot_on_a_compiled_project_runs_the_probe_once(self) -> None:
+        (self.root / "Library" / "ScriptAssemblies").mkdir(parents=True)
+        decision = snapshot_module.editor_open_compile_preflight_decision(self.root)
+        self.assertEqual("unavailable", decision["input_comparison"]["state"])
+        self.assertTrue(decision["run_compile_probe"])
+        self.assertEqual("input_snapshot_missing_compile_outcome_unknown", decision["reason"])
+
+        target = snapshot_module.editor_input_snapshot_path(self.root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("{", encoding="utf-8")
+        self.assertTrue(snapshot_module.editor_open_compile_preflight_decision(self.root)["run_compile_probe"])
+
+        self.persist()
+        settled = snapshot_module.editor_open_compile_preflight_decision(self.root)
+        self.assertFalse(settled["run_compile_probe"])
+        self.assertEqual("editor_inputs_unchanged_since_last_compile", settled["reason"])
 
     def test_a_touch_without_a_content_change_stays_unchanged(self) -> None:
         self.persist()
@@ -161,9 +178,12 @@ class PreflightVerdictTests(SnapshotFixture):
             result["batch_probe"] = {"error": {"code": "editor_running_batch_conflict"}}
         return result
 
+    PROBE_EPOCH = COMPILED_EPOCH + 10_000
+
     def run_preflight(self, probe: dict, mode: str = "auto") -> tuple[dict, mock.Mock]:
         probe_mock = mock.Mock(return_value=probe)
-        with mock.patch.object(server_batch_recovery, "run_batch_build_config_compile_matrix_probe", probe_mock):
+        with mock.patch.object(server_batch_recovery, "run_batch_build_config_compile_matrix_probe", probe_mock), \
+                mock.patch.object(server_batch_recovery, "time", mock.Mock(time=mock.Mock(return_value=self.PROBE_EPOCH))):
             return server_batch_recovery.run_editor_open_compile_preflight(self.root, timeout_ms=1000, mode=mode), probe_mock
 
     def test_red_needs_compile_errors_in_the_batch_log(self) -> None:
@@ -173,12 +193,96 @@ class PreflightVerdictTests(SnapshotFixture):
         self.assertEqual("red", red["verdict"])
         self.assertEqual(1, red["compile_errors_observed"])
         self.assertIn("error CS0246", red["compile_error_lines"][0])
+        self.persist()
+        write(self.root / "Assets/Scripts/Board.cs", "class Board { Missing m; } // again", COMPILED_EPOCH + 700)
         inconclusive, _ = self.run_preflight(self.probe(succeeded=False, log_text="License error\n"))
         self.assertEqual("inconclusive", inconclusive["verdict"])
+        self.assertNotIn("host_snapshot", inconclusive)
         blocked, _ = self.run_preflight(self.probe(succeeded=False, conflict=True))
         self.assertEqual("blocked_by_live_editor", blocked["verdict"])
+        self.assertNotIn("host_snapshot", blocked)
         green, _ = self.run_preflight(self.probe(succeeded=True))
         self.assertEqual("green", green["verdict"])
+        self.assertNotIn("host_snapshot", green)
+        self.assertEqual("compilation_finished", snapshot_module.read_persisted_editor_input_snapshot(self.root)["trigger"])
+
+    RED_LOG = "Assets/Scripts/Board.cs(1,15): error CS0246: The type 'Missing' could not be found\n"
+
+    def red_probe_on_changed_code(self) -> dict:
+        self.persist()
+        write(self.root / "Assets/Scripts/Board.cs", "class Board { Missing m; }", COMPILED_EPOCH + 600)
+        red, probe = self.run_preflight(self.probe(succeeded=False, log_text=self.RED_LOG))
+        probe.assert_called_once()
+        return red
+
+    def test_a_red_probe_records_a_host_snapshot_and_the_next_open_refuses_without_probing(self) -> None:
+        red = self.red_probe_on_changed_code()
+        self.assertEqual("red", red["verdict"])
+        self.assertTrue(red["host_snapshot"]["written"])
+        persisted = snapshot_module.read_persisted_editor_input_snapshot(self.root)
+        self.assertEqual("host_batch_probe", persisted["trigger"])
+        self.assertEqual("failed", persisted["compile_outcome"])
+        self.assertEqual(1, persisted["compile_error_count"])
+        self.assertEqual(len(persisted["paths"]), len(persisted["hashes"]))
+        self.assertEqual(persisted["input_count"], len(persisted["paths"]))
+        self.assertIn("Assets/Scripts/Board.cs", persisted["paths"])
+        self.assertEqual([], persisted["dirty_at_capture"])
+        self.assertRegex(persisted["basis_utc"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}Z$")
+
+        again, probe = self.run_preflight(self.probe(succeeded=True))
+        probe.assert_not_called()
+        self.assertEqual("red", again["verdict"])
+        self.assertFalse(again["run_compile_probe"])
+        self.assertEqual("compile_red_recorded_by_host_probe_inputs_unchanged", again["reason"])
+        self.assertEqual("red_recorded_by_host_probe_and_inputs_unchanged", again["compile_probe_skipped_reason"])
+        self.assertEqual(1, again["compile_errors_observed"])
+        self.assertIn("error CS0246", again["compile_error_lines"][0])
+
+    def test_an_edit_after_the_recorded_red_runs_the_probe_again(self) -> None:
+        self.red_probe_on_changed_code()
+        write(self.root / "Assets/Scripts/Board.cs", "class Board { }", self.PROBE_EPOCH + 60)
+        fixed, probe = self.run_preflight(self.probe(succeeded=True))
+        probe.assert_called_once()
+        self.assertEqual("green", fixed["verdict"])
+        self.assertEqual("editor_inputs_changed_since_last_compile", fixed["reason"])
+
+    def test_a_file_edited_while_the_probe_ran_is_not_covered_by_the_recorded_red(self) -> None:
+        self.persist()
+        board = self.root / "Assets/Scripts/Board.cs"
+        write(board, "class Board { Missing m; }", COMPILED_EPOCH + 600)
+
+        def probe_that_sees_an_edit(*_args, **_kwargs):
+            write(board, "class Board { Missing m; } // edited during probe", self.PROBE_EPOCH + 5)
+            return self.probe(succeeded=False, log_text=self.RED_LOG)
+
+        with mock.patch.object(
+            server_batch_recovery, "run_batch_build_config_compile_matrix_probe", side_effect=probe_that_sees_an_edit
+        ), mock.patch.object(server_batch_recovery, "time", mock.Mock(time=mock.Mock(return_value=self.PROBE_EPOCH))):
+            red = server_batch_recovery.run_editor_open_compile_preflight(self.root, timeout_ms=1000)
+        self.assertEqual(1, red["host_snapshot"]["dirty_at_capture_count"])
+        self.assertEqual(
+            ["Assets/Scripts/Board.cs"], snapshot_module.read_persisted_editor_input_snapshot(self.root)["dirty_at_capture"]
+        )
+        _, probe = self.run_preflight(self.probe(succeeded=False, log_text=self.RED_LOG))
+        probe.assert_called_once()
+
+    def test_a_snapshot_that_cannot_be_written_does_not_hide_the_red_verdict(self) -> None:
+        self.persist()
+        write(self.root / "Assets/Scripts/Board.cs", "class Board { Missing m; }", COMPILED_EPOCH + 600)
+        with mock.patch.object(server_batch_recovery, "write_host_probe_red_snapshot", side_effect=OSError("read-only")):
+            red, _ = self.run_preflight(self.probe(succeeded=False, log_text=self.RED_LOG))
+        self.assertEqual("red", red["verdict"])
+        self.assertEqual({"written": False, "error": "read-only"}, red["host_snapshot"])
+
+    def test_first_open_after_an_upgrade_probes_and_a_red_result_is_then_remembered(self) -> None:
+        (self.root / "Library" / "ScriptAssemblies").mkdir(parents=True)
+        first, probe = self.run_preflight(self.probe(succeeded=False, log_text=self.RED_LOG))
+        probe.assert_called_once()
+        self.assertEqual("input_snapshot_missing_compile_outcome_unknown", first["reason"])
+        self.assertEqual("red", first["verdict"])
+        second, probe = self.run_preflight(self.probe(succeeded=False, log_text=self.RED_LOG))
+        probe.assert_not_called()
+        self.assertEqual("red", second["verdict"])
 
     def test_a_project_without_a_build_config_falls_back_to_a_host_standalone_batch_compile(self) -> None:
         self.persist()

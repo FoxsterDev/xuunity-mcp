@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from server_core import bridge_enable_recovery_command
 
 from pathlib import Path
@@ -25,7 +26,7 @@ from server_bridge_runtime import (
 )
 from server_core import ToolInvocationError
 from server_host_platform import host_standalone_build_target
-from server_editor_input_snapshot import editor_open_compile_preflight_decision
+from server_editor_input_snapshot import editor_open_compile_preflight_decision, write_host_probe_red_snapshot
 from server_health import compile_error_lines_from_log
 from server_editor_host import (
     activate_unity_editor,
@@ -477,8 +478,15 @@ def run_editor_open_compile_preflight(project_root: Path, *, timeout_ms: int, mo
         },
         "verdict": "not_needed",
     }
+    if bool(decision.get("recorded_red")):
+        preflight["verdict"] = "red"
+        preflight["compile_probe_skipped_reason"] = "red_recorded_by_host_probe_and_inputs_unchanged"
+        preflight["compile_errors_observed"] = int(comparison.get("snapshot_compile_error_count") or 0)
+        preflight["compile_error_lines"] = list(comparison.get("snapshot_compile_error_lines") or [])
+        return preflight
     if not preflight["run_compile_probe"]:
         return preflight
+    probe_started_epoch = time.time()
     probe = run_batch_build_config_compile_matrix_probe(project_root, timeout_ms=timeout_ms)
     probe_error_code = str(dict(dict(probe.get("batch_probe") or {}).get("error") or {}).get("code") or "")
     if not bool(probe.get("succeeded")) and probe_error_code.startswith("build_config_"):
@@ -504,6 +512,15 @@ def run_editor_open_compile_preflight(project_root: Path, *, timeout_ms: int, mo
         preflight["verdict"] = "blocked_by_live_editor"
     elif evidence["compile_errors_observed"] > 0:
         preflight["verdict"] = "red"
+        try:
+            preflight["host_snapshot"] = write_host_probe_red_snapshot(
+                project_root,
+                probe_started_epoch=probe_started_epoch,
+                compile_error_count=evidence["compile_errors_observed"],
+                compile_error_lines=evidence["compile_error_lines"],
+            )
+        except OSError as exc:
+            preflight["host_snapshot"] = {"written": False, "error": str(exc)}
     else:
         preflight["verdict"] = "inconclusive"
     return preflight

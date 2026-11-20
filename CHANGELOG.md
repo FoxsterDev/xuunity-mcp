@@ -121,6 +121,20 @@
   `startup_modal_block_observed` says `before_wait`, `during_wait` or
   `at_deadline`. A log last written before the live editor process started is
   ignored, so a relaunch after a blocked session is not misread.
+- The closed-editor compile preflight covers the first open after a package
+  upgrade. With no input snapshot yet, the last compile outcome is unknown, so
+  `ensure-ready --open-editor` and `recover-editor-session` now run the batch
+  compile probe once (`input_snapshot_missing_compile_outcome_unknown`) when
+  the project has compiled before (`Library/ScriptAssemblies` exists); a red
+  probe refuses the open as before. A project that never compiled still opens
+  without a probe.
+- A red batch probe is remembered. Unity loads no domain on red code, so the
+  editor never refreshed the snapshot and every reopen probed again. The host
+  now writes the snapshot itself at the same path and schema
+  (`compile_outcome: failed`, `trigger: host_batch_probe`, with the compiler
+  lines), and the next open on unchanged inputs refuses with
+  `compile_red_recorded_by_host_probe_inputs_unchanged` without a new probe.
+  Any edit, and any file edited while the probe ran, runs the probe again.
 
 ## 0.3.90
 
