@@ -63,6 +63,13 @@
   result used to carry only the prose action
   `verify_resolver_output_freshness_and_generated_diff`. The tool description
   points at the typed lane for rollout proof.
+- An unknown UI selector key is refused instead of being ignored (RG-62).
+  `unity_ui_query`, `unity_ui_click`, `unity_ui_exists`, `unity_ui_get_text`,
+  `unity_ui_get_bounds` and scenario UI steps (`steps` and `cleanupSteps`, MCP
+  and CLI) return `unknown_selector_key` before anything reaches Unity, naming
+  the key, the closest valid keys and the full key list. `nameContains` used to
+  be dropped silently and the query returned unrelated nodes. The five tools now
+  declare the selector keys in their schema, as scenario steps already did.
 
 ## 0.3.90
 

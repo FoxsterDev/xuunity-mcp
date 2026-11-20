@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server_bridge_final_status import build_compact_final_status_projection
+from server_core import ToolInvocationError
 from server_mcp_protocol import JsonRpcError
 from server_test_suite_timeout import is_unfiltered_test_run, suite_aware_default_timeout_ms
+from server_ui_selector import assert_ui_selector_keys
 
 
 def tool_error_result(
@@ -602,6 +604,11 @@ def call_tool(
 
     tool = tools[name]
     validate_declared_argument_types(name, tool, args)
+    if "selector" in tool.get("inputSchema", {}).get("properties", {}):
+        try:
+            assert_ui_selector_keys(args.get("selector"), where=name)
+        except ToolInvocationError as exc:
+            return tool_error_result(exc, build_tool_error_payload=build_tool_error_payload)
     project_root = args.get("projectRoot")
     if not isinstance(project_root, str) or not project_root.strip():
         raise JsonRpcError(-32602, "projectRoot is required.")

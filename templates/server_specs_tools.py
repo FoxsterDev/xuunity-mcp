@@ -5,6 +5,7 @@ from typing import Any
 from server_specs_scenario import SCENARIO_DEFINITION_SCHEMA
 from server_specs_device import DEVICE_TOOLS
 from server_specs_startup import STARTUP_POLICIES
+from server_ui_selector import UI_SELECTOR_SCHEMA
 
 TOOLS: dict[str, dict[str, Any]] = {
     "xuunity_setup_plan": {
@@ -1024,7 +1025,7 @@ TOOLS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "projectRoot": {"type": "string"},
-                "selector": {"type": "object"},
+                "selector": UI_SELECTOR_SCHEMA,
                 "action": {"type": "string", "enum": ["click"], "default": "click"},
                 "approve": {"type": "boolean", "default": False},
                 "targetKind": {
@@ -1162,7 +1163,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "in Play Mode."
                     )
                 },
-                "selector": {"type": "object"},
+                "selector": UI_SELECTOR_SCHEMA,
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
                 "maxMatches": {"type": "integer", "default": 20, "minimum": 1},
@@ -1218,7 +1219,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "in Play Mode."
                     )
                 },
-                "selector": {"type": "object"},
+                "selector": UI_SELECTOR_SCHEMA,
                 "includeInactive": {"type": "boolean", "default": False},
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
                 "maxNodes": {"type": "integer", "default": 500, "minimum": 1},
@@ -1274,7 +1275,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "in Play Mode."
                     )
                 },
-                "selector": {"type": "object"},
+                "selector": UI_SELECTOR_SCHEMA,
                 "allowMany": {"type": "boolean", "default": False},
                 "includeInactive": {"type": "boolean", "default": False},
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},
@@ -1330,7 +1331,7 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "in Play Mode."
                     )
                 },
-                "selector": {"type": "object"},
+                "selector": UI_SELECTOR_SCHEMA,
                 "allowMany": {"type": "boolean", "default": False},
                 "includeInactive": {"type": "boolean", "default": False},
                 "maxDepth": {"type": "integer", "default": 12, "minimum": 1},

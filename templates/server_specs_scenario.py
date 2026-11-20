@@ -211,6 +211,7 @@ SCENARIO_STEP_SCHEMA: dict[str, Any] = {
                 "requireVisible": {"type": "boolean"},
                 "requireInteractable": {"type": "boolean"},
             },
+            "additionalProperties": False,
         },
         "expectStateChange": {
             "type": "boolean",
