@@ -10,6 +10,7 @@ ACCEPTANCE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/interactive_acceptance
 REFRESH_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/refresh_contract_smoke.json"
 COMPILE_SCENARIO="$PUBLIC_OPS_ROOT/templates/scenarios/compile_contract_smoke.json"
 SCAFFOLD_SCRIPT="$SCRIPT_DIR/scaffold_unity_ci_project.py"
+RUN_GUARD="$SCRIPT_DIR/unity_run_guard.py"
 
 ARTIFACT_ROOT="${XUUNITY_LIGHT_UNITY_MCP_VERSION_MATRIX_ROOT:-${TMPDIR:-/tmp}/xuunity-mcp-version-matrix}"
 RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')"
@@ -108,6 +109,17 @@ SUMMARY_TSV="$RUN_ROOT/summary.tsv"
 DISCOVERED_EDITORS_TSV="$RUN_ROOT/discovered_editors.tsv"
 
 mkdir -p "$PROJECTS_ROOT" "$RESULTS_ROOT"
+
+# Resolved before the sandbox below repoints the neutral install: the slot is host-wide.
+UNITY_SLOT_LOCK_FILE="$(python3 "$RUN_GUARD" lock-path)"
+TRACKED_PIDS_FILE="$RUN_ROOT/tracked_pids.jsonl"
+SLOT_HELD="false"
+STOP_REQUESTED="false"
+CLEANUP_DONE="false"
+CURRENT_UNITY_VERSION=""
+CURRENT_PROJECT_ROOT=""
+CURRENT_RESULT_DIR=""
+CURRENT_ROW_RECORDED="true"
 
 if [[ "$USE_HOST_INSTALL" != "true" ]]; then
   HOST_INSTALL_SANDBOX="$RUN_ROOT/host-install"
@@ -383,6 +395,49 @@ record_summary_row() {
     "$project_root" \
     "$result_dir" \
     "$notes" >> "$SUMMARY_TSV"
+  CURRENT_ROW_RECORDED="true"
+}
+
+# A trapped signal is delivered only between foreground commands, so every long step runs in the
+# background under an interruptible wait and is recorded for the stop path.
+run_tracked() {
+  "$@" &
+  local child_pid=$!
+  python3 "$RUN_GUARD" track-pid --tracked-file "$TRACKED_PIDS_FILE" --pid "$child_pid" >/dev/null 2>&1 || true
+  local status=0
+  wait "$child_pid" || status=$?
+  return "$status"
+}
+
+finish_run() {
+  if [[ "$CLEANUP_DONE" == "true" ]]; then
+    return 0
+  fi
+  CLEANUP_DONE="true"
+  if [[ "$STOP_REQUESTED" == "true" ]]; then
+    python3 "$RUN_GUARD" stop-run \
+      --projects-root "$PROJECTS_ROOT" \
+      --tracked-file "$TRACKED_PIDS_FILE" \
+      >"$RUN_ROOT/stop_cleanup.json" 2>"$RUN_ROOT/stop_cleanup.stderr.txt" || true
+    if [[ -n "$CURRENT_UNITY_VERSION" && "$CURRENT_ROW_RECORDED" != "true" ]]; then
+      write_json_result "$CURRENT_RESULT_DIR/result.json" "stopped" "$CURRENT_UNITY_VERSION" "interrupted" "run stopped by a signal" || true
+      record_summary_row "$CURRENT_UNITY_VERSION" "stopped" "interrupted" "$CURRENT_PROJECT_ROOT" "$CURRENT_RESULT_DIR" "run stopped by a signal" || true
+    fi
+    echo "[version-matrix] stopped; cleanup=$RUN_ROOT/stop_cleanup.json summary=$SUMMARY_TSV" >&2
+  fi
+  if [[ "$SLOT_HELD" == "true" ]]; then
+    python3 "$RUN_GUARD" lock-release --lock-file "$UNITY_SLOT_LOCK_FILE" --pid "$$" >/dev/null 2>&1 || true
+  fi
+}
+
+acquire_unity_slot() {
+  local output
+  if output="$(python3 "$RUN_GUARD" lock-acquire --lock-file "$UNITY_SLOT_LOCK_FILE" --pid "$$" --owner "run_unity_version_matrix" --command-text "run_unity_version_matrix.sh ${VERSIONS[*]}")"; then
+    SLOT_HELD="true"
+    return 0
+  fi
+  echo "$output" >&2
+  fail "Another Unity run holds the host slot ($UNITY_SLOT_LOCK_FILE). Nothing was started."
 }
 
 capture_license_fields() {
@@ -462,7 +517,7 @@ run_step() {
   local stderr_path="$3"
   shift 3
 
-  if "$@" >"$stdout_path" 2>"$stderr_path"; then
+  if run_tracked "$@" >"$stdout_path" 2>"$stderr_path"; then
     return 0
   fi
   return 1
@@ -481,7 +536,7 @@ create_project_if_needed() {
   rm -rf "$project_root"
   mkdir -p "$(dirname "$project_root")"
 
-  "$unity_path" \
+  run_tracked "$unity_path" \
     -batchmode \
     -quit \
     -createProject "$project_root" \
@@ -531,6 +586,10 @@ run_version_matrix_entry() {
   local result="passed"
   local failed_step="none"
   local notes=""
+  CURRENT_UNITY_VERSION="$unity_version"
+  CURRENT_PROJECT_ROOT="$project_root"
+  CURRENT_RESULT_DIR="$result_dir"
+  CURRENT_ROW_RECORDED="false"
   CURRENT_BATCHMODE_SUPPORTED=""
   CURRENT_LICENSE_BLOCKER_CODE=""
   CURRENT_EFFECTIVE_EXECUTION_LANE=""
@@ -722,6 +781,13 @@ run_version_matrix_entry() {
     rm -rf "$project_root"
   fi
 }
+
+trap 'STOP_REQUESTED="true"; exit 130' INT
+trap 'STOP_REQUESTED="true"; exit 143' TERM
+trap 'STOP_REQUESTED="true"; exit 129' HUP
+trap finish_run EXIT
+
+acquire_unity_slot
 
 for unity_version in "${VERSIONS[@]}"; do
   echo "[version-matrix] running $unity_version"

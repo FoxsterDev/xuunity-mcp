@@ -135,6 +135,20 @@
   lines), and the next open on unchanged inputs refuses with
   `compile_red_recorded_by_host_probe_inputs_unchanged` without a new probe.
   Any edit, and any file edited while the probe ran, runs the probe again.
+- `scripts/testing/run_unity_version_matrix.sh` no longer leaves an orphan
+  editor when it is stopped. Every long step runs under an interruptible wait,
+  and on INT, TERM or HUP the run ends the processes it started (the children
+  it tracked with their start time, the Unity processes whose command line
+  names this run's projects directory, and their descendants; the shared
+  licensing client is left alone), writes `stopped` for the current row and
+  saves `stop_cleanup.json`.
+- The test runners share a host-wide Unity slot. The new
+  `scripts/testing/unity_run_guard.py` keeps an advisory lock under the neutral
+  install's state directory (pid, owner, start time, command). The version
+  matrix and `run_consumer_rollout.py execute` take it and refuse with the
+  holder's details while another live run holds it (`unity_slot_busy`); a lock
+  whose holder exited or whose pid was reused is taken over. The MCP tools do
+  not take the lock.
 
 ## 0.3.90
 

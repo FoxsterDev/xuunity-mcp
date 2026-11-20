@@ -52,6 +52,11 @@ from server_editor_host_processes import (  # noqa: E402
 )
 from server_license import build_license_capabilities  # noqa: E402
 
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from unity_run_guard import UnitySlotBusy, acquire_slot, default_lock_path, release_slot  # noqa: E402
+
 
 SCHEMA_VERSION = 1
 DEFAULT_PACKAGE_NAME = "com.xuunity.light-mcp"
@@ -1897,7 +1902,34 @@ def main(argv: list[str]) -> int:
             release_tag = str((ledger.get("release") or {}).get("tag") or "")
             if args.confirm_release_tag != release_tag:
                 raise RolloutError("--confirm-release-tag does not match the frozen ledger release.")
-            ledger = execute_rollout(ledger)
+            slot_path = default_lock_path()
+            try:
+                acquire_slot(
+                    slot_path,
+                    pid=os.getpid(),
+                    owner="run_consumer_rollout",
+                    command=f"run_consumer_rollout.py execute --confirm-release-tag {release_tag}",
+                )
+            except UnitySlotBusy as busy:
+                print(
+                    json.dumps(
+                        {
+                            "schema_version": SCHEMA_VERSION,
+                            "status": "unity_slot_busy",
+                            "error": "unity_slot_busy",
+                            "message": "Another Unity run holds the host slot. Nothing was started.",
+                            "lock_path": str(slot_path),
+                            "holder": busy.holder,
+                        },
+                        indent=2,
+                        ensure_ascii=True,
+                    )
+                )
+                return 3
+            try:
+                ledger = execute_rollout(ledger)
+            finally:
+                release_slot(slot_path, pid=os.getpid())
             emit_ledger(ledger, args.output)
             return 0 if ledger.get("status") == "completed" else 2
         if args.command == "cleanup-owned":
