@@ -1460,8 +1460,13 @@ TOOLS: dict[str, dict[str, Any]] = {
         }
     },
     "unity_sdk_dependency_verify": {
-        "bridgeOperation": "unity.sdk.dependency.verify",
-        "description": "Verify generated SDK dependency artifacts against explicit expectations after package restore, EDM4U resolve, export, or build.",
+        "bridgeOperation": "host.sdk.dependency_verify",
+        "description": (
+            "Verify generated SDK dependency artifacts against explicit expectations after package restore, EDM4U "
+            "resolve, export, or build. Runs on the host by reading the files: it never opens, activates or needs "
+            "an editor. For android_resolver_package and gradle_dependency a group:artifact[:version] value is "
+            "parsed, actual_version is returned, and a different version fails instead of passing as a substring."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1496,7 +1501,12 @@ TOOLS: dict[str, dict[str, Any]] = {
                     },
                     "minItems": 1
                 },
-                "timeoutMs": {"type": "integer", "default": 30000, "minimum": 1000}
+                "timeoutMs": {
+                    "type": "integer",
+                    "default": 30000,
+                    "minimum": 1000,
+                    "description": "Accepted for compatibility; the host-side check does not wait on an editor."
+                }
             },
             "required": ["projectRoot", "expectations"]
         }

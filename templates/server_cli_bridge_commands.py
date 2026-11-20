@@ -912,24 +912,6 @@ def cmd_request_sdk_android_resolve(args):
     print_json(response)
 
 
-def cmd_request_sdk_dependency_verify(args):
-    project_root = ensure_project_root(args.project_root)
-    config_path = Path(args.config_file).expanduser()
-    if not config_path.is_absolute():
-        config_path = (Path.cwd() / config_path).resolve()
-    config = read_json(config_path)
-    if not isinstance(config, dict):
-        raise ToolInvocationError("invalid_dependency_verify_config", "Dependency verification config must be a JSON object.")
-
-    response = invoke_bridge(
-        str(project_root),
-        "unity.sdk.dependency.verify",
-        config,
-        resolve_operation_default_timeout_ms(project_root, "unity.sdk.dependency.verify", 30000) if args.timeout_ms is None else args.timeout_ms,
-    )
-    print_json(response)
-
-
 def cmd_request_editmode_tests(args):
     project_root = ensure_project_root(args.project_root)
     response = invoke_bridge(

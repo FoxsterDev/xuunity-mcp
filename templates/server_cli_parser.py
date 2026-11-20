@@ -584,10 +584,10 @@ def build_parser() -> argparse.ArgumentParser:
     sdk_package_restore_cmd.add_argument("--dry-run", action="store_true")
     sdk_package_restore_cmd.set_defaults(func_name="cmd_request_sdk_package_restore")
 
-    sdk_dependency_verify_cmd = sub.add_parser("request-sdk-dependency-verify", help="Verify generated SDK dependency artifacts from a JSON expectations file through the active bridge transport.")
+    sdk_dependency_verify_cmd = sub.add_parser("request-sdk-dependency-verify", help="Verify generated SDK dependency artifacts from a JSON expectations file by reading them on the host; no editor is opened or required.")
     sdk_dependency_verify_cmd.add_argument("--project-root", required=True)
     sdk_dependency_verify_cmd.add_argument("--config-file", required=True)
-    sdk_dependency_verify_cmd.add_argument("--timeout-ms", type=int, default=None)
+    sdk_dependency_verify_cmd.add_argument("--timeout-ms", type=int, default=None, help="Accepted for compatibility; the check does not wait on an editor.")
     sdk_dependency_verify_cmd.set_defaults(func_name="cmd_request_sdk_dependency_verify")
 
     editmode_cmd = sub.add_parser("request-editmode-tests", help="Send a direct unity.tests.run_editmode request through the active bridge transport.")

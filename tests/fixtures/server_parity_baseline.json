@@ -301,7 +301,7 @@
       "unity_device_coldstart_ab",
       "unity_tests_cancel"
     ],
-    "sha256": "ab31b749c86e25fc5ad4ebb23e82f7ddffebe7085cdf32924c5bdc1fcc09d4a7"
+    "sha256": "4d278170c8df92e7e2a25087327a8e3bfc8e58420fc060e551c9d1f2eda2acfa"
   },
   "request_final_status_projection": {
     "bridge_changed_since_submission": true,

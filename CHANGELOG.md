@@ -32,6 +32,19 @@
   `items_truncated_for_item_cap` counts them. The new `maxItemBytes`
   (`--max-item-bytes`) raises the cap, and `-1` or `maxPayloadBytes: -1`
   returns full lines.
+- `unity_sdk_dependency_verify` no longer opens or activates an editor (RG-56).
+  Every expectation kind is a file read, so the tool and
+  `request-sdk-dependency-verify` now run on the host and work with the editor
+  closed, open or busy. The result is small (`validation_evidence:
+  host_file_read`, `editor_required: false`) and a failed check sets `isError`
+  (CLI exit code 1). The `unity.sdk.dependency.verify` bridge operation stays in
+  the package for older hosts.
+- `android_resolver_package` and `gradle_dependency` expectations compare
+  versions (RG-57). A `group:artifact[:version]` value is parsed, the found
+  version is returned in `actual_version`, and a different version fails;
+  `13.0` used to pass against `13.0.1` as a substring. `version` and
+  `minVersion` apply to these kinds as they do to `podfile_lock_pod`. A value
+  that is not a coordinate keeps the plain contains check.
 
 ## 0.3.90
 
