@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- A scenario whose required `ui_click` was refused before delivery now ends
+  `failed` / `precondition` for every refusal that proves the target's state
+  after a complete search (RG-60): `ui_target_not_interactable`,
+  `ui_target_not_pointer_targetable`, `ui_target_has_no_click_handler`,
+  `ui_target_does_not_block_raycasts` and `selector_ambiguous` join
+  `ui_node_not_found` and `ui_target_not_visible`. A truncated search and
+  refusals that prove nothing about the target stay `inconclusive`.
+
 ## 0.3.90
 
 Release tag: `v0.3.90`

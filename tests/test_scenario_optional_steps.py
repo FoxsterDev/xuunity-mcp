@@ -64,6 +64,11 @@ class ScenarioOptionalStepTests(unittest.TestCase):
         for refusal, failure_class in (
             ("ui_node_not_found", "precondition"),
             ("ui_target_not_visible", "precondition"),
+            ("ui_target_not_interactable", "precondition"),
+            ("ui_target_not_pointer_targetable", "precondition"),
+            ("ui_target_has_no_click_handler", "precondition"),
+            ("ui_target_does_not_block_raycasts", "precondition"),
+            ("selector_ambiguous", "precondition"),
             ("ui_target_occluded", "blocking_popup"),
         ):
             with self.subTest(refusal=refusal):
@@ -80,6 +85,36 @@ class ScenarioOptionalStepTests(unittest.TestCase):
                 self.assertEqual("failed", verdict["verdict"])
                 self.assertEqual(failure_class, verdict["failure_class"])
                 self.assertEqual("authoritative", verdict["trust_class"])
+
+    def test_click_refusals_that_do_not_prove_target_state_stay_unproven(self) -> None:
+        for refusal in (
+            "ui_selector_search_truncated",
+            "ui_target_out_of_scope",
+            "ui_click_wait_in_progress",
+            "ui_coordinate_context_unresolved",
+            "ui_target_not_found",
+        ):
+            with self.subTest(refusal=refusal):
+                verdict = self._failed_run(
+                    {
+                        "stepId": "tab_quests",
+                        "kind": "ui_click",
+                        "status": "failed",
+                        "error_code": refusal,
+                        "payload_json": _click_payload("tab_quests", refusal_code=refusal),
+                    }
+                )
+                self.assertEqual("inconclusive", verdict["verdict"])
+                self.assertEqual("unity_unproven", verdict["failure_class"])
+        truncated = json.dumps(
+            {"ui_interaction": {"delivered": False, "refusal_code": "ui_target_not_interactable",
+                                "search_truncated": True}}
+        )
+        verdict = self._failed_run(
+            {"stepId": "tab", "kind": "ui_click", "status": "failed",
+             "error_code": "ui_target_not_interactable", "payload_json": truncated}
+        )
+        self.assertEqual("inconclusive", verdict["verdict"])
 
     def test_truncated_click_search_and_incomplete_read_stay_unproven(self) -> None:
         truncated = json.dumps(

@@ -1153,7 +1153,15 @@ def build_refresh_timeout_recovery_summary(normalized: dict[str, Any], step_item
     return summary
 
 
-UI_ABSENT_REFUSAL_CODES = {"ui_node_not_found", "ui_target_not_visible"}
+UI_COMPLETE_SEARCH_REFUSAL_CODES = {
+    "ui_node_not_found",
+    "ui_target_not_visible",
+    "ui_target_not_interactable",
+    "ui_target_not_pointer_targetable",
+    "ui_target_has_no_click_handler",
+    "ui_target_does_not_block_raycasts",
+    "selector_ambiguous",
+}
 
 
 def _complete_search_ui_refusal_class(step: dict[str, Any], payload: dict[str, Any]) -> str:
@@ -1166,7 +1174,7 @@ def _complete_search_ui_refusal_class(step: dict[str, Any], payload: dict[str, A
         refusal = str(interaction.get("refusal_code") or error_code)
         if refusal == "ui_target_occluded":
             return "blocking_popup"
-        if refusal in UI_ABSENT_REFUSAL_CODES and not bool(interaction.get("search_truncated")):
+        if refusal in UI_COMPLETE_SEARCH_REFUSAL_CODES and not bool(interaction.get("search_truncated")):
             return "precondition"
         return ""
     if kind in {"ui_exists", "ui_get_text"}:
