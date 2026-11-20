@@ -5,6 +5,7 @@ from server_core import bridge_enable_recovery_command
 from server_bridge_runtime import read_request_journal_events
 
 from server_cli_shared import *
+from server_console_hygiene import finalize_console_items
 from server_bridge_final_status import build_compact_final_status_projection
 
 
@@ -504,6 +505,7 @@ def cmd_request_console_grep(args):
                 after_lines=int(getattr(args, "after_lines", 0) or 0),
                 max_payload_bytes=getattr(args, "max_payload_bytes", None),
                 messages_only=bool(getattr(args, "messages_only", False)),
+                max_item_bytes=getattr(args, "max_item_bytes", None),
             )
         except ValueError as exc:
             raise ToolInvocationError("invalid_editor_log_grep", str(exc)) from exc
@@ -536,6 +538,7 @@ def cmd_request_console_grep(args):
             payload = {}
         if isinstance(payload, dict):
             payload = annotate_console_grep_false_empty(payload, args.include_type or [])
+            payload = finalize_console_items(payload, getattr(args, "max_item_bytes", None))
             response = dict(response)
             response["payload_json"] = json.dumps(payload, ensure_ascii=True)
     print_json(response)
@@ -571,6 +574,7 @@ def cmd_request_console_tail(args):
             bridge_state_is_live=anchor_state_is_live,
             explicit_path_requested=bool(explicit_log_path),
             max_payload_bytes=max_payload_bytes,
+            max_item_bytes=getattr(args, "max_item_bytes", None),
         )
         print_json(
             {
@@ -602,6 +606,7 @@ def cmd_request_console_tail(args):
             payload = {}
         if isinstance(payload, dict):
             payload = annotate_console_tail_payload(payload)
+            payload = finalize_console_items(payload, getattr(args, "max_item_bytes", None), max_payload_bytes)
             payload = apply_console_tail_byte_budget(payload, max_payload_bytes)
             response = dict(response)
             response["payload_json"] = json.dumps(payload, ensure_ascii=True)

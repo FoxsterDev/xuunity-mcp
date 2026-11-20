@@ -217,7 +217,6 @@
     ]
   },
   "mcp_tools_list": {
-    "sha256": "9842d7bc4b2aa282d35d88f95cb1e9519f0a56a0d732d0380d6919621cbda59e",
     "tool_count": 81,
     "tool_names": [
       "xuunity_setup_plan",
@@ -301,7 +300,8 @@
       "unity_device_metrics",
       "unity_device_coldstart_ab",
       "unity_tests_cancel"
-    ]
+    ],
+    "sha256": "ab31b749c86e25fc5ad4ebb23e82f7ddffebe7085cdf32924c5bdc1fcc09d4a7"
   },
   "request_final_status_projection": {
     "bridge_changed_since_submission": true,

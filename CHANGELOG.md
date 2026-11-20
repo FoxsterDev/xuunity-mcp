@@ -21,6 +21,17 @@
   type argument, and closure classes (`` Type/<>c__DisplayClassN`1<T>:<M>b__N_0 ``).
   The frame pattern did not accept `/` in a type name, so up to half of a
   result could be frames.
+- `unity_console_grep` and `unity_console_tail` no longer return token-like
+  values verbatim (RG-70). Bearer and Basic credentials, JWTs, and the values
+  of `token`, `secret`, `password`, `api-key`, `authorization`, `cookie` and
+  `credential` keys come back as `[REDACTED]` in messages, stack traces and
+  context lines, for both `source` values and for the CLI commands;
+  `redacted_secret_count` reports how many. The log file is not changed.
+- One returned console line is capped at 2048 bytes by default (RG-70). A
+  longer line is cut and carries `message_bytes_before_cap`;
+  `items_truncated_for_item_cap` counts them. The new `maxItemBytes`
+  (`--max-item-bytes`) raises the cap, and `-1` or `maxPayloadBytes: -1`
+  returns full lines.
 
 ## 0.3.90
 

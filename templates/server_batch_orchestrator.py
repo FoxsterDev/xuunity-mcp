@@ -40,6 +40,7 @@ from server_specs import (
     STARTUP_POLICIES,
     TOOLS,
 )
+from server_console_hygiene import finalize_console_items
 from server_health import (
     EDITOR_LOG_GREP_ABS_MAX_CHARS,
     EDITOR_LOG_GREP_MIN_CHARS,
@@ -1935,6 +1936,13 @@ def _editor_log_since_argument(arguments: dict[str, Any]) -> str:
     return since
 
 
+def _max_item_bytes_argument(arguments: dict[str, Any]) -> Any:
+    value = arguments.get("maxItemBytes")
+    if value is not None and (not isinstance(value, int) or isinstance(value, bool)):
+        raise JsonRpcError(-32602, "maxItemBytes must be an integer when provided.")
+    return value
+
+
 def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     project_root_value = arguments.get("projectRoot")
     if not isinstance(project_root_value, str) or not project_root_value.strip():
@@ -1991,6 +1999,7 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     messages_only = arguments.get("messagesOnly", False)
     if not isinstance(messages_only, bool):
         raise JsonRpcError(-32602, "messagesOnly must be a boolean.")
+    max_item_bytes = _max_item_bytes_argument(arguments)
 
     include_types = _optional_string_list_argument(arguments, "includeTypes")
     since = _editor_log_since_argument(arguments)
@@ -2035,6 +2044,7 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 after_lines=after_lines,
                 max_payload_bytes=max_payload_bytes,
                 messages_only=messages_only,
+                max_item_bytes=max_item_bytes,
             )
         except ValueError as exc:
             raise JsonRpcError(-32602, str(exc)) from exc
@@ -2063,6 +2073,7 @@ def call_unity_console_grep_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             payload = {}
         if isinstance(payload, dict):
             payload = annotate_console_grep_false_empty(payload, include_types or [])
+            payload = finalize_console_items(payload, max_item_bytes, max_payload_bytes)
             if messages_only:
                 payload = project_console_messages_only(payload)
             response = dict(response)
@@ -2095,6 +2106,7 @@ def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     include_stack_traces = arguments.get("includeStackTraces", False)
     if not isinstance(include_stack_traces, bool):
         raise JsonRpcError(-32602, "includeStackTraces must be a boolean.")
+    max_item_bytes = _max_item_bytes_argument(arguments)
     since = _editor_log_since_argument(arguments)
     since_request_id = str(arguments.get("sinceRequestId") or "").strip()
     project_root = ensure_project_root(project_root_value)
@@ -2121,6 +2133,7 @@ def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
                 bridge_state_is_live=anchor_state_is_live,
                 max_payload_bytes=max_payload_bytes,
                 explicit_path_requested=bool(editor_log_path),
+                max_item_bytes=max_item_bytes,
             )
         )
 
@@ -2148,6 +2161,7 @@ def call_unity_console_tail_tool(arguments: dict[str, Any]) -> dict[str, Any]:
             payload = {}
         if isinstance(payload, dict):
             payload = annotate_console_tail_payload(payload)
+            payload = finalize_console_items(payload, max_item_bytes, max_payload_bytes)
             payload = apply_console_tail_byte_budget(payload, max_payload_bytes)
             response = dict(response)
             response["payload_json"] = json.dumps(payload, ensure_ascii=True)

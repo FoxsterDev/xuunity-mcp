@@ -1596,6 +1596,18 @@ TOOLS: dict[str, dict[str, Any]] = {
                         "unity_console_grep as the compact recovery tool."
                     )
                 },
+                "maxItemBytes": {
+                    "type": "integer",
+                    "default": 2048,
+                    "minimum": -1,
+                    "description": (
+                        "Byte cap for one returned line (message and each context line). A longer line is cut and "
+                        "flagged with message_bytes_before_cap; items_truncated_for_item_cap counts them. Omit or 0 "
+                        "for the 2048 default; -1 for full lines (also implied by maxPayloadBytes=-1). Token-like values (Bearer tokens, JWTs, and values "
+                        "of token/secret/password/api-key/authorization/cookie keys) are always returned as "
+                        "[REDACTED]; redacted_secret_count reports how many."
+                    )
+                },
                 "includeTypes": {
                     "type": "array",
                     "items": {"type": "string"},
@@ -1737,6 +1749,18 @@ TOOLS: dict[str, dict[str, Any]] = {
                 "maxPayloadBytes": {
                     "type": "integer",
                     "description": "Byte budget for the returned items (default 16384 when context lines are requested; negative disables)."
+                },
+                "maxItemBytes": {
+                    "type": "integer",
+                    "default": 2048,
+                    "minimum": -1,
+                    "description": (
+                        "Byte cap for one returned line (message and each context line). A longer line is cut and "
+                        "flagged with message_bytes_before_cap; items_truncated_for_item_cap counts them. Omit or 0 "
+                        "for the 2048 default; -1 for full lines (also implied by maxPayloadBytes=-1). Token-like values (Bearer tokens, JWTs, and values "
+                        "of token/secret/password/api-key/authorization/cookie keys) are always returned as "
+                        "[REDACTED]; redacted_secret_count reports how many."
+                    )
                 },
                 "timeoutMs": {"type": "integer", "default": 5000, "minimum": 1000}
             },

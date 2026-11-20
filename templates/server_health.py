@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from server_bridge_paths import default_editor_log_path
+from server_console_hygiene import finalize_console_items
 from server_core import parse_utc_timestamp
 
 FRESH_HEARTBEAT_MAX_AGE_SECONDS = 5.0
@@ -843,6 +844,7 @@ def grep_editor_log_payload(
     after_lines: int = 0,
     max_payload_bytes: Any = None,
     messages_only: bool = False,
+    max_item_bytes: Any = None,
 ) -> dict[str, Any]:
     pattern = str(pattern or "").strip()
     if not pattern:
@@ -1026,6 +1028,7 @@ def grep_editor_log_payload(
         )
     if before_lines or after_lines:
         payload["context_lines"] = {"before": before_lines, "after": after_lines}
+    payload = finalize_console_items(payload, max_item_bytes, max_payload_bytes)
     if before_lines or after_lines or max_payload_bytes is not None:
         payload = apply_console_tail_byte_budget(payload, max_payload_bytes)
     return project_console_messages_only(payload) if messages_only else payload
@@ -1078,6 +1081,7 @@ def tail_editor_log_payload(
     bridge_state_is_live: bool = True,
     explicit_path_requested: bool = False,
     max_payload_bytes: Any = None,
+    max_item_bytes: Any = None,
 ) -> dict[str, Any]:
     limit = max(1, int(limit or 50))
     anchor = resolve_editor_log_since_anchor(
@@ -1142,6 +1146,7 @@ def tail_editor_log_payload(
         "recommended_next_action": "use_source_editor_log_grep_for_compile_errors",
         "validation_evidence": "unity_editor_log",
     }
+    payload = finalize_console_items(payload, max_item_bytes, max_payload_bytes)
     return apply_console_tail_byte_budget(payload, max_payload_bytes)
 
 

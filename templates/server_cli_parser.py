@@ -259,6 +259,7 @@ def build_parser() -> argparse.ArgumentParser:
     console_grep_cmd.add_argument("--before-lines", type=int, default=0, help="Editor.log lines before each match (0..20).")
     console_grep_cmd.add_argument("--after-lines", type=int, default=0, help="Editor.log lines after each match (0..20).")
     console_grep_cmd.add_argument("--max-payload-bytes", type=int, default=None)
+    console_grep_cmd.add_argument("--max-item-bytes", type=int, default=None, help="Byte cap for one returned line. Omit or 0 for the 2048 default; -1 for full lines.")
     console_grep_cmd.add_argument("--messages-only", action="store_true", help="Return each match as its message and line only.")
     console_grep_cmd.add_argument("--timeout-ms", type=int, default=5000)
     console_grep_cmd.set_defaults(func_name="cmd_request_console_grep")
@@ -276,6 +277,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Deterministic byte ceiling for returned items. Omit or 0 for the 16384 default; -1 for the unbounded raw tail.",
     )
+    console_tail_cmd.add_argument("--max-item-bytes", type=int, default=None, help="Byte cap for one returned line. Omit or 0 for the 2048 default; -1 for full lines.")
     console_tail_cmd.add_argument(
         "--since",
         choices=["playmode_start", "bridge_generation", "request_id"],
