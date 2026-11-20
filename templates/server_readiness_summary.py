@@ -173,7 +173,14 @@ def build_ensure_ready_summary(
     if isinstance(compile_preflight, dict) and compile_preflight:
         summary["compile_preflight"] = {
             key: compile_preflight.get(key)
-            for key in ("verdict", "reason", "run_compile_probe", "compile_errors_observed")
+            for key in (
+                "verdict",
+                "reason",
+                "run_compile_probe",
+                "compile_errors_observed",
+                "compile_probe_error_code",
+                "compile_probe_skipped_reason",
+            )
             if key in compile_preflight
         }
 

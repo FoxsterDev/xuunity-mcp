@@ -266,6 +266,17 @@ class PreflightVerdictTests(SnapshotFixture):
         _, probe = self.run_preflight(self.probe(succeeded=False, log_text=self.RED_LOG))
         probe.assert_called_once()
 
+    def test_an_inconclusive_probe_names_the_batch_lane_error(self) -> None:
+        self.persist()
+        write(self.root / "Assets/Scripts/Board.cs", "class Board { Missing m; }", COMPILED_EPOCH + 600)
+        refused = {"succeeded": False, "batch_probe": {"error": {
+            "code": "licensing_busy", "message": "Cannot safely probe licensing while an editor is live."}}}
+        preflight, _ = self.run_preflight(refused)
+        self.assertEqual("inconclusive", preflight["verdict"])
+        self.assertEqual("licensing_busy", preflight["compile_probe_error_code"])
+        self.assertIn("editor is live", preflight["compile_probe_error_message"])
+        self.assertNotIn("host_snapshot", preflight)
+
     def test_a_snapshot_that_cannot_be_written_does_not_hide_the_red_verdict(self) -> None:
         self.persist()
         write(self.root / "Assets/Scripts/Board.cs", "class Board { Missing m; }", COMPILED_EPOCH + 600)

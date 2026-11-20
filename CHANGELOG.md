@@ -144,6 +144,10 @@
   lines), and the next open on unchanged inputs refuses with
   `compile_red_recorded_by_host_probe_inputs_unchanged` without a new probe.
   Any edit, and any file edited while the probe ran, runs the probe again.
+- An `inconclusive` compile preflight says why its probe did not run:
+  `compile_probe_error_code` and `compile_probe_error_message` carry the batch
+  lane's refusal, for example `licensing_busy` while another editor is live on
+  the host.
 - `scripts/testing/run_unity_version_matrix.sh` no longer leaves an orphan
   editor when it is stopped. Every long step runs under an interruptible wait,
   and on INT, TERM or HUP the run ends the processes it started (the children

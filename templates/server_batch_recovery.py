@@ -505,6 +505,10 @@ def run_editor_open_compile_preflight(project_root: Path, *, timeout_ms: int, mo
     if bool(probe.get("succeeded")):
         preflight["verdict"] = "green"
         return preflight
+    final_probe_error = dict(dict(probe.get("batch_probe") or {}).get("error") or {})
+    if final_probe_error.get("code"):
+        preflight["compile_probe_error_code"] = str(final_probe_error.get("code"))
+        preflight["compile_probe_error_message"] = truncate_text(final_probe_error.get("message") or "", 240)
     classification, _, _ = classify_compile_probe_failure(probe)
     evidence = compile_probe_red_evidence(probe)
     preflight.update(evidence)
