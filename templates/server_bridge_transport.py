@@ -5,7 +5,6 @@ import json
 import socket
 import time
 import uuid
-from server_core import bridge_enable_recovery_command
 
 from pathlib import Path
 from typing import Any
@@ -35,6 +34,7 @@ from server_bridge_journal import (
 )
 from server_bridge_paths import bridge_state_path, inbox_dir, outbox_dir, request_journal_dir
 from server_bridge_state import (
+    bridge_disabled_advice,
     bridge_enabled,
     inspect_bridge_state_liveness,
     read_best_effort_bridge_state,
@@ -829,19 +829,16 @@ def invoke_bridge_transport(
             transport_name="disabled",
             reason="bridge_disabled",
         )
+        message, next_action = bridge_disabled_advice(project_root)
         raise ToolInvocationError(
             "bridge_disabled",
-            (
-                "Unity bridge is disabled for this project. "
-                f"Enable it with {bridge_enable_recovery_command()} "
-                "and reopen Unity."
-            ),
+            message,
             {
                 "request_submitted": False,
                 "request_ownership_acquired": False,
                 "transport_outcome": "request_not_submitted",
                 "operation_outcome": "request_not_dispatched",
-                "recommended_next_action": "enable_bridge_and_retry",
+                "recommended_next_action": next_action,
                 "transport": "disabled",
             },
         )

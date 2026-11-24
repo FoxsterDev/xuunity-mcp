@@ -104,6 +104,13 @@
   `enable_bridge_and_retry` advice sent agents through setup-plan, setup-apply
   and a reopen for nothing. Setup is still recommended when the package is not
   declared. Discovery reports `light_mcp_package_declared`.
+- The `bridge_disabled` error itself now gives the same advice as the status
+  fields. A request to a project whose bridge is disabled, and `ensure-ready`
+  without `--open-editor`, still told the agent to run setup-plan and
+  setup-apply when the package was declared, so `unity_status_summary` carried
+  `open_editor_or_ensure_ready` at the top and the setup recipe in its `error`.
+  With the package declared the error now names `ensure-ready --open-editor`
+  and `recommended_next_action: open_editor_or_ensure_ready`.
 - `unity_project_refresh` no longer attaches a `stale_risk` Play Mode caveat
   after an ordinary domain reload (RG-71). When the bridge identity changed
   during settle but the editor process is the same and the host observed Edit

@@ -10,11 +10,11 @@ import signal
 import subprocess
 import sys
 import time
-from server_core import bridge_enable_recovery_command
 
 from pathlib import Path
 from typing import Any, Callable
 
+from server_bridge_state import bridge_disabled_advice
 from server_bridge_runtime import (
     bridge_state_path,
     bridge_enabled,
@@ -1598,14 +1598,8 @@ def wait_for_ready(
         raise ToolInvocationError("invalid_startup_policy", f"Unknown startup policy: {startup_policy}")
 
     if not bridge_enabled(project_root):
-        raise ToolInvocationError(
-            "bridge_disabled",
-            (
-                "Unity bridge is disabled for this project. "
-                f"Enable it with {bridge_enable_recovery_command()} "
-                "and reopen Unity."
-            ),
-        )
+        message, next_action = bridge_disabled_advice(project_root)
+        raise ToolInvocationError("bridge_disabled", message, {"recommended_next_action": next_action})
 
     started_at = time.time()
     deadline = started_at + (timeout_ms / 1000.0)

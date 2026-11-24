@@ -11,7 +11,13 @@ from server_bridge_constants import (
     TCP_LOOPBACK_BRIDGE_TRANSPORT,
 )
 from server_bridge_paths import bridge_config_path, bridge_state_path
-from server_core import ToolInvocationError, parse_utc_timestamp as parse_core_utc_timestamp, read_json, render_launcher_cli
+from server_core import (
+    ToolInvocationError,
+    bridge_enable_recovery_command,
+    parse_utc_timestamp as parse_core_utc_timestamp,
+    read_json,
+    render_launcher_cli,
+)
 from server_host_platform import current_host_platform_adapter
 from server_recovery_commands import recommended_recovery_command_for_project
 
@@ -38,6 +44,20 @@ def light_mcp_package_declared(project_root: Path) -> bool:
         return False
     dependencies = manifest.get("dependencies") if isinstance(manifest, dict) else None
     return isinstance(dependencies, dict) and bool(str(dependencies.get(LIGHT_MCP_PACKAGE_NAME) or "").strip())
+
+
+def bridge_disabled_advice(project_root: Path) -> tuple[str, str]:
+    if light_mcp_package_declared(project_root):
+        action = "open_editor_or_ensure_ready"
+        return (
+            "Unity bridge is disabled for this project. The package is declared, so "
+            f"{recommended_recovery_command_for_project(project_root, action)} enables the bridge and opens Unity.",
+            action,
+        )
+    return (
+        f"Unity bridge is disabled for this project. Enable it with {bridge_enable_recovery_command()} and reopen Unity.",
+        "enable_bridge_and_retry",
+    )
 
 
 def try_read_bridge_config(project_root: Path) -> dict[str, Any] | None:
