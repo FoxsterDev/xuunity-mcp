@@ -1,8 +1,8 @@
 # XUUnity Light Unity MCP Public Retro Registry
 
 Status: active public registry
-Last triage: 2026-11-03 (`v0.3.85` status pass)
-Current release: `v0.3.85`
+Last triage: 2026-11-24 (`v0.3.91` intake of RG-54..RG-72)
+Current release: `v0.3.91`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
 deleted. Host-private and project-specific retros belong in the host's single
@@ -41,6 +41,44 @@ own owner registries, not in this public table.
 - `Completed Public History` is the place to find reusable lessons already
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
+
+## Intake 2026-11-24 (`v0.3.91`: retro rows RG-54..RG-72)
+
+- `v0.3.91` was published on 2026-11-24 (tag `v0.3.91` at `e5bd625`). The
+  `## 0.3.91` section of `CHANGELOG.md` is the record of what shipped.
+- Two new public retros, both twins of host-private chat retros from
+  2026-11-19 with project details removed:
+  - `2026-11-19_sdk_rollout_typed_lane_discoverability_chat_retro.md`
+    (RG-54..RG-59): the EDM4U result named no typed follow-up tool, and a
+    file-only dependency check opened an editor.
+  - `2026-11-19_ui_driving_and_incomplete_fix_followup_chat_retro.md`
+    (RG-60..RG-72): UI driving cost, two incomplete `v0.3.89` fixes (RG-53,
+    RG-20), the editor quit outside MCP, and redaction of console lines.
+- Still open after `v0.3.91`: RG-58, RG-64, RG-65, RG-67 (reproduce first),
+  RG-68, RG-69, and the `unity_edm4u_resolve` compact default payload.
+- Status vocabulary as in the 2026-11-03 pass.
+
+| ID | Retro | Priority | Status | Finding and fix or next step |
+| --- | --- | --- | --- | --- |
+| RG-54 | SDK rollout | P1 discoverability | done (v0.3.91), `8003a2c` | An Android `unity_edm4u_resolve` result carried only the prose action `verify_resolver_output_freshness_and_generated_diff`. It now lists `unity_sdk_generated_diff_guard` and `unity_sdk_android_resolve` in `next_tools` with the tracked generated paths filled in. |
+| RG-55 | SDK rollout | P2 verification | done (v0.3.91), `a96d746` | Reproduced first: an allowlisted Unity Gradle template that lost baseline lines passed without caller `requiredMarkersAfter`. The guard now fails with `template_markers_dropped`. |
+| RG-56 | SDK rollout | P1 side effect | done (v0.3.91), `03130ca` | `unity_sdk_dependency_verify` cold-started an editor (17 s) to read two files and left it running. Every expectation kind now runs on the host with no editor. |
+| RG-57 | SDK rollout | P2 evidence | done (v0.3.91), `03130ca` | Passing coordinate checks reported `actual_version: ""` and matched by substring. The found version is returned and a different version fails. |
+| RG-58 | SDK rollout; extended by UI follow-up | P2 evidence | open | A persisted test result has counts and the last started and finished test only, so proving that new tests ran needs a second run; a PlayMode run filtered to two assemblies gave no note that one contributed 0. Next: a bounded executed-test list for filtered runs, or per-fixture or per-assembly counts. |
+| RG-59 | SDK rollout | P3 token cost | done (v0.3.91), `03130ca` | Dependency verify returned ~10 KB by default; the host-side result is now small. |
+| RG-60 | UI follow-up | P2 misleading verdict | done (v0.3.91), `42c1dc4` | Recurrence of RG-53: a required click refused before delivery as `ui_target_not_interactable` ended `inconclusive / unity_unproven`. Every refusal that proves the target's state after a complete search is now `failed` / `precondition`. |
+| RG-61 | UI follow-up | P2 noise | done (v0.3.91), `19c2042` | Recurrence of RG-20: nested-type, async state machine and closure frames passed the frame filter. The pattern now drops them. |
+| RG-62 | UI follow-up | P2 silent contract | done (v0.3.91), `701bed5` | An unknown selector key was ignored and the query returned unrelated nodes. UI tools and scenario steps now refuse `unknown_selector_key`. |
+| RG-63 | UI follow-up | P2 discoverability | done (v0.3.91), `6c90cc1` | Closing the editor needed the CLI helpers and a shell. `unity_editor_quit` runs them from MCP and returns `closeout_classification`. |
+| RG-64 | UI follow-up | P2 observability | open | `busy_reason: idle` while another session's test run was in Play Mode; the chat polled `bridge_state.json`. Next: derive `busy_reason` from the active test phase and Play Mode; add `waitForIdleMs`. |
+| RG-65 | UI follow-up | P2 selector gap | open | Two dropdowns instantiated from one prefab share one hierarchy path, and no selector picks one. Next: `matchIndex` or ancestor-text matching. |
+| RG-66 | UI follow-up | P2 recovery advice | done (v0.3.91), `f887f74`, `bb98ae8` | `bridge_disabled` on a closed project that declares the package advised setup and a reopen. Every field now recommends `open_editor_or_ensure_ready`. |
+| RG-67 | UI follow-up | P2 churn, unconfirmed | open; reproduce first | `runInBackground` 0 → 1 left after managed Play Mode cycles three times, with no config action. Next: reproduce; then restore at `ExitingPlayMode` or hold saves until the restore. |
+| RG-68 | UI follow-up | P3 missing primitive | open | A target below the fold was refused `ui_target_not_pointer_targetable` with no way to scroll. Next: `scrollIntoView` on `ui_click` or a `ui_scroll` step. |
+| RG-69 | UI follow-up | P3 token cost | open | `ui_click` averaged 7.7 KB, a one-operation `prefab_mutate` 5.4 KB, the full action catalog 36 KB. Next: compact defaults. |
+| RG-70 | UI follow-up | P2 redaction / P3 size | done (v0.3.91), `bc2b647`, `c6a0135` | A console line returned a session token verbatim and one item was 11.2 KB. Token-like values are redacted and one line is capped at 2048 bytes by default. |
+| RG-71 | UI follow-up | P3 noise | done (v0.3.91), `bf61986` | 8 of 9 refreshes attached a `stale_risk` Play Mode caveat. A same-editor domain reload is now `expected_domain_reload`. |
+| RG-72 | UI follow-up | P3 contract friction | done (v0.3.91), `2439fbd` | A scenario `ui_click` required `interactionId`. It now defaults to the step's `stepId`. |
 
 ## Intake 2026-11-03 (`v0.3.85` release closeout and status pass)
 
@@ -705,6 +743,8 @@ the entire Windows install root-cause set (python3 delegation, UTF-8 BOM,
 
 | Date | File | Scope | Registry Status | Why It Is Not Completed History |
 | --- | --- | --- | --- | --- |
+| 2026-11-19 | `2026-11-19_ui_driving_and_incomplete_fix_followup_chat_retro.md` | two interactive chats, 224 MCP calls (`v0.3.88`-`v0.3.90`): UI driving on a fresh test player, scenario click verdicts, console frames and redaction, selector contract, editor quit from MCP, shared-checkout waiting | **partial (`v0.3.91`: RG-60, RG-61, RG-62, RG-63, RG-66, RG-70, RG-71, RG-72 done; RG-64, RG-65, RG-67, RG-68, RG-69 open)** | No Unity-side failure. `ui_click` plus `ui_query` were 52% of the MCP bytes. Shipped: complete-search click refusals are preconditions, nested and async frames are filtered, unknown selector keys are refused, `unity_editor_quit`, `ensure-ready` advice for a declared package, console redaction and a per-line cap, `expected_domain_reload`, `interactionId` defaults to `stepId`. Open: busy state for a foreign test run and `waitForIdleMs` (RG-64), duplicate-path selection (RG-65), `runInBackground` churn to reproduce (RG-67), scroll into view (RG-68), compact UI and catalog payloads (RG-69). Extends RG-58 to PlayMode assembly filters. |
+| 2026-11-19 | `2026-11-19_sdk_rollout_typed_lane_discoverability_chat_retro.md` | SDK adapter rollout across sixteen consumer projects (`v0.3.90`): EDM4U next-tool discoverability, template-line guard, editor-free dependency verify, executed-test evidence | **partial (`v0.3.91`: RG-54, RG-55, RG-56, RG-57, RG-59 done; RG-58 and the EDM4U compact payload open)** | No Unity-side failure. The EDM4U result now names the typed tools with prefilled paths, the diff guard fails on dropped Unity template lines, and dependency verify runs on the host with parsed versions and a small payload. Open: an executed-test list or per-fixture counts in persisted results (RG-58), and a compact default for `unity_edm4u_resolve` (~14 KB). Extends `2026-05-14_sdk_rollout_mcp_portfolio_retro.md`. |
 | 2026-11-03 | `2026-11-03_v0_3_85_release_closeout_retro.md` | `v0.3.85` release closeout: consumer rollout helper, consumer import churn, Windows-only test failure, lanes not proven live | **open** | Rollout helper: its own run dir inside a consumer workspace is flagged as a side effect (recurred from `v0.3.84`; keep the run dir outside consumer repositories), the global Unity scan matches any command line containing the Unity binary path, and detached `VBCSCompiler` servers are not tracked. One consumer regenerates a UI effect settings asset on every batch import. A Windows-only test expectation was fixed before the tag (`ed61a7d`); the process gap is running the Windows-like host flavor before tagging. A wait over 300 s, Unity 2021.3 and Windows/Ubuntu editors are not live-proven. Extends `2026-08-29_consumer_release_rollout_safety_retro.md`. |
 | 2026-10-07 | `2026-10-07_long_playmode_recovery_cap_and_dispatch_truth_chat_retro.md` | three consumer projects, 222 MCP calls over eight days (`v0.3.80`-`v0.3.83`): scenario dispatch truth under import-worker churn, full PlayMode suites against the post-reset recovery cap, setup live-session proof, console error evidence, CLI test progress | **partial (`v0.3.85`: P0-2 done; P2-1 and P3-3 partial; P0-1, P1-1..P1-3, P2-2, P2-3, P3-1, P3-2 open)**; intake 2026-10-07, verified open at `v0.3.83` | Status 2026-11-03: test operations now wait the caller's `timeoutMs` (live up to 250 s; over 300 s unit-tested only); test console errors are classified (`expected_by_test`) and a finished run reports its own counts; `editor_log` frame filtering, the compact reset envelope, `setup_plan` live-session proof, journal truth, CLI progress, the `ensure-ready` pointer and `previous_game_view` remain. Next: P0-1. Original intake: Unity never failed. P0-1: `scenario_run_and_wait` returned `bridge_owned_by_non_main_process` with `request_submitted=false` 12 times after the scenario had been dispatched (poll phase reading an import-worker heartbeat), and one operator rerun became a real double run. P0-2: every PlayMode run longer than ~5 min ends in `request_lifecycle_reset` because `post_reset_recovery_cap_ms=300000` replaces the caller's `timeoutMs` after the Play-entry reload; `request_final_status` recovered both passing suites. P1: compact lifecycle-reset envelope (32-33 k, contradictory fields, a run-aborting cleanup hint), `setup_plan` live-session proof, journal truth (retryable abandon for resumed runs, stale reclassification generation, orphaned outbox). P2/P3: editor_log frame suppression and an exact request-scoped error count, CLI test progress sidecar, `ensure-ready` discoverability from MCP, `explicit_path_requested`, `previous_game_view`. |
 | 2026-10-07 | `2026-10-07_playmode_business_flow_validation_chat_retro.md` | interactive Play Mode validation of reward/loyalty/analytics flows on two consumer projects: event-order evidence, custom-button clicks, runtime state read-back all needed temp project hooks | **open; no item shipped as of `v0.3.85`**; intake 2026-10-07 | Status 2026-11-03: all seven priority items and the docs promotion are open; `console_grep messagesOnly` was not part of `v0.3.85`. Original intake: Unity never failed (379 journaled requests, one delivery-unproven poll, 20 honest reclassifications). Three hand-written editor hooks were the cost: no public path records `GameObserver` event order when `Debug.Log` is filtered and the console buffer is recreated on Play; `ui_click` cannot satisfy raycast-checking buttons or a render-vs-screen size mismatch; `runInBackground`/PlayerPrefs/static state need a hook. Proposed P1: raycast-filled `ui_click` mode and a stock runtime hook; P2: `console_grep messagesOnly`, all-at-once `poll_until` validation with optional `failWhen`, minimal step detail. |
