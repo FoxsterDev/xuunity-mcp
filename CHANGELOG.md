@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+## 0.3.91
+
+Release tag: `v0.3.91`
+
+Current Git UPM install URL:
+
+```text
+https://github.com/FoxsterDev/xuunity-mcp.git?path=/packages/com.xuunity.light-mcp#v0.3.91
+```
+
+Several answers sent agents the wrong way. A scenario click that hit a disabled
+button, or that changed nothing on screen, was reported as an infrastructure
+problem instead of a failed precondition. A misspelled UI selector key was
+silently ignored. An editor stuck on the "Enter Safe Mode?" dialog was reported
+only after the whole readiness timeout. Console lines could carry session
+tokens and arbitrarily long payloads. `unity_sdk_dependency_verify` opened an
+editor and matched versions by substring. Closing an editor took a shell
+command. This release fixes those answers, adds `unity_editor_quit`, and lets
+only one test run use Unity on a machine at a time.
+
+### Changed
+
+- Released `v0.3.91` package metadata, server metadata, package manifests, and Git UPM examples.
+- Behaviour that callers can notice: an unknown selector key now fails with
+  `unknown_selector_key`; console lines are capped at 2048 bytes and token-like
+  values are redacted by default (`maxItemBytes: -1` keeps a full line);
+  `unity_sdk_dependency_verify` returns a tool error on a version mismatch and
+  its CLI exits with code 1; the generated diff guard fails when an allowlisted
+  Unity template lost baseline lines (`templateMarkerGuard: false` turns it
+  off); the first editor open after a package upgrade on a project that has
+  compiled before runs a batch compile first. The server now lists 82 tools.
+- The Unity package (C#) is unchanged from `v0.3.90`; every change is in the
+  host server and the test scripts.
+
 ### Added
 
 - `unity_editor_quit` closes a project's editor and verifies the process exit
@@ -184,6 +218,56 @@
   with `status: test_framework_missing` and
   `recommended_recovery_tool: unity_package_install_test_framework` when such a
   process is live and neither the manifest nor the lock names the package.
+
+### Validation
+
+- Host Python suite on macOS: 1604 tests, all passed, 18 platform skips.
+- Offline checks on Windows and Ubuntu in CI passed on the merged commit, with
+  the site UI and discovery checks.
+- Package self-tests in clean generated projects, package from local source,
+  macOS, on Unity 2021.3.58f1, 2022.3.62f3, 6000.0.58f2, 6000.1.13f1,
+  6000.2.14f1, 6000.3.23f1, 6000.4.4f1, 6000.5.10f1 and 6000.6.0b3: EditMode
+  core 240/240, TextMeshPro 6/6, uGUI 79/79, PlayMode uGUI 22 passed and
+  6 skipped, PlayMode core 6/6 on every version. The matrix ran from the
+  branch before its final host-side fixes; the package did not change.
+- Stopping the version matrix with SIGTERM left no Unity process, wrote a
+  `stopped` row and released the Unity slot; a second runner started during a
+  matrix run was refused with `unity_slot_busy`.
+- Live checks in a generated project on Unity 6000.0.58f2:
+  - `unity_editor_quit` refused without `approve`, refused in Play Mode with
+    `editor_quit_refused_editor_busy`, and with approval returned
+    `quit_ack_and_process_exit_verified`.
+  - Scenario verdicts: a click on a disabled or missing button and a delivered
+    click that changed nothing, required or optional, ended `failed` /
+    `precondition`; optional clicks on hidden or missing buttons ended
+    `skipped_optional_absent`; a click step without `interactionId` reported
+    its `stepId`.
+  - An unknown selector key was refused on `unity_ui_query` and in scenario
+    validation before anything reached Unity.
+  - `unity_project_refresh` after a script edit reported
+    `expected_domain_reload` with the same editor process.
+  - A closed project that declares the package recommended
+    `open_editor_or_ensure_ready` in every field.
+  - With red code and no input snapshot, `ensure-ready --open-editor` ran the
+    batch probe and refused the open; the next open refused without a probe.
+  - An editor already on the Safe Mode dialog was reported in 1 second
+    (`before_wait`); one that reached it just before the call was reported in
+    24 seconds (`during_wait`) instead of at the 120-second deadline.
+- `scripts/testing/run_package_selftests.sh` on Unity 6000.5.10f1: 7 of 7
+  EditMode tests passed.
+
+### Known limitations
+
+- `Unity Package CI` remains waived (no runner Unity license); the local
+  licensed runs above are the package evidence.
+- Live Unity runs were on macOS only. The process start time read through
+  PowerShell, the Unity slot lock and the cleanup of tracked processes run on
+  Windows and Linux only in CI offline tests with stubs.
+- Play Mode liveness needs one 2-second sample after entering Play Mode. A
+  click within that window reads `playmode_liveness_unproven`, and a click
+  that changed nothing then stays `inconclusive` instead of `precondition`.
+- Live acceptance on real game projects, long Play Mode runs and scenarios that
+  need a live backend were not rerun for this release.
 
 ## 0.3.90
 
