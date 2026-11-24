@@ -385,13 +385,22 @@ class ReadinessAfterSafeModeTests(unittest.TestCase):
         self.assertNotEqual("editor_startup_modal_blocked", result.code)
         self.assertEqual(2, sleep.call_count)
 
+    def test_a_block_that_turns_quiet_during_the_wait_is_reported_once_quiet(self) -> None:
+        result, sleep = self._wait("Compilation failed", log_age=5.0, editor_started_age=500.0, timeout_ms=120000)
+        self.assertIsInstance(result, ToolInvocationError)
+        self.assertEqual("editor_startup_modal_blocked", result.code)
+        self.assertEqual("during_wait", result.details["startup_modal_block_observed"])
+        self.assertEqual("waiting_for_bridge_readiness", result.details["startup_stage"])
+        self.assertGreaterEqual(result.details["editor_log_idle_seconds"], 20.0)
+        self.assertEqual(15, sleep.call_count)
+
     def test_a_block_that_turns_quiet_only_by_the_deadline_is_reported_there(self) -> None:
-        result, sleep = self._wait("Compilation failed", log_age=5.0, editor_started_age=500.0, timeout_ms=24000)
+        result, sleep = self._wait("Compilation failed", log_age=9.0, editor_started_age=500.0, timeout_ms=13000)
         self.assertIsInstance(result, ToolInvocationError)
         self.assertEqual("editor_startup_modal_blocked", result.code)
         self.assertEqual("at_deadline", result.details["startup_modal_block_observed"])
         self.assertEqual("readiness_deadline_reached", result.details["startup_stage"])
-        self.assertEqual(24, sleep.call_count)
+        self.assertEqual(13, sleep.call_count)
 
     def test_a_bridge_state_owned_by_the_live_editor_is_never_the_modal(self) -> None:
         result, sleep = self._wait("Compilation failed", log_age=100.0, editor_started_age=500.0, starting_pid=222)

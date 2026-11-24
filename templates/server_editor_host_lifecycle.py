@@ -1525,6 +1525,9 @@ def _editor_log_written_by_live_editor(
     return started_at is not None and log_modified_at >= started_at - 1.0
 
 
+QUIET_STARTUP_BLOCK_RECHECK_SECONDS = 5.0
+
+
 def _preexisting_startup_modal_block_error(
     project_root: Path,
     editor_log_path: Path,
@@ -1606,14 +1609,16 @@ def wait_for_ready(
     state: dict[str, Any] | None = None
     last_readiness_error: ToolInvocationError | None = None
     last_log_text = ""
-    preexisting_block_checked = False
-    while time.time() < deadline:
+    next_quiet_block_check_at = started_at
+    while (now := time.time()) < deadline:
         state = try_read_bridge_state(project_root)
         ready = bridge_state_is_ready(state, heartbeat_max_age_seconds)
-        if not ready and not preexisting_block_checked:
-            preexisting_block_checked = True
+        if not ready and now >= next_quiet_block_check_at:
+            observed = "before_wait" if next_quiet_block_check_at == started_at else "during_wait"
+            next_quiet_block_check_at = now + QUIET_STARTUP_BLOCK_RECHECK_SECONDS
+            # An editor that reached the dialog shortly before the call goes quiet during the wait and writes nothing new.
             modal_error = _preexisting_startup_modal_block_error(
-                project_root, editor_log_path, state, startup_policy, "waiting_for_bridge_readiness", "before_wait"
+                project_root, editor_log_path, state, startup_policy, "waiting_for_bridge_readiness", observed
             )
             if modal_error is not None:
                 raise modal_error

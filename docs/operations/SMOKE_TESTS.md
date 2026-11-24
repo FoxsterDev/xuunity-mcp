@@ -59,7 +59,9 @@ Pass criteria:
 - an editor started on code with a compile error makes `ensure-ready` return
   `editor_startup_modal_blocked` before its timeout, with the compiler lines
   and `recovery_steps`; an editor that was already blocked before the call is
-  reported on the first pass (`startup_modal_block_observed=before_wait`)
+  reported on the first pass (`startup_modal_block_observed=before_wait`); an
+  editor that reached the dialog just before the call is reported once its log
+  has been quiet for 20 seconds (`during_wait`), not at the deadline
 - with the editor closed and compile inputs changed to red code,
   `ensure-ready --open-editor` refuses with `editor_open_refused_compile_red`
   and opens nothing; the next open on unchanged inputs refuses again without a

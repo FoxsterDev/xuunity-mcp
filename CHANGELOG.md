@@ -137,6 +137,14 @@
   `startup_modal_block_observed` says `before_wait`, `during_wait` or
   `at_deadline`. A log last written before the live editor process started is
   ignored, so a relaunch after a blocked session is not misread.
+- An editor that reached the startup dialog shortly before `ensure-ready`
+  began, so its log had not yet been quiet for the 20 seconds the fingerprint
+  needs, is now reported once the log turns quiet instead of at the deadline.
+  The wait repeated the fingerprint check only on its first pass, and a blocked
+  editor writes nothing new, so such an editor waited out the full timeout. The
+  wait now repeats the check every 5 seconds while the bridge is not attached
+  and reports `startup_modal_block_observed: during_wait`. On a live editor
+  stopped by a compile error it answered in 23 seconds instead of 122.
 - The closed-editor compile preflight covers the first open after a package
   upgrade. With no input snapshot yet, the last compile outcome is unknown, so
   `ensure-ready --open-editor` and `recover-editor-session` now run the batch
