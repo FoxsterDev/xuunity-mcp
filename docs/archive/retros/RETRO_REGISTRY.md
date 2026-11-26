@@ -1,7 +1,7 @@
 # XUUnity Light Unity MCP Public Retro Registry
 
 Status: active public registry
-Last triage: 2026-11-24 (`v0.3.91` intake of RG-54..RG-72)
+Last triage: 2026-11-26 (intake of RG-73..RG-80); previous 2026-11-24 (`v0.3.91` intake of RG-54..RG-72)
 Current release: `v0.3.91`
 
 Update this file whenever a public-safe MCP retro is added, moved, renamed, or
@@ -41,6 +41,29 @@ own owner registries, not in this public table.
 - `Completed Public History` is the place to find reusable lessons already
   implemented, applied, superseded, or retained only for history.
 - Prompt templates are listed separately and are not backlog items.
+
+## Intake 2026-11-26 (retro rows RG-73..RG-80, checked against `v0.3.91`)
+
+- One new public retro, the twin of a host-private chat retro from
+  2026-11-26 with project details removed:
+  - `2026-11-26_cold_open_import_health_and_ios_device_gap_chat_retro.md`
+    (RG-73..RG-80): three downloaded Unity `2022.3` projects. Quarantined native
+    editor plugins made a scripted importer fail on every asset, while `ready`
+    and a batch build's `errors=0` stayed green. There is no iOS device lane.
+- Confirmed in practice: RG-63 (`unity_editor_quit`, 3/3 verified exits) and
+  RG-66 (one `unity_ensure_ready {openEditor}` from `declared_not_resolved`, 3/3).
+- All eight rows are open.
+
+| ID | Retro | Priority | Status | Finding and fix or next step |
+| --- | --- | --- | --- | --- |
+| RG-73 | Cold open | P1 safety | open | Extraction from a downloaded archive left `com.apple.quarantine` on editor-loaded native plugins. Gatekeeper's modal offered "Move to Trash" and the plugin was deleted. Next: macOS preflight in `ensure_ready` and `status_summary` returning `native_plugins_quarantined` with paths and an owner-run remediation; never strip automatically. |
+| RG-74 | Cold open | P1 trust | open | A scripted importer threw `DllNotFoundException` for 141 assets; `ready`, `compiler_error_count 0` and a batch `BuildReport` with 0 errors all stayed green. Next: an import-health digest (importer exceptions, native load failures, assets with no main object) in `ensure_ready` and `status_summary`; build validation fails closed on importer exceptions. |
+| RG-75 | Cold open | P2 scope | open | `since=bridge_generation` starts after the startup import; an unanchored search of a brand-new host-owned log is `inconclusive`. Next: `since=editor_process_start`; `complete_single_session` when `editor_opened_by_this_call` and the log is new. |
+| RG-76 | Cold open | P2 noise | open | `Start importing …Exception.cs` lines matched `Exception` (9 and 65 noise hits). Next: suppress import lines by default; `includeImportNoise` to keep them. |
+| RG-77 | Cold open | P2 missing lane | open | Device tools are Android-only; iOS install, launch and console ran through `devicectl` in a shell, a locked phone was unclassified, and no screenshot was possible. Next: iOS through `devicectl`, a locked classification, `screenshot_unavailable` with the prerequisite, collapsed-repeat console digest. |
+| RG-78 | Cold open | P3 clarity | open | `verdict: ready` with `busy_reason: updating`; `interactive_compile_block_detected` + `resolved_by: bridge_attached` with 0 errors. Next: `waitForIdle` or `ready_but_updating`; `transient_compile_modal_cleared`. |
+| RG-79 | Cold open | P3 clarity | open | A fresh `Library/` opened on Standalone for an iOS project, and Play Mode did not exercise platform `#if` paths. Next: echo `active_build_target` and the intended platform; warn `playmode_platform_mismatch`. |
+| RG-80 | Cold open | P3 missing primitive | open | `ui_click` is uGUI-only, so 3D tap-and-hold gameplay could not be driven. Next: Play Mode `unity_input_pointer` through the `EventSystem` and physics raycasters, or Input System injection. |
 
 ## Intake 2026-11-24 (`v0.3.91`: retro rows RG-54..RG-72)
 
